@@ -1,0 +1,27 @@
+vertx:
+  uploads-dir: /app/prebid-server/data/file-uploads
+adapters:
+  rubicon:
+    enabled: true
+metrics:
+  type: graphite
+  host: graphite:3003
+  interval: 60
+cache:
+  scheme: https
+  query: uuid=%PBS_CACHE_UUID%
+settings:
+  type: mysql
+  stored-requests-query: SELECT uuid, config FROM stored_requests WHERE uuid IN (%ID_LIST%)
+  amp-stored-requests-query: SELECT uuid, config FROM stored_requests WHERE uuid IN (%ID_LIST%)
+recaptcha-url: https://www.google.com/recaptcha/api/siteverify
+recaptcha-secret: secret_value
+host-cookie:
+  opt-out-url: http://prebid.org/optout
+  opt-in-url: http://prebid.org/optin
+  domain: rubiconproject.com
+  family: rubicon
+  cookie-name: khaos
+  optout-cookie:
+    name: trp_optout
+    value: "true"

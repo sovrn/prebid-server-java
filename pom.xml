@@ -17,6 +17,10 @@
     </organization>
 
     <properties>
+        <!-- used for rpm packaging -->
+        <ci.build.number>0</ci.build.number>
+        <ci.repository.revision.number>manual</ci.repository.revision.number>
+
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -267,6 +271,13 @@
 
     <build>
         <finalName>${project.name}</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
+
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -390,6 +401,64 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <version>2.1.5</version>
+                <executions>
+                    <execution>
+                        <id>generate-rpm</id>
+                        <goals>
+                            <goal>rpm</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <name>${project.name}</name>
+                    <version>${project.version}</version>
+                    <release>${ci.build.number}</release>
+                    <license>Rubicon Project</license>
+                    <distribution>${project.name}</distribution>
+                    <group>System/RP</group>
+                    <packager>Rubicon Project</packager>
+                    <vendor>Rubicon Project</vendor>
+                    <description>Rubicon Project Prebid Server</description>
+                    <summary>Rubicon Project Prebid Server</summary>
+                    <needarch>false</needarch>
+                    <url>http://www.rubiconproject.com</url>
+                    <defineStatements>
+                        <defineStatement>name ${project.name}</defineStatement>
+                        <defineStatement>_tmppath %{_topdir}/tmp</defineStatement>
+                    </defineStatements>
+                    <mappings>
+                        <mapping>
+                            <directory>/app/${project.name}</directory>
+                            <filemode>755</filemode>
+                            <username>prodicon</username>
+                            <groupname>prodicon</groupname>
+                            <sources>
+                                <source>
+                                    <location>${project.build.directory}/${project.name}.jar</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/app/${project.name}/conf</directory>
+                            <filemode>644</filemode>
+                            <username>prodicon</username>
+                            <groupname>prodicon</groupname>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/src/rpm/application.yaml</location>
+                                </source>
+                                <source>
+                                    <location>${project.basedir}/src/rpm/logback-spring.xml</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                    </mappings>
+                </configuration>
             </plugin>
         </plugins>
     </build>
