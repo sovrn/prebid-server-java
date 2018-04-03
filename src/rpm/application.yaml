@@ -1,6 +1,10 @@
 vertx:
   uploads-dir: /app/prebid-server/data/file-uploads
 adapters:
+  appnexus:
+    enabled: true
+  conversant:
+    enabled: true
   rubicon:
     enabled: true
 metrics:
