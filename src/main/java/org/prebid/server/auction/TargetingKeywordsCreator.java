@@ -3,6 +3,8 @@ package org.prebid.server.auction;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.exception.PreBidException;
+import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularityBucket;
 import org.prebid.server.proto.response.Bid;
 
 import java.math.BigDecimal;
@@ -75,65 +77,62 @@ public class TargetingKeywordsCreator {
      */
     private static final String HB_ENV_APP_VALUE = "mobile-app";
 
-    private final String priceGranularityString;
-    private final CpmBucket.PriceGranularity priceGranularity;
+    private final PriceGranularity priceGranularity;
+    private final boolean includeWinners;
     private final boolean isApp;
 
-    private TargetingKeywordsCreator(String priceGranularityString, CpmBucket.PriceGranularity priceGranularity,
-                                     boolean isApp) {
-        this.priceGranularityString = priceGranularityString;
+    private TargetingKeywordsCreator(PriceGranularity priceGranularity, boolean includeWinners, boolean isApp) {
         this.priceGranularity = priceGranularity;
+        this.includeWinners = includeWinners;
         this.isApp = isApp;
     }
 
     /**
      * Creates {@link TargetingKeywordsCreator} for the given params.
      */
-    public static TargetingKeywordsCreator create(String priceGranularity, boolean isApp) {
-        return new TargetingKeywordsCreator(priceGranularity, parsePriceGranularity(priceGranularity), isApp);
+    public static TargetingKeywordsCreator create(List<ExtPriceGranularityBucket> buckets, boolean includeWinners,
+                                                  boolean isApp) {
+        return new TargetingKeywordsCreator(PriceGranularity.createFromBuckets(buckets), includeWinners,
+                isApp);
     }
 
     /**
-     * Determines the {@link CpmBucket.PriceGranularity} from an input string value.
+     * Creates {@link TargetingKeywordsCreator} for string price granularity representation.
      */
-    private static CpmBucket.PriceGranularity parsePriceGranularity(String priceGranularity) {
-        CpmBucket.PriceGranularity result = null;
-        if (StringUtils.isBlank(priceGranularity)) {
-            result = CpmBucket.PriceGranularity.med;
-        } else {
-            try {
-                result = CpmBucket.PriceGranularity.valueOf(priceGranularity);
-            } catch (IllegalArgumentException e) {
-                logger.error("Price bucket granularity error: ''{0}'' is not a recognized granularity",
-                        priceGranularity);
-            }
+    public static TargetingKeywordsCreator create(String stringPriceGranularity, boolean includeWinners,
+                                                  boolean isApp) {
+        return new TargetingKeywordsCreator(convertToCustomPriceGranularity(stringPriceGranularity),
+                includeWinners, isApp);
+    }
+
+    /**
+     * Converts string price granularity value to custom view.
+     * In case of invalid string value returns null. In case of null, returns default custom value.
+     */
+    private static PriceGranularity convertToCustomPriceGranularity(String stringPriceGranularity) {
+        if (stringPriceGranularity == null) {
+            return PriceGranularity.DEFAULT;
         }
-        return result;
-    }
 
-    /**
-     * Checks the price granularity is valid.
-     */
-    public boolean isPriceGranularityValid() {
-        return priceGranularity != null;
+        try {
+            return PriceGranularity.createFromString(stringPriceGranularity);
+        } catch (PreBidException ex) {
+            logger.error("Price bucket granularity error: ''{0}'' is not a recognized granularity",
+                    stringPriceGranularity);
+        }
+        return null;
     }
 
     /**
      * Compares given price to computed CPM value according to the price granularity.
      */
     public boolean isNonZeroCpm(BigDecimal price) {
-        if (isPriceGranularityValid()) {
-            final BigDecimal cpm = CpmBucket.fromCpmAsNumber(price, priceGranularity);
-            return cpm != null && cpm.compareTo(BigDecimal.ZERO) != 0;
-        }
-        return false;
+        final BigDecimal cpm = CpmBucket.fromCpmAsNumber(price, priceGranularity);
+        return cpm != null && cpm.compareTo(BigDecimal.ZERO) != 0;
     }
 
-    /**
-     * Returns the price granularity as string value.
-     */
-    public String priceGranularity() {
-        return priceGranularityString;
+    private boolean isPriceGranularityValid() {
+        return priceGranularity != null;
     }
 
     /**
@@ -161,7 +160,7 @@ public class TargetingKeywordsCreator {
         final String roundedCpm = isPriceGranularityValid() ? CpmBucket.fromCpm(price, priceGranularity) : defaultCpm;
         final String hbSize = sizeFrom(width, height);
 
-        final KeywordMap keywordMap = new KeywordMap(bidder, winningBid);
+        final KeywordMap keywordMap = new KeywordMap(bidder, winningBid, includeWinners);
         keywordMap.put(HB_PB_KEY, roundedCpm);
         keywordMap.put(HB_BIDDER_KEY, bidder);
         if (hbSize != null) {
@@ -205,13 +204,16 @@ public class TargetingKeywordsCreator {
      * Brings a convenient way for creating keywords regarding to bidder and winning bid flag.
      */
     private class KeywordMap {
+
         private final String bidder;
         private final boolean winningBid;
+        private final boolean includeWinners;
         private final Map<String, String> keywords;
 
-        KeywordMap(String bidder, boolean winningBid) {
+        KeywordMap(String bidder, boolean winningBid, boolean includeWinners) {
             this.bidder = bidder;
             this.winningBid = winningBid;
+            this.includeWinners = includeWinners;
             this.keywords = new HashMap<>();
         }
 
@@ -223,7 +225,7 @@ public class TargetingKeywordsCreator {
             final List<String> keys = new ArrayList<>(2);
             keys.add(String.format("%s_%s", prefix, bidder));
             // For the top bid, we want to put additional keys apart from bidder-suffixed
-            if (winningBid) {
+            if (winningBid && includeWinners) {
                 keys.add(prefix);
             }
             return keys;

@@ -160,7 +160,7 @@ public class ApplicationTest extends VertxTest {
                 .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=utf-8"))
                 .withHeader("Accept", WireMock.equalTo("application/json"))
                 .withHeader("User-Agent", WireMock.equalTo("userAgent"))
-                .withHeader("X-Request-Agent", WireMock.equalTo("PrebidAdapter 0.1.0"))
+                .withHeader("X-Request-Agent", WireMock.equalTo("PrebidAdapter 0.1.1"))
                 .withHeader("X-Forwarded-For", WireMock.equalTo("192.168.244.1"))
                 .withHeader("Cookie", WireMock.equalTo("uid=AF-UID"))
                 .withRequestBody(WireMock.equalTo(""))
@@ -205,7 +205,6 @@ public class ApplicationTest extends VertxTest {
                         + "JuIjoiOTkwMDExIiwiYWR0ZWxsaWdlbnQiOiJBVC1VSUQiLCJhZGZvcm0iOiJBRi1VSUQifX0=")
                 .body(jsonFrom("openrtb2/test-auction-request.json"))
                 .post("/openrtb2/auction");
-
 
         // then
         String expectedAuctionResponse = auctionResponseFrom(jsonFrom("openrtb2/test-auction-response.json"),
@@ -336,7 +335,7 @@ public class ApplicationTest extends VertxTest {
                 .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=utf-8"))
                 .withHeader("Accept", WireMock.equalTo("application/json"))
                 .withHeader("User-Agent", WireMock.equalTo("userAgent"))
-                .withHeader("X-Request-Agent", WireMock.equalTo("PrebidAdapter 0.1.0"))
+                .withHeader("X-Request-Agent", WireMock.equalTo("PrebidAdapter 0.1.1"))
                 .withHeader("X-Forwarded-For", WireMock.equalTo("192.168.244.1"))
                 .withHeader("Cookie", WireMock.equalTo("uid=AF-UID"))
                 .withRequestBody(WireMock.equalTo(""))

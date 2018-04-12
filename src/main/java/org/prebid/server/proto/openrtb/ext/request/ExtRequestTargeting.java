@@ -1,5 +1,6 @@
 package org.prebid.server.proto.openrtb.ext.request;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
@@ -13,5 +14,10 @@ public class ExtRequestTargeting {
     /**
      * Defines the contract for bidrequest.ext.prebid.targeting.pricegranularity
      */
-    String pricegranularity;
+    JsonNode pricegranularity;
+
+    /**
+     * Defines the contract for bidrequest.ext.prebid.targeting.includewinners
+     */
+    Boolean includewinners;
 }

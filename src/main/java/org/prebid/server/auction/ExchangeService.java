@@ -1,6 +1,7 @@
 package org.prebid.server.auction;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.BidRequest;
@@ -29,6 +30,7 @@ import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularityBucket;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
@@ -38,7 +40,10 @@ import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseDebug;
+import org.prebid.server.validation.ResponseBidValidator;
+import org.prebid.server.validation.model.ValidationResult;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -61,16 +66,23 @@ public class ExchangeService {
 
     private static final String PREBID_EXT = "prebid";
     private static final BigDecimal THOUSAND = BigDecimal.valueOf(1000);
+    private static final TypeReference<List<ExtPriceGranularityBucket>> GRANULARITY_BUCKETS_LIST_TYPE_REFERENCE =
+            new TypeReference<List<ExtPriceGranularityBucket>>() {
+            };
 
     private final BidderCatalog bidderCatalog;
+    private final ResponseBidValidator responseBidValidator;
     private final CacheService cacheService;
     private final Metrics metrics;
     private final Clock clock;
     private long expectedCacheTime;
 
-    public ExchangeService(BidderCatalog bidderCatalog, CacheService cacheService, Metrics metrics, Clock clock,
+    public ExchangeService(BidderCatalog bidderCatalog,
+                           ResponseBidValidator responseBidValidator, CacheService cacheService,
+                           Metrics metrics, Clock clock,
                            long expectedCacheTime) {
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
+        this.responseBidValidator = Objects.requireNonNull(responseBidValidator);
         this.cacheService = Objects.requireNonNull(cacheService);
         this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
@@ -113,8 +125,8 @@ public class ExchangeService {
 
         // send all the requests to the bidders and gathers results
         final CompositeFuture bidderResults = CompositeFuture.join(bidderRequests.stream()
-                .map(bidderRequest -> requestBids(bidderRequest, startTime,
-                        auctionTimeout(timeout, shouldCacheBids), aliases))
+                .map(bidderRequest -> requestBids(bidderRequest, startTime, auctionTimeout(timeout, shouldCacheBids),
+                        aliases, bidAdjustments(requestExt)))
                 .collect(Collectors.toList()));
 
         // produce response from bidder results
@@ -126,57 +138,33 @@ public class ExchangeService {
     }
 
     /**
-     * Updates 'request' and 'no_cookie_requests' metrics for each {@link BidderRequest}
+     * Extracts {@link ExtBidRequest} from bid request.
      */
-    private void updateRequestMetric(List<BidderRequest> bidderRequests, UidsCookie uidsCookie,
-                                     Map<String, String> aliases) {
-        bidderRequests.forEach(bidderRequest -> {
-            final String bidder = resolveBidder(bidderRequest.getBidder(), aliases);
-
-            metrics.forAdapter(bidder).incCounter(MetricName.requests);
-
-            final boolean noBuyerId = !bidderCatalog.isValidName(bidder) || StringUtils.isBlank(
-                    uidsCookie.uidFrom(bidderCatalog.usersyncerByName(bidder).cookieFamilyName()));
-
-            if (bidderRequest.getBidRequest().getApp() == null && noBuyerId) {
-                metrics.forAdapter(bidder).incCounter(MetricName.no_cookie_requests);
-            }
-        });
+    private static ExtBidRequest requestExt(BidRequest bidRequest) {
+        try {
+            return bidRequest.getExt() != null
+                    ? Json.mapper.treeToValue(bidRequest.getExt(), ExtBidRequest.class) : null;
+        } catch (JsonProcessingException e) {
+            throw new PreBidException(String.format("Error decoding bidRequest.ext: %s", e.getMessage()), e);
+        }
     }
 
     /**
-     * Updates 'request_time', 'responseTime', 'timeout_request', 'error_requests', 'no_bid_requests',
-     * 'prices' metrics for each {@link BidderResponse}
+     * Extracts aliases from {@link ExtBidRequest}.
      */
-    private void updateMetricsFromResponses(List<BidderResponse> bidderResponses) {
-        bidderResponses.forEach(bidderResponse -> {
-            final AdapterMetrics adapterMetrics = metrics.forAdapter(bidderResponse.getBidder());
+    private static Map<String, String> getAliases(ExtBidRequest requestExt) {
+        final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
+        final Map<String, String> aliases = prebid != null ? prebid.getAliases() : null;
+        return aliases != null ? aliases : Collections.emptyMap();
+    }
 
-            adapterMetrics.updateTimer(MetricName.request_time, bidderResponse.getResponseTime());
-
-            final List<BidderBid> bidderBids = bidderResponse.getSeatBid().getBids();
-            List<Bid> bids = null;
-            if (CollectionUtils.isNotEmpty(bidderBids)) {
-                bids = bidderBids.stream()
-                        .map(BidderBid::getBid).collect(Collectors.toList());
-            }
-
-            if (CollectionUtils.isEmpty(bids)) {
-                adapterMetrics.incCounter(MetricName.no_bid_requests);
-            } else {
-                bids.forEach(bid -> {
-                    final long cpmPrice = bid.getPrice() != null
-                            ? bid.getPrice().multiply(THOUSAND).longValue()
-                            : 0L;
-                    adapterMetrics.updateHistogram(MetricName.prices, cpmPrice);
-                });
-            }
-            if (CollectionUtils.isNotEmpty(bidderResponse.getSeatBid().getErrors())) {
-                bidderResponse.getSeatBid().getErrors().forEach(error -> adapterMetrics.incCounter(error.isTimedOut()
-                        ? MetricName.timeout_requests
-                        : MetricName.error_requests));
-            }
-        });
+    /**
+     * Extracts bidAdjustments from {@link ExtBidRequest}.
+     */
+    private static Map<String, BigDecimal> bidAdjustments(ExtBidRequest requestExt) {
+        final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
+        final Map<String, BigDecimal> bidAdjustmentFactors = prebid != null ? prebid.getBidadjustmentfactors() : null;
+        return bidAdjustmentFactors != null ? bidAdjustmentFactors : Collections.emptyMap();
     }
 
     /**
@@ -245,10 +233,15 @@ public class ExchangeService {
                 .collect(Collectors.toList());
     }
 
+    private static <T> Stream<T> asStream(Iterator<T> iterator) {
+        final Iterable<T> iterable = () -> iterator;
+        return StreamSupport.stream(iterable.spliterator(), false);
+    }
+
     /**
      * Extracts {@link ExtUser} from {@link User} or returns null if not presents.
      */
-    private ExtUser extUser(User user) {
+    private static ExtUser extUser(User user) {
         final ObjectNode userExt = user != null ? user.getExt() : null;
         if (userExt != null) {
             try {
@@ -263,7 +256,7 @@ public class ExchangeService {
     /**
      * Returns 'explicit' UIDs from request body.
      */
-    private Map<String, String> uidsFromBody(ExtUser extUser) {
+    private static Map<String, String> uidsFromBody(ExtUser extUser) {
         return extUser != null && extUser.getPrebid() != null
                 // as long as ext.prebid exists we are guaranteed that user.ext.prebid.buyeruids also exists
                 ? extUser.getPrebid().getBuyeruids()
@@ -273,7 +266,7 @@ public class ExchangeService {
     /**
      * Returns 'user.ext' with empty 'prebid.buyeryds'.
      */
-    private ObjectNode removeBuyersidsFromUserExtPrebid(ExtUser extUser) {
+    private static ObjectNode removeBuyersidsFromUserExtPrebid(ExtUser extUser) {
         return Json.mapper.valueToTree(ExtUser.of(ExtUserPrebid.of(null), extUser.getConsent(),
                 extUser.getDigitrust()));
     }
@@ -282,7 +275,7 @@ public class ExchangeService {
      * Returns the name associated with bidder if bidder is an alias.
      * If it's not an alias, the bidder is returned.
      */
-    private String resolveBidder(String bidder, Map<String, String> aliases) {
+    private static String resolveBidder(String bidder, Map<String, String> aliases) {
         return aliases.getOrDefault(bidder, bidder);
     }
 
@@ -349,23 +342,21 @@ public class ExchangeService {
     }
 
     /**
-     * Extracts aliases from {@link ExtBidRequest}.
+     * Updates 'request' and 'no_cookie_requests' metrics for each {@link BidderRequest}
      */
-    private Map<String, String> getAliases(ExtBidRequest requestExt) {
-        final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
-        final Map<String, String> aliases = prebid != null ? prebid.getAliases() : null;
-        return aliases != null ? aliases : Collections.emptyMap();
-    }
+    private void updateRequestMetric(List<BidderRequest> bidderRequests, UidsCookie uidsCookie,
+                                     Map<String, String> aliases) {
+        for (BidderRequest bidderRequest : bidderRequests) {
+            final String bidder = resolveBidder(bidderRequest.getBidder(), aliases);
 
-    /**
-     * Extracts {@link ExtBidRequest} from bid request.
-     */
-    private static ExtBidRequest requestExt(BidRequest bidRequest) {
-        try {
-            return bidRequest.getExt() != null
-                    ? Json.mapper.treeToValue(bidRequest.getExt(), ExtBidRequest.class) : null;
-        } catch (JsonProcessingException e) {
-            throw new PreBidException(String.format("Error decoding bidRequest.ext: %s", e.getMessage()), e);
+            metrics.forAdapter(bidder).incCounter(MetricName.requests);
+
+            final boolean noBuyerId = !bidderCatalog.isValidName(bidder) || StringUtils.isBlank(
+                    uidsCookie.uidFrom(bidderCatalog.usersyncerByName(bidder).cookieFamilyName()));
+
+            if (bidderRequest.getBidRequest().getApp() == null && noBuyerId) {
+                metrics.forAdapter(bidder).incCounter(MetricName.no_cookie_requests);
+            }
         }
     }
 
@@ -385,7 +376,23 @@ public class ExchangeService {
      * should be included in bid response.
      */
     private static TargetingKeywordsCreator buildKeywordsCreator(ExtRequestTargeting targeting, boolean isApp) {
-        return targeting != null ? TargetingKeywordsCreator.create(targeting.getPricegranularity(), isApp) : null;
+        return targeting != null
+                ? TargetingKeywordsCreator.create(parsePriceGranularityBuckets(targeting.getPricegranularity()),
+                targeting.getIncludewinners() != null ? targeting.getIncludewinners() : true, isApp)
+                : null;
+    }
+
+    /**
+     * Parse {@link JsonNode} to {@link List} of {@link ExtPriceGranularityBucket}. Throws {@link PreBidException} in
+     * case of errors during decoding pricegranularity.
+     */
+    private static List<ExtPriceGranularityBucket> parsePriceGranularityBuckets(JsonNode priceGranularity) {
+        try {
+            return Json.mapper.readerFor(GRANULARITY_BUCKETS_LIST_TYPE_REFERENCE).readValue(priceGranularity);
+        } catch (IOException e) {
+            throw new PreBidException(String.format("Error decoding bidRequest.prebid.targeting.pricegranularity: %s",
+                    e.getMessage()), e);
+        }
     }
 
     /**
@@ -409,6 +416,82 @@ public class ExchangeService {
     }
 
     /**
+     * Passes the request to a corresponding bidder and wraps response in {@link BidderResponse} which also holds
+     * recorded response time.
+     */
+    private Future<BidderResponse> requestBids(BidderRequest bidderRequest, long startTime, Timeout timeout,
+                                               Map<String, String> aliases,
+                                               Map<String, BigDecimal> bidAdjustments) {
+        final String bidder = bidderRequest.getBidder();
+        final BigDecimal bidPriceAdjustmentFactor = bidAdjustments.get(bidder);
+        return bidderCatalog.bidderRequesterByName(resolveBidder(bidder, aliases))
+                .requestBids(bidderRequest.getBidRequest(), timeout)
+                .map(this::validateAndUpdateResponse)
+                .map(seat -> applyBidPriceAdjustment(seat, bidPriceAdjustmentFactor))
+                .map(result -> BidderResponse.of(bidder, result, responseTime(startTime)));
+    }
+
+    /**
+     * Validates bid response from exchange.
+     * <p>
+     * Removes invalid bids from response and adds corresponding error to {@link BidderSeatBid}.
+     * <p>
+     * Returns input argument as the result if no errors found or create new {@link BidderSeatBid} otherwise.
+     */
+    private BidderSeatBid validateAndUpdateResponse(BidderSeatBid bidderSeatBid) {
+        final List<BidderBid> bids = bidderSeatBid.getBids();
+
+        final List<BidderBid> validBids = new ArrayList<>(bids.size());
+        final List<BidderError> errors = new ArrayList<>(bidderSeatBid.getErrors());
+
+        for (BidderBid bid : bids) {
+            final ValidationResult validationResult = responseBidValidator.validate(bid.getBid());
+            if (validationResult.hasErrors()) {
+                for (String error : validationResult.getErrors()) {
+                    errors.add(BidderError.create(error));
+                }
+            } else {
+                validBids.add(bid);
+            }
+        }
+
+        return validBids.size() == bids.size()
+                ? bidderSeatBid
+                : BidderSeatBid.of(validBids, bidderSeatBid.getHttpCalls(), errors);
+    }
+
+    /**
+     * Applies correction to {@link Bid#price}
+     * <p>
+     * Should be used when {@link BidderSeatBid} was validated
+     * by {@link ExchangeService#validateAndUpdateResponse(BidderSeatBid)}
+     */
+    private static BidderSeatBid applyBidPriceAdjustment(BidderSeatBid bidderSeatBid,
+                                                         BigDecimal priceAdjustmentFactor) {
+        final List<BidderBid> bidderBids = bidderSeatBid.getBids();
+        return CollectionUtils.isEmpty(bidderBids) || priceAdjustmentFactor == null
+                ? bidderSeatBid
+                : BidderSeatBid.of(adjustBids(bidderBids, priceAdjustmentFactor),
+                bidderSeatBid.getHttpCalls(), bidderSeatBid.getErrors());
+    }
+
+    private static List<BidderBid> adjustBids(List<BidderBid> bidderBids, BigDecimal priceAdjustmentFactor) {
+        return bidderBids.stream()
+                .map(bidderBid -> adjustBid(bidderBid, priceAdjustmentFactor))
+                .collect(Collectors.toList());
+    }
+
+    private static BidderBid adjustBid(BidderBid bidderBid, BigDecimal priceAdjustmentFactor) {
+        final Bid bid = bidderBid.getBid();
+        return BidderBid.of(bid.toBuilder().price(bid.getPrice().multiply(priceAdjustmentFactor)).build(),
+                bidderBid.getType());
+    }
+
+    private int responseTime(long startTime) {
+        return Math.toIntExact(clock.millis() - startTime);
+    }
+
+    /**
      * If we need to cache bids, then it will take some time to call prebid cache.
      * We should reduce the amount of time the bidders have, to compensate.
      */
@@ -422,15 +505,41 @@ public class ExchangeService {
     }
 
     /**
-     * Passes the request to a corresponding bidder and wraps response in {@link BidderResponse} which also holds
-     * recorded response time.
+     * Updates 'request_time', 'responseTime', 'timeout_request', 'error_requests', 'no_bid_requests',
+     * 'prices' metrics for each {@link BidderResponse}
      */
-    private Future<BidderResponse> requestBids(BidderRequest bidderRequest, long startTime, Timeout timeout,
-                                               Map<String, String> aliases) {
-        final String bidder = bidderRequest.getBidder();
-        return bidderCatalog.bidderRequesterByName(resolveBidder(bidder, aliases))
-                .requestBids(bidderRequest.getBidRequest(), timeout)
-                .map(result -> BidderResponse.of(bidder, result, responseTime(startTime)));
+    private void updateMetricsFromResponses(List<BidderResponse> bidderResponses) {
+        for (BidderResponse bidderResponse : bidderResponses) {
+            final String bidder = bidderResponse.getBidder();
+            final AdapterMetrics adapterMetrics = metrics.forAdapter(bidder);
+
+            adapterMetrics.updateTimer(MetricName.request_time, bidderResponse.getResponseTime());
+
+            final List<BidderBid> bidderBids = bidderResponse.getSeatBid().getBids();
+            final List<Bid> bids = CollectionUtils.isNotEmpty(bidderBids)
+                    ? bidderBids.stream().map(BidderBid::getBid).collect(Collectors.toList())
+                    : null;
+
+            if (CollectionUtils.isEmpty(bids)) {
+                adapterMetrics.incCounter(MetricName.no_bid_requests);
+            } else {
+                for (Bid bid : bids) {
+                    final long cpmPrice = bid.getPrice() != null
+                            ? bid.getPrice().multiply(THOUSAND).longValue()
+                            : 0L;
+                    adapterMetrics.updateHistogram(MetricName.prices, cpmPrice);
+                }
+            }
+
+            final List<BidderError> errors = bidderResponse.getSeatBid().getErrors();
+            if (CollectionUtils.isNotEmpty(errors)) {
+                for (BidderError error : errors) {
+                    adapterMetrics.incCounter(error.isTimedOut()
+                            ? MetricName.timeout_requests
+                            : MetricName.error_requests);
+                }
+            }
+        }
     }
 
     /**
@@ -599,7 +708,7 @@ public class ExchangeService {
                         toSeatBid(bidderResponse, keywordsCreator, winningBidsWithCacheIds, winningBidsByBidder))
                 .collect(Collectors.toList());
 
-        final ExtBidResponse bidResponseExt = toExtBidResponse(bidderResponses, bidRequest, keywordsCreator);
+        final ExtBidResponse bidResponseExt = toExtBidResponse(bidderResponses, bidRequest);
 
         return BidResponse.builder()
                 .id(bidRequest.getId())
@@ -653,21 +762,12 @@ public class ExchangeService {
      * Creates {@link ExtBidResponse} populated with response time, errors and debug info (if requested) from all
      * bidders
      */
-    private static ExtBidResponse toExtBidResponse(List<BidderResponse> results, BidRequest bidRequest,
-                                                   TargetingKeywordsCreator keywordsCreator) {
+    private static ExtBidResponse toExtBidResponse(List<BidderResponse> results, BidRequest bidRequest) {
         final Map<String, Integer> responseTimeMillis = results.stream()
                 .collect(Collectors.toMap(BidderResponse::getBidder, BidderResponse::getResponseTime));
 
         final Map<String, List<String>> errors = results.stream()
                 .collect(Collectors.toMap(BidderResponse::getBidder, r -> messages(r.getSeatBid().getErrors())));
-        // if price granularity in request is not valid - add corresponding error message for each bidder
-        if (keywordsCreator != null && !keywordsCreator.isPriceGranularityValid()) {
-            final String priceGranularityError = String.format(
-                    "Price bucket granularity error: '%s' is not a recognized granularity",
-                    keywordsCreator.priceGranularity());
-            errors.replaceAll((k, v) -> append(v, priceGranularityError));
-        }
-
         final Map<String, List<ExtHttpCall>> httpCalls = Objects.equals(bidRequest.getTest(), 1)
                 ? results.stream()
                 .collect(Collectors.toMap(BidderResponse::getBidder, r -> r.getSeatBid().getHttpCalls()))
@@ -677,22 +777,13 @@ public class ExchangeService {
                 responseTimeMillis, null);
     }
 
+    private static List<String> messages(List<BidderError> errors) {
+        return CollectionUtils.emptyIfNull(errors).stream().map(BidderError::getMessage).collect(Collectors.toList());
+    }
+
     private static <T> List<T> append(List<T> originalList, T value) {
         final List<T> list = new ArrayList<>(originalList);
         list.add(value);
         return list;
-    }
-
-    private static <T> Stream<T> asStream(Iterator<T> iterator) {
-        final Iterable<T> iterable = () -> iterator;
-        return StreamSupport.stream(iterable.spliterator(), false);
-    }
-
-    private int responseTime(long startTime) {
-        return Math.toIntExact(clock.millis() - startTime);
-    }
-
-    private static List<String> messages(List<BidderError> errors) {
-        return CollectionUtils.emptyIfNull(errors).stream().map(BidderError::getMessage).collect(Collectors.toList());
     }
 }

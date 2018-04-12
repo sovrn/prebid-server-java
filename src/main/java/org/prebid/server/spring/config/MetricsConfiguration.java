@@ -10,8 +10,6 @@ import com.izettle.metrics.influxdb.InfluxDbSender;
 import io.vertx.core.Vertx;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
-import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.metric.CounterType;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.vertx.CloseableAdapter;
@@ -41,12 +39,9 @@ public class MetricsConfiguration {
     private Vertx vertx;
 
     @Bean
-    @ConditionalOnProperty(prefix = "metrics", name = "type", havingValue = "graphite")
+    @ConditionalOnProperty(prefix = "metrics.graphite", name = "host")
     ScheduledReporter graphiteReporter(GraphiteProperties graphiteProperties, MetricRegistry metricRegistry) {
-        // format is "<host>:<port>"
-        final String hostAndPort = graphiteProperties.getHost();
-
-        final Graphite graphite = new Graphite(host(hostAndPort), port(hostAndPort));
+        final Graphite graphite = new Graphite(graphiteProperties.getHost(), graphiteProperties.getPort());
         final ScheduledReporter reporter = GraphiteReporter.forRegistry(metricRegistry)
                 .prefixedWith(graphiteProperties.getPrefix())
                 .build(graphite);
@@ -56,15 +51,13 @@ public class MetricsConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(prefix = "metrics", name = "type", havingValue = "influxdb")
+    @ConditionalOnProperty(prefix = "metrics.influxdb", name = "host")
     ScheduledReporter influxdbReporter(InfluxdbProperties influxdbProperties, MetricRegistry metricRegistry)
             throws Exception {
-        // format is "<host>:<port>"
-        final String hostAndPort = influxdbProperties.getHost();
-
         final InfluxDbSender influxDbSender = new InfluxDbHttpSender(
                 influxdbProperties.getProtocol(),
-                host(hostAndPort), port(hostAndPort),
+                influxdbProperties.getHost(),
+                influxdbProperties.getPort(),
                 influxdbProperties.getDatabase(),
                 influxdbProperties.getAuth(),
                 TimeUnit.SECONDS,
@@ -78,9 +71,8 @@ public class MetricsConfiguration {
     }
 
     @Bean
-    Metrics metrics(@Value("${metrics.metricType}") CounterType counterType, MetricRegistry metricRegistry,
-                    BidderCatalog bidderCatalog) {
-        return new Metrics(metricRegistry, counterType, bidderCatalog);
+    Metrics metrics(@Value("${metrics.metricType}") CounterType counterType, MetricRegistry metricRegistry) {
+        return new Metrics(metricRegistry, counterType);
     }
 
     @Bean
@@ -96,36 +88,40 @@ public class MetricsConfiguration {
     }
 
     @Component
-    @ConfigurationProperties(prefix = "metrics")
-    @ConditionalOnProperty(prefix = "metrics", name = "type", havingValue = "graphite")
+    @ConfigurationProperties(prefix = "metrics.graphite")
+    @ConditionalOnProperty(prefix = "metrics.graphite", name = "host")
     @Validated
     @Data
     @NoArgsConstructor
     private static class GraphiteProperties {
 
         @NotBlank
-        private String host;
-        @NotBlank
         private String prefix;
+        @NotBlank
+        private String host;
+        @NotNull
+        private Integer port;
         @NotNull
         @Min(1)
         private Integer interval;
     }
 
     @Component
-    @ConfigurationProperties(prefix = "metrics")
-    @ConditionalOnProperty(prefix = "metrics", name = "type", havingValue = "influxdb")
+    @ConfigurationProperties(prefix = "metrics.influxdb")
+    @ConditionalOnProperty(prefix = "metrics.influxdb", name = "host")
     @Validated
     @Data
     @NoArgsConstructor
     private static class InfluxdbProperties {
 
         @NotBlank
-        private String host;
-        @NotBlank
         private String prefix;
         @NotBlank
         private String protocol;
+        @NotBlank
+        private String host;
+        @NotNull
+        private Integer port;
         @NotBlank
         private String database;
         @NotBlank
@@ -139,13 +135,5 @@ public class MetricsConfiguration {
         @NotNull
         @Min(1)
         private Integer interval;
-    }
-
-    private static String host(String hostAndPort) {
-        return StringUtils.substringBefore(hostAndPort, ":");
-    }
-
-    private static int port(String hostAndPort) {
-        return Integer.parseInt(StringUtils.substringAfter(hostAndPort, ":"));
     }
 }
