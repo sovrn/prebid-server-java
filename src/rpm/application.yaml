@@ -8,9 +8,10 @@ adapters:
   rubicon:
     enabled: true
 metrics:
-  type: graphite
-  host: graphite:3003
-  interval: 60
+  graphite:
+    host: graphite
+    port: 3003
+    interval: 60
 cache:
   scheme: https
   query: uuid=%PBS_CACHE_UUID%
