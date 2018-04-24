@@ -1,13 +1,15 @@
-package org.prebid.server.bidder.facebook.proto;
+package org.prebid.server.bidder.openx.proto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
-@Value
 @AllArgsConstructor(staticName = "of")
-public class ExtImpFacebook {
+@Value
+public class OpenxRequestExt {
 
-    @JsonProperty("placementId")
-    String placementId;
+    @JsonProperty("delDomain")
+    String delDomain;
+
+    String bc;
 }

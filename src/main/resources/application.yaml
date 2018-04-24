@@ -49,6 +49,10 @@ adapters:
     enabled: false
     endpoint: https://prebid.s2s.lfstmedia.com/adrequest
     usersync-url: //ads.lfstmedia.com/idsync/137062?synced=1&ttl=1s&rurl=
+  openx:
+    enabled: false
+    endpoint: http://rtb.openx.net/prebid
+    usersync-url: https://rtb.openx.net/sync/prebid?r=
   pubmatic:
     enabled: false
     endpoint: http://openbid.pubmatic.com/translator?source=prebid-server
@@ -68,10 +72,11 @@ adapters:
 metrics:
   metricType: flushingCounter
 settings:
-  pool-size: 20
-  in-memory-cache:
-    cache-size: 10000
-    ttl-seconds: 360
+  database:
+    pool-size: 20
+    in-memory-cache:
+      cache-size: 10000
+      ttl-seconds: 360
 recaptcha-url: https://www.google.com/recaptcha/api/siteverify
 recaptcha-secret: secret_value
 host-cookie:

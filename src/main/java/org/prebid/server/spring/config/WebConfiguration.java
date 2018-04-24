@@ -11,6 +11,7 @@ import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.prebid.server.analytics.CompositeAnalyticsReporter;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.ExchangeService;
@@ -34,7 +35,7 @@ import org.prebid.server.handler.info.BiddersHandler;
 import org.prebid.server.handler.openrtb2.AmpHandler;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
-import org.prebid.server.settings.ApplicationSettings;
+import org.prebid.server.settings.CompositeApplicationSettings;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.BidderParamValidator;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,7 +136,7 @@ public class WebConfiguration {
     @Bean
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     AuctionHandler auctionHandler(
-            ApplicationSettings applicationSettings,
+            CompositeApplicationSettings applicationSettings,
             BidderCatalog bidderCatalog,
             PreBidRequestContextFactory preBidRequestContextFactory,
             CacheService cacheService,
@@ -143,8 +144,8 @@ public class WebConfiguration {
             HttpAdapterConnector httpAdapterConnector,
             Clock clock) {
 
-        return new AuctionHandler(applicationSettings, bidderCatalog, preBidRequestContextFactory, cacheService,
-                metrics, httpAdapterConnector, clock);
+        return new AuctionHandler(applicationSettings, bidderCatalog, preBidRequestContextFactory,
+                cacheService, metrics, httpAdapterConnector, clock);
     }
 
     @Bean
@@ -154,12 +155,13 @@ public class WebConfiguration {
             ExchangeService exchangeService,
             AuctionRequestFactory auctionRequestFactory,
             UidsCookieService uidsCookieService,
+            CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
             Clock clock,
             TimeoutFactory timeoutFactory) {
 
         return new org.prebid.server.handler.openrtb2.AuctionHandler(defaultTimeoutMs, exchangeService,
-                auctionRequestFactory, uidsCookieService, metrics, clock, timeoutFactory);
+                auctionRequestFactory, uidsCookieService, analyticsReporter, metrics, clock, timeoutFactory);
     }
 
     @Bean
@@ -171,12 +173,14 @@ public class WebConfiguration {
             UidsCookieService uidsCookieService,
             AmpProperties ampProperties,
             BidderCatalog bidderCatalog,
+            CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
             Clock clock,
             TimeoutFactory timeoutFactory) {
 
         return new AmpHandler(defaultTimeoutMs, ampRequestFactory, exchangeService, uidsCookieService,
-                ampProperties.getCustomTargetingSet(), bidderCatalog, metrics, clock, timeoutFactory);
+                ampProperties.getCustomTargetingSet(), bidderCatalog, analyticsReporter, metrics, clock,
+                timeoutFactory);
     }
 
     @Bean
@@ -188,14 +192,16 @@ public class WebConfiguration {
     CookieSyncHandler cookieSyncHandler(
             UidsCookieService uidsCookieService,
             BidderCatalog bidderCatalog,
+            CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics) {
 
-        return new CookieSyncHandler(uidsCookieService, bidderCatalog, metrics);
+        return new CookieSyncHandler(uidsCookieService, bidderCatalog, analyticsReporter, metrics);
     }
 
     @Bean
-    SetuidHandler setuidHandler(UidsCookieService uidsCookieService, Metrics metrics) {
-        return new SetuidHandler(uidsCookieService, metrics);
+    SetuidHandler setuidHandler(UidsCookieService uidsCookieService, CompositeAnalyticsReporter analyticsReporter,
+                                Metrics metrics) {
+        return new SetuidHandler(uidsCookieService, analyticsReporter, metrics);
     }
 
     @Bean

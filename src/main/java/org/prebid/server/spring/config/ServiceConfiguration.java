@@ -18,7 +18,7 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
-import org.prebid.server.settings.ApplicationSettings;
+import org.prebid.server.settings.CompositeApplicationSettings;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
+import javax.validation.constraints.Min;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.Properties;
@@ -58,17 +59,17 @@ public class ServiceConfiguration {
     PreBidRequestContextFactory preBidRequestContextFactory(
             @Value("${default-timeout-ms}") long defaultTimeoutMs,
             ImplicitParametersExtractor implicitParametersExtractor,
-            ApplicationSettings applicationSettings,
+            CompositeApplicationSettings applicationSettings,
             UidsCookieService uidsCookieService,
             TimeoutFactory timeoutFactory) {
 
-        return new PreBidRequestContextFactory(defaultTimeoutMs, implicitParametersExtractor, applicationSettings,
-                uidsCookieService, timeoutFactory);
+        return new PreBidRequestContextFactory(defaultTimeoutMs, implicitParametersExtractor,
+                applicationSettings, uidsCookieService, timeoutFactory);
     }
 
     @Bean
     AuctionRequestFactory auctionRequestFactory(
-            @Value("${auction.max-request-size}") int maxRequestSize,
+            @Value("${auction.max-request-size}") @Min(0) int maxRequestSize,
             StoredRequestProcessor storedRequestProcessor,
             ImplicitParametersExtractor implicitParametersExtractor,
             UidsCookieService uidsCookieService,
@@ -135,8 +136,7 @@ public class ServiceConfiguration {
     @Bean
     StoredRequestProcessor storedRequestProcessor(
             @Value("${auction.stored-requests-timeout-ms}") long defaultTimeoutMs,
-            ApplicationSettings applicationSettings,
-            TimeoutFactory timeoutFactory) {
+            CompositeApplicationSettings applicationSettings, TimeoutFactory timeoutFactory) {
 
         return new StoredRequestProcessor(applicationSettings, timeoutFactory, defaultTimeoutMs);
     }
