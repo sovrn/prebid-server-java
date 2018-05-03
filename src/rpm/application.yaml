@@ -18,8 +18,8 @@ cache:
 settings:
   database:
     type: mysql
-    stored-requests-query: SELECT uuid, config FROM stored_requests WHERE uuid IN (%ID_LIST%)
-    amp-stored-requests-query: SELECT uuid, config FROM stored_requests WHERE uuid IN (%ID_LIST%)
+    stored-requests-query: SELECT uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%) UNION ALL SELECT uuid, config, 'imp' as dataType FROM stored_requests WHERE uuid IN (%IMP_ID_LIST%)
+    amp-stored-requests-query: SELECT uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%)
 recaptcha-url: https://www.google.com/recaptcha/api/siteverify
 recaptcha-secret: secret_value
 host-cookie:
