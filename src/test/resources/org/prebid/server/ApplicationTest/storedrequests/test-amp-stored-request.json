@@ -18,6 +18,22 @@
           "accountId": 5001,
           "siteId": 6001,
           "zoneId": 7001
+        },
+        "appnexus": {
+          "invCode": "abc",
+          "keywords": [
+            {
+              "key": "foo",
+              "value": [
+                "bar",
+                "baz"
+              ]
+            }
+          ],
+          "member": "103",
+          "position": "below",
+          "reserve": 1,
+          "trafficSourceCode": "trafficSource"
         }
       }
     }
@@ -27,10 +43,23 @@
     "page": "http://www.example.com"
   },
   "tmax": 2000,
+  "cur": [
+    "EUR"
+  ],
   "ext": {
     "prebid": {
       "targeting": {
-        "pricegranularity": "dense"
+        "pricegranularity": "dense",
+        "currency": {
+          "rates": {
+            "EUR": {
+              "USD": 1.2406
+            },
+            "USD": {
+              "EUR": 0.8110
+            }
+          }
+        }
       },
       "cache": {
         "bids": []

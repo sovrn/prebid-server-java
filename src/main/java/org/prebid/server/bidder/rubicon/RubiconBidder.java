@@ -85,6 +85,7 @@ public class RubiconBidder implements Bidder<BidRequest> {
             + HttpHeaderValues.CHARSET.toString() + "=" + StandardCharsets.UTF_8.toString().toLowerCase();
 
     private static final String PREBID_SERVER_USER_AGENT = "prebid-server/1.0";
+    private static final String DEFAULT_BID_CURRENCY = "USD";
 
     private static final TypeReference<ExtPrebid<?, ExtImpRubicon>> RUBICON_EXT_TYPE_REFERENCE = new
             TypeReference<ExtPrebid<?, ExtImpRubicon>>() {
@@ -221,7 +222,6 @@ public class RubiconBidder implements Bidder<BidRequest> {
     }
 
     private RubiconImpExt makeImpExt(ExtImpRubicon rubiconImpExt, Imp imp) {
-
         return RubiconImpExt.of(RubiconImpExtRp.of(rubiconImpExt.getZoneId(), makeInventory(rubiconImpExt),
                 RubiconImpExtRpTrack.of("", "")), mapVendorsNamesToUrls(imp.getMetric()));
     }
@@ -235,7 +235,7 @@ public class RubiconBidder implements Bidder<BidRequest> {
         if (metrics == null) {
             return null;
         }
-        List<String> vendorsUrls = metrics.stream()
+        final List<String> vendorsUrls = metrics.stream()
                 .filter(this::isMetricSupported)
                 .map(metric -> ViewabilityVendors.valueOf(metric.getVendor()).getUrl())
                 .collect(Collectors.toList());
@@ -357,7 +357,7 @@ public class RubiconBidder implements Bidder<BidRequest> {
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
                 .filter(bid -> bid.getPrice().compareTo(BigDecimal.ZERO) > 0)
-                .map(bid -> BidderBid.of(bid, bidType(bidRequest)))
+                .map(bid -> BidderBid.of(bid, bidType(bidRequest), DEFAULT_BID_CURRENCY))
                 .collect(Collectors.toList());
     }
 

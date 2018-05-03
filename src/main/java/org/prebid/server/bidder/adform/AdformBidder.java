@@ -63,7 +63,6 @@ public class AdformBidder implements Bidder<Void> {
      */
     @Override
     public Result<List<HttpRequest<Void>>> makeHttpRequests(BidRequest request) {
-
         final List<Imp> imps = request.getImp();
         final ResultWithErrors<List<ExtImpAdform>> extImpAdformsResult = getExtImpAdforms(imps);
         final List<ExtImpAdform> extImpAdforms = extImpAdformsResult.result;
@@ -237,7 +236,7 @@ public class AdformBidder implements Bidder<Void> {
                             .h(adformBid.getHeight())
                             .dealid(adformBid.getDealId())
                             .build(),
-                    BidType.banner));
+                    BidType.banner, null));
         }
         return bidderBids;
     }
@@ -248,7 +247,9 @@ public class AdformBidder implements Bidder<Void> {
     @AllArgsConstructor(staticName = "of")
     @Value
     private static class ResultWithErrors<T> {
+
         T result;
+
         List<String> errors;
     }
 }

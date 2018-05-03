@@ -156,13 +156,12 @@ public class SovrnBidder implements Bidder<BidRequest> {
     }
 
     private static List<BidderBid> bidsFromResponse(BidResponse bidResponse) {
-
         return bidResponse.getSeatbid().stream()
                 .filter(Objects::nonNull)
                 .map(SeatBid::getBid)
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
-                .map(bid -> BidderBid.of(bid, BidType.banner))
+                .map(bid -> BidderBid.of(bid, BidType.banner, null))
                 .collect(Collectors.toList());
     }
 }

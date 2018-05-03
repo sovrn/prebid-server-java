@@ -2,73 +2,63 @@
   "id": "tid",
   "imp": [
     {
-      "id": "impId13",
+      "id": "impId1",
       "banner": {
         "format": [
           {
-            "w": 300,
-            "h": 250
+            "w": 980,
+            "h": 120
           }
         ],
         "w": 300,
-        "h": 250
+        "h": 600,
+        "pos": 3
       },
-      "tagid": "tagId1",
+      "tagid": "abc",
+      "bidfloor": 1.0,
+      "secure": 1,
       "ext": {
-        "bidder": {
-          "tagid": "tagId1"
+        "appnexus": {
+          "keywords": "foo=bar,foo=baz",
+          "traffic_source_code": "trafficSource"
         }
       }
     }
   ],
   "site": {
     "domain": "example.com",
-    "page": "http://www.example.com",
-    "publisher": {
-      "id": "publisherId"
-    }
+    "page": "https://google.com"
   },
   "device": {
     "ua": "userAgent",
-    "dnt": 2,
-    "ip": "192.168.244.1",
-    "pxratio": 4.2,
-    "language": "en",
-    "ifa": "ifaId"
+    "ip": "192.168.244.1"
   },
-  "user": {
-    "buyeruid": "990011",
-    "ext": {
-      "digitrust": {
-        "id": "id",
-        "keyv": 123,
-        "pref": 0
-      }
-    }
-  },
-  "test": 1,
   "at": 1,
-  "tmax": 1000,
+  "tmax": 9999970,
   "cur": [
     "EUR"
   ],
-  "source": {
-    "fd": 1,
-    "tid": "tid"
-  },
   "ext": {
     "prebid": {
-      "aliases": {
-        "appnexusAlias": "appnexus",
-        "conversantAlias": "conversant"
-      },
       "targeting": {
         "pricegranularity": [
           {
             "precision": 2,
             "min": 0,
+            "max": 3,
+            "increment": 0.01
+          },
+          {
+            "precision": 2,
+            "min": 3,
+            "max": 8,
+            "increment": 0.05
+          },
+          {
+            "precision": 2,
+            "min": 8,
             "max": 20,
-            "increment": 0.1
+            "increment": 0.5
           }
         ],
         "currency": {
@@ -77,7 +67,7 @@
               "USD": 1.2406
             },
             "USD": {
-              "EUR": 0.8110
+              "EUR": 0.811
             }
           }
         },

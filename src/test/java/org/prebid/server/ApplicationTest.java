@@ -225,6 +225,7 @@ public class ApplicationTest extends VertxTest {
         // then
         String expectedAuctionResponse = auctionResponseFrom(jsonFrom("openrtb2/test-auction-response.json"),
                 response, "ext.responsetimemillis.%s");
+
         JSONAssert.assertEquals(expectedAuctionResponse, response.asString(), JSONCompareMode.NON_EXTENSIBLE);
     }
 
@@ -247,6 +248,11 @@ public class ApplicationTest extends VertxTest {
                 .withRequestBody(equalToJson(jsonFrom("amp/test-rubicon-bid-request.json")))
                 .willReturn(aResponse().withBody(jsonFrom("amp/test-rubicon-bid-response.json"))));
 
+        // appnexus exchange
+        wireMockRule.stubFor(post(urlPathEqualTo("/appnexus-exchange"))
+                .withRequestBody(equalToJson(jsonFrom("amp/test-appnexus-bid-request.json")))
+                .willReturn(aResponse().withBody(jsonFrom("amp/test-appnexus-bid-response.json"))));
+
         // pre-bid cache
         wireMockRule.stubFor(post(urlPathEqualTo("/cache"))
                 .withRequestBody(equalToJson(jsonFrom("amp/test-cache-request.json")))
@@ -262,7 +268,13 @@ public class ApplicationTest extends VertxTest {
                 // {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")
                 .when()
-                .get("/openrtb2/amp?tag_id=test-amp-stored-request")
+                .get("/openrtb2/amp" +
+                        "?tag_id=test-amp-stored-request" +
+                        "&ow=980" +
+                        "&oh=120" +
+                        "&timeout=10000000" +
+                        "&slot=overwrite-tagId" +
+                        "&curl=https%3A%2F%2Fgoogle.com")
                 .then()
                 .assertThat()
                 .body(Matchers.equalTo(jsonFrom("amp/test-amp-response.json")));
