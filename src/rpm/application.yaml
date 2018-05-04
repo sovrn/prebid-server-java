@@ -7,6 +7,8 @@ adapters:
     enabled: true
   rubicon:
     enabled: true
+auction:
+  ad-server-currency: USD
 metrics:
   graphite:
     host: graphite
