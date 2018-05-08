@@ -33,3 +33,4 @@ host-cookie:
   optout-cookie:
     name: trp_optout
     value: "true"
+status-response: ready
