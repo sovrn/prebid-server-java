@@ -31,13 +31,15 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(CookieSyncHandler.class);
 
+    private final boolean enableCookie;
     private final UidsCookieService uidsCookieService;
     private final BidderCatalog bidderCatalog;
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
 
-    public CookieSyncHandler(UidsCookieService uidsCookieService, BidderCatalog bidderCatalog,
+    public CookieSyncHandler(boolean enableCookie, UidsCookieService uidsCookieService, BidderCatalog bidderCatalog,
                              AnalyticsReporter analyticsReporter, Metrics metrics) {
+        this.enableCookie = enableCookie;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
@@ -46,6 +48,10 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext context) {
+        if (!enableCookie) {
+            context.response().setStatusCode(HttpResponseStatus.NO_CONTENT.code()).end();
+            return;
+        }
         metrics.incCounter(MetricName.cookie_sync_requests);
 
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);

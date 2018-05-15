@@ -81,7 +81,21 @@ public class CookieSyncHandlerTest extends VertxTest {
         given(routingContext.response()).willReturn(httpResponse);
         given(httpResponse.putHeader(any(CharSequence.class), any(CharSequence.class))).willReturn(httpResponse);
 
-        cookieSyncHandler = new CookieSyncHandler(uidsCookieService, bidderCatalog, analyticsReporter, metrics);
+        cookieSyncHandler = new CookieSyncHandler(true, uidsCookieService, bidderCatalog, analyticsReporter, metrics);
+    }
+
+    @Test
+    public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookiesDisables() {
+        // given
+        cookieSyncHandler = new CookieSyncHandler(false, uidsCookieService, bidderCatalog, analyticsReporter, metrics);
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(204);
+        verify(httpResponse).end();
     }
 
     @Test

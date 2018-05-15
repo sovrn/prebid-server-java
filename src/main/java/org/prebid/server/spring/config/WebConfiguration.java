@@ -189,18 +189,20 @@ public class WebConfiguration {
 
     @Bean
     CookieSyncHandler cookieSyncHandler(
+            @Value("${enable-cookie:#{true}}") boolean enableCookie,
             UidsCookieService uidsCookieService,
             BidderCatalog bidderCatalog,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics) {
 
-        return new CookieSyncHandler(uidsCookieService, bidderCatalog, analyticsReporter, metrics);
+        return new CookieSyncHandler(enableCookie, uidsCookieService, bidderCatalog, analyticsReporter, metrics);
     }
 
     @Bean
-    SetuidHandler setuidHandler(UidsCookieService uidsCookieService, CompositeAnalyticsReporter analyticsReporter,
+    SetuidHandler setuidHandler(@Value("${enable-cookie:#{true}}") boolean enableCookie,
+                                UidsCookieService uidsCookieService, CompositeAnalyticsReporter analyticsReporter,
                                 Metrics metrics) {
-        return new SetuidHandler(uidsCookieService, analyticsReporter, metrics);
+        return new SetuidHandler(enableCookie, uidsCookieService, analyticsReporter, metrics);
     }
 
     @Bean

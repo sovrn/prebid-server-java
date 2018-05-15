@@ -16,11 +16,14 @@ import java.util.Objects;
 
 public class SetuidHandler implements Handler<RoutingContext> {
 
+    private final boolean enableCookie;
     private final UidsCookieService uidsCookieService;
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
 
-    public SetuidHandler(UidsCookieService uidsCookieService, AnalyticsReporter analyticsReporter, Metrics metrics) {
+    public SetuidHandler(boolean enableCookie, UidsCookieService uidsCookieService, AnalyticsReporter analyticsReporter,
+                         Metrics metrics) {
+        this.enableCookie = enableCookie;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
@@ -28,6 +31,10 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     @Override
     public void handle(RoutingContext context) {
+        if (!enableCookie) {
+            context.response().setStatusCode(HttpResponseStatus.NO_CONTENT.code()).end();
+            return;
+        }
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
         if (!uidsCookie.allowsSync()) {
             final int status = HttpResponseStatus.UNAUTHORIZED.code();

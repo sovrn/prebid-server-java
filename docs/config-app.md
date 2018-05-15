@@ -123,3 +123,4 @@ For HTTP data source available next options:
 - `external-url` - the setting stands for external URL prebid server is reachable by, 
 for example address of the load-balancer e.g. http://prebid.host.com.
 - `default-timeout-ms` - this setting controls default timeout for /auction endpoint.
+- `enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints 

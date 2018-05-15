@@ -73,7 +73,21 @@ public class SetuidHandlerTest extends VertxTest {
         given(metrics.cookieSync()).willReturn(cookieSyncMetrics);
         given(cookieSyncMetrics.forBidder(anyString())).willReturn(bidderCookieSyncMetrics);
 
-        setuidHandler = new SetuidHandler(uidsCookieService, analyticsReporter, metrics);
+        setuidHandler = new SetuidHandler(true, uidsCookieService, analyticsReporter, metrics);
+    }
+
+    @Test
+    public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookiesDisables() {
+        // given
+        setuidHandler = new SetuidHandler(false, uidsCookieService, analyticsReporter, metrics);
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(204));
+        verify(httpResponse).end();
     }
 
     @Test
