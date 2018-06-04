@@ -21,6 +21,7 @@ import org.prebid.server.bidder.HttpAdapterConnector;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.handler.AuctionHandler;
 import org.prebid.server.handler.BidderParamHandler;
 import org.prebid.server.handler.CookieSyncHandler;
@@ -35,7 +36,7 @@ import org.prebid.server.handler.info.BiddersHandler;
 import org.prebid.server.handler.openrtb2.AmpHandler;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
-import org.prebid.server.settings.CompositeApplicationSettings;
+import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.BidderParamValidator;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,7 +136,7 @@ public class WebConfiguration {
     @Bean
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     AuctionHandler auctionHandler(
-            CompositeApplicationSettings applicationSettings,
+            ApplicationSettings applicationSettings,
             BidderCatalog bidderCatalog,
             PreBidRequestContextFactory preBidRequestContextFactory,
             CacheService cacheService,
@@ -200,9 +201,15 @@ public class WebConfiguration {
 
     @Bean
     SetuidHandler setuidHandler(@Value("${enable-cookie:#{true}}") boolean enableCookie,
-                                UidsCookieService uidsCookieService, CompositeAnalyticsReporter analyticsReporter,
+                                UidsCookieService uidsCookieService,
+                                GdprService gdprService,
+                                @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
+                                @Value("${geolocation.cookie-sync-enabled}") boolean useGeoLocation,
+                                CompositeAnalyticsReporter analyticsReporter,
                                 Metrics metrics) {
-        return new SetuidHandler(enableCookie, uidsCookieService, analyticsReporter, metrics);
+
+        return new SetuidHandler(enableCookie, uidsCookieService, gdprService, hostVendorId, useGeoLocation,
+                analyticsReporter, metrics);
     }
 
     @Bean

@@ -9,6 +9,8 @@ vertx:
     instances: 1
 http:
   port: 8080
+admin:
+  port: 8060
 http-client:
   max-pool-size: 1000
   connect-timeout-ms: 2500
@@ -41,6 +43,10 @@ adapters:
     enabled: false
     endpoint: http://media.msg.dotomi.com/s2s/header/24
     usersync-url: http://prebid-match.dotomi.com/prebid/match?rurl=
+  eplanning:
+    enabled: false
+    endpoint: http://ads.us.e-planning.net/dsp/obr/1
+    usersync-url: http://sync.e-planning.net/um?uid
   facebook:
     enabled: false
     endpoint: https://an.facebook.com/placementbid.ortb
@@ -77,13 +83,18 @@ metrics:
 settings:
   database:
     pool-size: 20
-    in-memory-cache:
-      cache-size: 10000
-      ttl-seconds: 360
+  in-memory-cache:
+    cache-size: 10000
+    ttl-seconds: 360
+    notification-endpoints-enabled: false
 recaptcha-url: https://www.google.com/recaptcha/api/siteverify
 recaptcha-secret: secret_value
 host-cookie:
   opt-out-url: http://prebid.org/optout
   opt-in-url: http://prebid.org/optin
   ttl-days: 90
-
+gdpr:
+  default-value: 1
+  eea-countries: at,bg,be,cy,cz,dk,ee,fi,fr,de,gr,hu,ie,it,lv,lt,lu,mt,nl,pl,pt,ro,sk,si,es,se,gb,is,no,li,ai,aw,pt,bm,aq,io,vg,ic,ky,fk,re,mw,gp,gf,yt,pf,tf,gl,pt,ms,an,bq,cw,sx,nc,pn,sh,pm,gs,tc,uk,wf
+geolocation:
+  cookie-sync-enabled: false
