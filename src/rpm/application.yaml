@@ -3,10 +3,33 @@ vertx:
 adapters:
   appnexus:
     enabled: true
+    pbs-enforces-gdpr: false
   conversant:
     enabled: true
+    pbs-enforces-gdpr: false
   rubicon:
     enabled: true
+    pbs-enforces-gdpr: false
+  adform:
+    pbs-enforces-gdpr: false
+  adtelligent:
+    pbs-enforces-gdpr: false
+  eplanning:
+    pbs-enforces-gdpr: false
+  facebook:
+    pbs-enforces-gdpr: false
+  indexexchange:
+    pbs-enforces-gdpr: false
+  lifestreet:
+    pbs-enforces-gdpr: false
+  openx:
+    pbs-enforces-gdpr: false
+  pubmatic:
+    pbs-enforces-gdpr: false
+  pulsepoint:
+    pbs-enforces-gdpr: false
+  sovrn:
+    pbs-enforces-gdpr: false
 auction:
   ad-server-currency: USD
 metrics:
