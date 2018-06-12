@@ -34,4 +34,6 @@ host-cookie:
     name: trp_optout
     value: "true"
 status-response: ready
+gdpr:
+  default-value: 0
 enable-cookie: false
