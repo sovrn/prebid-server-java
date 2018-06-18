@@ -204,6 +204,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .imp(emptyList())
                         .app(App.builder().build())
                         .build(),
+                null,
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
                         .build());
@@ -223,6 +224,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidRequest.builder()
                         .imp(emptyList())
                         .build(),
+                null,
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(singletonList(bid)).build()))
                         .build());
@@ -238,7 +240,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final BidResponse bidResponse = sampleBidResponse();
 
         // when
-        final BidResponse returnedBidResponse = module.postProcess(bidRequest, bidResponse).result();
+        final BidResponse returnedBidResponse = module.postProcess(bidRequest, null, bidResponse).result();
 
         // then
         then(returnedBidResponse.getSeatbid())

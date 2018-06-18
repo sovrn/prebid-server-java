@@ -25,6 +25,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.auction.BidResponsePostProcessor;
+import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -110,7 +111,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     @Override
-    public Future<BidResponse> postProcess(BidRequest bidRequest, BidResponse bidResponse) {
+    public Future<BidResponse> postProcess(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
         return Future.succeededFuture(processBidResponse(bidRequest, bidResponse));
     }
 

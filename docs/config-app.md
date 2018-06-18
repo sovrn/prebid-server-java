@@ -11,9 +11,9 @@ This section can be extended against standard [Spring configuration](https://doc
 - `vertx.worker-pool-size` - set the maximum number of worker threads to be used by the Vert.x instance.
 - `vertx.uploads-dir` - directory that Vert.x [BodyHandler](http://vertx.io/docs/apidocs/io/vertx/ext/web/handler/BodyHandler.html) will use to store multi-part file uploads. 
 This parameter exists to allow to change the location of the directory Vert.x will create because it will and there is no way to make it not.
-- `vertx.verticle.instances` - how many verticles should be started. 
-This parameter affects how many CPU cores will be utilized by the application. Rough assumption - one verticle instance will keep 1 CPU core busy.
-- `vertx.verticle.deploy-timeout-ms` - waiting time before Vert.x starts one verticle instance. If time exceeds - exception will be thrown and Prebid Server stops.
+- `vertx.http-server-instances` - how many http server instances should be created. 
+This parameter affects how many CPU cores will be utilized by the application. Rough assumption - one http server instance will keep 1 CPU core busy.
+- `vertx.init-timeout-ms` - time to wait for asynchronous initialization steps completion before considering them stuck. When exceeded - exception is thrown and Prebid Server stops.
 
 ## HTTP
 - `http.port` - the port to listen on.
@@ -130,6 +130,9 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 - `gdpr.eea-countries` - comma separated list of countries in European Economic Area (EEA).
 - `gdpr.default-value` - determines GDPR in scope default value (if no information in request and no geolocation data).
 - `gdpr.host-vendor-id` - the organization running a cluster of Prebid Servers.
+- `gdpr.vendorlist.http-endpoint-template` - template string for vendor list url, where `{VERSION}` is used as version number placeholder.
+- `gdpr.vendorlist.http-default-timeout-ms` - default operation timeout for obtaining new vendor list.
+- `gdpr.vendorlist.filesystem-cache-dir` - directory for local storage cache for vendor list. Should be with `WRITE` permissions for user application run from.
 
 ## Geo location
 - `geolocation.cookie-sync-enabled` - if equals to `true` geo location service will be used in `/setuid` and `/cookie_sync` endpoints handling.

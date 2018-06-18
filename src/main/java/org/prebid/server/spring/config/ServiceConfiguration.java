@@ -3,9 +3,11 @@ package org.prebid.server.spring.config;
 import de.malkusch.whoisServerList.publicSuffixList.PublicSuffixList;
 import de.malkusch.whoisServerList.publicSuffixList.PublicSuffixListFactory;
 import io.vertx.core.Vertx;
+import io.vertx.core.file.FileSystem;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import org.prebid.server.auction.AmpRequestFactory;
+import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.auction.ExchangeService;
@@ -19,17 +21,19 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
+import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
+import org.prebid.server.vertx.ContextRunner;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 
 import javax.validation.constraints.Min;
 import java.io.IOException;
@@ -41,7 +45,6 @@ import java.util.Properties;
 public class ServiceConfiguration {
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     CacheService cacheService(
             @Value("${cache.scheme}") String scheme,
             @Value("${cache.host}") String host,
@@ -92,7 +95,6 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     GoogleRecaptchaVerifier googleRecaptchaVerifier(
             @Value("${recaptcha-url}") String recaptchaUrl,
             @Value("${recaptcha-secret}") String recaptchaSecret,
@@ -102,7 +104,7 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+    @Scope(scopeName = VertxContextScope.NAME, proxyMode = ScopedProxyMode.INTERFACES)
     HttpClient httpClient(
             @Value("${http-client.max-pool-size}") int maxPoolSize,
             @Value("${http-client.connect-timeout-ms}") int connectTimeoutMs,
@@ -127,6 +129,20 @@ public class ServiceConfiguration {
                 hostCookieDomain, ttlDays);
     }
 
+    @Bean
+    VendorListService vendorListService(
+            FileSystem fileSystem,
+            @Value("${gdpr.vendorlist.filesystem-cache-dir}") String cacheDir,
+            HttpClient httpClient,
+            @Value("${gdpr.vendorlist.http-endpoint-template}") String endpointTemplate,
+            @Value("${gdpr.vendorlist.http-default-timeout-ms}") int defaultTimeoutMs,
+            @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
+            BidderCatalog bidderCatalog) {
+
+        return VendorListService.create(fileSystem, cacheDir, httpClient, endpointTemplate, defaultTimeoutMs,
+                hostVendorId, bidderCatalog);
+    }
+
     /**
      * Geo location service is not implemented and passed as NULL argument.
      * It can be provided by vendor (host company) itself.
@@ -134,13 +150,13 @@ public class ServiceConfiguration {
     @Bean
     GdprService gdprService(
             @Value("${gdpr.eea-countries}") String eeaCountries,
+            VendorListService vendorListService,
             @Value("${gdpr.default-value}") String defaultValue) {
 
-        return new GdprService(null, Arrays.asList(eeaCountries.trim().split(",")), defaultValue);
+        return new GdprService(null, Arrays.asList(eeaCountries.trim().split(",")), vendorListService, defaultValue);
     }
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     ExchangeService exchangeService(
             @Value("${auction.expected-cache-time-ms}") long expectedCacheTimeMs,
             @Value("${geolocation.openrtb2-auctions-enabled}") boolean useGeoLocation,
@@ -167,7 +183,6 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     HttpAdapterConnector httpAdapterConnector(HttpClient httpClient, Clock clock) {
         return new HttpAdapterConnector(httpClient, clock);
     }
@@ -217,13 +232,26 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-    CurrencyConversionService currencyConversionRates(@Value("${auction.currency-rates-refresh-period-ms}")
-                                                              long refreshPeriod,
-                                                      @Value("${auction.currency-rates-url}")
-                                                              String currencyServerUrl,
-                                                      Vertx vertx,
-                                                      HttpClient httpClient) {
-        return new CurrencyConversionService(currencyServerUrl, refreshPeriod, httpClient, vertx);
+    AmpResponsePostProcessor ampResponsePostProcessor() {
+        return AmpResponsePostProcessor.noOp();
+    }
+
+    @Bean
+    CurrencyConversionService currencyConversionRates(
+            @Value("${auction.currency-rates-refresh-period-ms}") long refreshPeriod,
+            @Value("${auction.currency-rates-url}") String currencyServerUrl,
+            Vertx vertx,
+            HttpClient httpClient,
+            ContextRunner contextRunner) {
+
+        final CurrencyConversionService service = new CurrencyConversionService(currencyServerUrl, refreshPeriod,
+                vertx, httpClient);
+
+        contextRunner.runOnServiceContext(future -> {
+            service.initialize();
+            future.complete();
+        });
+
+        return service;
     }
 }
