@@ -4,13 +4,11 @@ import io.vertx.core.http.HttpClient;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.rubicon.analytics.RubiconAnalyticsModule;
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
@@ -24,7 +22,6 @@ import java.time.Clock;
 public class RubiconAnalyticsConfiguration {
 
     @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     @Primary
     RubiconAnalyticsModule rubiconAnalyticsModule(RubiconAnalyticsModuleProperties properties,
                                                   HttpClient httpClient, Clock clock) {
