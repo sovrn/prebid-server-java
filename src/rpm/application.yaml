@@ -11,6 +11,12 @@ adapters:
   rubicon:
     enabled: true
     pbs-enforces-gdpr: false
+  pubmatic:
+    enabled: true
+    pbs-enforces-gdpr: false
+  pulsepoint:
+    enabled: true
+    pbs-enforces-gdpr: false
   adform:
     pbs-enforces-gdpr: false
   adtelligent:
@@ -24,10 +30,6 @@ adapters:
   lifestreet:
     pbs-enforces-gdpr: false
   openx:
-    pbs-enforces-gdpr: false
-  pubmatic:
-    pbs-enforces-gdpr: false
-  pulsepoint:
     pbs-enforces-gdpr: false
   sovrn:
     pbs-enforces-gdpr: false
