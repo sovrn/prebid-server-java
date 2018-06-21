@@ -88,7 +88,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         final String gdpr = context.request().getParam("gdpr");
         final String gdprConsent = context.request().getParam("gdpr_consent");
         final String ip = useGeoLocation ? HttpUtil.ipFrom(context.request()) : null;
-        gdprService.resultByVendor(GDPR_PURPOSES, gdprVendorIds, gdpr, gdprConsent, ip)
+        gdprService.resultByVendor(GDPR_PURPOSES, gdprVendorIds, gdpr, gdprConsent, context, ip)
                 .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, accountId, bidder,
                         gdprConsent, ip));
     }

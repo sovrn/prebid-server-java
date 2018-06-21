@@ -133,10 +133,10 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 - `gdpr.vendorlist.http-endpoint-template` - template string for vendor list url, where `{VERSION}` is used as version number placeholder.
 - `gdpr.vendorlist.http-default-timeout-ms` - default operation timeout for obtaining new vendor list.
 - `gdpr.vendorlist.filesystem-cache-dir` - directory for local storage cache for vendor list. Should be with `WRITE` permissions for user application run from.
+- `gdpr.rubicon.enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints
+- `gdpr.rubicon.rsid-cookie-encryption-key` - encryption key to decode RSID cookie value.
 - `gdpr.rubicon.audit-cookie-encryption-key` - set key for uid audit cookie using Blowfish algorithm
-- `gdpr.rubicon.host-ip` - the ip pbs hosted on. 
-- `gdpr.rubicon.enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints 
-
+- `gdpr.rubicon.host-ip` - the ip pbs hosted on.
 
 ## Geo location
 - `geolocation.cookie-sync-enabled` - if equals to `true` geo location service will be used in `/setuid` and `/cookie_sync` endpoints handling.
@@ -147,3 +147,4 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 for example address of the load-balancer e.g. http://prebid.host.com.
 - `default-timeout-ms` - this setting controls default timeout for /auction endpoint.
 - `admin.port` - the port to listen on administration requests.
+- `enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints 

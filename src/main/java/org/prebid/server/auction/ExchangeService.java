@@ -15,6 +15,7 @@ import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.json.Json;
+import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
@@ -124,7 +125,8 @@ public class ExchangeService {
      * Runs an auction: delegates request to applicable bidders, gathers responses from them and constructs final
      * response containing returned bids and additional information in extensions.
      */
-    public Future<BidResponse> holdAuction(BidRequest bidRequest, UidsCookie uidsCookie, Timeout timeout) {
+    public Future<BidResponse> holdAuction(BidRequest bidRequest, UidsCookie uidsCookie, Timeout timeout,
+                                           RoutingContext context) {
         // extract ext from bid request
         final ExtBidRequest requestExt;
         try {
@@ -145,7 +147,7 @@ public class ExchangeService {
 
         final long startTime = clock.millis();
 
-        return extractBidderRequests(bidRequest, uidsCookie, aliases, timeout)
+        return extractBidderRequests(bidRequest, uidsCookie, aliases, context)
                 .map(bidderRequests -> updateRequestMetric(bidderRequests, uidsCookie, aliases))
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(bidderRequest, startTime,
@@ -226,10 +228,8 @@ public class ExchangeService {
      * NOTE: the return list will only contain entries for bidders that both have the extension field in at least one
      * {@link Imp}, and are known to {@link BidderCatalog} or aliases from {@link BidRequest}.ext.prebid.aliases.
      */
-    private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest,
-                                                              UidsCookie uidsCookie,
-                                                              Map<String, String> aliases,
-                                                              Timeout timeout) {
+    private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest, UidsCookie uidsCookie,
+                                                              Map<String, String> aliases, RoutingContext context) {
         // sanity check: discard imps without extension
         final List<Imp> imps = bidRequest.getImp().stream()
                 .filter(imp -> imp.getExt() != null)
@@ -257,7 +257,7 @@ public class ExchangeService {
         // the intended Bidder.
         // - bidrequest.user.buyeruid will be set to that Bidder's ID.
 
-        return getVendorsToGdprPermission(bidRequest, bidders, extUser, aliases, extRegs)
+        return getVendorsToGdprPermission(bidRequest, bidders, extUser, aliases, extRegs, context)
                 .map(gdprResponse -> makeBidderRequests(bidders, bidRequest, uidsBody, uidsCookie,
                         userExtNode, extRegs, aliases, imps, gdprResponse.getVendorsToGdpr()));
     }
@@ -270,7 +270,7 @@ public class ExchangeService {
      */
     private Future<GdprResponse> getVendorsToGdprPermission(BidRequest bidRequest, List<String> bidders,
                                                             ExtUser extUser, Map<String, String> aliases,
-                                                            ExtRegs extRegs) {
+                                                            ExtRegs extRegs, RoutingContext context) {
         final Set<Integer> gdprEnforcedVendorIds = extractGdprEnforcedVendors(bidders, aliases);
         if (gdprEnforcedVendorIds.isEmpty()) {
             return Future.succeededFuture(GdprResponse.of(Collections.emptyMap(), null));
@@ -282,7 +282,7 @@ public class ExchangeService {
         final String ipAddress = useGeoLocation && device != null ? device.getIp() : null;
 
         return gdprService.resultByVendor(GDPR_PURPOSES, gdprEnforcedVendorIds, gdpr != null ? gdpr.toString() : null,
-                gdprConsent, ipAddress);
+                gdprConsent, context, ipAddress);
     }
 
     private List<BidderRequest> makeBidderRequests(List<String> bidders, BidRequest bidRequest,

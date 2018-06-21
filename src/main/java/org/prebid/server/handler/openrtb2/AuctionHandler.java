@@ -80,7 +80,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
                 .recover(this::updateImpsRequestedErrorMetrics)
                 .map(bidRequest -> updateAppAndNoCookieMetrics(bidRequest, uidsCookie.hasLiveUids(), isSafari))
                 .compose(bidRequest ->
-                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime)))
+                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime), context))
                 .recover(this::updateErrorRequestsMetric)
                 .map(bidResponse -> addToEvent(bidResponse, auctionEventBuilder::bidResponse))
                 .setHandler(responseResult -> handleResult(responseResult, auctionEventBuilder, context));

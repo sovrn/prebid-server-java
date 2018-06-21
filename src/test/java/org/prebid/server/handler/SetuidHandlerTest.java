@@ -18,7 +18,6 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.SetuidEvent;
-import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
@@ -29,6 +28,7 @@ import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.CookieSyncMetrics;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 
 import java.util.Base64;
 import java.util.HashMap;
@@ -77,7 +77,7 @@ public class SetuidHandlerTest extends VertxTest {
 
     @Before
     public void setUp() {
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, true), null)));
         given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
                 .willReturn(Cookie.cookie("audit", "value"));
@@ -127,7 +127,7 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldRespondWithErrorIfAccountIdParamIsMissing(){
+    public void shouldRespondWithErrorIfAccountIdParamIsMissing() {
         // given
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
@@ -164,7 +164,7 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithoutCookieIfGdprProcessingPreventsCookieSetting() {
         // given
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, false), null)));
 
         given(uidsCookieService.parseFromRequest(any()))
@@ -187,7 +187,7 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithErrorIfGdprProcessingFails() {
         // given
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
                 .willReturn(Future.failedFuture("gdpr exception"));
 
         given(uidsCookieService.parseFromRequest(any()))
@@ -228,7 +228,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verify(gdprService).resultByVendor(anySet(), anySet(), any(), any(), eq("192.168.144.1"));
+        verify(gdprService).resultByVendor(anySet(), anySet(), any(), any(), any(), eq("192.168.144.1"));
     }
 
     @Test

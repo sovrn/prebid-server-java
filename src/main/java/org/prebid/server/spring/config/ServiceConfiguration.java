@@ -25,6 +25,7 @@ import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
@@ -155,17 +156,24 @@ public class ServiceConfiguration {
         return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
     }
 
+    @Bean
+    RsidCookieService rsidCookieService(@Value("${gdpr.rubicon.rsid-cookie-encryption-key}") String encryptionKey) {
+        return new RsidCookieService(encryptionKey);
+    }
+
     /**
      * Geo location service is not implemented and passed as NULL argument.
      * It can be provided by vendor (host company) itself.
      */
     @Bean
     GdprService gdprService(
+            RsidCookieService rsidCookieService,
             @Value("${gdpr.eea-countries}") String eeaCountries,
             VendorListService vendorListService,
             @Value("${gdpr.default-value}") String defaultValue) {
 
-        return new GdprService(null, Arrays.asList(eeaCountries.trim().split(",")), vendorListService, defaultValue);
+        return new GdprService(rsidCookieService, null, Arrays.asList(eeaCountries.trim().split(",")),
+                vendorListService, defaultValue);
     }
 
     @Bean

@@ -116,15 +116,15 @@ public class AmpHandler implements Handler<RoutingContext> {
                 .recover(this::updateImpsRequestedErrorMetrics)
                 .map(bidRequest -> updateAppAndNoCookieMetrics(bidRequest, uidsCookie.hasLiveUids(), isSafari))
                 .compose(bidRequest ->
-                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime))
+                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime), context)
                                 .map(bidResponse -> Tuple2.of(bidRequest, bidResponse)))
                 .map((Tuple2<BidRequest, BidResponse> result) ->
                         addToEvent(result.getRight(), ampEventBuilder::bidResponse, result))
                 .map((Tuple2<BidRequest, BidResponse> result) -> toAmpResponse(result.getLeft(), result.getRight()))
                 .recover(this::updateErrorRequestsMetric)
                 .compose((Tuple3<BidRequest, BidResponse, AmpResponse> result) ->
-                  ampResponsePostProcessor.postProcess(result.getLeft(), result.getMiddle(), result.getRight(),
-                           context.queryParams()))
+                        ampResponsePostProcessor.postProcess(result.getLeft(), result.getMiddle(), result.getRight(),
+                                context.queryParams()))
                 .map(ampResponse -> addToEvent(ampResponse.getTargeting(), ampEventBuilder::targeting, ampResponse))
                 .setHandler(responseResult -> handleResult(responseResult, ampEventBuilder, context));
     }

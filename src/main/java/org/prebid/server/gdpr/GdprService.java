@@ -4,6 +4,7 @@ import com.iab.gdpr.ConsentStringParser;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
@@ -12,6 +13,8 @@ import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.rubicon.rsid.RsidCookieService;
+import org.prebid.server.rubicon.rsid.model.Rsid;
 
 import java.text.ParseException;
 import java.util.HashMap;
@@ -31,13 +34,16 @@ public class GdprService {
 
     public static final Logger logger = LoggerFactory.getLogger(GdprService.class);
 
+    private final RsidCookieService rsidCookieService;
     private final GeoLocationService geoLocationService;
     private final List<String> eeaCountries;
     private final VendorListService vendorListService;
     private final String gdprDefaultValue;
 
-    public GdprService(GeoLocationService geoLocationService, List<String> eeaCountries,
+    public GdprService(RsidCookieService rsidCookieService,
+                       GeoLocationService geoLocationService, List<String> eeaCountries,
                        VendorListService vendorListService, String gdprDefaultValue) {
+        this.rsidCookieService = Objects.requireNonNull(rsidCookieService);
         this.geoLocationService = geoLocationService;
         this.eeaCountries = Objects.requireNonNull(eeaCountries);
         this.vendorListService = Objects.requireNonNull(vendorListService);
@@ -49,30 +55,39 @@ public class GdprService {
      * [true/false] and country user comes from.
      */
     public Future<GdprResponse> resultByVendor(Set<GdprPurpose> purposes, Set<Integer> vendorIds, String gdpr,
-                                               String gdprConsent, String ipAddress) {
-        return resolveGdprWithCountryValue(gdpr, ipAddress)
+                                               String gdprConsent, RoutingContext context, String ipAddress) {
+        return resolveGdprWithCountryValue(gdpr, context, ipAddress)
                 .compose(gdprWithCountry -> toGdprResponse(gdprWithCountry.getGdpr(), gdprConsent, purposes, vendorIds,
                         gdprWithCountry.getCountry()));
     }
 
     /**
-     * Determines GDPR and country values from external GDPR param, geo location or default.
+     * Determines GDPR and country values from external GDPR param/RSID cookie/geo location or default.
      */
-    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress) {
+    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, RoutingContext context, String ipAddress) {
+        // from request param
         final String gdprFromRequest = StringUtils.stripToNull(gdpr);
-
-        final Future<GdprWithCountry> result;
         if (isValidGdpr(gdprFromRequest)) {
-            result = Future.succeededFuture(GdprWithCountry.of(gdprFromRequest, null));
-        } else if (ipAddress != null && geoLocationService != null) {
-            result = geoLocationService.lookup(ipAddress)
+            return Future.succeededFuture(GdprWithCountry.of(gdprFromRequest, null));
+        }
+
+        // from RSID cookie
+        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        final String country = rsid != null ? rsid.getCountry() : null;
+        if (country != null) {
+            return Future.succeededFuture(createGdprWithCountry(country));
+        }
+
+        // from geo location
+        if (ipAddress != null && geoLocationService != null) {
+            return geoLocationService.lookup(ipAddress)
                     .map(GeoInfo::getCountry)
                     .map(this::createGdprWithCountry)
                     .otherwise(GdprWithCountry.of(gdprDefaultValue, null));
-        } else {
-            result = Future.succeededFuture(GdprWithCountry.of(gdprDefaultValue, null));
         }
-        return result;
+
+        // use default
+        return Future.succeededFuture(GdprWithCountry.of(gdprDefaultValue, null));
     }
 
     /**
