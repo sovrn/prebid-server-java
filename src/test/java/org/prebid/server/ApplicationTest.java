@@ -297,6 +297,7 @@ public class ApplicationTest extends VertxTest {
                         "&timeout=10000000" +
                         "&slot=overwrite-tagId" +
                         "&curl=https%3A%2F%2Fgoogle.com");
+
         JSONAssert.assertEquals(jsonFrom("amp/test-amp-response.json"), response.asString(),
                 JSONCompareMode.NON_EXTENSIBLE);
     }
