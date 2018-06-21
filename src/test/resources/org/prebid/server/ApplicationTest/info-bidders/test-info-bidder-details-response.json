@@ -28,6 +28,6 @@
   ],
   "gdpr": {
     "vendorId": 52,
-    "enforced": true
+    "enforced": false
   }
 }
