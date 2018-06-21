@@ -63,4 +63,6 @@ status-response: ready
 gdpr:
   vendorlist:
     filesystem-cache-dir: /app/prebid-server/data/vendorlist-cache
-enable-cookie: false
+  rubicon:
+    enable-cookie: false
+

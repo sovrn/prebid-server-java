@@ -264,9 +264,9 @@ public class ExchangeService {
 
 
     /**
-     * Returns {@link Future&lt;{@link Map}&lt;{@link Integer}, {@link Boolean}&gt;&gt;}, where bidders vendor id mapped
-     * to enabling or disabling gdpr in scope of pbs server. If bidder vendor id is not present in map, it means that
-     * pbs not enforced particular bidder to follow pbs gdpr procedure.
+     * Returns {@link Future<GdprResponse>}, where bidders vendor id mapped to enabling or disabling gdpr in scope of
+     * pbs server. If bidder vendor id is not present in map, it means that pbs not enforced particular bidder to follow
+     * pbs gdpr procedure.
      */
     private Future<GdprResponse> getVendorsToGdprPermission(BidRequest bidRequest, List<String> bidders,
                                                             ExtUser extUser, Map<String, String> aliases,

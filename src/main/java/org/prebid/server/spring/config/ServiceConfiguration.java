@@ -24,12 +24,14 @@ import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
 import org.prebid.server.vertx.ContextRunner;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
@@ -141,6 +143,16 @@ public class ServiceConfiguration {
 
         return VendorListService.create(fileSystem, cacheDir, httpClient, endpointTemplate, defaultTimeoutMs,
                 hostVendorId, bidderCatalog);
+    }
+
+    @ConditionalOnProperty(name = "gdpr.rubicon.enable-cookie", matchIfMissing = true)
+    @Bean
+    UidsAuditCookieService uidsAuditCookieService(
+            @Value("${gdpr.rubicon.audit-cookie-encryption-key:#{null}}") String encryptionKey,
+            @Value("${host-cookie.ttl-days}") Integer ttlDays,
+            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp) {
+
+        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
     }
 
     /**

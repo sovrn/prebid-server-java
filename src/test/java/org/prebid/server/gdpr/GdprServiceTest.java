@@ -13,8 +13,6 @@ import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.geolocation.model.GeoInfo;
 
-import java.util.Map;
-
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -229,5 +227,6 @@ public class GdprServiceTest {
         // then
         assertThat(future.succeeded()).isTrue();
         verifyZeroInteractions(geoLocationService);
+        assertThat(future.result()).isEqualTo(GdprResponse.of(singletonMap(1, false), null));
     }
 }

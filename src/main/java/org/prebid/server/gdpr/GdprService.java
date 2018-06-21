@@ -56,7 +56,7 @@ public class GdprService {
     }
 
     /**
-     * Determines GDPR value from external GDPR param, geo location or default.
+     * Determines GDPR and country values from external GDPR param, geo location or default.
      */
     private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress) {
         final String gdprFromRequest = StringUtils.stripToNull(gdpr);

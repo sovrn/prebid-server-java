@@ -18,10 +18,12 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.SetuidEvent;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
+import org.prebid.server.exception.PreBidException;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.CookieSyncMetrics;
@@ -30,6 +32,7 @@ import org.prebid.server.metric.Metrics;
 
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyMap;
@@ -50,6 +53,8 @@ public class SetuidHandlerTest extends VertxTest {
 
     @Mock
     private UidsCookieService uidsCookieService;
+    @Mock
+    private UidsAuditCookieService uidsAuditCookieService;
     @Mock
     private GdprService gdprService;
     @Mock
@@ -74,23 +79,26 @@ public class SetuidHandlerTest extends VertxTest {
     public void setUp() {
         given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, true), null)));
-
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willReturn(Cookie.cookie("audit", "value"));
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
         given(routingContext.addCookie(any())).willReturn(routingContext);
 
+        given(httpRequest.getParam("account_id")).willReturn("accountId");
+
         given(metrics.cookieSync()).willReturn(cookieSyncMetrics);
         given(cookieSyncMetrics.forBidder(anyString())).willReturn(bidderCookieSyncMetrics);
 
-        setuidHandler = new SetuidHandler(true, uidsCookieService, gdprService, null, false, analyticsReporter,
-                metrics);
+        setuidHandler = new SetuidHandler(true, uidsCookieService, uidsAuditCookieService, gdprService, null, false,
+                analyticsReporter, metrics);
     }
 
     @Test
     public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookiesDisables() {
         // given
-        setuidHandler = new SetuidHandler(false, uidsCookieService, gdprService, null, false, analyticsReporter,
-                metrics);
+        setuidHandler = new SetuidHandler(false, uidsCookieService, uidsAuditCookieService, gdprService, null, false,
+                analyticsReporter, metrics);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -115,6 +123,24 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(401));
         verify(httpResponse).end();
+        verifyNoMoreInteractions(httpResponse);
+    }
+
+    @Test
+    public void shouldRespondWithErrorIfAccountIdParamIsMissing(){
+        // given
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+        given(httpRequest.getParam("account_id")).willReturn(null);
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(400));
+        verify(httpResponse).end(eq("\"account_id\" query param is required"));
         verifyNoMoreInteractions(httpResponse);
     }
 
@@ -184,7 +210,8 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldPassIpAddressToGdprServiceIfGeoLocationEnabled() {
         // given
-        setuidHandler = new SetuidHandler(true, uidsCookieService, gdprService, null, true, analyticsReporter, metrics);
+        setuidHandler = new SetuidHandler(true, uidsCookieService, uidsAuditCookieService, gdprService, null, true,
+                analyticsReporter, metrics);
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
@@ -222,7 +249,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        final Cookie uidsCookie = captureCookie();
+        final Cookie uidsCookie = captureCookies().get(0);
         verify(httpResponse).end();
         // this uids cookie value stands for {"uids":{"adnxs":"12345"}}
         final Uids decodedUids = decodeUids(uidsCookie.getValue());
@@ -247,7 +274,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        final Cookie uidsCookie = captureCookie();
+        final Cookie uidsCookie = captureCookies().get(0);
         verify(httpResponse).end();
         // this uids cookie value stands for {"uids":{"audienceNetwork":"facebookUid"}}
         final Uids decodedUids = decodeUids(uidsCookie.getValue());
@@ -275,7 +302,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        final Cookie uidsCookie = captureCookie();
+        final Cookie uidsCookie = captureCookies().get(0);
         verify(httpResponse).end();
         verify(cookieSyncMetrics).forBidder(eq(RUBICON));
         verify(bidderCookieSyncMetrics).incCounter(eq(MetricName.sets));
@@ -284,6 +311,57 @@ public class SetuidHandlerTest extends VertxTest {
         assertThat(decodedUids.getUids()).hasSize(2);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("updatedUid");
         assertThat(decodedUids.getUids().get(ADNXS).getUid()).isEqualTo("12345");
+    }
+
+
+    @Test
+    public void shouldSendBadRequestIfAuditCookieWasNotCreated() {
+        // given
+        given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willThrow(new PreBidException(
+                        "Uid was not defined. Should be present to set uid audit cookie."));
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(400));
+        verify(httpResponse).end("Error occurred on audit cookie creation, uid cookie will not be set without audit:" +
+                " Uid was not defined. Should be present to set uid audit cookie.");
+    }
+
+    @Test
+    public void shouldSendUidsAuditCookieWithUidsCookie() {
+        // given
+        given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willReturn(Cookie.cookie("audit", "value").setDomain("rubicon"));
+
+        // {"tempUIDs":{"adnxs":{"uid":"12345"}, "rubicon":{"uid":"updatedUid"}}}
+        given(uidsCookieService.toCookie(any())).willReturn(Cookie
+                .cookie("uids", "eyJ0ZW1wVUlEcyI6eyJhZG54cyI6eyJ1aWQiOiIxMjM0NSJ9LCAicnViaWNvbiI6eyJ1aWQiOiJ1cGRhdGVkVW"
+                        + "lkIn19fQ=="));
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        final Cookie uidsCookie = captureCookies().get(0);
+        assertThat(uidsCookie).isNotNull();
+        final Cookie uidsAuditCookie = captureCookies().get(1);
+        assertThat(uidsAuditCookie.getValue()).isEqualTo("value");
+        assertThat(uidsAuditCookie.getDomain()).isEqualTo("rubicon");
     }
 
     @Test
@@ -430,10 +508,10 @@ public class SetuidHandlerTest extends VertxTest {
                 .build());
     }
 
-    private Cookie captureCookie() {
+    private List<Cookie> captureCookies() {
         final ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor.forClass(Cookie.class);
-        verify(routingContext).addCookie(cookieCaptor.capture());
-        return cookieCaptor.getValue();
+        verify(routingContext, times(2)).addCookie(cookieCaptor.capture());
+        return cookieCaptor.getAllValues();
     }
 
     private static Uids decodeUids(String value) {

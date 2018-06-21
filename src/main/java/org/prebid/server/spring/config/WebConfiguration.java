@@ -41,6 +41,7 @@ import org.prebid.server.handler.info.BiddersHandler;
 import org.prebid.server.handler.openrtb2.AmpHandler;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.BidderParamValidator;
@@ -225,7 +226,7 @@ public class WebConfiguration {
 
     @Bean
     CookieSyncHandler cookieSyncHandler(
-            @Value("${enable-cookie:#{true}}") boolean enableCookie,
+            @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             UidsCookieService uidsCookieService,
             BidderCatalog bidderCatalog,
             CompositeAnalyticsReporter analyticsReporter,
@@ -236,16 +237,17 @@ public class WebConfiguration {
 
     @Bean
     SetuidHandler setuidHandler(
-            @Value("${enable-cookie:#{true}}") boolean enableCookie,
+            @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             UidsCookieService uidsCookieService,
+            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
             GdprService gdprService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
             @Value("${geolocation.cookie-sync-enabled}") boolean useGeoLocation,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics) {
 
-        return new SetuidHandler(enableCookie, uidsCookieService, gdprService, hostVendorId, useGeoLocation,
-                analyticsReporter, metrics);
+        return new SetuidHandler(enableCookie, uidsCookieService, uidsAuditCookieService, gdprService, hostVendorId,
+                useGeoLocation, analyticsReporter, metrics);
     }
 
     @Bean

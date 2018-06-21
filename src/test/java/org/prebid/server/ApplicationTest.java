@@ -7,6 +7,7 @@ import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.config.ObjectMapperConfig;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.http.Cookie;
+import io.restassured.http.Cookies;
 import io.restassured.internal.mapping.Jackson2Mapper;
 import io.restassured.parsing.Parser;
 import io.restassured.response.Response;
@@ -485,7 +486,7 @@ public class ApplicationTest extends VertxTest {
 
     @Test
     public void setuidShouldUpdateRubiconUidInUidCookie() {
-        final Cookie uidsCookie = given(spec)
+        final Cookies cookies = given(spec)
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT","adnxs":"12345"},
                 // "bday":"2017-08-15T19:47:59.523908376Z"}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIiwiYWRueHMiOiIxMjM0"
@@ -494,13 +495,15 @@ public class ApplicationTest extends VertxTest {
                 .queryParam("bidder", RUBICON)
                 .queryParam("uid", "updatedUid")
                 .queryParam("gdpr", "1")
+                .queryParam("account_id", "accountId")
                 .queryParam("gdpr_consent", "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA")
                 .when()
                 .get("/setuid")
                 .then()
                 .extract()
-                .detailedCookie("uids");
+                .detailedCookies();
 
+        final Cookie uidsCookie = cookies.get("uids");
         assertThat(uidsCookie.getDomain()).isEqualTo("cookie-domain");
         assertThat(uidsCookie.getMaxAge()).isEqualTo(7776000);
         assertThat(uidsCookie.getExpiryDate().toInstant())
@@ -515,6 +518,12 @@ public class ApplicationTest extends VertxTest {
         assertThat(uids.getUids().get("adnxs").getUid()).isEqualTo("12345");
         assertThat(uids.getUids().get("adnxs").getExpires().toInstant())
                 .isCloseTo(Instant.now().minus(5, ChronoUnit.MINUTES), within(10, ChronoUnit.SECONDS));
+
+        final Cookie auditCookie = cookies.get("audit");
+        assertThat(auditCookie.getDomain()).isEqualTo("rubiconproject.com");
+        assertThat(auditCookie.getMaxAge()).isEqualTo(7776000);
+        assertThat(auditCookie.getExpiryDate().toInstant())
+                .isCloseTo(Instant.now().plus(90, ChronoUnit.DAYS), within(10, ChronoUnit.SECONDS));
     }
 
     @Test

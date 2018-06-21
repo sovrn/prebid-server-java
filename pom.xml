@@ -47,6 +47,7 @@
         <metrics.version>3.2.3</metrics.version>
         <metrics-influxdb.version>1.2.2</metrics-influxdb.version>
         <consent-string-parser.version>1.1.1</consent-string-parser.version>
+        <commons-validator.version>1.6</commons-validator.version>
 
         <!-- test dependencies versions -->
         <junit.version>4.12</junit.version>
@@ -126,6 +127,11 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-collections4</artifactId>
             <version>${commons.collections.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-validator</groupId>
+            <artifactId>commons-validator</artifactId>
+            <version>${commons-validator.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
