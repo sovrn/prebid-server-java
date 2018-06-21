@@ -147,4 +147,3 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 for example address of the load-balancer e.g. http://prebid.host.com.
 - `default-timeout-ms` - this setting controls default timeout for /auction endpoint.
 - `admin.port` - the port to listen on administration requests.
-- `enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints 
