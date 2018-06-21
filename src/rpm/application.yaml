@@ -1,5 +1,4 @@
 vertx:
-  http-server-instances: ${vertx.verticle.instances}
   uploads-dir: /app/prebid-server/data/file-uploads
 adapters:
   appnexus:
