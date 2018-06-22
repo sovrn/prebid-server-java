@@ -147,7 +147,7 @@ public class ExchangeService {
 
         final long startTime = clock.millis();
 
-        return extractBidderRequests(bidRequest, uidsCookie, aliases, context)
+        return extractBidderRequests(bidRequest, uidsCookie, aliases, timeout)
                 .map(bidderRequests -> updateRequestMetric(bidderRequests, uidsCookie, aliases))
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(bidderRequest, startTime,
@@ -228,8 +228,10 @@ public class ExchangeService {
      * NOTE: the return list will only contain entries for bidders that both have the extension field in at least one
      * {@link Imp}, and are known to {@link BidderCatalog} or aliases from {@link BidRequest}.ext.prebid.aliases.
      */
-    private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest, UidsCookie uidsCookie,
-                                                              Map<String, String> aliases, RoutingContext context) {
+    private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest,
+                                                              UidsCookie uidsCookie,
+                                                              Map<String, String> aliases,
+                                                              Timeout timeout, RoutingContext context) {
         // sanity check: discard imps without extension
         final List<Imp> imps = bidRequest.getImp().stream()
                 .filter(imp -> imp.getExt() != null)
@@ -257,20 +259,20 @@ public class ExchangeService {
         // the intended Bidder.
         // - bidrequest.user.buyeruid will be set to that Bidder's ID.
 
-        return getVendorsToGdprPermission(bidRequest, bidders, extUser, aliases, extRegs, context)
+        return getVendorsToGdprPermission(bidRequest, bidders, extUser, aliases, extRegs, timeout, context)
                 .map(gdprResponse -> makeBidderRequests(bidders, bidRequest, uidsBody, uidsCookie,
                         userExtNode, extRegs, aliases, imps, gdprResponse.getVendorsToGdpr()));
     }
 
 
     /**
-     * Returns {@link Future<GdprResponse>}, where bidders vendor id mapped to enabling or disabling gdpr in scope of
-     * pbs server. If bidder vendor id is not present in map, it means that pbs not enforced particular bidder to follow
-     * pbs gdpr procedure.
+     * Returns {@link Future&lt;{@link GdprResponse}&gt;}, where bidders vendor id mapped
+     * to enabling or disabling gdpr in scope of pbs server. If bidder vendor id is not present in map, it means that
+     * pbs not enforced particular bidder to follow pbs gdpr procedure.
      */
     private Future<GdprResponse> getVendorsToGdprPermission(BidRequest bidRequest, List<String> bidders,
                                                             ExtUser extUser, Map<String, String> aliases,
-                                                            ExtRegs extRegs, RoutingContext context) {
+                                                            ExtRegs extRegs, Timeout timeout, RoutingContext context) {
         final Set<Integer> gdprEnforcedVendorIds = extractGdprEnforcedVendors(bidders, aliases);
         if (gdprEnforcedVendorIds.isEmpty()) {
             return Future.succeededFuture(GdprResponse.of(Collections.emptyMap(), null));
@@ -282,7 +284,7 @@ public class ExchangeService {
         final String ipAddress = useGeoLocation && device != null ? device.getIp() : null;
 
         return gdprService.resultByVendor(GDPR_PURPOSES, gdprEnforcedVendorIds, gdpr != null ? gdpr.toString() : null,
-                gdprConsent, context, ipAddress);
+                gdprConsent, ipAddress, timeout, context);
     }
 
     private List<BidderRequest> makeBidderRequests(List<String> bidders, BidRequest bidRequest,

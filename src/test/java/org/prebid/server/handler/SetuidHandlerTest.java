@@ -23,6 +23,7 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.CookieSyncMetrics;
@@ -30,6 +31,9 @@ import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -77,7 +81,7 @@ public class SetuidHandlerTest extends VertxTest {
 
     @Before
     public void setUp() {
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, true), null)));
         given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
                 .willReturn(Cookie.cookie("audit", "value"));
@@ -90,8 +94,12 @@ public class SetuidHandlerTest extends VertxTest {
         given(metrics.cookieSync()).willReturn(cookieSyncMetrics);
         given(cookieSyncMetrics.forBidder(anyString())).willReturn(bidderCookieSyncMetrics);
 
-        setuidHandler = new SetuidHandler(true, uidsCookieService, uidsAuditCookieService, gdprService, null, false,
-                analyticsReporter, metrics);
+        final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+        final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
+        setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, false, analyticsReporter, metrics,
+                timeoutFactory);
+        setuidHandler = new SetuidHandler(2000, true, uidsCookieService, uidsAuditCookieService, gdprService, null, false,
+                analyticsReporter, metrics,timeoutFactory);
     }
 
     @Test
@@ -164,7 +172,7 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithoutCookieIfGdprProcessingPreventsCookieSetting() {
         // given
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, false), null)));
 
         given(uidsCookieService.parseFromRequest(any()))
@@ -187,7 +195,7 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithErrorIfGdprProcessingFails() {
         // given
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
                 .willReturn(Future.failedFuture("gdpr exception"));
 
         given(uidsCookieService.parseFromRequest(any()))
@@ -210,6 +218,10 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldPassIpAddressToGdprServiceIfGeoLocationEnabled() {
         // given
+        final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+        final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
+        setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, true, analyticsReporter, metrics,
+                timeoutFactory);
         setuidHandler = new SetuidHandler(true, uidsCookieService, uidsAuditCookieService, gdprService, null, true,
                 analyticsReporter, metrics);
 
@@ -228,7 +240,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verify(gdprService).resultByVendor(anySet(), anySet(), any(), any(), any(), eq("192.168.144.1"));
+        verify(gdprService).resultByVendor(anySet(), anySet(), any(), any(), eq("192.168.144.1"), any(), any());
     }
 
     @Test

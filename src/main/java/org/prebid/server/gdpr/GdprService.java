@@ -9,6 +9,7 @@ import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.execution.Timeout;
 import org.prebid.server.gdpr.model.GdprPurpose;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.gdpr.vendorlist.VendorListService;
@@ -55,8 +56,8 @@ public class GdprService {
      * [true/false] and country user comes from.
      */
     public Future<GdprResponse> resultByVendor(Set<GdprPurpose> purposes, Set<Integer> vendorIds, String gdpr,
-                                               String gdprConsent, RoutingContext context, String ipAddress) {
-        return resolveGdprWithCountryValue(gdpr, context, ipAddress)
+                                               String gdprConsent, String ipAddress, Timeout timeout, RoutingContext context) {
+        return resolveGdprWithCountryValue(gdpr, ipAddress, timeout, context)
                 .compose(gdprWithCountry -> toGdprResponse(gdprWithCountry.getGdpr(), gdprConsent, purposes, vendorIds,
                         gdprWithCountry.getCountry()));
     }
@@ -64,9 +65,10 @@ public class GdprService {
     /**
      * Determines GDPR and country values from external GDPR param/RSID cookie/geo location or default.
      */
-    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, RoutingContext context, String ipAddress) {
+    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress, Timeout timeout, RoutingContext context) {
         // from request param
         final String gdprFromRequest = StringUtils.stripToNull(gdpr);
+
         if (isValidGdpr(gdprFromRequest)) {
             return Future.succeededFuture(GdprWithCountry.of(gdprFromRequest, null));
         }
@@ -80,7 +82,7 @@ public class GdprService {
 
         // from geo location
         if (ipAddress != null && geoLocationService != null) {
-            return geoLocationService.lookup(ipAddress)
+            return geoLocationService.lookup(ipAddress, timeout)
                     .map(GeoInfo::getCountry)
                     .map(this::createGdprWithCountry)
                     .otherwise(GdprWithCountry.of(gdprDefaultValue, null));
