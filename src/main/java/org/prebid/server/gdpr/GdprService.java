@@ -56,7 +56,8 @@ public class GdprService {
      * [true/false] and country user comes from.
      */
     public Future<GdprResponse> resultByVendor(Set<GdprPurpose> purposes, Set<Integer> vendorIds, String gdpr,
-                                               String gdprConsent, String ipAddress, Timeout timeout, RoutingContext context) {
+                                               String gdprConsent, String ipAddress, Timeout timeout,
+                                               RoutingContext context) {
         return resolveGdprWithCountryValue(gdpr, ipAddress, timeout, context)
                 .compose(gdprWithCountry -> toGdprResponse(gdprWithCountry.getGdpr(), gdprConsent, purposes, vendorIds,
                         gdprWithCountry.getCountry()));
@@ -65,7 +66,8 @@ public class GdprService {
     /**
      * Determines GDPR and country values from external GDPR param/RSID cookie/geo location or default.
      */
-    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress, Timeout timeout, RoutingContext context) {
+    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress, Timeout timeout,
+                                                                RoutingContext context) {
         // from request param
         final String gdprFromRequest = StringUtils.stripToNull(gdpr);
 

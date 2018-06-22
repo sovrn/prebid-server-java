@@ -147,7 +147,7 @@ public class ExchangeService {
 
         final long startTime = clock.millis();
 
-        return extractBidderRequests(bidRequest, uidsCookie, aliases, timeout)
+        return extractBidderRequests(bidRequest, uidsCookie, aliases, timeout, context)
                 .map(bidderRequests -> updateRequestMetric(bidderRequests, uidsCookie, aliases))
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(bidderRequest, startTime,
@@ -228,10 +228,9 @@ public class ExchangeService {
      * NOTE: the return list will only contain entries for bidders that both have the extension field in at least one
      * {@link Imp}, and are known to {@link BidderCatalog} or aliases from {@link BidRequest}.ext.prebid.aliases.
      */
-    private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest,
-                                                              UidsCookie uidsCookie,
-                                                              Map<String, String> aliases,
-                                                              Timeout timeout, RoutingContext context) {
+    private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest, UidsCookie uidsCookie,
+                                                              Map<String, String> aliases, Timeout timeout,
+                                                              RoutingContext context) {
         // sanity check: discard imps without extension
         final List<Imp> imps = bidRequest.getImp().stream()
                 .filter(imp -> imp.getExt() != null)

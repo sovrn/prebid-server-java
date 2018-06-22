@@ -97,16 +97,17 @@ public class SetuidHandlerTest extends VertxTest {
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
         setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, false, analyticsReporter, metrics,
-                timeoutFactory);
-        setuidHandler = new SetuidHandler(2000, true, uidsCookieService, uidsAuditCookieService, gdprService, null, false,
-                analyticsReporter, metrics,timeoutFactory);
+                timeoutFactory, true, uidsAuditCookieService);
     }
 
     @Test
     public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookiesDisables() {
         // given
-        setuidHandler = new SetuidHandler(false, uidsCookieService, uidsAuditCookieService, gdprService, null, false,
-                analyticsReporter, metrics);
+        final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+        final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
+        setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, false, analyticsReporter, metrics,
+                timeoutFactory, false, uidsAuditCookieService
+        );
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -221,9 +222,7 @@ public class SetuidHandlerTest extends VertxTest {
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
         setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, true, analyticsReporter, metrics,
-                timeoutFactory);
-        setuidHandler = new SetuidHandler(true, uidsCookieService, uidsAuditCookieService, gdprService, null, true,
-                analyticsReporter, metrics);
+                timeoutFactory, true, uidsAuditCookieService);
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));

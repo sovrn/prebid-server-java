@@ -238,21 +238,18 @@ public class WebConfiguration {
     @Bean
     SetuidHandler setuidHandler(
             @Value("${setuid.default-timeout-ms}") int defaultTimeoutMs,
-            @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             UidsCookieService uidsCookieService,
-            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
             GdprService gdprService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
             @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
-            TimeoutFactory timeoutFactory) {
+            TimeoutFactory timeoutFactory,
+            @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
+            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService) {
 
         return new SetuidHandler(defaultTimeoutMs, uidsCookieService, gdprService, hostVendorId, useGeoLocation,
-                analyticsReporter, metrics, timeoutFactory);
-            Metrics metrics) {
-        return new SetuidHandler(enableCookie, uidsCookieService, uidsAuditCookieService, gdprService, hostVendorId,
-                useGeoLocation, analyticsReporter, metrics);
+                analyticsReporter, metrics, timeoutFactory, enableCookie, uidsAuditCookieService);
     }
 
     @Bean
