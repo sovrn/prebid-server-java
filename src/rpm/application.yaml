@@ -18,6 +18,8 @@ metrics:
     host: graphite
     port: 3003
     interval: 60
+  accounts:
+    default-verbosity: detailed
 cache:
   scheme: https
   query: uuid=%PBS_CACHE_UUID%
