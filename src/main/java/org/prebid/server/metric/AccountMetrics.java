@@ -8,31 +8,38 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * Registry of {@link AdapterMetrics} for account metrics support.
+ * Account metrics support.
  */
-public class AccountMetrics extends UpdatableMetrics {
+class AccountMetrics extends UpdatableMetrics {
 
     private final Function<String, AdapterMetrics> adapterMetricsCreator;
     // not thread-safe maps are intentionally used here because it's harmless in this particular case - eventually
     // this all boils down to metrics lookup by underlying metric registry and that operation is guaranteed to be
     // thread-safe
     private final Map<String, AdapterMetrics> adapterMetrics;
+    private final RequestTypeMetrics requestTypeMetrics;
 
     AccountMetrics(MetricRegistry metricRegistry, CounterType counterType, String account) {
         super(Objects.requireNonNull(metricRegistry), Objects.requireNonNull(counterType),
-                nameCreator(Objects.requireNonNull(account)));
+                nameCreator(createPrefix(Objects.requireNonNull(account))));
         adapterMetricsCreator = adapterType -> new AdapterMetrics(metricRegistry, counterType, account, adapterType);
         adapterMetrics = new HashMap<>();
+        requestTypeMetrics = new RequestTypeMetrics(metricRegistry, counterType, createPrefix(account));
     }
 
-    private static Function<MetricName, String> nameCreator(String account) {
-        return metricName -> String.format("account.%s.%s", account, metricName.name());
+    private static String createPrefix(String account) {
+        return String.format("account.%s", account);
     }
 
-    /**
-     * Returns existing or creates a new {@link AdapterMetrics}.
-     */
-    public AdapterMetrics forAdapter(String adapterType) {
+    private static Function<MetricName, String> nameCreator(String prefix) {
+        return metricName -> String.format("%s.%s", prefix, metricName.toString());
+    }
+
+    AdapterMetrics forAdapter(String adapterType) {
         return adapterMetrics.computeIfAbsent(adapterType, adapterMetricsCreator);
+    }
+
+    RequestTypeMetrics requestType() {
+        return requestTypeMetrics;
     }
 }

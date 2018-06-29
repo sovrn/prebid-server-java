@@ -11,7 +11,6 @@ import com.iab.openrtb.response.SeatBid;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.AsyncResult;
-import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
@@ -37,6 +36,7 @@ import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.metric.model.MetricsContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
@@ -64,6 +64,7 @@ public class AmpHandler implements Handler<RoutingContext> {
     private static final TypeReference<ExtBidResponse> EXT_BID_RESPONSE_TYPE_REFERENCE =
             new TypeReference<ExtBidResponse>() {
             };
+    private static final MetricsContext METRICS_CONTEXT = MetricsContext.of(MetricName.amp);
 
     private final long defaultTimeout;
     private final AmpRequestFactory ampRequestFactory;
@@ -107,55 +108,38 @@ public class AmpHandler implements Handler<RoutingContext> {
 
         final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpHeaders.USER_AGENT));
 
-        updateRequestMetrics(isSafari);
+        metrics.updateSafariRequestsMetric(isSafari);
 
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
 
         ampRequestFactory.fromRequest(context)
-                .map(this::updateImpsRequestedMetrics)
-                .recover(this::updateImpsRequestedErrorMetrics)
-                .map(bidRequest -> updateAppAndNoCookieMetrics(bidRequest, uidsCookie.hasLiveUids(), isSafari))
+                .map(bidRequest ->
+                        updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest, uidsCookie, isSafari))
                 .compose(bidRequest ->
-                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime), context)
+                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime),
+                                METRICS_CONTEXT, context)
                                 .map(bidResponse -> Tuple2.of(bidRequest, bidResponse)))
                 .map((Tuple2<BidRequest, BidResponse> result) ->
                         addToEvent(result.getRight(), ampEventBuilder::bidResponse, result))
-                .map((Tuple2<BidRequest, BidResponse> result) -> toAmpResponse(result.getLeft(), result.getRight()))
-                .recover(this::updateErrorRequestsMetric)
+                .map((Tuple2<BidRequest, BidResponse> result) -> Tuple3.of(result.getLeft(), result.getRight(),
+                        toAmpResponse(result.getLeft(), result.getRight())))
                 .compose((Tuple3<BidRequest, BidResponse, AmpResponse> result) ->
                         ampResponsePostProcessor.postProcess(result.getLeft(), result.getMiddle(), result.getRight(),
                                 context.queryParams()))
                 .map(ampResponse -> addToEvent(ampResponse.getTargeting(), ampEventBuilder::targeting, ampResponse))
+                .map(ampResponse -> setupRequestTimeMetricUpdater(ampResponse, context, startTime))
                 .setHandler(responseResult -> handleResult(responseResult, ampEventBuilder, context));
     }
 
-    private void updateRequestMetrics(boolean isSafari) {
-        metrics.incCounter(MetricName.amp_requests);
-        if (isSafari) {
-            metrics.incCounter(MetricName.safari_requests);
-        }
+    private static <T, R> R addToEvent(T field, Consumer<T> consumer, R result) {
+        consumer.accept(field);
+        return result;
     }
 
-    private BidRequest updateImpsRequestedMetrics(BidRequest bidRequest) {
-        metrics.incCounter(MetricName.imps_requested, bidRequest.getImp().size());
-        return bidRequest;
-    }
-
-    private Future<BidRequest> updateImpsRequestedErrorMetrics(Throwable throwable) {
-        metrics.incCounter(MetricName.imps_requested, 0L);
-        return Future.failedFuture(throwable);
-    }
-
-    private BidRequest updateAppAndNoCookieMetrics(BidRequest bidRequest, boolean liveUidsPresent, boolean isSafari) {
-        if (bidRequest.getApp() != null) {
-            metrics.incCounter(MetricName.app_requests);
-        } else if (!liveUidsPresent) {
-            metrics.incCounter(MetricName.no_cookie_requests);
-            if (isSafari) {
-                metrics.incCounter(MetricName.safari_no_cookie_requests);
-            }
-        }
-
+    private BidRequest updateAppAndNoCookieAndImpsRequestedMetrics(BidRequest bidRequest, UidsCookie uidsCookie,
+                                                                   boolean isSafari) {
+        metrics.updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest.getApp() != null, uidsCookie.hasLiveUids(),
+                isSafari, bidRequest.getImp().size());
         return bidRequest;
     }
 
@@ -164,12 +148,13 @@ public class AmpHandler implements Handler<RoutingContext> {
         return timeoutFactory.create(startTime, tmax != null && tmax > 0 ? tmax : defaultTimeout);
     }
 
-    private static <T, R> R addToEvent(T field, Consumer<T> consumer, R result) {
-        consumer.accept(field);
-        return result;
+    private <T> T setupRequestTimeMetricUpdater(T returnValue, RoutingContext context, long startTime) {
+        // set up handler to update request time metric when response is sent back to a client
+        context.response().endHandler(ignored -> metrics.updateRequestTimeMetric(clock.millis() - startTime));
+        return returnValue;
     }
 
-    private Tuple3<BidRequest, BidResponse, AmpResponse> toAmpResponse(BidRequest bidRequest, BidResponse bidResponse) {
+    private AmpResponse toAmpResponse(BidRequest bidRequest, BidResponse bidResponse) {
         // fetch targeting information from response bids
         final List<SeatBid> seatBids = bidResponse.getSeatbid();
 
@@ -186,7 +171,7 @@ public class AmpHandler implements Handler<RoutingContext> {
         final ExtResponseDebug extResponseDebug = Objects.equals(bidRequest.getTest(), 1)
                 ? extResponseDebugFrom(bidResponse) : null;
 
-        return Tuple3.of(bidRequest, bidResponse, AmpResponse.of(targeting, extResponseDebug));
+        return AmpResponse.of(targeting, extResponseDebug);
     }
 
     private Map<String, String> targetingFrom(Bid bid, String bidder) {
@@ -247,13 +232,9 @@ public class AmpHandler implements Handler<RoutingContext> {
         return extBidResponse != null ? extBidResponse.getDebug() : null;
     }
 
-    private Future<Tuple3<BidRequest, BidResponse, AmpResponse>> updateErrorRequestsMetric(Throwable failed) {
-        metrics.incCounter(MetricName.error_requests);
-        return Future.failedFuture(failed);
-    }
-
     private void handleResult(AsyncResult<AmpResponse> responseResult, AmpEvent.AmpEventBuilder ampEventBuilder,
                               RoutingContext context) {
+        final MetricName requestStatus;
         final int status;
         final List<String> errorMessages;
 
@@ -269,11 +250,13 @@ public class AmpHandler implements Handler<RoutingContext> {
             context.response().putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON);
             context.response().end(Json.encode(responseResult.result()));
 
+            requestStatus = MetricName.ok;
             status = HttpResponseStatus.OK.code();
             errorMessages = Collections.emptyList();
         } else {
             final Throwable exception = responseResult.cause();
             if (exception instanceof InvalidRequestException) {
+                requestStatus = MetricName.badinput;
                 status = HttpResponseStatus.BAD_REQUEST.code();
                 errorMessages = ((InvalidRequestException) exception).getMessages();
 
@@ -286,8 +269,9 @@ public class AmpHandler implements Handler<RoutingContext> {
             } else {
                 logger.error("Critical error while running the auction", exception);
 
-                final String message = exception.getMessage();
+                requestStatus = MetricName.err;
                 status = HttpResponseStatus.INTERNAL_SERVER_ERROR.code();
+                final String message = exception.getMessage();
                 errorMessages = Collections.singletonList(message);
 
                 context.response()
@@ -296,6 +280,7 @@ public class AmpHandler implements Handler<RoutingContext> {
             }
         }
 
+        metrics.updateRequestTypeMetric(METRICS_CONTEXT.getRequestType(), requestStatus);
         analyticsReporter.processEvent(ampEventBuilder.status(status).errors(errorMessages).build());
     }
 

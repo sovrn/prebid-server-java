@@ -5,7 +5,6 @@ import com.iab.openrtb.response.BidResponse;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.AsyncResult;
-import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
@@ -16,6 +15,7 @@ import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.ExchangeService;
+import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.InvalidRequestException;
@@ -23,6 +23,7 @@ import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.metric.model.MetricsContext;
 import org.prebid.server.util.HttpUtil;
 
 import java.time.Clock;
@@ -71,54 +72,39 @@ public class AuctionHandler implements Handler<RoutingContext> {
 
         final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpHeaders.USER_AGENT));
 
-        updateRequestMetrics(isSafari);
+        metrics.updateSafariRequestsMetric(isSafari);
 
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
         auctionRequestFactory.fromRequest(context)
-                .map(bidRequest -> addToEvent(bidRequest, auctionEventBuilder::bidRequest))
-                .map(this::updateImpsRequestedMetrics)
-                .recover(this::updateImpsRequestedErrorMetrics)
-                .map(bidRequest -> updateAppAndNoCookieMetrics(bidRequest, uidsCookie.hasLiveUids(), isSafari))
-                .compose(bidRequest ->
-                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime), context))
-                .recover(this::updateErrorRequestsMetric)
-                .map(bidResponse -> addToEvent(bidResponse, auctionEventBuilder::bidResponse))
+                .map(bidRequest -> addToEvent(bidRequest, bidRequest, auctionEventBuilder::bidRequest))
+                .map(bidRequest ->
+                        updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest, uidsCookie, isSafari))
+                .map(bidRequest -> Tuple2.of(bidRequest, toMetricsContext(bidRequest)))
+                .compose((Tuple2<BidRequest, MetricsContext> result) ->
+                        exchangeService.holdAuction(result.getLeft(), uidsCookie, timeout(result.getLeft(), startTime),
+                                result.getRight(), context)
+                                .map(bidResponse -> Tuple2.of(bidResponse, result.getRight())))
+                .map((Tuple2<BidResponse, MetricsContext> result) ->
+                        addToEvent(result, result.getLeft(), auctionEventBuilder::bidResponse))
+                .map((Tuple2<BidResponse, MetricsContext> result) ->
+                        setupRequestTimeMetricUpdater(result, context, startTime))
                 .setHandler(responseResult -> handleResult(responseResult, auctionEventBuilder, context));
     }
 
-    private static <T> T addToEvent(T field, Consumer<T> consumer) {
+    private static <T, R> R addToEvent(R returnValue, T field, Consumer<T> consumer) {
         consumer.accept(field);
-        return field;
+        return returnValue;
     }
 
-    private void updateRequestMetrics(boolean isSafari) {
-        metrics.incCounter(MetricName.requests);
-        metrics.incCounter(MetricName.ortb_requests);
-        if (isSafari) {
-            metrics.incCounter(MetricName.safari_requests);
-        }
-    }
-
-    private BidRequest updateImpsRequestedMetrics(BidRequest bidRequest) {
-        metrics.incCounter(MetricName.imps_requested, bidRequest.getImp().size());
+    private BidRequest updateAppAndNoCookieAndImpsRequestedMetrics(BidRequest bidRequest, UidsCookie uidsCookie,
+                                                                   boolean isSafari) {
+        metrics.updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest.getApp() != null, uidsCookie.hasLiveUids(),
+                isSafari, bidRequest.getImp().size());
         return bidRequest;
     }
 
-    private Future<BidRequest> updateImpsRequestedErrorMetrics(Throwable throwable) {
-        metrics.incCounter(MetricName.imps_requested, 0L);
-        return Future.failedFuture(throwable);
-    }
-
-    private BidRequest updateAppAndNoCookieMetrics(BidRequest bidRequest, boolean liveUidsPresent, boolean isSafari) {
-        if (bidRequest.getApp() != null) {
-            metrics.incCounter(MetricName.app_requests);
-        } else if (!liveUidsPresent) {
-            metrics.incCounter(MetricName.no_cookie_requests);
-            if (isSafari) {
-                metrics.incCounter(MetricName.safari_no_cookie_requests);
-            }
-        }
-        return bidRequest;
+    private static MetricsContext toMetricsContext(BidRequest bidRequest) {
+        return MetricsContext.of(bidRequest.getApp() != null ? MetricName.openrtb2app : MetricName.openrtb2web);
     }
 
     private Timeout timeout(BidRequest bidRequest, long startTime) {
@@ -126,26 +112,36 @@ public class AuctionHandler implements Handler<RoutingContext> {
         return timeoutFactory.create(startTime, tmax != null && tmax > 0 ? tmax : defaultTimeout);
     }
 
-    private Future<BidResponse> updateErrorRequestsMetric(Throwable failed) {
-        metrics.incCounter(MetricName.error_requests);
-        return Future.failedFuture(failed);
+    private <T> T setupRequestTimeMetricUpdater(T returnValue, RoutingContext context, long startTime) {
+        // set up handler to update request time metric when response is sent back to a client
+        context.response().endHandler(ignored -> metrics.updateRequestTimeMetric(clock.millis() - startTime));
+        return returnValue;
     }
 
-    private void handleResult(AsyncResult<BidResponse> responseResult,
+    private void handleResult(AsyncResult<Tuple2<BidResponse, MetricsContext>> responseResult,
                               AuctionEvent.AuctionEventBuilder auctionEventBuilder, RoutingContext context) {
+        final MetricName requestType;
+        final MetricName requestStatus;
         final int status;
         final List<String> errorMessages;
 
         if (responseResult.succeeded()) {
+            final Tuple2<BidResponse, MetricsContext> result = responseResult.result();
+
             context.response()
                     .putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
-                    .end(Json.encode(responseResult.result()));
+                    .end(Json.encode(result.getLeft()));
 
+            requestType = result.getRight().getRequestType();
+            requestStatus = MetricName.ok;
             status = HttpResponseStatus.OK.code();
             errorMessages = Collections.emptyList();
         } else {
+            requestType = MetricName.openrtb2web;
+
             final Throwable exception = responseResult.cause();
             if (exception instanceof InvalidRequestException) {
+                requestStatus = MetricName.badinput;
                 status = HttpResponseStatus.BAD_REQUEST.code();
                 errorMessages = ((InvalidRequestException) exception).getMessages();
 
@@ -158,8 +154,9 @@ public class AuctionHandler implements Handler<RoutingContext> {
             } else {
                 logger.error("Critical error while running the auction", exception);
 
-                final String message = exception.getMessage();
+                requestStatus = MetricName.err;
                 status = HttpResponseStatus.INTERNAL_SERVER_ERROR.code();
+                final String message = exception.getMessage();
                 errorMessages = Collections.singletonList(message);
 
                 context.response()
@@ -168,6 +165,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
             }
         }
 
+        metrics.updateRequestTypeMetric(requestType, requestStatus);
         analyticsReporter.processEvent(auctionEventBuilder.status(status).errors(errorMessages).build());
     }
 }

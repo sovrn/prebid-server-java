@@ -3,11 +3,14 @@ package org.prebid.server.auction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
+import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Regs;
+import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
 import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
@@ -19,6 +22,7 @@ import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.auction.model.BidderRequest;
 import org.prebid.server.auction.model.BidderResponse;
@@ -35,9 +39,9 @@ import org.prebid.server.execution.Timeout;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprPurpose;
 import org.prebid.server.gdpr.model.GdprResponse;
-import org.prebid.server.metric.AdapterMetrics;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.metric.model.MetricsContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
@@ -115,7 +119,7 @@ public class ExchangeService {
         this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
         if (expectedCacheTime < 0) {
-            throw new IllegalArgumentException("Expected cache time could not be negative");
+            throw new IllegalArgumentException("Expected cache time should be positive");
         }
         this.expectedCacheTime = expectedCacheTime;
         this.useGeoLocation = useGeoLocation;
@@ -126,7 +130,7 @@ public class ExchangeService {
      * response containing returned bids and additional information in extensions.
      */
     public Future<BidResponse> holdAuction(BidRequest bidRequest, UidsCookie uidsCookie, Timeout timeout,
-                                           RoutingContext context) {
+                                           MetricsContext metricsContext, RoutingContext context) {
         // extract ext from bid request
         final ExtBidRequest requestExt;
         try {
@@ -145,10 +149,13 @@ public class ExchangeService {
         // build targeting keywords creator
         final TargetingKeywordsCreator keywordsCreator = buildKeywordsCreator(targeting, bidRequest.getApp() != null);
 
+        final String publisherId = publisherId(bidRequest);
+
         final long startTime = clock.millis();
 
         return extractBidderRequests(bidRequest, uidsCookie, aliases, timeout, context)
-                .map(bidderRequests -> updateRequestMetric(bidderRequests, uidsCookie, aliases))
+                .map(bidderRequests ->
+                        updateRequestMetric(bidderRequests, uidsCookie, aliases, publisherId, metricsContext))
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(bidderRequest, startTime,
                                 auctionTimeout(timeout, cacheInfo.doCaching), aliases, bidAdjustments(requestExt),
@@ -157,7 +164,7 @@ public class ExchangeService {
                 // send all the requests to the bidders and gathers results
                 .map(CompositeFuture::<BidderResponse>list)
                 // produce response from bidder results
-                .map(this::updateMetricsFromResponses)
+                .map(bidderResponses -> updateMetricsFromResponses(bidderResponses, publisherId))
                 .compose(result ->
                         toBidResponse(result, bidRequest, keywordsCreator, cacheInfo, timeout))
                 .compose(bidResponse -> bidResponsePostProcessor.postProcess(bidRequest, uidsCookie, bidResponse));
@@ -182,6 +189,21 @@ public class ExchangeService {
         final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
         final Map<String, String> aliases = prebid != null ? prebid.getAliases() : null;
         return aliases != null ? aliases : Collections.emptyMap();
+    }
+
+    /**
+     * Extracts publisher id either from {@link BidRequest}.app.publisher.id or {@link BidRequest}.site.publisher.id.
+     * If neither is present returns empty string.
+     */
+    private static String publisherId(BidRequest bidRequest) {
+        final App app = bidRequest.getApp();
+        final Publisher appPublisher = app != null ? app.getPublisher() : null;
+        final Site site = bidRequest.getSite();
+        final Publisher sitePublisher = site != null ? site.getPublisher() : null;
+
+        final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
+
+        return publisher != null ? publisher.getId() : StringUtils.EMPTY;
     }
 
     /**
@@ -331,7 +353,7 @@ public class ExchangeService {
             maskingRequired = gdprAllowsUserData != null && !gdprAllowsUserData;
 
             if (maskingRequired) {
-                metrics.forAdapter(resolvedBidderName).incCounter(MetricName.gdpr_masked);
+                metrics.updateGdprMaskedMetric(resolvedBidderName);
             }
         }
         return maskingRequired;
@@ -525,21 +547,22 @@ public class ExchangeService {
     }
 
     /**
-     * Updates 'request' and 'no_cookie_requests' metrics for each {@link BidderRequest}
+     * Updates 'account.*.request', 'request' and 'no_cookie_requests' metrics for each {@link BidderRequest}
      */
     private List<BidderRequest> updateRequestMetric(List<BidderRequest> bidderRequests, UidsCookie uidsCookie,
-                                                    Map<String, String> aliases) {
+                                                    Map<String, String> aliases, String publisherId,
+                                                    MetricsContext metricsContext) {
+        final MetricName requestType = metricsContext.getRequestType();
+
+        metrics.updateAccountRequestMetrics(publisherId, requestType);
+
         for (BidderRequest bidderRequest : bidderRequests) {
             final String bidder = resolveBidder(bidderRequest.getBidder(), aliases);
-
-            metrics.forAdapter(bidder).incCounter(MetricName.requests);
-
+            final boolean isApp = bidderRequest.getBidRequest().getApp() != null;
             final boolean noBuyerId = !bidderCatalog.isValidName(bidder) || StringUtils.isBlank(
                     uidsCookie.uidFrom(bidderCatalog.usersyncerByName(bidder).cookieFamilyName()));
 
-            if (bidderRequest.getBidRequest().getApp() == null && noBuyerId) {
-                metrics.forAdapter(bidder).incCounter(MetricName.no_cookie_requests);
-            }
+            metrics.updateAdapterRequestTypeAndNoCookieMetrics(bidder, requestType, !isApp && noBuyerId);
         }
         return bidderRequests;
     }
@@ -649,7 +672,7 @@ public class ExchangeService {
             final ValidationResult validationResult = responseBidValidator.validate(bid.getBid());
             if (validationResult.hasErrors()) {
                 for (String error : validationResult.getErrors()) {
-                    errors.add(BidderError.create(error));
+                    errors.add(BidderError.generic(error));
                 }
             } else {
                 validBids.add(bid);
@@ -697,7 +720,7 @@ public class ExchangeService {
                 }
                 updatedBidderBids.add(bidderBid);
             } catch (PreBidException ex) {
-                errors.add(BidderError.create(ex.getMessage()));
+                errors.add(BidderError.generic(ex.getMessage()));
             }
         }
 
@@ -727,39 +750,57 @@ public class ExchangeService {
      * This method should always be invoked after {@link ExchangeService#validateAndUpdateResponse(BidderSeatBid)}
      * to make sure {@link Bid#price} is not empty.
      */
-    private List<BidderResponse> updateMetricsFromResponses(List<BidderResponse> bidderResponses) {
+    private List<BidderResponse> updateMetricsFromResponses(List<BidderResponse> bidderResponses, String publisherId) {
         for (final BidderResponse bidderResponse : bidderResponses) {
             final String bidder = bidderResponse.getBidder();
-            final AdapterMetrics adapterMetrics = metrics.forAdapter(bidder);
 
-            adapterMetrics.updateTimer(MetricName.request_time, bidderResponse.getResponseTime());
+            metrics.updateAdapterResponseTime(bidder, publisherId, bidderResponse.getResponseTime());
 
             final List<BidderBid> bidderBids = bidderResponse.getSeatBid().getBids();
             if (CollectionUtils.isEmpty(bidderBids)) {
-                adapterMetrics.incCounter(MetricName.no_bid_requests);
+                metrics.updateAdapterRequestNobidMetrics(bidder, publisherId);
             } else {
+                metrics.updateAdapterRequestGotbidsMetrics(bidder, publisherId);
+
                 for (final BidderBid bidderBid : bidderBids) {
                     final Bid bid = bidderBid.getBid();
 
-                    adapterMetrics.updateHistogram(MetricName.prices, bid.getPrice().multiply(THOUSAND).longValue());
-
-                    final MetricName markupMetricName = bid.getAdm() != null
-                            ? MetricName.adm_bids_received : MetricName.nurl_bids_received;
-                    adapterMetrics.forBidType(bidderBid.getType()).incCounter(markupMetricName);
+                    final long cpm = bid.getPrice().multiply(THOUSAND).longValue();
+                    metrics.updateAdapterBidMetrics(bidder, publisherId, cpm, bid.getAdm() != null,
+                            bidderBid.getType().toString());
                 }
             }
 
             final List<BidderError> errors = bidderResponse.getSeatBid().getErrors();
             if (CollectionUtils.isNotEmpty(errors)) {
-                for (final BidderError error : errors) {
-                    adapterMetrics.incCounter(error.isTimedOut()
-                            ? MetricName.timeout_requests
-                            : MetricName.error_requests);
-                }
+                errors.stream()
+                        .map(BidderError::getType)
+                        .distinct()
+                        .map(ExchangeService::bidderErrorTypeToMetric)
+                        .forEach(errorMetric -> metrics.updateAdapterRequestErrorMetric(bidder, errorMetric));
             }
         }
 
         return bidderResponses;
+    }
+
+    private static MetricName bidderErrorTypeToMetric(BidderError.Type errorType) {
+        final MetricName errorMetric;
+        switch (errorType) {
+            case bad_input:
+                errorMetric = MetricName.badinput;
+                break;
+            case bad_server_response:
+                errorMetric = MetricName.badserverresponse;
+                break;
+            case timeout:
+                errorMetric = MetricName.timeout;
+                break;
+            case generic:
+            default:
+                errorMetric = MetricName.unknown_error;
+        }
+        return errorMetric;
     }
 
     /**

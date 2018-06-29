@@ -28,13 +28,12 @@ import org.prebid.server.auction.model.PreBidRequestContext.PreBidRequestContext
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.HttpAdapterConnector;
+import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.proto.BidCacheResult;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
-import org.prebid.server.metric.AccountMetrics;
-import org.prebid.server.metric.AdapterMetrics;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.request.AdUnit;
@@ -92,14 +91,6 @@ public class AuctionHandlerTest extends VertxTest {
     @Mock
     private Metrics metrics;
     @Mock
-    private AdapterMetrics adapterMetrics;
-    @Mock
-    private AdapterMetrics.MarkupMetrics adapterMarkupMetrics;
-    @Mock
-    private AccountMetrics accountMetrics;
-    @Mock
-    private AdapterMetrics accountAdapterMetrics;
-    @Mock
     private HttpAdapterConnector httpAdapterConnector;
     private Clock clock;
 
@@ -126,11 +117,6 @@ public class AuctionHandlerTest extends VertxTest {
         given(bidderCatalog.isValidName(eq(APPNEXUS))).willReturn(true);
         given(bidderCatalog.isActive(eq(APPNEXUS))).willReturn(true);
         willReturn(appnexusAdapter).given(bidderCatalog).adapterByName(eq(APPNEXUS));
-
-        given(metrics.forAdapter(any())).willReturn(adapterMetrics);
-        given(metrics.forAdapter(anyString()).forBidType(any())).willReturn(adapterMarkupMetrics);
-        given(metrics.forAccount(anyString())).willReturn(accountMetrics);
-        given(accountMetrics.forAdapter(any())).willReturn(accountAdapterMetrics);
 
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
@@ -314,7 +300,7 @@ public class AuctionHandlerTest extends VertxTest {
                                         .price(new BigDecimal("5.67"))
                                         .build())
                                 .collect(Collectors.toList()),
-                        false)))
+                        null)))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
                         BidderStatus.builder().bidder(APPNEXUS).responseTimeMs(100).build(),
                         Arrays.stream(new String[]{"bidId3", "bidId4"})
@@ -323,7 +309,7 @@ public class AuctionHandlerTest extends VertxTest {
                                         .price(new BigDecimal("5.67"))
                                         .build())
                                 .collect(Collectors.toList()),
-                        false)));
+                        null)));
         // when
         auctionHandler.handle(routingContext);
 
@@ -358,7 +344,7 @@ public class AuctionHandlerTest extends VertxTest {
                                         .bidder(RUBICON).code("adUnitCode2").bidId("bidId2")
                                         .price(new BigDecimal("6.35"))
                                         .responseTimeMs(80).build()),
-                        false)))
+                        null)))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
                         BidderStatus.builder().bidder(APPNEXUS).responseTimeMs(100).build(),
                         asList(
@@ -370,7 +356,7 @@ public class AuctionHandlerTest extends VertxTest {
                                         .bidder(APPNEXUS).code("adUnitCode2").bidId("bidId4")
                                         .price(new BigDecimal("7.15"))
                                         .responseTimeMs(100).build()),
-                        false)));
+                        null)));
 
         // when
         auctionHandler.handle(routingContext);
@@ -410,7 +396,7 @@ public class AuctionHandlerTest extends VertxTest {
                                 org.prebid.server.proto.response.Bid.builder().mediaType(MediaType.banner)
                                         .bidder(RUBICON).code("adUnitCode1").bidId("bidId1")
                                         .price(new BigDecimal("5.67")).build()),
-                        false)));
+                        null)));
 
         // when
         auctionHandler.handle(routingContext);
@@ -435,7 +421,7 @@ public class AuctionHandlerTest extends VertxTest {
                         singletonList(
                                 org.prebid.server.proto.response.Bid.builder().mediaType(MediaType.video)
                                         .bidId("bidId1").price(new BigDecimal("5.67")).build()),
-                        false)));
+                        null)));
 
         // when
         auctionHandler.handle(routingContext);
@@ -476,14 +462,14 @@ public class AuctionHandlerTest extends VertxTest {
         given(httpAdapterConnector.call(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
                         BidderStatus.builder().bidder(RUBICON).responseTimeMs(500).error("rubicon error").build(),
-                        emptyList(), false)))
+                        emptyList(), BidderError.badInput("rubicon error"))))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
                         BidderStatus.builder().bidder(APPNEXUS).responseTimeMs(100).build(),
                         singletonList(org.prebid.server.proto.response.Bid.builder()
                                 .bidId("bidId1")
                                 .price(new BigDecimal("5.67"))
                                 .build()),
-                        false)));
+                        null)));
 
         // when
         auctionHandler.handle(routingContext);
@@ -516,30 +502,14 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.requests));
-        verify(metrics).incCounter(eq(MetricName.app_requests));
-        verify(metrics).incCounter(eq(MetricName.imps_requested), eq(1L));
-        verify(accountMetrics).incCounter(eq(MetricName.requests));
-        verify(metrics).updateTimer(eq(MetricName.request_time), anyLong());
-        verify(adapterMetrics).incCounter(eq(MetricName.requests));
-        verify(accountAdapterMetrics).incCounter(eq(MetricName.requests));
-        verify(adapterMetrics).updateTimer(eq(MetricName.request_time), eq(100L));
-        verify(accountAdapterMetrics).updateTimer(eq(MetricName.request_time), eq(100L));
-        verify(adapterMetrics).incCounter(eq(MetricName.no_cookie_requests));
-        verify(accountAdapterMetrics).incCounter(eq(MetricName.no_cookie_requests));
-        verify(accountMetrics).incCounter(eq(MetricName.bids_received), eq(1L));
-        verify(accountAdapterMetrics).incCounter(eq(MetricName.bids_received), eq(1L));
-        verify(adapterMetrics).updateHistogram(eq(MetricName.prices), eq(5670L));
-        verify(accountMetrics).updateHistogram(eq(MetricName.prices), eq(5670L));
-        verify(accountAdapterMetrics).updateHistogram(eq(MetricName.prices), eq(5670L));
-        verify(adapterMarkupMetrics).incCounter(eq(MetricName.nurl_bids_received));
-        verify(accountMetrics, never()).incCounter(eq(MetricName.no_bid_requests));
-        verify(accountAdapterMetrics, never()).incCounter(eq(MetricName.no_bid_requests));
-        verify(metrics, never()).incCounter(eq(MetricName.safari_requests));
-        verify(metrics, never()).incCounter(eq(MetricName.no_cookie_requests));
-        verify(metrics, never()).incCounter(eq(MetricName.safari_no_cookie_requests));
-        verify(metrics, never()).incCounter(eq(MetricName.error_requests));
-        verify(metrics, never()).incCounter(eq(MetricName.imps_requested), eq(0L));
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.legacy), eq(MetricName.ok));
+        verify(metrics).updateAppAndNoCookieAndImpsRequestedMetrics(eq(true), anyBoolean(), anyBoolean(), eq(1));
+        verify(metrics).updateAccountRequestMetrics(eq("accountId"), eq(MetricName.legacy));
+        verify(metrics).updateRequestTimeMetric(anyLong());
+        verify(metrics).updateAdapterRequestGotbidsMetrics(eq(RUBICON), eq("accountId"));
+        verify(metrics).updateAdapterRequestTypeAndNoCookieMetrics(eq(RUBICON), eq(MetricName.legacy), eq(true));
+        verify(metrics).updateAdapterResponseTime(eq(RUBICON), eq("accountId"), eq(100));
+        verify(metrics).updateAdapterBidMetrics(eq(RUBICON), eq("accountId"), eq(5670L), eq(false), eq("banner"));
     }
 
     @SuppressWarnings("unchecked")
@@ -554,8 +524,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(adapterMetrics).incCounter(eq(MetricName.no_bid_requests));
-        verify(accountAdapterMetrics).incCounter(eq(MetricName.no_bid_requests));
+        verify(metrics).updateAdapterRequestNobidMetrics(eq(RUBICON), eq("accountId"));
     }
 
     @Test
@@ -570,9 +539,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.safari_requests));
-        verify(metrics).incCounter(eq(MetricName.no_cookie_requests));
-        verify(metrics).incCounter(eq(MetricName.safari_no_cookie_requests));
+        verify(metrics).updateAppAndNoCookieAndImpsRequestedMetrics(eq(false), eq(false), eq(true), anyInt());
     }
 
     @Test
@@ -587,8 +554,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.error_requests));
-        verify(metrics).incCounter(eq(MetricName.imps_requested), eq(0L));
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.legacy), eq(MetricName.badinput));
     }
 
     @Test
@@ -601,23 +567,49 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.error_requests));
-        verify(metrics).incCounter(eq(MetricName.imps_requested), eq(0L));
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.legacy), eq(MetricName.badinput));
     }
 
     @Test
-    public void shouldIncrementErrorMetricIfAdapterReturnsError() {
+    public void shouldIncrementErrorMetricIfAdapterReturnsBadInputError() {
         // given
         givenPreBidRequestContextWith1AdUnitAnd1Bid(identity());
 
-        givenBidderRespondingWithError(RUBICON, "rubicon error", false);
+        givenBidderRespondingWithError(RUBICON, BidderError.badInput("rubicon error"));
 
         // when
         auctionHandler.handle(routingContext);
 
         // then
-        verify(adapterMetrics).incCounter(eq(MetricName.error_requests));
-        verify(accountAdapterMetrics).incCounter(eq(MetricName.error_requests));
+        verify(metrics).updateAdapterRequestErrorMetric(eq(RUBICON), eq(MetricName.badinput));
+    }
+
+    @Test
+    public void shouldIncrementErrorMetricIfAdapterReturnsBadServerResponseError() {
+        // given
+        givenPreBidRequestContextWith1AdUnitAnd1Bid(identity());
+
+        givenBidderRespondingWithError(RUBICON, BidderError.badServerResponse("rubicon error"));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateAdapterRequestErrorMetric(eq(RUBICON), eq(MetricName.badserverresponse));
+    }
+
+    @Test
+    public void shouldIncrementErrorMetricIfAdapterReturnsGenericError() {
+        // given
+        givenPreBidRequestContextWith1AdUnitAnd1Bid(identity());
+
+        givenBidderRespondingWithError(RUBICON, BidderError.generic("rubicon error"));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateAdapterRequestErrorMetric(eq(RUBICON), eq(MetricName.unknown_error));
     }
 
     @Test
@@ -625,14 +617,13 @@ public class AuctionHandlerTest extends VertxTest {
         // given
         givenPreBidRequestContextWith1AdUnitAnd1Bid(identity());
 
-        givenBidderRespondingWithError(RUBICON, "time out", true);
+        givenBidderRespondingWithError(RUBICON, BidderError.timeout("time out"));
 
         // when
         auctionHandler.handle(routingContext);
 
         // then
-        verify(adapterMetrics).incCounter(eq(MetricName.timeout_requests));
-        verify(accountAdapterMetrics).incCounter(eq(MetricName.timeout_requests));
+        verify(metrics).updateAdapterRequestErrorMetric(eq(RUBICON), eq(MetricName.timeout));
     }
 
     @Test
@@ -648,8 +639,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.error_requests));
-        verify(metrics).incCounter(eq(MetricName.imps_requested), eq(0L));
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.legacy), eq(MetricName.err));
     }
 
     private void givenPreBidRequestContextWith1AdUnitAnd1Bid(
@@ -702,14 +692,14 @@ public class AuctionHandlerTest extends VertxTest {
                                         .mediaType(MediaType.banner)
                                         .build())
                                 .collect(Collectors.toList()),
-                        false)));
+                        null)));
     }
 
-    private void givenBidderRespondingWithError(String bidder, String error, boolean timedOut) {
+    private void givenBidderRespondingWithError(String bidder, BidderError error) {
         given(httpAdapterConnector.call(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
-                        BidderStatus.builder().bidder(bidder).responseTimeMs(500).error(error).build(),
-                        emptyList(), timedOut)));
+                        BidderStatus.builder().bidder(bidder).responseTimeMs(500).error(error.getMessage()).build(),
+                        emptyList(), error)));
     }
 
     private PreBidResponse capturePreBidResponse() throws IOException {

@@ -1,7 +1,6 @@
 package org.prebid.server.metric;
 
 import com.codahale.metrics.MetricRegistry;
-import org.prebid.server.proto.openrtb.ext.response.BidType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -9,51 +8,61 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
- * Registry of metrics for an account metrics support.
+ * Adapter metrics support.
  */
-public class AdapterMetrics extends UpdatableMetrics {
+class AdapterMetrics extends UpdatableMetrics {
 
-    private final Function<BidType, MarkupMetrics> markupMetricsCreator;
-    private final Map<BidType, MarkupMetrics> markupMetrics;
+    private final RequestTypeMetrics requestTypeMetrics;
+    private final RequestMetrics requestMetrics;
+    private final Function<String, BidTypeMetrics> bidTypeMetricsCreator;
+    private final Map<String, BidTypeMetrics> bidTypeMetrics;
 
     AdapterMetrics(MetricRegistry metricRegistry, CounterType counterType, String adapterType) {
         super(Objects.requireNonNull(metricRegistry), Objects.requireNonNull(counterType),
-                nameCreator(String.format("adapter.%s", Objects.requireNonNull(adapterType))));
+                nameCreator(createAdapterPrefix(Objects.requireNonNull(adapterType))));
 
-        markupMetricsCreator = bidType -> new MarkupMetrics(metricRegistry, counterType,
-                String.format("adapter.%s.%s", Objects.requireNonNull(adapterType), bidType.name()));
-        markupMetrics = new HashMap<>();
+        bidTypeMetricsCreator = bidType ->
+                new BidTypeMetrics(metricRegistry, counterType, createAdapterPrefix(adapterType), bidType);
+        requestTypeMetrics = new RequestTypeMetrics(metricRegistry, counterType, createAdapterPrefix(adapterType));
+        requestMetrics = new RequestMetrics(metricRegistry, counterType, createAdapterPrefix(adapterType));
+        bidTypeMetrics = new HashMap<>();
     }
 
     AdapterMetrics(MetricRegistry metricRegistry, CounterType counterType, String account, String adapterType) {
         super(Objects.requireNonNull(metricRegistry), Objects.requireNonNull(counterType),
-                nameCreator(String.format("account.%s.%s", Objects.requireNonNull(account),
+                nameCreator(createAccountAdapterPrefix(Objects.requireNonNull(account),
                         Objects.requireNonNull(adapterType))));
 
+        requestMetrics = new RequestMetrics(metricRegistry, counterType,
+                createAccountAdapterPrefix(account, adapterType));
+
         // not used for account.adapter metrics
-        markupMetricsCreator = null;
-        markupMetrics = null;
+        bidTypeMetricsCreator = null;
+        requestTypeMetrics = null;
+        bidTypeMetrics = null;
+    }
+
+    private static String createAdapterPrefix(String adapterType) {
+        return String.format("adapter.%s", adapterType);
+    }
+
+    private static String createAccountAdapterPrefix(String account, String adapterType) {
+        return String.format("account.%s.%s", account, adapterType);
     }
 
     private static Function<MetricName, String> nameCreator(String prefix) {
-        return metricName -> String.format("%s.%s", prefix, metricName.name());
+        return metricName -> String.format("%s.%s", prefix, metricName.toString());
     }
 
-    public MarkupMetrics forBidType(BidType bidType) {
-        return markupMetrics.computeIfAbsent(bidType, markupMetricsCreator);
+    RequestTypeMetrics requestType() {
+        return requestTypeMetrics;
     }
 
-    /**
-     * Markup delivery metrics for reporting on certain bid type
-     */
-    public static class MarkupMetrics extends UpdatableMetrics {
+    RequestMetrics request() {
+        return requestMetrics;
+    }
 
-        MarkupMetrics(MetricRegistry metricRegistry, CounterType counterType, String prefix) {
-            super(metricRegistry, counterType, nameCreator(prefix));
-        }
-
-        private static Function<MetricName, String> nameCreator(String prefix) {
-            return metricName -> String.format("%s.%s", prefix, metricName.name());
-        }
+    BidTypeMetrics forBidType(String bidType) {
+        return bidTypeMetrics.computeIfAbsent(bidType, bidTypeMetricsCreator);
     }
 }

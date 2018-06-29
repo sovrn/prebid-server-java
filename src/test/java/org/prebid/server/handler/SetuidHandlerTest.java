@@ -26,8 +26,6 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprResponse;
-import org.prebid.server.metric.CookieSyncMetrics;
-import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 
@@ -65,10 +63,6 @@ public class SetuidHandlerTest extends VertxTest {
     private AnalyticsReporter analyticsReporter;
     @Mock
     private Metrics metrics;
-    @Mock
-    private CookieSyncMetrics cookieSyncMetrics;
-    @Mock
-    private CookieSyncMetrics.BidderCookieSyncMetrics bidderCookieSyncMetrics;
 
     private SetuidHandler setuidHandler;
 
@@ -90,9 +84,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(routingContext.addCookie(any())).willReturn(routingContext);
 
         given(httpRequest.getParam("account_id")).willReturn("accountId");
-
-        given(metrics.cookieSync()).willReturn(cookieSyncMetrics);
-        given(cookieSyncMetrics.forBidder(anyString())).willReturn(bidderCookieSyncMetrics);
 
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
@@ -315,8 +306,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         final Cookie uidsCookie = captureCookies().get(0);
         verify(httpResponse).end();
-        verify(cookieSyncMetrics).forBidder(eq(RUBICON));
-        verify(bidderCookieSyncMetrics).incCounter(eq(MetricName.sets));
         // this uids cookie value stands for {"uids":{"adnxs":"12345","rubicon":"updatedUid"}}
         final Uids decodedUids = decodeUids(uidsCookie.getValue());
         assertThat(decodedUids.getUids()).hasSize(2);
@@ -388,7 +377,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verify(cookieSyncMetrics).incCounter(eq(MetricName.opt_outs));
+        verify(metrics).updateCookieSyncOptoutMetric();
     }
 
     @Test
@@ -403,7 +392,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verify(cookieSyncMetrics).incCounter(eq(MetricName.bad_requests));
+        verify(metrics).updateCookieSyncBadRequestMetric();
     }
 
     @Test
@@ -419,7 +408,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verify(bidderCookieSyncMetrics).incCounter(eq(MetricName.sets));
+        verify(metrics).updateCookieSyncSetsMetric(eq(RUBICON));
     }
 
     @Test

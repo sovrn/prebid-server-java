@@ -6,6 +6,7 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.BidResponse;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.http.CaseInsensitiveHeaders;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
@@ -39,6 +40,7 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 public class AuctionHandlerTest extends VertxTest {
@@ -106,7 +108,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willThrow(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willThrow(
                 new RuntimeException("Unexpected exception"));
 
         // when
@@ -123,14 +125,14 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         // when
         auctionHandler.handle(routingContext);
 
         // then
-        verify(exchangeService).holdAuction(any(), any(), any(), any());
+        verify(exchangeService).holdAuction(any(), any(), any(), any(), any());
         verify(httpResponse).putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON);
         verify(httpResponse).end(eq("{}"));
     }
@@ -141,7 +143,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).tmax(1000L).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         // when
@@ -157,7 +159,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         // when
@@ -173,7 +175,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).tmax(1000L).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         final Instant now = Instant.now();
@@ -187,26 +189,41 @@ public class AuctionHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldIncrementRequestsAndOrtbRequestsMetrics() {
+    public void shouldIncrementOkOpenrtb2WebRequestMetrics() {
         // given
         given(auctionRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(BidRequest.builder().build()));
+                .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         // when
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.requests));
-        verify(metrics).incCounter(eq(MetricName.ortb_requests));
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.openrtb2web), eq(MetricName.ok));
+    }
+
+    @Test
+    public void shouldIncrementOkOpenrtb2AppRequestMetrics() {
+        // given
+        given(auctionRequestFactory.fromRequest(any())).willReturn(Future.succeededFuture(
+                BidRequest.builder().imp(emptyList()).app(App.builder().build()).build()));
+
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
+                Future.succeededFuture(BidResponse.builder().build()));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.openrtb2app), eq(MetricName.ok));
     }
 
     @Test
     public void shouldIncrementAppRequestMetrics() {
         // given
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         given(auctionRequestFactory.fromRequest(any()))
@@ -217,7 +234,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.app_requests));
+        verify(metrics).updateAppAndNoCookieAndImpsRequestedMetrics(eq(true), anyBoolean(), anyBoolean(), anyInt());
     }
 
     @Test
@@ -226,7 +243,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         given(uidsCookie.hasLiveUids()).willReturn(false);
@@ -238,9 +255,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.safari_requests));
-        verify(metrics).incCounter(eq(MetricName.safari_no_cookie_requests));
-        verify(metrics).incCounter(eq(MetricName.no_cookie_requests));
+        verify(metrics).updateAppAndNoCookieAndImpsRequestedMetrics(eq(false), eq(false), eq(true), anyInt());
     }
 
     @Test
@@ -250,18 +265,18 @@ public class AuctionHandlerTest extends VertxTest {
                 .willReturn(Future.succeededFuture(
                         BidRequest.builder().imp(singletonList(Imp.builder().build())).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         // when
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.imps_requested), eq(1L));
+        verify(metrics).updateAppAndNoCookieAndImpsRequestedMetrics(anyBoolean(), anyBoolean(), anyBoolean(), eq(1));
     }
 
     @Test
-    public void shouldIncrementErrorRequestMetrics() {
+    public void shouldIncrementBadinputOpenrtb2WebRequestMetrics() {
         // given
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.failedFuture(new InvalidRequestException("Request is invalid")));
@@ -270,8 +285,59 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).incCounter(eq(MetricName.error_requests));
-        verify(metrics).incCounter(eq(MetricName.imps_requested), eq(0L));
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.openrtb2web), eq(MetricName.badinput));
+    }
+
+    @Test
+    public void shouldIncrementErrOpenrtb2WebRequestMetrics() {
+        // given
+        given(auctionRequestFactory.fromRequest(any())).willReturn(Future.failedFuture(new RuntimeException()));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.openrtb2web), eq(MetricName.err));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void shouldUpdateRequestTimeMetric() {
+        // given
+
+        // set up clock mock to check that request_time metric has been updated with expected value
+        given(clock.millis()).willReturn(5000L).willReturn(5500L);
+
+        given(auctionRequestFactory.fromRequest(any()))
+                .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
+
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
+                Future.succeededFuture(BidResponse.builder().build()));
+
+        // simulate calling end handler that is supposed to update request_time timer value
+        given(httpResponse.endHandler(any())).willAnswer(inv -> {
+            ((Handler<Void>) inv.getArgument(0)).handle(null);
+            return null;
+        });
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateRequestTimeMetric(eq(500L));
+    }
+
+    @Test
+    public void shouldNotUpdateRequestTimeMetricIfRequestFails() {
+        // given
+        given(auctionRequestFactory.fromRequest(any()))
+                .willReturn(Future.failedFuture(new InvalidRequestException("Request is invalid")));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse, never()).endHandler(any());
     }
 
     @Test
@@ -297,7 +363,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willThrow(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willThrow(
                 new RuntimeException("Unexpected exception"));
 
         // when
@@ -318,7 +384,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any())).willReturn(
                 Future.succeededFuture(BidResponse.builder().build()));
 
         // when
@@ -336,7 +402,7 @@ public class AuctionHandlerTest extends VertxTest {
 
     private Timeout captureTimeout() {
         final ArgumentCaptor<Timeout> timeoutCaptor = ArgumentCaptor.forClass(Timeout.class);
-        verify(exchangeService).holdAuction(any(), any(), timeoutCaptor.capture(), any());
+        verify(exchangeService).holdAuction(any(), any(), timeoutCaptor.capture(), any(), any());
         return timeoutCaptor.getValue();
     }
 
