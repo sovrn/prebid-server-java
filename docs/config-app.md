@@ -145,6 +145,7 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 - `gdpr.rubicon.rsid-cookie-encryption-key` - encryption key to decode RSID cookie value.
 - `gdpr.rubicon.audit-cookie-encryption-key` - set key for uid audit cookie using Blowfish algorithm
 - `gdpr.rubicon.host-ip` - the ip pbs hosted on.
+- `gdpr.rubicon.geolocation-netacuity-server` - the address of the NetAcuity database server.
 
 ## General settings
 - `external-url` - the setting stands for external URL prebid server is reachable by, 

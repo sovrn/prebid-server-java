@@ -48,6 +48,7 @@
         <metrics-influxdb.version>1.2.2</metrics-influxdb.version>
         <consent-string-sdk.version>2.0.2</consent-string-sdk.version>
         <commons-validator.version>1.6</commons-validator.version>
+        <netacuity.version>6.0.1.0</netacuity.version>
 
         <!-- test dependencies versions -->
         <junit.version>4.12</junit.version>
@@ -63,6 +64,14 @@
         <download-plugin.version>1.2.0</download-plugin.version>
         <jacoco-plugin.version>0.8.0</jacoco-plugin.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>internal-repository-rpm</id>
+            <name>Rubicon Nexus RPM</name>
+            <url>https://maven.fanops.net/nexus/repository/rpm</url>
+        </repository>
+    </repositories>
 
     <dependencyManagement>
         <dependencies>
@@ -223,6 +232,11 @@
             <groupId>com.conversantmedia.gdpr</groupId>
             <artifactId>consent-string-sdk-java</artifactId>
             <version>${consent-string-sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>sources</groupId>
+            <artifactId>netacuity-api</artifactId>
+            <version>${netacuity.version}</version>
         </dependency>
         <!-- Test -->
         <dependency>

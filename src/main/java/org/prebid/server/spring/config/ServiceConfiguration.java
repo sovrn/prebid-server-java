@@ -25,6 +25,7 @@ import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.geolocation.NetAcuityGeoLocationService;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.validation.BidderParamValidator;
@@ -161,19 +162,26 @@ public class ServiceConfiguration {
         return new RsidCookieService(encryptionKey);
     }
 
+    @Bean
+    NetAcuityGeoLocationService netAcuityGeoLocationService(
+            @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
+
+        return NetAcuityGeoLocationService.create(server);
+    }
+
     /**
-     * Geo location service is not implemented and passed as NULL argument.
-     * It can be provided by vendor (host company) itself.
+     * Geo location service should be provided by hosting company.
      */
     @Bean
     GdprService gdprService(
             RsidCookieService rsidCookieService,
             @Value("${gdpr.eea-countries}") String eeaCountries,
             VendorListService vendorListService,
-            @Value("${gdpr.default-value}") String defaultValue) {
+            @Value("${gdpr.default-value}") String defaultValue,
+            NetAcuityGeoLocationService netAcuityGeoLocationService) {
 
-        return new GdprService(rsidCookieService, null, Arrays.asList(eeaCountries.trim().split(",")),
-                vendorListService, defaultValue);
+        return new GdprService(rsidCookieService, netAcuityGeoLocationService,
+                Arrays.asList(eeaCountries.trim().split(",")), vendorListService, defaultValue);
     }
 
     @Bean
