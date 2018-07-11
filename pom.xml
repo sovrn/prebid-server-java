@@ -72,6 +72,13 @@
             <url>https://maven.fanops.net/nexus/repository/rpm</url>
         </repository>
     </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>internal-repository-rpm</id>
+            <name>Rubicon Nexus RPM</name>
+            <url>https://maven.fanops.net/nexus/repository/rpm</url>
+        </pluginRepository>
+    </pluginRepositories>
 
     <dependencyManagement>
         <dependencies>
