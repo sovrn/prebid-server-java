@@ -13,28 +13,42 @@ import org.prebid.server.geolocation.model.GeoInfo;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.TimeoutException;
 
 public class NetAcuityGeoLocationService implements GeoLocationService {
 
+    private static final Random RANDOM = new Random();
     private static final int API_ID = 1;
 
-    private final InetAddress serverAddress;
+    private final List<InetAddress> serverAddresses;
 
-    private NetAcuityGeoLocationService(InetAddress serverAddress) {
-        this.serverAddress = serverAddress;
+    private NetAcuityGeoLocationService(List<InetAddress> serverAddresses) {
+        this.serverAddresses = serverAddresses;
     }
 
     public static NetAcuityGeoLocationService create(String server) {
-        final InetAddress serverAddress;
-        try {
-            serverAddress = InetAddress.getByName(Objects.requireNonNull(server));
-        } catch (UnknownHostException e) {
-            throw new IllegalArgumentException(String.format("Invalid NetAcuity server address: %s", server), e);
+        final String[] hosts = Objects.requireNonNull(server).split(",");
+        final List<InetAddress> serverAddresses = new ArrayList<>(hosts.length);
+        for (String host : hosts) {
+            final InetAddress serverAddress;
+            try {
+                serverAddress = InetAddress.getByName(host.trim());
+            } catch (UnknownHostException e) {
+                throw new IllegalArgumentException(String.format("Invalid NetAcuity server address: %s", host), e);
+            }
+            serverAddresses.add(serverAddress);
         }
 
-        return new NetAcuityGeoLocationService(serverAddress);
+        if (serverAddresses.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format("No NetAcuity server addresses was specified: %s", server));
+        }
+
+        return new NetAcuityGeoLocationService(serverAddresses);
     }
 
     @Override
@@ -51,7 +65,7 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
             return failWith(new PreBidException(String.format("Invalid IP address to lookup: %s", ip), e));
         }
 
-        final DbAccessor dbAccessor = DbAccessorFactory.getAccessor(serverAddress, API_ID,
+        final DbAccessor dbAccessor = DbAccessorFactory.getAccessor(serverAddress(), API_ID,
                 Math.toIntExact(remainingTimeout));
         final Query query;
         try {
@@ -62,6 +76,12 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
 
         final String country = ((PulseQuery) query).getTwoLetterCountry();
         return Future.succeededFuture(GeoInfo.of(country));
+    }
+
+    private InetAddress serverAddress() {
+        final int size = serverAddresses.size();
+        final int index = size > 1 ? RANDOM.nextInt(size) : 0;
+        return serverAddresses.get(index);
     }
 
     private static Future<GeoInfo> failWith(Throwable throwable) {

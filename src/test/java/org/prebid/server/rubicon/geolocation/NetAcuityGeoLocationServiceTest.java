@@ -25,10 +25,29 @@ public class NetAcuityGeoLocationServiceTest {
     }
 
     @Test
-    public void createShouldFailOnInvalidServerAddress() {
-        assertThatThrownBy(() -> NetAcuityGeoLocationService.create("invalid"))
+    public void createShouldFailOnAtLeastOneInvalidServerAddress() {
+        assertThatThrownBy(() -> NetAcuityGeoLocationService.create("localhost,invalid"))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid NetAcuity server address: invalid");
+    }
+
+    @Test
+    public void createShouldFailOnEmptyServerAddresses() {
+        assertThatThrownBy(() -> NetAcuityGeoLocationService.create(","))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No NetAcuity server addresses was specified: ,");
+    }
+
+    @Test
+    public void createShouldTolerateSpacesForServers() {
+        // given
+        final String server = "localhost,     localhost  ,localhost , localhost";
+
+        // when
+        final NetAcuityGeoLocationService geoLocationService = NetAcuityGeoLocationService.create(server);
+
+        // then
+        assertThat(geoLocationService).isNotNull();
     }
 
     @Test
