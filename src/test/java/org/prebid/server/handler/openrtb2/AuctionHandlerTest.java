@@ -183,8 +183,8 @@ public class AuctionHandlerTest extends VertxTest {
         given(auctionRequestFactory.fromRequest(any()))
                 .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).tmax(6000L).build()));
 
-        given(exchangeService.holdAuction(any(), any(), any(), any())).willReturn(
-                Future.succeededFuture(BidResponse.builder().build()));
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(BidResponse.builder().build()));
 
         // when
         auctionHandler.handle(routingContext);
