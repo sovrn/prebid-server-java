@@ -150,7 +150,7 @@ public class AuctionRequestFactory {
                             isIncludeWinnersNull ? true : targeting.getIncludewinners(),
                             isIncludeBidderKeysNull ? true : targeting.getIncludebidderkeys()),
                     prebid.getStoredrequest(),
-                    prebid.getCache())));
+                    prebid.getCache()), extBidRequest.getRubicon()));
         }
         return null;
     }

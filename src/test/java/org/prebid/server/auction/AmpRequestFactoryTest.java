@@ -155,7 +155,7 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithDefaultPrebidValuesIfPrebidIsNull() {
         // given
-        final ObjectNode extBidRequest = mapper.valueToTree(ExtBidRequest.of(null));
+        final ObjectNode extBidRequest = mapper.valueToTree(ExtBidRequest.of(null, null));
         final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(extBidRequest),
                 Imp.builder().build());
         given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
@@ -437,7 +437,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null)))
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null)))
                         .site(Site.builder().page("will-be-overridden").build()),
                 Imp.builder().build());
 
@@ -464,7 +464,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null)))
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null)))
                         .site(null),
                 Imp.builder().build());
 
@@ -495,7 +495,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -531,7 +531,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -567,7 +567,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -602,7 +602,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -636,7 +636,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -669,7 +669,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(asList(Format.builder().w(1).h(2).build(),
@@ -700,7 +700,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(asList(Format.builder().w(1).h(2).build(),
@@ -731,7 +731,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -764,7 +764,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -796,7 +796,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -829,7 +829,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -862,7 +862,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -895,7 +895,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -932,7 +932,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -967,7 +967,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder()
@@ -1000,7 +1000,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder().build());
 
         given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
@@ -1025,7 +1025,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
                         .tmax(500L)
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder().build());
 
         given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
@@ -1055,7 +1055,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         return BidRequest.builder()
                 .imp(singletonList(Imp.builder().build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(
-                        ExtRequestPrebid.of(null, null, extRequestTargeting, null, extRequestPrebidCache))))
+                        ExtRequestPrebid.of(null, null, extRequestTargeting, null, extRequestPrebidCache), null)))
                 .build();
     }
 }

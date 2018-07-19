@@ -51,7 +51,10 @@ import org.prebid.server.bidder.rubicon.proto.RubiconUserExtRp;
 import org.prebid.server.bidder.rubicon.proto.RubiconVideoExt;
 import org.prebid.server.bidder.rubicon.proto.RubiconVideoExtRp;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestRubicon;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestRubiconDebug;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
@@ -585,6 +588,43 @@ public class RubiconBidderTest extends VertxTest {
         // given
         final HttpCall<BidRequest> httpCall = givenHttpCall(givenBidRequest(identity()),
                 givenBidResponse(ZERO));
+
+        // when
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue()).isEmpty();
+    }
+
+    @Test
+    public void makeBidsShouldReturnOverriddenPriceForVideoBidIfPriceLessOrEqualToZero()
+            throws JsonProcessingException {
+        // given
+        final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(mapper.valueToTree(
+                ExtBidRequest.of(null, ExtRequestRubicon.of(ExtRequestRubiconDebug.of(5.015f))))),
+                builder -> builder.video(Video.builder().build()),
+                identity());
+        final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest, givenBidResponse(ZERO));
+
+        // when
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue())
+                .containsOnly(BidderBid.of(Bid.builder().price(BigDecimal.valueOf(5.015f)).build(), video, "USD"));
+    }
+
+    @Test
+    public void makeBidsShouldNotReturnImpForBannerBidIfPriceLessOrEqualToZeroAndCpmOverridePresents()
+            throws JsonProcessingException {
+        // given
+        final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(mapper.valueToTree(
+                ExtBidRequest.of(null, ExtRequestRubicon.of(ExtRequestRubiconDebug.of(5.015f))))),
+                identity(),
+                identity());
+        final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest, givenBidResponse(ZERO));
 
         // when
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);

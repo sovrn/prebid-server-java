@@ -247,7 +247,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        null, null, ExtRequestTargeting.of(new TextNode("low"), null, null, null), null, null))))
+                        null, null, ExtRequestTargeting.of(new TextNode("low"), null, null, null), null, null), null)))
                 .build());
 
         // when
@@ -272,7 +272,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        null, null, ExtRequestTargeting.of(new TextNode("invalid"), null, null, null), null, null))))
+                        null, null, ExtRequestTargeting.of(new TextNode("invalid"), null, null, null), null, null),
+                        null)))
                 .build());
 
         // when
@@ -290,7 +291,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        null, null, ExtRequestTargeting.of(null, null, null, null), null, null))))
+                        null, null, ExtRequestTargeting.of(null, null, null, null), null, null), null)))
                 .build());
 
         // when
@@ -315,7 +316,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        null, null, ExtRequestTargeting.of(null, null, null, null), null, null))))
+                        null, null, ExtRequestTargeting.of(null, null, null, null), null, null), null)))
                 .build());
 
         // when
@@ -339,7 +340,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        null, null, ExtRequestTargeting.of(null, null, null, null), null, null))))
+                        null, null, ExtRequestTargeting.of(null, null, null, null), null, null), null)))
                 .build());
 
         // when

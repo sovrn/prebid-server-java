@@ -414,7 +414,7 @@ public class ExchangeServiceTest extends VertxTest {
                                         null))).build())
                         .regs(Regs.of(null, mapper.valueToTree(ExtRegs.of(1))))
                         .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                                singletonMap("bidderAlias", "someBidder"), null, null, null, null)))));
+                                singletonMap("bidderAlias", "someBidder"), null, null, null, null), null))));
 
         // when
         exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null);
@@ -522,7 +522,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(singletonList(
                 givenImp(singletonMap("bidderAlias", 1), identity())),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        singletonMap("bidderAlias", "bidder"), null, null, null, null)))));
+                        singletonMap("bidderAlias", "bidder"), null, null, null, null), null))));
 
         // when
         exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null);
@@ -544,7 +544,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(singletonList(
                 givenImp(doubleMap("bidder", 1, "bidderAlias", 2), identity())),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        singletonMap("bidderAlias", "bidder"), null, null, null, null)))));
+                        singletonMap("bidderAlias", "bidder"), null, null, null, null), null))));
 
         // when
         exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null);
@@ -668,19 +668,19 @@ public class ExchangeServiceTest extends VertxTest {
 
         given(bidderRequester.requestBids(eq(givenBidRequest(givenSingleImp(singletonMap("bidder", 1)),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        singletonMap("bidderAlias", "bidder"), null, null, null, null)))))), any()))
+                        singletonMap("bidderAlias", "bidder"), null, null, null, null), null))))), any()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().price(BigDecimal.ONE).build())))));
 
         given(bidderRequester.requestBids(eq(givenBidRequest(givenSingleImp(singletonMap("bidder", 2)),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        singletonMap("bidderAlias", "bidder"), null, null, null, null)))))), any()))
+                        singletonMap("bidderAlias", "bidder"), null, null, null, null), null))))), any()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().price(BigDecimal.ONE).build())))));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(doubleMap("bidder", 1, "bidderAlias", 2)),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                        singletonMap("bidderAlias", "bidder"), null, null, null, null)))));
+                        singletonMap("bidderAlias", "bidder"), null, null, null, null), null))));
 
         // when
         final BidResponse bidResponse =
@@ -872,7 +872,7 @@ public class ExchangeServiceTest extends VertxTest {
                                 Json.mapper.valueToTree(ExtPriceGranularity.of(2, singletonList(
                                         ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
                                 null, true, true),
-                        null, null)))));
+                        null, null), null))));
 
         given(responseBidValidator.validate(any()))
                 .willReturn(ValidationResult.error("bid validation error"));
@@ -910,7 +910,7 @@ public class ExchangeServiceTest extends VertxTest {
                                                 Json.mapper.valueToTree(ExtPriceGranularity.of(2, singletonList(
                                                         ExtGranularityRange.of(BigDecimal.valueOf(5),
                                                                 BigDecimal.valueOf(0.5))))), null, true, true),
-                                        null, null)))));
+                                        null, null), null))));
 
         // when
         final BidResponse bidResponse =
@@ -947,7 +947,7 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
                                 2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                         BigDecimal.valueOf(0.5))))), null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null))))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null)), null))));
 
         // when
         final BidResponse bidResponse =
@@ -985,7 +985,7 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
                                 2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                         BigDecimal.valueOf(0.5))))), null, true, true), null,
-                        ExtRequestPrebidCache.of(null, ExtRequestPrebidCacheVastxml.of(null)))))));
+                        ExtRequestPrebidCache.of(null, ExtRequestPrebidCacheVastxml.of(null))), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1022,7 +1022,7 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(2,
                                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
                                 null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null))))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null)), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1059,7 +1059,7 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(2,
                                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
                                 null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null))))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null)), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1094,7 +1094,7 @@ public class ExchangeServiceTest extends VertxTest {
                         ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(2,
                                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
                                 null, true, true),
-                        null, null)))));
+                        null, null), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1124,7 +1124,7 @@ public class ExchangeServiceTest extends VertxTest {
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(2,
                                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
-                                null, false, true), null, null)))));
+                                null, false, true), null, null), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1152,7 +1152,7 @@ public class ExchangeServiceTest extends VertxTest {
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(2,
                                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
-                                null, true, false), null, null)))));
+                                null, true, false), null, null), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1299,7 +1299,7 @@ public class ExchangeServiceTest extends VertxTest {
                         ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(2,
                                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5))))),
                                 null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null))))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null), null)), null))));
 
         // when
         exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
@@ -1390,7 +1390,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(singletonList(givenImp(singletonMap("bidder", 2), identity())),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(emptyMap(),
-                        singletonMap("bidder", BigDecimal.valueOf(10.0)), null, null, null)))));
+                        singletonMap("bidder", BigDecimal.valueOf(10.0)), null, null, null), null))));
 
         given(currencyService.convertCurrency(any(), any(), any(), any())).willReturn(BigDecimal.valueOf(10.0));
 
@@ -1522,7 +1522,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(singletonList(givenImp(singletonMap("bidder", 2), identity())),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(emptyMap(),
-                        singletonMap("bidder", BigDecimal.valueOf(2.468)), null, null, null)))));
+                        singletonMap("bidder", BigDecimal.valueOf(2.468)), null, null, null), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1543,7 +1543,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(singletonList(givenImp(singletonMap("bidder", 2), identity())),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(emptyMap(),
-                        singletonMap("some-other-bidder", BigDecimal.TEN), null, null, null)))));
+                        singletonMap("some-other-bidder", BigDecimal.TEN), null, null, null), null))));
 
         // when
         final BidResponse bidResponse =

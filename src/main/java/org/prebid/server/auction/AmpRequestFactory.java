@@ -22,6 +22,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheBids;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheVastxml;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestRubicon;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.util.HttpUtil;
 
@@ -141,7 +142,8 @@ public class AmpRequestFactory {
 
         return setDefaultTargeting || setDefaultCache || setSecure || setTestParam
                 ? bidRequest.toBuilder()
-                .ext(createExtWithDefaults(bidRequest, prebid, setDefaultTargeting, setDefaultCache))
+                .ext(createExtWithDefaults(bidRequest, prebid, setDefaultTargeting, setDefaultCache,
+                        requestExt.getRubicon()))
                 .imp(setSecure ? Collections.singletonList(imps.get(0).toBuilder().secure(1).build()) : imps)
                 .test(setTestParam ? Integer.valueOf(1) : test)
                 .build()
@@ -324,7 +326,8 @@ public class AmpRequestFactory {
      * Creates updated with default values bidrequest.ext {@link ObjectNode}
      */
     private static ObjectNode createExtWithDefaults(BidRequest bidRequest, ExtRequestPrebid prebid,
-                                                    boolean setDefaultTargeting, boolean setDefaultCache) {
+                                                    boolean setDefaultTargeting, boolean setDefaultCache,
+                                                    ExtRequestRubicon extRequestRubicon) {
         final boolean isPrebidNull = prebid == null;
 
         return setDefaultTargeting || setDefaultCache
@@ -338,7 +341,7 @@ public class AmpRequestFactory {
                         setDefaultCache
                                 ? ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null),
                                 ExtRequestPrebidCacheVastxml.of(null))
-                                : isPrebidNull ? null : prebid.getCache())))
+                                : isPrebidNull ? null : prebid.getCache()), extRequestRubicon))
                 : bidRequest.getExt();
     }
 

@@ -15,6 +15,7 @@ import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
 import com.iab.openrtb.request.Video;
+import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -53,6 +54,9 @@ import org.prebid.server.bidder.rubicon.proto.RubiconVideoExt;
 import org.prebid.server.bidder.rubicon.proto.RubiconVideoExtRp;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestRubicon;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestRubiconDebug;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
@@ -348,14 +352,44 @@ public class RubiconBidder implements Bidder<BidRequest> {
     }
 
     private static List<BidderBid> bidsFromResponse(BidRequest bidRequest, BidResponse bidResponse) {
+        final Float cpmOverride = cpmOverrideFrom(bidRequest);
+
         return bidResponse.getSeatbid().stream()
                 .filter(Objects::nonNull)
                 .map(SeatBid::getBid)
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
+                .map(bid -> overridePriceIfZeroForDebug(bid, cpmOverride, bidRequest))
                 .filter(bid -> bid.getPrice().compareTo(BigDecimal.ZERO) > 0)
                 .map(bid -> BidderBid.of(bid, bidType(bidRequest), DEFAULT_BID_CURRENCY))
                 .collect(Collectors.toList());
+    }
+
+    private static Float cpmOverrideFrom(BidRequest bidRequest) {
+        final ObjectNode ext = bidRequest.getExt();
+        if (ext == null) {
+            return null;
+        }
+
+        final ExtBidRequest extBidRequest;
+        try {
+            extBidRequest = Json.mapper.treeToValue(ext, ExtBidRequest.class);
+        } catch (JsonProcessingException e) {
+            throw new DecodeException(String.format("Error decoding bidRequest.ext: %s", e.getMessage()));
+        }
+
+        final ExtRequestRubicon extRequestRubicon = extBidRequest.getRubicon();
+        final ExtRequestRubiconDebug extRequestRubiconDebug = extRequestRubicon != null
+                ? extRequestRubicon.getDebug() : null;
+        return extRequestRubiconDebug != null ? extRequestRubiconDebug.getCpmOverride() : null;
+    }
+
+    private static Bid overridePriceIfZeroForDebug(Bid bid, Float cpmOverride, BidRequest bidRequest) {
+        return cpmOverride != null && cpmOverride > 0
+                && bid.getPrice().compareTo(BigDecimal.ZERO) <= 0
+                && bidType(bidRequest) == BidType.video
+                ? bid.toBuilder().price(BigDecimal.valueOf(cpmOverride)).build()
+                : bid;
     }
 
     private static BidType bidType(BidRequest bidRequest) {
