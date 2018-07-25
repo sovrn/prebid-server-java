@@ -44,5 +44,5 @@ gdpr:
   vendorlist:
     filesystem-cache-dir: /app/prebid-server/data/vendorlist-cache
   rubicon:
-    enable-cookie: false
+    enable-cookie: true
     rsid-cookie-encryption-key: fdvndnvavad jdavao89571-34242134fdfads
