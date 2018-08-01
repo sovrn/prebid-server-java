@@ -41,6 +41,7 @@ host-cookie:
     value: "true"
 status-response: ready
 gdpr:
+  host-vendor-id: 52
   vendorlist:
     filesystem-cache-dir: /app/prebid-server/data/vendorlist-cache
   geolocation:
