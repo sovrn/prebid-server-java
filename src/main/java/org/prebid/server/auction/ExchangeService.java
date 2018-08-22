@@ -517,7 +517,6 @@ public class ExchangeService {
                 .lat(lat != null ? Float.valueOf(ROUND_TWO_DECIMALS.format(lat)) : null)
                 .build()
                 : null;
-
     }
 
     private List<Imp> prepareImps(String bidder, List<Imp> imps) {
@@ -795,6 +794,9 @@ public class ExchangeService {
                 break;
             case bad_server_response:
                 errorMetric = MetricName.badserverresponse;
+                break;
+            case failed_to_request_bids:
+                errorMetric = MetricName.failedtorequestbids;
                 break;
             case timeout:
                 errorMetric = MetricName.timeout;

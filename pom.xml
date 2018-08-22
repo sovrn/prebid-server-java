@@ -33,7 +33,7 @@
         <spring.boot.version>1.5.9.RELEASE</spring.boot.version>
         <validation-api.version>2.0.1.Final</validation-api.version>
         <hibernate-validator.version>6.0.7.Final</hibernate-validator.version>
-        <vertx.version>3.5.2</vertx.version>
+        <vertx.version>3.5.3</vertx.version>
         <lombok.version>1.16.16</lombok.version>
         <commons.version>3.6</commons.version>
         <commons.collections.version>4.1</commons.collections.version>
@@ -63,6 +63,7 @@
         <checkstyle.version>7.6</checkstyle.version>
         <download-plugin.version>1.2.0</download-plugin.version>
         <jacoco-plugin.version>0.8.0</jacoco-plugin.version>
+        <git-commmit-plugin.version>2.2.4</git-commmit-plugin.version>
     </properties>
 
     <repositories>
@@ -419,6 +420,28 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>pl.project13.maven</groupId>
+                <artifactId>git-commit-id-plugin</artifactId>
+                <version>${git-commmit-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>get-the-git-infos</id>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
+                    <prefix>git</prefix>
+                    <verbose>false</verbose>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <generateGitPropertiesFilename>${project.build.outputDirectory}/git-revision.json
+                    </generateGitPropertiesFilename>
+                    <format>json</format>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

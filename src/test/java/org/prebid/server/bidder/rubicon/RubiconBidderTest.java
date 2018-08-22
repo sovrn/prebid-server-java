@@ -82,7 +82,7 @@ public class RubiconBidderTest extends VertxTest {
     private static final String USERNAME = "username";
     private static final String PASSWORD = "password";
 
-    private final MetaInfo rubiconMetaInfo = new RubiconMetaInfo(true);
+    private final MetaInfo rubiconMetaInfo = new RubiconMetaInfo(true, true);
 
     private RubiconBidder rubiconBidder;
 

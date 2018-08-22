@@ -12,7 +12,6 @@ import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CookieHandler;
 import io.vertx.ext.web.handler.CorsHandler;
 import io.vertx.ext.web.handler.StaticHandler;
-import io.vertx.ext.web.handler.TimeoutHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.analytics.CompositeAnalyticsReporter;
@@ -29,6 +28,7 @@ import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.handler.AuctionHandler;
 import org.prebid.server.handler.BidderParamHandler;
+import org.prebid.server.handler.ConnectionHandler;
 import org.prebid.server.handler.CookieSyncHandler;
 import org.prebid.server.handler.GetuidsHandler;
 import org.prebid.server.handler.NoCacheHandler;
@@ -79,6 +79,9 @@ public class WebConfiguration {
     private HttpServerOptions httpServerOptions;
 
     @Autowired
+    private ConnectionHandler connectionHandler;
+
+    @Autowired
     private Router router;
 
     @Value("${http.port}")
@@ -90,7 +93,10 @@ public class WebConfiguration {
                 httpPort);
 
         contextRunner.<HttpServer>runOnNewContext(httpServerNum, future ->
-                vertx.createHttpServer(httpServerOptions).requestHandler(router::accept).listen(httpPort, future));
+                vertx.createHttpServer(httpServerOptions)
+                        .connectionHandler(connectionHandler)
+                        .requestHandler(router::accept)
+                        .listen(httpPort, future));
 
         logger.info("Successfully started {0} instances of Http Server", httpServerNum);
     }
@@ -99,7 +105,13 @@ public class WebConfiguration {
     HttpServerOptions httpServerOptions() {
         return new HttpServerOptions()
                 .setHandle100ContinueAutomatically(true)
-                .setCompressionSupported(true);
+                .setCompressionSupported(true)
+                .setIdleTimeout(10); // kick off long processing requests
+    }
+
+    @Bean
+    ConnectionHandler connectionHandler(Metrics metrics) {
+        return ConnectionHandler.create(metrics);
     }
 
     @Bean
@@ -122,7 +134,6 @@ public class WebConfiguration {
                   StaticHandler staticHandler) {
 
         final Router router = Router.router(vertx);
-        router.route().handler(TimeoutHandler.create(10000)); // kick off long processing requests
         router.route().handler(cookieHandler);
         router.route().handler(bodyHandler);
         router.route().handler(noCacheHandler);
@@ -228,12 +239,18 @@ public class WebConfiguration {
     @Bean
     CookieSyncHandler cookieSyncHandler(
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
+            @Value("${cookie-sync.default-timeout-ms}") int defaultTimeoutMs,
             UidsCookieService uidsCookieService,
             BidderCatalog bidderCatalog,
+            GdprService gdprService,
+            @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
+            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation,
             CompositeAnalyticsReporter analyticsReporter,
-            Metrics metrics) {
+            Metrics metrics,
+            TimeoutFactory timeoutFactory) {
 
-        return new CookieSyncHandler(enableCookie, uidsCookieService, bidderCatalog, analyticsReporter, metrics);
+        return new CookieSyncHandler(enableCookie, defaultTimeoutMs, uidsCookieService, bidderCatalog, gdprService, hostVendorId,
+                useGeoLocation, analyticsReporter, metrics, timeoutFactory);
     }
 
     @Bean

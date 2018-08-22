@@ -40,6 +40,9 @@ This parameter affects how many CPU cores will be utilized by the application. R
 ## Setuid
 - `setuid.default-timeout-ms` - default operation timeout for requests to `/setuid` endpoint.
 
+## Cookie Sync
+- `cookie-sync.default-timeout-ms` - default operation timeout for requests to `/cookie_sync` endpoint.
+
 ## Adapters
 - `adapters.*` - the section for bidder specific configuration options.
 
@@ -47,6 +50,7 @@ There are several typical keys:
 - `adapters.<BIDDER_NAME>.enabled` - indicates the bidder should be active and ready for auction. By default all bidders are disabled.
 - `adapters.<BIDDER_NAME>.endpoint` - the url for submitting bids.
 - `adapters.<BIDDER_NAME>.usersync-url` - the url for synchronizing UIDs cookie.
+- `adapters.<BIDDER_NAME>.pbs-enforces-gdpr` - indicates if pbs server provides gdpr support for bidder or bidder will handle it itself.
 
 But feel free to add additional bidder's specific options.
 
@@ -72,8 +76,9 @@ For `influxdb` backend type available next options:
 - `metrics.influxdb.readTimeout` - the response timeout.
 - `metrics.influxdb.interval` - interval in seconds between successive sending metrics.
 
-It is possible to define how many account-level metrics will be submitted on per-account basis:
-- `metrics.accounts.default-verbosity` - verbosity for accounts not specified in next sections. Allowed values: `none, basic, detailed`.
+It is possible to define how many account-level metrics will be submitted on per-account basis.
+See [metrics documentation](metrics.md) for complete list of metrics submitted at each verbosity level.
+- `metrics.accounts.default-verbosity` - verbosity for accounts not specified in next sections. Allowed values: `none, basic, detailed`. Default is `none`.
 - `metrics.accounts.basic-verbosity` - a list of accounts for which only basic metrics will be submitted.
 - `metrics.accounts.detailed-verbosity` - a list of accounts for which all metrics will be submitted. 
 
