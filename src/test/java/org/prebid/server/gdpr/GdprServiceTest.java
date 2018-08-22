@@ -253,7 +253,7 @@ public class GdprServiceTest {
         // when
         final Future<?> future =
                 gdprService.resultByVendor(singleton(GdprPurpose.informationStorageAndAccess), singleton(1), "1",
-                        "BONciguONcjGKADACHENAOLS1r", null, null);
+                        "BONciguONcjGKADACHENAOLS1r", null, null, null);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -266,7 +266,7 @@ public class GdprServiceTest {
         // when
         final Future<?> future =
                 gdprService.resultByVendor(singleton(GdprPurpose.informationStorageAndAccess), singleton(1), "1",
-                        "BOSbaBZOSbaBoABABBENBcoAAAAgSABgBAA", null, null);
+                        "BOSbaBZOSbaBoABABBENBcoAAAAgSABgBAA", null, null, null);
 
         // then
         assertThat(future.failed()).isTrue();

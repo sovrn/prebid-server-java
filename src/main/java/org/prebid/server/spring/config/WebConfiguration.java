@@ -249,7 +249,8 @@ public class WebConfiguration {
             Metrics metrics,
             TimeoutFactory timeoutFactory) {
 
-        return new CookieSyncHandler(enableCookie, defaultTimeoutMs, uidsCookieService, bidderCatalog, gdprService, hostVendorId,
+        return new CookieSyncHandler(enableCookie, defaultTimeoutMs, uidsCookieService, bidderCatalog, gdprService,
+                hostVendorId,
                 useGeoLocation, analyticsReporter, metrics, timeoutFactory);
     }
 

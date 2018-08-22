@@ -45,9 +45,6 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     private static final Set<GdprPurpose> GDPR_PURPOSES =
             Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess));
 
-    private static final String GDPR_PLACEHOLDER = "{{gdpr}}";
-    private static final String GDPR_CONSENT_PLACEHOLDER = "{{gdpr_consent}}";
-
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
     private final BidderCatalog bidderCatalog;
@@ -58,9 +55,10 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     private final Metrics metrics;
     private final TimeoutFactory timeoutFactory;
 
-    public CookieSyncHandler(boolean enableCookie, long defaultTimeout, UidsCookieService uidsCookieService, BidderCatalog bidderCatalog,
-                             GdprService gdprService, Integer gdprHostVendorId, boolean useGeoLocation,
-                             AnalyticsReporter analyticsReporter, Metrics metrics, TimeoutFactory timeoutFactory) {
+    public CookieSyncHandler(boolean enableCookie, long defaultTimeout, UidsCookieService uidsCookieService,
+                             BidderCatalog bidderCatalog, GdprService gdprService, Integer gdprHostVendorId,
+                             boolean useGeoLocation, AnalyticsReporter analyticsReporter, Metrics metrics,
+                             TimeoutFactory timeoutFactory) {
         this.enableCookie = enableCookie;
         this.defaultTimeout = defaultTimeout;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
@@ -128,7 +126,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         final String ip = useGeoLocation ? HttpUtil.ipFrom(context.request()) : null;
         final String gdprAsString = gdpr != null ? gdpr.toString() : null;
         gdprService.resultByVendor(GDPR_PURPOSES, Collections.singleton(gdprHostVendorId), gdprAsString, gdprConsent,
-                ip, timeoutFactory.create(defaultTimeout))
+                ip, timeoutFactory.create(defaultTimeout), context)
                 .setHandler(asyncResult -> handleGdprResultForHost(asyncResult, context, uidsCookie, biddersToSync, ip,
                         gdprAsString, gdprConsent));
     }
@@ -144,7 +142,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         } else {
             final Set<Integer> vendorIds = gdprVendorIdsFor(biddersToSync);
             gdprService.resultByVendor(GDPR_PURPOSES, vendorIds, gdpr, gdprConsent, ip,
-                    timeoutFactory.create(defaultTimeout))
+                    timeoutFactory.create(defaultTimeout), context)
                     .setHandler(asyncResultForBidders -> handleGdprResultForBidders(asyncResultForBidders, context,
                             uidsCookie, biddersToSync, gdpr, gdprConsent));
         }

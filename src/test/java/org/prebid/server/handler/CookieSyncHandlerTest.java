@@ -93,14 +93,17 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
-        cookieSyncHandler = new CookieSyncHandler(true, 2000, uidsCookieService, bidderCatalog, gdprService, null, false,
-                analyticsReporter, metrics, timeoutFactory);
+        cookieSyncHandler = new CookieSyncHandler(true, 2000, uidsCookieService, bidderCatalog, gdprService, null,
+                false, analyticsReporter, metrics, timeoutFactory);
     }
 
     @Test
     public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookiesDisables() {
         // given
-        cookieSyncHandler = new CookieSyncHandler(false, uidsCookieService, bidderCatalog, analyticsReporter, metrics);
+        final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+        final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
+        cookieSyncHandler = new CookieSyncHandler(false, 2000, uidsCookieService, bidderCatalog, gdprService, null,
+                false, analyticsReporter, metrics, timeoutFactory);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -563,7 +566,7 @@ public class CookieSyncHandlerTest extends VertxTest {
             vendorToGdprResult.put(entry.getValue(), true);
         }
 
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(vendorToGdprResult, null)));
     }
 
