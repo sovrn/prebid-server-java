@@ -530,7 +530,7 @@ public class ApplicationTest extends VertxTest {
                 .queryParam("bidder", RUBICON)
                 .queryParam("uid", "updatedUid")
                 .queryParam("gdpr", "1")
-                .queryParam("account_id", "accountId")
+                .queryParam("account", "account")
                 .queryParam("gdpr_consent", "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA")
                 .when()
                 .get("/setuid")

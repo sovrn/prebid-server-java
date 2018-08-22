@@ -83,7 +83,7 @@ public class SetuidHandlerTest extends VertxTest {
         given(routingContext.response()).willReturn(httpResponse);
         given(routingContext.addCookie(any())).willReturn(routingContext);
 
-        given(httpRequest.getParam("account_id")).willReturn("accountId");
+        given(httpRequest.getParam("account")).willReturn("account");
 
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
@@ -127,11 +127,12 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldRespondWithErrorIfAccountIdParamIsMissing() {
+    public void shouldRespondWithErrorIfAccountParamIsMissingAndUserInGdprScope() {
         // given
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
-        given(httpRequest.getParam("account_id")).willReturn(null);
+        given(httpRequest.getParam("account")).willReturn(null);
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
 
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
@@ -140,7 +141,28 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end(eq("\"account_id\" query param is required"));
+        verify(httpResponse).end(eq("\"account\" query param is required"));
+        verifyNoMoreInteractions(httpResponse);
+    }
+
+    @Test
+    public void shouldNotRespondWithErrorIfAccountParamIsMissingAndUserNotInGdprScope() {
+        // given
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, false), null)));
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+        given(httpRequest.getParam("account")).willReturn(null);
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(200));
+        verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
         verifyNoMoreInteractions(httpResponse);
     }
 

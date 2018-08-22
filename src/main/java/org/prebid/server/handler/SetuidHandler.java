@@ -32,7 +32,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private static final Set<GdprPurpose> GDPR_PURPOSES =
             Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess));
     private static final String BIDDER_PARAM = "bidder";
-    private static final String ACCOUNT_ID_PARAM = "account_id";
+    private static final String ACCOUNT_PARAM = "account";
 
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
@@ -77,12 +77,6 @@ public class SetuidHandler implements Handler<RoutingContext> {
             return;
         }
 
-        final String accountId = context.request().getParam(ACCOUNT_ID_PARAM);
-        if (StringUtils.isBlank(accountId)) {
-            respondWithMissingParamMessage(ACCOUNT_ID_PARAM, context);
-            return;
-        }
-
         final String bidder = context.request().getParam(BIDDER_PARAM);
         if (StringUtils.isBlank(bidder)) {
             respondWithMissingParamMessage(BIDDER_PARAM, context);
@@ -91,10 +85,11 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
         final String gdpr = context.request().getParam("gdpr");
         final String gdprConsent = context.request().getParam("gdpr_consent");
+        final String account = context.request().getParam(ACCOUNT_PARAM);
         final String ip = useGeoLocation ? HttpUtil.ipFrom(context.request()) : null;
         gdprService.resultByVendor(GDPR_PURPOSES, gdprVendorIds, gdpr, gdprConsent, ip,
                 timeoutFactory.create(defaultTimeout), context)
-                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, accountId, bidder,
+                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, account, bidder,
                         gdprConsent, ip));
     }
 
@@ -106,14 +101,19 @@ public class SetuidHandler implements Handler<RoutingContext> {
     }
 
     private void handleResult(AsyncResult<GdprResponse> asyncResult, RoutingContext context,
-                              UidsCookie uidsCookie, String accountId, String bidder, String gdprConsent, String ip) {
+                              UidsCookie uidsCookie, String account, String bidder, String gdprConsent, String ip) {
         final boolean gdprProcessingFailed = asyncResult.failed();
         final GdprResponse gdprResponse = asyncResult.result();
         final boolean allowedCookie = !gdprProcessingFailed && gdprResponse.getVendorsToGdpr().values()
                 .iterator().next();
 
         if (allowedCookie) {
-            respondWithCookie(context, accountId, bidder, uidsCookie, gdprConsent, gdprResponse.getCountry(), ip);
+            if (StringUtils.isBlank(account)) {
+                respondWithMissingParamMessage(ACCOUNT_PARAM, context);
+                return;
+            }
+
+            respondWithCookie(context, account, bidder, uidsCookie, gdprConsent, gdprResponse.getCountry(), ip);
         } else {
             final int status;
             final String body;
