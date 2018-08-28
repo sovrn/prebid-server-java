@@ -12,6 +12,7 @@ public class UsersyncInfo {
 
     public static final String GDPR_PLACEHOLDER = "{{gdpr}}";
     public static final String GDPR_CONSENT_PLACEHOLDER = "{{gdpr_consent}}";
+    public static final String ACCOUNT_PLACEHOLDER = "{{account}}";
 
     String url;
 
@@ -42,6 +43,17 @@ public class UsersyncInfo {
 
             return UsersyncInfo.of(updatedUrl, type, supportCORS);
         }
+        return this;
+    }
+
+    public UsersyncInfo withAccount(String account) {
+        if (url.contains(ACCOUNT_PLACEHOLDER)) {
+            final String updatedUrl = url.replace(ACCOUNT_PLACEHOLDER,
+                    HttpUtil.encodeUrl(ObjectUtils.firstNonNull(account, "")));
+
+            return UsersyncInfo.of(updatedUrl, type, supportCORS);
+        }
+
         return this;
     }
 }

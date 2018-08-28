@@ -128,7 +128,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         gdprService.resultByVendor(GDPR_PURPOSES, Collections.singleton(gdprHostVendorId), gdprAsString, gdprConsent,
                 ip, timeoutFactory.create(defaultTimeout), context)
                 .setHandler(asyncResult -> handleGdprResultForHost(asyncResult, context, uidsCookie, biddersToSync, ip,
-                        gdprAsString, gdprConsent));
+                        gdprAsString, gdprConsent, cookieSyncRequest.getAccount()));
     }
 
     /**
@@ -136,15 +136,15 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private void handleGdprResultForHost(AsyncResult<GdprResponse> asyncResultForHost, RoutingContext context,
                                          UidsCookie uidsCookie, Collection<String> biddersToSync, String ip,
-                                         String gdpr, String gdprConsent) {
+                                         String gdpr, String gdprConsent, String account) {
         if (asyncResultForHost.failed()) {
-            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync);
+            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync, account);
         } else {
             final Set<Integer> vendorIds = gdprVendorIdsFor(biddersToSync);
             gdprService.resultByVendor(GDPR_PURPOSES, vendorIds, gdpr, gdprConsent, ip,
                     timeoutFactory.create(defaultTimeout), context)
                     .setHandler(asyncResultForBidders -> handleGdprResultForBidders(asyncResultForBidders, context,
-                            uidsCookie, biddersToSync, gdpr, gdprConsent));
+                            uidsCookie, biddersToSync, gdpr, gdprConsent, account));
         }
     }
 
@@ -153,9 +153,9 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private void handleGdprResultForBidders(AsyncResult<GdprResponse> asyncResultForBidders, RoutingContext context,
                                             UidsCookie uidsCookie, Collection<String> biddersToSync,
-                                            String gdpr, String gdprConsent) {
+                                            String gdpr, String gdprConsent, String account) {
         if (asyncResultForBidders.failed()) {
-            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync);
+            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync, account);
         } else {
             final Set<Integer> vendorIds = asyncResultForBidders.result().getVendorsToGdpr().entrySet().stream()
                     .filter(Map.Entry::getValue) // get bidders passed GDPR verification
@@ -166,7 +166,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                     .filter(bidder -> !vendorIds.contains(gdprVendorIdFor(bidder)))
                     .collect(Collectors.toSet());
 
-            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersRejectedByGdpr);
+            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersRejectedByGdpr, account);
         }
     }
 
@@ -193,9 +193,10 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      * Make HTTP response for given bidders.
      */
     private void respondWith(RoutingContext context, UidsCookie uidsCookie, String gdpr, String gdprConsent,
-                             Collection<String> bidders, Collection<String> biddersRejectedByGdpr) {
+                             Collection<String> bidders, Collection<String> biddersRejectedByGdpr, String account) {
         final List<BidderUsersyncStatus> bidderStatuses = bidders.stream()
-                .map(bidderName -> bidderStatusFor(bidderName, uidsCookie, biddersRejectedByGdpr, gdpr, gdprConsent))
+                .map(bidderName -> bidderStatusFor(bidderName, uidsCookie, biddersRejectedByGdpr, gdpr, gdprConsent,
+                        account))
                 .filter(Objects::nonNull) // skip bidder with live Uid
                 .collect(Collectors.toList());
 
@@ -217,7 +218,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private BidderUsersyncStatus bidderStatusFor(String bidderName, UidsCookie uidsCookie,
                                                  Collection<String> biddersRejectedByGdpr, String gdpr,
-                                                 String gdprConsent) {
+                                                 String gdprConsent, String account) {
         final BidderUsersyncStatus result;
 
         if (!bidderCatalog.isValidName(bidderName)) {
@@ -239,7 +240,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
             if (!uidsCookie.hasLiveUidFrom(usersyncer.cookieFamilyName())) {
                 result = bidderStatusBuilder(bidderName)
                         .noCookie(true)
-                        .usersync(usersyncer.usersyncInfo().withGdpr(gdpr, gdprConsent))
+                        .usersync(usersyncer.usersyncInfo().withGdpr(gdpr, gdprConsent).withAccount(account))
                         .build();
             } else {
                 result = null;

@@ -238,7 +238,8 @@ public class HttpAdapterConnector {
 
             bidderStatusBuilder
                     .noCookie(true)
-                    .usersync(usersyncer.usersyncInfo().withGdpr(gdpr, gdprConsent));
+                    .usersync(usersyncer.usersyncInfo().withGdpr(gdpr, gdprConsent)
+                            .withAccount(preBidRequest.getAccountId()));
         }
 
         final List<Result<List<Bid>>> bidsWithErrors = exchangeCalls.stream()

@@ -661,6 +661,35 @@ public class HttpAdapterConnectorTest extends VertxTest {
     }
 
     @Test
+    public void callShouldReturnGdprAwareAdapterResponseWithNoCookieIfNoAdapterUidInCookieAndNoAppInPreBidRequestWithAccount()
+            throws IOException {
+        // given
+        final Regs regs = Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1)));
+        final User user = User.builder()
+                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null)))
+                .build();
+        preBidRequestContext = givenPreBidRequestContext(identity(), builder -> builder.regs(regs).user(user).accountId("account"));
+
+        givenHttpClientReturnsResponses(200,
+                givenBidResponse(identity(), identity(), singletonList(identity())));
+
+        given(usersyncer.usersyncInfo()).willReturn(
+                UsersyncInfo.of("http://url?redir=%26account%3D{{account}}%26gdpr%3D{{gdpr}}%26gdpr_consent%3D{{gdpr_consent}}",
+                        null, false));
+
+        // when
+        final Future<AdapterResponse> adapterResponseFuture =
+                httpAdapterConnector.call(adapter, usersyncer, adapterRequest, preBidRequestContext);
+
+        // then
+        final AdapterResponse adapterResponse = adapterResponseFuture.result();
+        assertThat(adapterResponse.getBidderStatus().getNoCookie()).isTrue();
+        assertThat(adapterResponse.getBidderStatus().getUsersync()).isNotNull();
+        assertThat(adapterResponse.getBidderStatus().getUsersync())
+                .isEqualTo(UsersyncInfo.of("http://url?redir=%26account%3Daccount%26gdpr%3D1%26gdpr_consent%3Dconsent%241", null, false));
+    }
+
+    @Test
     public void callShouldReturnAdapterResponseWithoutNoCookieIfNoAdapterUidInCookieAndAppPresentInPreBidRequest()
             throws IOException {
         // given
