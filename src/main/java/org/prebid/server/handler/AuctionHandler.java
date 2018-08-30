@@ -122,7 +122,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
                                         bidderResults.<AdapterResponse>list())))
 
                 .compose((Tuple3<PreBidRequestContext, Account, List<AdapterResponse>> result) ->
-                        resolveVendorsToGdpr(result.getLeft(), result.getRight())
+                        resolveVendorsToGdpr(result.getLeft(), result.getRight(), context)
                                 .map(vendorsToGdpr -> Tuple3.of(result.getLeft(), result.getMiddle(),
                                         composePreBidResponse(result.getLeft(), result.getRight(), vendorsToGdpr))))
 
@@ -184,7 +184,8 @@ public class AuctionHandler implements Handler<RoutingContext> {
     }
 
     private Future<Map<Integer, Boolean>> resolveVendorsToGdpr(PreBidRequestContext preBidRequestContext,
-                                                               List<AdapterResponse> adapterResponses) {
+                                                               List<AdapterResponse> adapterResponses,
+                                                               RoutingContext context) {
         final Set<Integer> vendorIds = adapterResponses.stream()
                 .map(adapterResponse -> adapterResponse.getBidderStatus().getBidder())
                 .filter(bidderCatalog::isActive)
@@ -201,7 +202,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
         final String ip = useGeoLocation ? preBidRequestContext.getIp() : null;
 
         return gdprService.resultByVendor(GDPR_PURPOSES, vendorIds, gdpr, gdprConsent, ip,
-                preBidRequestContext.getTimeout())
+                preBidRequestContext.getTimeout(), context)
                 .map(gdprResponse -> toVendorsToGdpr(gdprResponse.getVendorsToGdpr(), hostVendorIdIsMissing));
     }
 
