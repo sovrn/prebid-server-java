@@ -183,9 +183,10 @@ public class ServiceConfiguration {
         @Bean
         @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "false",
                 matchIfMissing = true)
-        GeoLocationService basicGeoLocationService() {
+        GeoLocationService basicGeoLocationService(
+                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
 
-            return createGeoLocationService();
+            return createGeoLocationService(server);
         }
 
         @Bean
@@ -195,18 +196,20 @@ public class ServiceConfiguration {
                 Metrics metrics,
                 @Value("${gdpr.geolocation.circuit-breaker.max-failures}") int maxFailures,
                 @Value("${gdpr.geolocation.circuit-breaker.timeout-ms}") long timeoutMs,
-                @Value("${gdpr.geolocation.circuit-breaker.reset-timeout-ms}") long resetTimeoutMs) {
+                @Value("${gdpr.geolocation.circuit-breaker.reset-timeout-ms}") long resetTimeoutMs,
+                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
 
-            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(), metrics, maxFailures,
-                    timeoutMs, resetTimeoutMs);
+            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(server), metrics,
+                    maxFailures, timeoutMs, resetTimeoutMs);
         }
 
         /**
          * Geo location service is not implemented by default.
          * It can be provided by vendor (host company) itself.
          */
-        private GeoLocationService createGeoLocationService() {
-            throw new RuntimeException("Geo location service is not implemented");
+        private GeoLocationService createGeoLocationService(String server) {
+
+            return NetAcuityGeoLocationService.create(server);
         }
     }
 
@@ -216,21 +219,25 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    NetAcuityGeoLocationService netAcuityGeoLocationService(
-            @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
-
-        return NetAcuityGeoLocationService.create(server);
-    }
-
-    @Bean
     GdprService gdprService(
+            RsidCookieService rsidCookieService,
             @Autowired(required = false) GeoLocationService geoLocationService,
             VendorListService vendorListService,
             @Value("${gdpr.eea-countries}") String eeaCountriesAsString,
             @Value("${gdpr.default-value}") String defaultValue) {
 
         final List<String> eeaCountries = Arrays.asList(eeaCountriesAsString.trim().split(","));
-        return new GdprService(geoLocationService, vendorListService, eeaCountries, defaultValue);
+        return new GdprService(rsidCookieService, geoLocationService, vendorListService, eeaCountries, defaultValue);
+    }
+
+    @ConditionalOnProperty(name = "gdpr.rubicon.enable-cookie", matchIfMissing = true)
+    @Bean
+    UidsAuditCookieService uidsAuditCookieService(
+            @Value("${gdpr.rubicon.audit-cookie-encryption-key:#{null}}") String encryptionKey,
+            @Value("${host-cookie.ttl-days}") Integer ttlDays,
+            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp) {
+
+        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
     }
 
     @Bean

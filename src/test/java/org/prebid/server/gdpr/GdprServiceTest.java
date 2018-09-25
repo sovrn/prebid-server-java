@@ -194,8 +194,8 @@ public class GdprServiceTest {
     public void shouldReturnAllowedResultIfNoGdprParamAndConsentParamIsValidAndCountryIsInEEA() {
         // given
         given(geoLocationService.lookup(anyString(), any())).willReturn(Future.succeededFuture(GeoInfo.of("country1")));
-        gdprService = new GdprService(rsidCookieService, geoLocationService, singletonList("country1"),
-                vendorListService, "1");
+        gdprService = new GdprService(rsidCookieService, geoLocationService, vendorListService,
+                singletonList("country1"), "1");
 
         // when
         final Future<?> future =

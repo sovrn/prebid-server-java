@@ -1,5 +1,11 @@
 vertx:
   uploads-dir: /app/prebid-server/data/file-uploads
+http-client:
+  circuit-breaker:
+    enabled: true
+    max-failures: 20
+    timeout-ms: 2000
+    reset-timeout-ms: 20000
 adapters:
   appnexus:
     enabled: true
