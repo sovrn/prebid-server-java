@@ -4,7 +4,6 @@ import de.malkusch.whoisServerList.publicSuffixList.PublicSuffixList;
 import de.malkusch.whoisServerList.publicSuffixList.PublicSuffixListFactory;
 import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
-import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
@@ -22,6 +21,8 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.vendorlist.VendorListService;
+import org.prebid.server.geolocation.CircuitBreakerSecuredGeoLocationService;
+import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -32,6 +33,10 @@ import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
 import org.prebid.server.vertx.ContextRunner;
+import org.prebid.server.vertx.http.BasicHttpClient;
+import org.prebid.server.vertx.http.CircuitBreakerSecuredHttpClient;
+import org.prebid.server.vertx.http.HttpClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -43,6 +48,7 @@ import javax.validation.constraints.Min;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 @Configuration
@@ -110,15 +116,37 @@ public class ServiceConfiguration {
 
     @Bean
     @Scope(scopeName = VertxContextScope.NAME, proxyMode = ScopedProxyMode.INTERFACES)
-    HttpClient httpClient(
+    @ConditionalOnProperty(prefix = "http-client.circuit-breaker", name = "enabled", havingValue = "false",
+            matchIfMissing = true)
+    BasicHttpClient basicHttpClient(
+            Vertx vertx,
+            @Value("${http-client.max-pool-size}") int maxPoolSize,
+            @Value("${http-client.connect-timeout-ms}") int connectTimeoutMs) {
+
+        return createBasicHttpClient(vertx, maxPoolSize, connectTimeoutMs);
+    }
+
+    @Bean
+    @Scope(scopeName = VertxContextScope.NAME, proxyMode = ScopedProxyMode.INTERFACES)
+    @ConditionalOnProperty(prefix = "http-client.circuit-breaker", name = "enabled", havingValue = "true")
+    CircuitBreakerSecuredHttpClient circuitBreakerSecuredHttpClient(
+            Vertx vertx,
+            Metrics metrics,
             @Value("${http-client.max-pool-size}") int maxPoolSize,
             @Value("${http-client.connect-timeout-ms}") int connectTimeoutMs,
-            Vertx vertx) {
+            @Value("${http-client.circuit-breaker.max-failures}") int maxFailures,
+            @Value("${http-client.circuit-breaker.timeout-ms}") long timeoutMs,
+            @Value("${http-client.circuit-breaker.reset-timeout-ms}") long resetTimeoutMs) {
 
+        final HttpClient httpClient = createBasicHttpClient(vertx, maxPoolSize, connectTimeoutMs);
+        return new CircuitBreakerSecuredHttpClient(vertx, httpClient, metrics, maxFailures, timeoutMs, resetTimeoutMs);
+    }
+
+    private static BasicHttpClient createBasicHttpClient(Vertx vertx, int maxPoolSize, int connectTimeoutMs) {
         final HttpClientOptions options = new HttpClientOptions()
                 .setMaxPoolSize(maxPoolSize)
                 .setConnectTimeout(connectTimeoutMs);
-        return vertx.createHttpClient(options);
+        return new BasicHttpClient(vertx.createHttpClient(options));
     }
 
     @Bean
@@ -148,14 +176,38 @@ public class ServiceConfiguration {
                 hostVendorId, bidderCatalog);
     }
 
-    @ConditionalOnProperty(name = "gdpr.rubicon.enable-cookie", matchIfMissing = true)
-    @Bean
-    UidsAuditCookieService uidsAuditCookieService(
-            @Value("${gdpr.rubicon.audit-cookie-encryption-key:#{null}}") String encryptionKey,
-            @Value("${host-cookie.ttl-days}") Integer ttlDays,
-            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp) {
+    @Configuration
+    @ConditionalOnProperty(prefix = "gdpr.geolocation", name = "enabled", havingValue = "true")
+    static class GeoLocationConfiguration {
 
-        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
+        @Bean
+        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "false",
+                matchIfMissing = true)
+        GeoLocationService basicGeoLocationService() {
+
+            return createGeoLocationService();
+        }
+
+        @Bean
+        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
+        CircuitBreakerSecuredGeoLocationService circuitBreakerSecuredGeoLocationService(
+                Vertx vertx,
+                Metrics metrics,
+                @Value("${gdpr.geolocation.circuit-breaker.max-failures}") int maxFailures,
+                @Value("${gdpr.geolocation.circuit-breaker.timeout-ms}") long timeoutMs,
+                @Value("${gdpr.geolocation.circuit-breaker.reset-timeout-ms}") long resetTimeoutMs) {
+
+            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(), metrics, maxFailures,
+                    timeoutMs, resetTimeoutMs);
+        }
+
+        /**
+         * Geo location service is not implemented by default.
+         * It can be provided by vendor (host company) itself.
+         */
+        private GeoLocationService createGeoLocationService() {
+            throw new RuntimeException("Geo location service is not implemented");
+        }
     }
 
     @Bean
@@ -170,19 +222,15 @@ public class ServiceConfiguration {
         return NetAcuityGeoLocationService.create(server);
     }
 
-    /**
-     * Geo location service should be provided by hosting company.
-     */
     @Bean
     GdprService gdprService(
-            RsidCookieService rsidCookieService,
-            @Value("${gdpr.eea-countries}") String eeaCountries,
+            @Autowired(required = false) GeoLocationService geoLocationService,
             VendorListService vendorListService,
-            @Value("${gdpr.default-value}") String defaultValue,
-            NetAcuityGeoLocationService netAcuityGeoLocationService) {
+            @Value("${gdpr.eea-countries}") String eeaCountriesAsString,
+            @Value("${gdpr.default-value}") String defaultValue) {
 
-        return new GdprService(rsidCookieService, netAcuityGeoLocationService,
-                Arrays.asList(eeaCountries.trim().split(",")), vendorListService, defaultValue);
+        final List<String> eeaCountries = Arrays.asList(eeaCountriesAsString.trim().split(","));
+        return new GdprService(geoLocationService, vendorListService, eeaCountries, defaultValue);
     }
 
     @Bean

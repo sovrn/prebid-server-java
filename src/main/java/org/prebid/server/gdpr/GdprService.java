@@ -43,8 +43,8 @@ public class GdprService {
     private final String gdprDefaultValue;
 
     public GdprService(RsidCookieService rsidCookieService,
-                       GeoLocationService geoLocationService, List<String> eeaCountries,
-                       VendorListService vendorListService, String gdprDefaultValue) {
+                       GeoLocationService geoLocationService, VendorListService vendorListService,
+                       List<String> eeaCountries, String gdprDefaultValue) {
         this.rsidCookieService = Objects.requireNonNull(rsidCookieService);
         this.geoLocationService = geoLocationService;
         this.eeaCountries = Objects.requireNonNull(eeaCountries);
@@ -65,7 +65,7 @@ public class GdprService {
     }
 
     /**
-     * Determines GDPR and country values from external GDPR param/RSID cookie/geo location or default.
+     * Determines GDPR value from external GDPR param, geo location or default.
      */
     private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress, Timeout timeout,
                                                                 RoutingContext context) {

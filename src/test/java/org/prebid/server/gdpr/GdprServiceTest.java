@@ -40,15 +40,15 @@ public class GdprServiceTest {
         given(vendorListService.forVersion(anyInt())).willReturn(Future.succeededFuture(
                 singletonMap(1, singleton(GdprPurpose.informationStorageAndAccess.getId()))));
 
-        gdprService = new GdprService(rsidCookieService, null, emptyList(), vendorListService, "1");
+        gdprService = new GdprService(rsidCookieService, null, vendorListService, emptyList(), "1");
     }
 
     @Test
     public void shouldReturnGdprFromGeoLocationServiceIfGdprFromRequestIsNotValid() {
         // given
         given(geoLocationService.lookup(anyString(), any())).willReturn(Future.succeededFuture(GeoInfo.of("country1")));
-        gdprService = new GdprService(rsidCookieService, geoLocationService, singletonList("country1"),
-                vendorListService, "1");
+        gdprService = new GdprService(rsidCookieService, geoLocationService, vendorListService,
+                singletonList("country1"), "1");
 
         // when
         final Future<?> future =
@@ -164,7 +164,7 @@ public class GdprServiceTest {
     public void shouldReturnAllowedResultIfNoGdprParamAndCountryIsNotFoundButDefaultGdprIsZero() {
         // given
         given(geoLocationService.lookup(anyString(), any())).willReturn(Future.failedFuture("country not found"));
-        gdprService = new GdprService(rsidCookieService, geoLocationService, emptyList(), vendorListService, "0");
+        gdprService = new GdprService(rsidCookieService, geoLocationService, vendorListService, emptyList(), "0");
 
         // when
         final Future<?> future =
@@ -179,7 +179,7 @@ public class GdprServiceTest {
     public void shouldReturnAllowedResultIfNoGdprParamAndCountryIsNotInEEA() {
         // given
         given(geoLocationService.lookup(anyString(), any())).willReturn(Future.succeededFuture(GeoInfo.of("country1")));
-        gdprService = new GdprService(rsidCookieService, geoLocationService, emptyList(), vendorListService, "1");
+        gdprService = new GdprService(rsidCookieService, geoLocationService, vendorListService, emptyList(), "1");
 
         // when
         final Future<?> future =
@@ -210,7 +210,7 @@ public class GdprServiceTest {
     @Test
     public void shouldReturnAllowedResultIfNoGdprParamAndNoIpButGdprDefaultValueIsZero() {
         // given
-        gdprService = new GdprService(rsidCookieService, null, emptyList(), vendorListService, "0");
+        gdprService = new GdprService(rsidCookieService, null, vendorListService, emptyList(), "0");
 
         // when
         final Future<?> future =
