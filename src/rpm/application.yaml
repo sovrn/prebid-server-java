@@ -3,9 +3,9 @@ vertx:
 http-client:
   circuit-breaker:
     enabled: true
-    max-failures: 20
-    timeout-ms: 2000
-    reset-timeout-ms: 20000
+    opening-threshold: 20
+    opening-interval-ms: 2000
+    closing-interval-ms: 20000
 adapters:
   appnexus:
     enabled: true
