@@ -616,7 +616,7 @@ public class HttpAdapterConnectorTest extends VertxTest {
                 .build();
         preBidRequestContext = givenPreBidRequestContext(identity(), builder -> builder.regs(regs).user(user).accountId("account"));
 
-        givenHttpClientReturnsResponses(200,
+        givenHttpClientReturnsResponse(200,
                 givenBidResponse(identity(), identity(), singletonList(identity())));
 
         given(usersyncer.usersyncInfo()).willReturn(
