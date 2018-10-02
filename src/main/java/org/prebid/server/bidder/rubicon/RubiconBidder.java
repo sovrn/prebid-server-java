@@ -26,6 +26,7 @@ import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.ViewabilityVendors;
@@ -63,7 +64,6 @@ import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.util.HttpUtil;
-import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -173,6 +173,7 @@ public class RubiconBidder implements Bidder<BidRequest> {
                 .site(makeSite(bidRequest.getSite(), rubiconImpExt))
                 .app(makeApp(bidRequest.getApp(), rubiconImpExt))
                 .imp(Collections.singletonList(makeImp(imp, rubiconImpExt)))
+                .cur(null) // suppress currencies
                 .build();
     }
 
