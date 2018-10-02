@@ -37,9 +37,9 @@ settings:
     amp-stored-requests-query: SELECT uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%)
     circuit-breaker:
       enabled: true
-      max-failures: 5
-      timeout-ms: 2000
-      reset-timeout-ms: 20000
+      opening-threshold: 10
+      opening-interval-ms: 2000
+      closing-interval-ms: 20000
 recaptcha-url: https://www.google.com/recaptcha/api/siteverify
 recaptcha-secret: secret_value
 host-cookie:
