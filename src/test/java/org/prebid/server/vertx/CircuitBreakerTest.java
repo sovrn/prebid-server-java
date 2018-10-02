@@ -121,6 +121,9 @@ public class CircuitBreakerTest {
 
     @Test
     public void executeShouldFailsWithOriginalExceptionIfOpeningIntervalExceeds(TestContext context) {
+        // given
+        circuitBreaker = new CircuitBreaker("name", vertx, 2, 100L, 200L);
+
         // when
         final Future<?> future1 = executeWithFail(context, "exception1");
         waitForOpeningInterval(context);
@@ -153,11 +156,11 @@ public class CircuitBreakerTest {
     }
 
     private void waitForOpeningInterval(TestContext context) {
-        waitForInterval(context, 200L);
+        waitForInterval(context, 101L);
     }
 
     private void waitForClosingInterval(TestContext context) {
-        waitForInterval(context, 300L);
+        waitForInterval(context, 201L);
     }
 
     private void waitForInterval(TestContext context, long timeout) {
