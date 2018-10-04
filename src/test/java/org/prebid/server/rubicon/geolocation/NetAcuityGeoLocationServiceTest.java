@@ -1,8 +1,13 @@
 package org.prebid.server.rubicon.geolocation;
 
 import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.ext.unit.TestContext;
+import io.vertx.ext.unit.junit.VertxUnitRunner;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
@@ -15,25 +20,34 @@ import java.util.concurrent.TimeoutException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@RunWith(VertxUnitRunner.class)
 public class NetAcuityGeoLocationServiceTest {
+
+    private Vertx vertx;
 
     private NetAcuityGeoLocationService netAcuityGeoLocationService;
 
     @Before
     public void setUp() {
-        netAcuityGeoLocationService = NetAcuityGeoLocationService.create("localhost");
+        vertx = Vertx.vertx();
+        netAcuityGeoLocationService = NetAcuityGeoLocationService.create(vertx, "localhost");
+    }
+
+    @After
+    public void tearDown(TestContext context) {
+        vertx.close(context.asyncAssertSuccess());
     }
 
     @Test
     public void createShouldFailOnAtLeastOneInvalidServerAddress() {
-        assertThatThrownBy(() -> NetAcuityGeoLocationService.create("localhost,invalid"))
+        assertThatThrownBy(() -> NetAcuityGeoLocationService.create(vertx, "localhost,invalid"))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid NetAcuity server address: invalid");
     }
 
     @Test
     public void createShouldFailOnEmptyServerAddresses() {
-        assertThatThrownBy(() -> NetAcuityGeoLocationService.create(","))
+        assertThatThrownBy(() -> NetAcuityGeoLocationService.create(vertx, ","))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("No NetAcuity server addresses was specified: ,");
     }
@@ -44,7 +58,7 @@ public class NetAcuityGeoLocationServiceTest {
         final String server = "localhost,     localhost  ,localhost , localhost";
 
         // when
-        final NetAcuityGeoLocationService geoLocationService = NetAcuityGeoLocationService.create(server);
+        final NetAcuityGeoLocationService geoLocationService = NetAcuityGeoLocationService.create(vertx, server);
 
         // then
         assertThat(geoLocationService).isNotNull();
@@ -55,7 +69,7 @@ public class NetAcuityGeoLocationServiceTest {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
-        Timeout timeout = timeoutFactory.create(500L);
+        final Timeout timeout = timeoutFactory.create(500L);
 
         // when
         final Future<?> future = netAcuityGeoLocationService.lookup("invalid", timeout);
@@ -72,7 +86,7 @@ public class NetAcuityGeoLocationServiceTest {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
-        Timeout expiredTimeout = timeoutFactory.create(clock.instant().minusMillis(1500L).toEpochMilli(), 1000L);
+        final Timeout expiredTimeout = timeoutFactory.create(clock.instant().minusMillis(1500L).toEpochMilli(), 1000L);
 
         // when
         final Future<?> future = netAcuityGeoLocationService.lookup(null, expiredTimeout);
@@ -83,7 +97,7 @@ public class NetAcuityGeoLocationServiceTest {
     }
 
     @Test
-    public void lookupShouldFailIfGeoLookupRequestTimedOut() {
+    public void lookupShouldFailIfGeoLookupRequestTimedOut(TestContext context) {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
@@ -93,9 +107,7 @@ public class NetAcuityGeoLocationServiceTest {
         final Future<?> future = netAcuityGeoLocationService.lookup("localhost", timeout);
 
         // then
-        assertThat(future.failed()).isTrue();
-        assertThat(future.cause())
-                .isInstanceOf(PreBidException.class)
-                .hasMessage("Geo location lookup failed: Receive timed out");
+        future.setHandler(context.asyncAssertFailure(throwable ->
+                assertThat(throwable).isInstanceOf(PreBidException.class).hasMessage("Geo location lookup failed")));
     }
 }

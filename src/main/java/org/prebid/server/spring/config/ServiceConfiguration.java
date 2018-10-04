@@ -185,9 +185,10 @@ public class ServiceConfiguration {
         @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "false",
                 matchIfMissing = true)
         GeoLocationService basicGeoLocationService(
+                Vertx vertx,
                 @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
 
-            return createGeoLocationService(server);
+            return createGeoLocationService(vertx, server);
         }
 
         @Bean
@@ -200,7 +201,7 @@ public class ServiceConfiguration {
                 @Value("${gdpr.geolocation.circuit-breaker.closing-interval-ms}") long closingIntervalMs,
                 @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
 
-            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(server), metrics,
+            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(vertx, server), metrics,
                     openingThreshold, openingIntervalMs, closingIntervalMs);
         }
 
@@ -208,9 +209,9 @@ public class ServiceConfiguration {
          * Geo location service is not implemented by default.
          * It can be provided by vendor (host company) itself.
          */
-        private GeoLocationService createGeoLocationService(String server) {
+        private GeoLocationService createGeoLocationService(Vertx vertx, String server) {
 
-            return NetAcuityGeoLocationService.create(server);
+            return NetAcuityGeoLocationService.create(vertx, server);
         }
     }
 
