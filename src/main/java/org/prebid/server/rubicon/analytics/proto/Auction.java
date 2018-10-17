@@ -21,4 +21,10 @@ public class Auction {
 
     @JsonProperty("accountId")
     Integer accountId;
+
+    @JsonProperty("serverTimeoutMillis")
+    Long serverTimeoutMillis;
+
+    @JsonProperty("hasRubiconId")
+    Boolean hasRubiconId;
 }

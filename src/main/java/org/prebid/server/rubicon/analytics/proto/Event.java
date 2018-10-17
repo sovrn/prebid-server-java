@@ -10,9 +10,6 @@ import java.util.List;
 @Value
 public class Event {
 
-    @JsonProperty("eventTimeMillis")
-    Long eventTimeMillis;
-
     String integration;
 
     String version;
@@ -26,4 +23,12 @@ public class Event {
 
     @JsonProperty("bidsWon")
     List<BidWon> bidsWon;
+
+    @JsonProperty("eventCreator")
+    EventCreator eventCreator;
+
+    @JsonProperty("userAgent")
+    String userAgent;
+
+    String country;
 }

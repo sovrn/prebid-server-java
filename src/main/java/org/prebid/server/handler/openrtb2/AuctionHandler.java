@@ -85,6 +85,8 @@ public class AuctionHandler implements Handler<RoutingContext> {
         metrics.updateSafariRequestsMetric(isSafari);
 
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
+        auctionEventBuilder.uidsCookie(uidsCookie);
+
         auctionRequestFactory.fromRequest(context)
                 .map(bidRequest -> addToEvent(bidRequest, bidRequest, auctionEventBuilder::bidRequest))
                 .map(bidRequest ->

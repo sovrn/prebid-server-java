@@ -13,8 +13,7 @@ import com.iab.openrtb.request.Video;
 import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
-import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientRequest;
+import io.vertx.core.Future;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -25,27 +24,32 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
+import org.prebid.server.bidder.BidderCatalog;
+import org.prebid.server.bidder.Usersyncer;
+import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.rubicon.analytics.proto.AdUnit;
 import org.prebid.server.rubicon.analytics.proto.Auction;
 import org.prebid.server.rubicon.analytics.proto.BidWon;
 import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
-import org.prebid.server.rubicon.analytics.proto.Error;
 import org.prebid.server.rubicon.analytics.proto.Event;
+import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.ExtApp;
 import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
+import org.prebid.server.rubicon.analytics.proto.Params;
+import org.prebid.server.vertx.http.HttpClient;
+import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Base64;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.*;
@@ -61,27 +65,41 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
     @Mock
+    private BidderCatalog bidderCatalog;
+    @Mock
+    private Usersyncer rubiconUsersyncer;
+    @Mock
+    private Usersyncer appnexusUsersyncer;
+    @Mock
+    private UidsCookie uidsCookie;
+    @Mock
     private HttpClient httpClient;
-    private Clock clock;
 
     private RubiconAnalyticsModule module;
 
-    @Mock
-    private HttpClientRequest httpClientRequest;
-
     @Before
     public void setUp() {
-        given(httpClient.postAbs(anyString(), any())).willReturn(httpClientRequest);
-        given(httpClientRequest.exceptionHandler(any())).willReturn(httpClientRequest);
+        given(bidderCatalog.isValidName(anyString())).willReturn(true);
+        given(bidderCatalog.usersyncerByName("rubicon")).willReturn(rubiconUsersyncer);
+        given(bidderCatalog.usersyncerByName("appnexus")).willReturn(appnexusUsersyncer);
 
-        clock = Clock.fixed(LocalDateTime.of(2018, 4, 26, 15, 22).toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-        module = new RubiconAnalyticsModule("url", 1, "pbs-version-1", httpClient, clock);
+        given(rubiconUsersyncer.cookieFamilyName()).willReturn("rubicon");
+        given(appnexusUsersyncer.cookieFamilyName()).willReturn("appnexus");
+
+        given(uidsCookie.hasLiveUidFrom("rubicon")).willReturn(true);
+        given(uidsCookie.hasLiveUidFrom("appnexus")).willReturn(false);
+
+        module = new RubiconAnalyticsModule("url", 1, "pbs-version-1", "pbsHostname", "dataCenterRegion", bidderCatalog,
+                httpClient);
     }
 
     @Test
     public void processEventShouldTakeIntoAccountSamplingFactor() {
         // given
-        module = new RubiconAnalyticsModule("url", 10, "pbs-version-1", httpClient, clock);
+        module = new RubiconAnalyticsModule("url", 10, "pbs-version-1", "pbsHostname", "dataCenterRegion",
+                bidderCatalog, httpClient);
+
+        givenHttpClientReturnsResponse(200, null);
 
         // when
         for (int i = 0; i < 10; i++) {
@@ -90,6 +108,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                             .imp(emptyList())
                             .app(App.builder().build())
                             .build())
+                    .uidsCookie(uidsCookie)
                     .bidResponse(BidResponse.builder()
                             .seatbid(emptyList())
                             .build())
@@ -97,7 +116,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         }
 
         // then
-        verify(httpClient).postAbs(anyString(), any());
+        verify(httpClient).post(anyString(), any(), anyLong());
     }
 
     @Test
@@ -125,8 +144,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processEventShouldPostEventToEndpoint() throws IOException {
         // given
+        givenHttpClientReturnsResponse(200, null);
+
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .bidRequest(sampleBidRequest())
+                .uidsCookie(uidsCookie)
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -135,8 +157,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
-        verify(httpClient).postAbs(eq("url/event"), any());
-        verify(httpClientRequest).end(eventCaptor.capture());
+        verify(httpClient).post(eq("url/event"), eventCaptor.capture(), anyLong());
+
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBase()
                 .auctions(singletonList(Auction.of(
                         "bidRequestId",
@@ -145,55 +167,64 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 AdUnit.builder()
                                         .transactionId("impId1")
                                         .status("success")
-                                        .error(Error.of("", ""))
                                         .mediaTypes(asList("banner", "video"))
                                         .videoAdFormat("interstitial")
                                         .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
-                                        .adUnitCode("")
                                         .adServerTargeting(singletonMap("key1", "value1"))
                                         .bids(singletonList(
-                                                org.prebid.server.rubicon.analytics.proto.Bid.of(
-                                                        "rubicon",
-                                                        "success",
-                                                        "server",
-                                                        org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                345, BigDecimal.valueOf(4.56), "video",
-                                                                Dimensions.of(500, 600)))))
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("rubicon")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(123, 456, 789))
+                                                        .bidResponse(
+                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
+                                                                        345, BigDecimal.valueOf(4.56), "video",
+                                                                        Dimensions.of(500, 600)))
+                                                        .build()))
                                         .build(),
                                 AdUnit.builder()
                                         .transactionId("impId2")
                                         .status("success")
-                                        .error(Error.of("", ""))
                                         .mediaTypes(singletonList("video"))
                                         .videoAdFormat("mid-roll")
                                         .dimensions(singletonList(Dimensions.of(100, 200)))
-                                        .adUnitCode("")
                                         .adServerTargeting(singletonMap("key22", "value22"))
                                         .bids(asList(
-                                                org.prebid.server.rubicon.analytics.proto.Bid.of(
-                                                        "appnexus",
-                                                        "success",
-                                                        "server",
-                                                        org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                456, BigDecimal.valueOf(5.67), "video",
-                                                                Dimensions.of(600, 700))),
-
-                                                org.prebid.server.rubicon.analytics.proto.Bid.of(
-                                                        "appnexus",
-                                                        "success",
-                                                        "server",
-                                                        org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                567, BigDecimal.valueOf(6.78), "video",
-                                                                Dimensions.of(600, 700)))))
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .bidResponse(
+                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
+                                                                        456, BigDecimal.valueOf(5.67), "video",
+                                                                        Dimensions.of(600, 700)))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .bidResponse(
+                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
+                                                                        567, BigDecimal.valueOf(6.78), "video",
+                                                                        Dimensions.of(600, 700)))
+                                                        .build()))
                                         .build()),
-                        1234)))
+                        1234, 1000L, true)))
                 .build());
     }
 
     @Test
     public void postProcessShouldTakeIntoAccountSamplingFactor() {
         // given
-        module = new RubiconAnalyticsModule("url", 2, "pbs-version-1", httpClient, clock);
+        module = new RubiconAnalyticsModule("url", 2, "pbs-version-1", "pbsHostname", "dataCenterRegion", bidderCatalog,
+                httpClient);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -204,7 +235,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .imp(emptyList())
                         .app(App.builder().build())
                         .build(),
-                null,
+                uidsCookie,
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
                         .build());
@@ -240,7 +271,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final BidResponse bidResponse = sampleBidResponse();
 
         // when
-        final BidResponse returnedBidResponse = module.postProcess(bidRequest, null, bidResponse).result();
+        final BidResponse returnedBidResponse = module.postProcess(bidRequest, uidsCookie, bidResponse).result();
 
         // then
         then(returnedBidResponse.getSeatbid())
@@ -256,13 +287,15 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .bidder("rubicon")
                                         .samplingFactor(1)
                                         .bidwonStatus("success")
-                                        .error(Error.of("", ""))
-                                        .mediaTypes(Collections.singletonList("video-instream"))
+                                        .mediaTypes(asList("banner", "video-instream"))
                                         .videoAdFormat("interstitial")
-                                        .adUnitCode("")
                                         .source("server")
                                         .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(
                                                 345, BigDecimal.valueOf(4.56), "video", Dimensions.of(500, 600)))
+                                        .serverLatencyMillis(101)
+                                        .serverHasUserId(true)
+                                        .hasRubiconId(true)
+                                        .params(Params.of(123, 456, 789))
                                         .build()))
                                 .build(),
                         expectedEventBuilderBase()
@@ -272,13 +305,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .bidder("appnexus")
                                         .samplingFactor(1)
                                         .bidwonStatus("success")
-                                        .error(Error.of("", ""))
-                                        .mediaTypes(Collections.singletonList("video-instream"))
+                                        .mediaTypes(singletonList("video-instream"))
                                         .videoAdFormat("mid-roll")
-                                        .adUnitCode("")
                                         .source("server")
                                         .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(
                                                 456, BigDecimal.valueOf(5.67), "video", Dimensions.of(600, 700)))
+                                        .serverLatencyMillis(202)
+                                        .serverHasUserId(false)
+                                        .hasRubiconId(true)
                                         .build()))
                                 .build(),
                         expectedEventBuilderBase()
@@ -288,18 +322,19 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .bidder("appnexus")
                                         .samplingFactor(1)
                                         .bidwonStatus("success")
-                                        .error(Error.of("", ""))
-                                        .mediaTypes(Collections.singletonList("video-instream"))
+                                        .mediaTypes(singletonList("video-instream"))
                                         .videoAdFormat("mid-roll")
-                                        .adUnitCode("")
                                         .source("server")
                                         .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(
                                                 567, BigDecimal.valueOf(6.78), "video", Dimensions.of(600, 700)))
+                                        .serverLatencyMillis(202)
+                                        .serverHasUserId(false)
+                                        .hasRubiconId(true)
                                         .build()))
                                 .build());
     }
 
-    private BidRequest sampleBidRequest() {
+    private static BidRequest sampleBidRequest() {
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
@@ -310,6 +345,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .carrier("carrier")
                         .connectiontype(17)
                         .lmt(1)
+                        .ua("userAgent")
                         .build())
                 .app(App.builder()
                         .bundle("bundle")
@@ -328,15 +364,19 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
                                         ExtImpRubicon.builder()
                                                 .video(RubiconVideoParams.builder().sizeId(202).build())
+                                                .accountId(123)
+                                                .siteId(456)
+                                                .zoneId(789)
                                                 .build())))
                                 .build(),
                         Imp.builder().id("impId2")
                                 .video(Video.builder().startdelay(-1).w(100).h(200).build())
                                 .build()))
+                .tmax(1000L)
                 .build();
     }
 
-    private BidResponse sampleBidResponse() {
+    private static BidResponse sampleBidResponse() {
         return BidResponse.builder()
                 .seatbid(asList(
                         SeatBid.builder()
@@ -376,12 +416,21 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         singletonMap("key22", "value22"))))
                                                 .build()))
                                 .build()))
+                .ext(mapper.valueToTree(
+                        ExtBidResponse.of(null, null, doubleMap("rubicon", 101, "appnexus", 202), null)))
                 .build();
     }
 
-    private Event.EventBuilder expectedEventBuilderBase() {
+    @SuppressWarnings("SameParameterValue")
+    private static <K, V> Map<K, V> doubleMap(K key1, V value1, K key2, V value2) {
+        final Map<K, V> map = new HashMap<>();
+        map.put(key1, value1);
+        map.put(key2, value2);
+        return map;
+    }
+
+    private static Event.EventBuilder expectedEventBuilderBase() {
         return Event.builder()
-                .eventTimeMillis(clock.millis())
                 .integration("pbs")
                 .version("pbs-version-1")
                 .client(Client.builder()
@@ -395,6 +444,15 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .app(org.prebid.server.rubicon.analytics.proto.App.of("bundle", "version", "sdkVersion",
                                 "sdkSource"))
                         .build())
-                .limitAdTracking(true);
+                .limitAdTracking(true)
+                .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
+                .userAgent("userAgent");
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private void givenHttpClientReturnsResponse(int statusCode, String response) {
+        final HttpClientResponse httpClientResponse = HttpClientResponse.of(statusCode, null, response);
+        given(httpClient.post(anyString(), any(), anyLong()))
+                .willReturn(Future.succeededFuture(httpClientResponse));
     }
 }

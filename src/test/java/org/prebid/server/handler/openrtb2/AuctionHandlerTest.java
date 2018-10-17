@@ -415,6 +415,7 @@ public class AuctionHandlerTest extends VertxTest {
         // then
         final AuctionEvent auctionEvent = captureAuctionEvent();
         assertThat(auctionEvent).isEqualTo(AuctionEvent.builder()
+                .uidsCookie(uidsCookie)
                 .status(400)
                 .errors(singletonList("Request is invalid"))
                 .build());
@@ -436,6 +437,7 @@ public class AuctionHandlerTest extends VertxTest {
         final AuctionEvent auctionEvent = captureAuctionEvent();
         assertThat(auctionEvent).isEqualTo(AuctionEvent.builder()
                 .bidRequest(BidRequest.builder().imp(emptyList()).build())
+                .uidsCookie(uidsCookie)
                 .status(500)
                 .errors(singletonList("Unexpected exception"))
                 .build());
@@ -457,6 +459,7 @@ public class AuctionHandlerTest extends VertxTest {
         final AuctionEvent auctionEvent = captureAuctionEvent();
         assertThat(auctionEvent).isEqualTo(AuctionEvent.builder()
                 .bidRequest(BidRequest.builder().imp(emptyList()).build())
+                .uidsCookie(uidsCookie)
                 .bidResponse(BidResponse.builder().build())
                 .status(200)
                 .errors(emptyList())

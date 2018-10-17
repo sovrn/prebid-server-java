@@ -37,6 +37,17 @@ public class BidWon {
 
     String source;
 
+    @JsonProperty("serverLatencyMillis")
+    Integer serverLatencyMillis;
+
+    @JsonProperty("serverHasUserId")
+    Boolean serverHasUserId;
+
+    @JsonProperty("hasRubiconId")
+    Boolean hasRubiconId;
+
+    Params params;
+
     @JsonProperty("bidResponse")
     BidResponse bidResponse;
 }
