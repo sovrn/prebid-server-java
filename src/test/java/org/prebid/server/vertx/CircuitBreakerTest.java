@@ -30,7 +30,7 @@ public class CircuitBreakerTest {
     @Before
     public void setUp() {
         vertx = Vertx.vertx();
-        circuitBreaker = new CircuitBreaker("name", vertx, 0, 100L, 200L);
+        circuitBreaker = new CircuitBreaker("name", vertx, 1, 100L, 200L);
     }
 
     @After

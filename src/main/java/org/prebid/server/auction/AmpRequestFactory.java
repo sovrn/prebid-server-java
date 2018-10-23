@@ -339,8 +339,8 @@ public class AmpRequestFactory {
                                 ? createTargetingWithDefaults(prebid) : prebid.getTargeting(),
                         isPrebidNull ? null : prebid.getStoredrequest(),
                         setDefaultCache
-                                ? ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null),
-                                ExtRequestPrebidCacheVastxml.of(null))
+                                ? ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null),
+                                ExtRequestPrebidCacheVastxml.of(null, null))
                                 : isPrebidNull ? null : prebid.getCache()), extRequestRubicon))
                 : bidRequest.getExt();
     }

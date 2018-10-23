@@ -20,6 +20,7 @@ import io.vertx.core.Future;
 import io.vertx.core.json.Json;
 import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
@@ -31,8 +32,9 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
-import org.prebid.server.cache.CacheIdInfo;
 import org.prebid.server.cache.CacheService;
+import org.prebid.server.cache.model.CacheContext;
+import org.prebid.server.cache.model.CacheIdInfo;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
@@ -52,9 +54,11 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
+import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
+import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseDebug;
 import org.prebid.server.proto.response.BidderInfo;
 import org.prebid.server.validation.ResponseBidValidator;
@@ -101,16 +105,17 @@ public class ExchangeService {
     private final GdprService gdprService;
     private final Metrics metrics;
     private final Clock clock;
-    private final long expectedCacheTime;
     private final boolean useGeoLocation;
+    private final long expectedCacheTime;
 
     public ExchangeService(BidderCatalog bidderCatalog,
                            ResponseBidValidator responseBidValidator, CacheService cacheService,
                            BidResponsePostProcessor bidResponsePostProcessor,
-                           CurrencyConversionService currencyService,
-                           GdprService gdprService,
-                           Metrics metrics, Clock clock,
-                           long expectedCacheTime, boolean useGeoLocation) {
+                           CurrencyConversionService currencyService, GdprService gdprService,
+                           Metrics metrics, Clock clock, boolean useGeoLocation, long expectedCacheTime) {
+        if (expectedCacheTime < 0) {
+            throw new IllegalArgumentException("Expected cache time should be positive");
+        }
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.responseBidValidator = Objects.requireNonNull(responseBidValidator);
         this.cacheService = Objects.requireNonNull(cacheService);
@@ -119,11 +124,8 @@ public class ExchangeService {
         this.gdprService = gdprService;
         this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
-        if (expectedCacheTime < 0) {
-            throw new IllegalArgumentException("Expected cache time should be positive");
-        }
-        this.expectedCacheTime = expectedCacheTime;
         this.useGeoLocation = useGeoLocation;
+        this.expectedCacheTime = expectedCacheTime;
     }
 
     /**
@@ -167,7 +169,7 @@ public class ExchangeService {
                 // produce response from bidder results
                 .map(bidderResponses -> updateMetricsFromResponses(bidderResponses, publisherId))
                 .compose(result ->
-                        toBidResponse(result, bidRequest, keywordsCreator, cacheInfo, timeout))
+                        toBidResponse(result, bidRequest, keywordsCreator, cacheInfo, publisherId, timeout))
                 .compose(bidResponse -> bidResponsePostProcessor.postProcess(bidRequest, uidsCookie, bidResponse));
     }
 
@@ -445,7 +447,11 @@ public class ExchangeService {
 
         // clean buyeruid from user and user.ext.prebid
         if (maskingRequired) {
-            return builder.buyeruid(null).ext(updatedUserExt).build();
+            return builder
+                    .buyeruid(null)
+                    .geo(user != null ? maskGeo(user.getGeo()) : null)
+                    .ext(updatedUserExt)
+                    .build();
         }
 
         final String resolvedBidder = resolveBidder(bidder, aliases);
@@ -592,8 +598,22 @@ public class ExchangeService {
                 final Integer cacheBidsTtl = shouldCacheBids ? cache.getBids().getTtlseconds() : null;
                 final Integer cacheVideoBidsTtl = shouldCacheVideoBids ? cache.getVastxml().getTtlseconds() : null;
 
-                return BidRequestCacheInfo.of(true, shouldCacheBids, cacheBidsTtl,
-                        shouldCacheVideoBids, cacheVideoBidsTtl);
+                final boolean returnCreativeBid = shouldCacheBids
+                        ? ObjectUtils.defaultIfNull(cache.getBids().getReturnCreative(), true)
+                        : false;
+                final boolean returnCreativeVideoBid = shouldCacheVideoBids
+                        ? ObjectUtils.defaultIfNull(cache.getVastxml().getReturnCreative(), true)
+                        : false;
+
+                return BidRequestCacheInfo.builder()
+                        .doCaching(true)
+                        .shouldCacheBids(shouldCacheBids)
+                        .cacheBidsTtl(cacheBidsTtl)
+                        .shouldCacheVideoBids(shouldCacheVideoBids)
+                        .cacheVideoBidsTtl(cacheVideoBidsTtl)
+                        .returnCreativeBids(returnCreativeBid)
+                        .returnCreativeVideoBids(returnCreativeVideoBid)
+                        .build();
             }
         }
 
@@ -814,14 +834,15 @@ public class ExchangeService {
      */
     private Future<BidResponse> toBidResponse(List<BidderResponse> bidderResponses, BidRequest bidRequest,
                                               TargetingKeywordsCreator keywordsCreator, BidRequestCacheInfo cacheInfo,
-                                              Timeout timeout) {
+                                              String publisherId, Timeout timeout) {
         final Set<Bid> winningBids = newOrEmptySet(keywordsCreator);
         final Set<Bid> winningBidsByBidder = newOrEmptySet(keywordsCreator);
         populateWinningBids(keywordsCreator, bidderResponses, winningBids, winningBidsByBidder);
 
-        return toWinningBidsWithCacheIds(winningBids, bidRequest.getImp(), keywordsCreator, cacheInfo, timeout)
+        return toWinningBidsWithCacheIds(winningBids, bidRequest.getImp(), keywordsCreator, cacheInfo, publisherId,
+                timeout)
                 .map(winningBidsWithCacheIds -> toBidResponseWithCacheInfo(bidderResponses, bidRequest, keywordsCreator,
-                        winningBidsWithCacheIds, winningBidsByBidder));
+                        winningBidsWithCacheIds, winningBidsByBidder, cacheInfo));
     }
 
     /**
@@ -904,9 +925,9 @@ public class ExchangeService {
     /**
      * Corresponds cacheId (or null if not present) to each {@link Bid}.
      */
-    private Future<Map<Bid, CacheIdInfo>> toWinningBidsWithCacheIds(Set<Bid> winningBids, List<Imp> imps,
-                                                                    TargetingKeywordsCreator keywordsCreator,
-                                                                    BidRequestCacheInfo cacheInfo, Timeout timeout) {
+    private Future<Map<Bid, CacheIdInfo>> toWinningBidsWithCacheIds(
+            Set<Bid> winningBids, List<Imp> imps, TargetingKeywordsCreator keywordsCreator,
+            BidRequestCacheInfo cacheInfo, String publisherId, Timeout timeout) {
         final Future<Map<Bid, CacheIdInfo>> result;
 
         if (!cacheInfo.doCaching) {
@@ -917,28 +938,11 @@ public class ExchangeService {
                     .filter(bid -> keywordsCreator.isNonZeroCpm(bid.getPrice()))
                     .collect(Collectors.toList());
 
-            final List<Bid> cacheBids = cacheInfo.shouldCacheBids
-                    ? winningBidsWithNonZeroCpm
-                    : Collections.emptyList();
-
-            final List<Bid> cacheVideoBids;
-            if (cacheInfo.shouldCacheVideoBids) {
-                final List<String> videoImpIds = imps.stream()
-                        .filter(imp -> imp.getVideo() != null)
-                        .map(Imp::getId)
-                        .collect(Collectors.toList());
-
-                cacheVideoBids = winningBidsWithNonZeroCpm.stream()
-                        .filter(bid -> videoImpIds.contains(bid.getImpid())) // bid is video
-                        .collect(Collectors.toList());
-            } else {
-                cacheVideoBids = Collections.emptyList();
-            }
-
-            result = cacheService.cacheBidsOpenrtb(cacheBids, cacheVideoBids, cacheInfo.cacheBidsTtl,
-                    cacheInfo.cacheVideoBidsTtl, timeout)
-                    .recover(throwable -> Future.succeededFuture(Collections.emptyMap())) // just skip cache errors
-                    .map(map -> addNotCachedBids(map, winningBids));
+            result = cacheService.cacheBidsOpenrtb(winningBidsWithNonZeroCpm, imps, CacheContext.of(
+                    cacheInfo.shouldCacheBids, cacheInfo.cacheBidsTtl, cacheInfo.shouldCacheVideoBids,
+                    cacheInfo.cacheVideoBidsTtl), publisherId, timeout)
+                    .recover(throwable -> Future.succeededFuture(Collections.emptyMap())) // skip cache errors
+                    .map(bidToCacheId -> addNotCachedBids(bidToCacheId, winningBids));
         }
 
         return result;
@@ -973,14 +977,15 @@ public class ExchangeService {
      * Creates an OpenRTB {@link BidResponse} from the bids supplied by the bidder,
      * including processing of winning bids with cache IDs.
      */
-    private static BidResponse toBidResponseWithCacheInfo(List<BidderResponse> bidderResponses, BidRequest bidRequest,
-                                                          TargetingKeywordsCreator keywordsCreator,
-                                                          Map<Bid, CacheIdInfo> winningBidsWithCacheIds,
-                                                          Set<Bid> winningBidsByBidder) {
+    private BidResponse toBidResponseWithCacheInfo(List<BidderResponse> bidderResponses, BidRequest bidRequest,
+                                                   TargetingKeywordsCreator keywordsCreator,
+                                                   Map<Bid, CacheIdInfo> winningBidsWithCacheIds,
+                                                   Set<Bid> winningBidsByBidder, BidRequestCacheInfo cacheInfo) {
         final List<SeatBid> seatBids = bidderResponses.stream()
                 .filter(bidderResponse -> !bidderResponse.getSeatBid().getBids().isEmpty())
                 .map(bidderResponse ->
-                        toSeatBid(bidderResponse, keywordsCreator, winningBidsWithCacheIds, winningBidsByBidder))
+                        toSeatBid(bidderResponse, keywordsCreator, winningBidsWithCacheIds, winningBidsByBidder,
+                                cacheInfo))
                 .collect(Collectors.toList());
 
         final ExtBidResponse bidResponseExt = toExtBidResponse(bidderResponses, bidRequest);
@@ -999,8 +1004,9 @@ public class ExchangeService {
      * Creates an OpenRTB {@link SeatBid} for a bidder. It will contain all the bids supplied by a bidder and a "bidder"
      * extension field populated.
      */
-    private static SeatBid toSeatBid(BidderResponse bidderResponse, TargetingKeywordsCreator keywordsCreator,
-                                     Map<Bid, CacheIdInfo> winningBidsWithCacheIds, Set<Bid> winningBidsByBidder) {
+    private SeatBid toSeatBid(BidderResponse bidderResponse, TargetingKeywordsCreator keywordsCreator,
+                              Map<Bid, CacheIdInfo> winningBidsWithCacheIds, Set<Bid> winningBidsByBidder,
+                              BidRequestCacheInfo cacheInfo) {
         final String bidder = bidderResponse.getBidder();
         final BidderSeatBid bidderSeatBid = bidderResponse.getSeatBid();
 
@@ -1010,7 +1016,8 @@ public class ExchangeService {
                 .group(0)
                 .bid(bidderSeatBid.getBids().stream()
                         .map(bidderBid ->
-                                toBid(bidderBid, bidder, keywordsCreator, winningBidsWithCacheIds, winningBidsByBidder))
+                                toBid(bidderBid, bidder, keywordsCreator, winningBidsWithCacheIds, winningBidsByBidder,
+                                        cacheInfo))
                         .collect(Collectors.toList()));
 
         return seatBidBuilder.build();
@@ -1019,27 +1026,46 @@ public class ExchangeService {
     /**
      * Returns an OpenRTB {@link Bid} with "prebid" and "bidder" extension fields populated.
      */
-    private static Bid toBid(BidderBid bidderBid, String bidder, TargetingKeywordsCreator keywordsCreator,
-                             Map<Bid, CacheIdInfo> winningBidsWithCacheIds, Set<Bid> winningBidsByBidder) {
+    private Bid toBid(BidderBid bidderBid, String bidder, TargetingKeywordsCreator keywordsCreator,
+                      Map<Bid, CacheIdInfo> winningBidsWithCacheIds, Set<Bid> winningBidsByBidder,
+                      BidRequestCacheInfo cacheInfo) {
         final Bid bid = bidderBid.getBid();
-
         final Map<String, String> targetingKeywords;
+        final ExtResponseCache cache;
+
         if (keywordsCreator != null && winningBidsByBidder.contains(bid)) {
             final boolean isWinningBid = winningBidsWithCacheIds.containsKey(bid);
             final String cacheId = isWinningBid ? winningBidsWithCacheIds.get(bid).getCacheId() : null;
             final String videoCacheId = isWinningBid ? winningBidsWithCacheIds.get(bid).getVideoCacheId() : null;
 
+            if (videoCacheId != null && !cacheInfo.returnCreativeVideoBids) {
+                bid.setAdm(null);
+            } else if (cacheId != null && !cacheInfo.returnCreativeBids) {
+                bid.setAdm(null);
+            }
+
             targetingKeywords = keywordsCreator.makeFor(bid, bidder, isWinningBid, cacheId, videoCacheId);
+            final CacheAsset bids = cacheId != null ? toCacheAsset(cacheId) : null;
+            final CacheAsset vastXml = videoCacheId != null ? toCacheAsset(videoCacheId) : null;
+            cache = bids != null || vastXml != null ? ExtResponseCache.of(vastXml, bids) : null;
         } else {
             targetingKeywords = null;
+            cache = null;
         }
 
-        final ExtBidPrebid prebidExt = ExtBidPrebid.of(bidderBid.getType(), targetingKeywords);
+        final ExtBidPrebid prebidExt = ExtBidPrebid.of(bidderBid.getType(), targetingKeywords, cache);
         final ExtPrebid<ExtBidPrebid, ObjectNode> bidExt = ExtPrebid.of(prebidExt, bid.getExt());
 
         bid.setExt(Json.mapper.valueToTree(bidExt));
 
         return bid;
+    }
+
+    /**
+     * Creates {@link CacheAsset} for the given cache ID.
+     */
+    private CacheAsset toCacheAsset(String cacheId) {
+        return CacheAsset.of(cacheService.getCachedAssetURL(cacheId), cacheId);
     }
 
     /**
@@ -1069,7 +1095,7 @@ public class ExchangeService {
     /**
      * Holds caching information for auction request
      */
-    @AllArgsConstructor(staticName = "of")
+    @Builder
     @Value
     private static class BidRequestCacheInfo {
 
@@ -1083,8 +1109,20 @@ public class ExchangeService {
 
         Integer cacheVideoBidsTtl;
 
+        boolean returnCreativeBids;
+
+        boolean returnCreativeVideoBids;
+
         static BidRequestCacheInfo noCache() {
-            return BidRequestCacheInfo.of(false, false, null, false, null);
+            return BidRequestCacheInfo.builder()
+                    .doCaching(false)
+                    .shouldCacheBids(false)
+                    .cacheBidsTtl(null)
+                    .shouldCacheVideoBids(false)
+                    .cacheVideoBidsTtl(null)
+                    .returnCreativeBids(false)
+                    .returnCreativeVideoBids(false)
+                    .build();
         }
     }
 }

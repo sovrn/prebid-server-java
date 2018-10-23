@@ -1,12 +1,21 @@
 package org.prebid.server.cache;
 
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.iab.openrtb.request.Imp;
+import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.cache.account.AccountCacheService;
+import org.prebid.server.cache.model.CacheBid;
+import org.prebid.server.cache.model.CacheContext;
+import org.prebid.server.cache.model.CacheIdInfo;
+import org.prebid.server.cache.model.CacheTtl;
 import org.prebid.server.cache.proto.BidCacheResult;
 import org.prebid.server.cache.proto.request.BannerValue;
 import org.prebid.server.cache.proto.request.BidCacheRequest;
@@ -23,6 +32,7 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,18 +50,23 @@ public class CacheService {
 
     private static final Logger logger = LoggerFactory.getLogger(CacheService.class);
 
+    private final AccountCacheService accountCacheService;
+    private final CacheTtl mediaTypeCacheTtl;
     private final HttpClient httpClient;
     private final String endpointUrl;
     private final String cachedAssetUrlTemplate;
 
-    public CacheService(HttpClient httpClient, String endpointUrl, String cachedAssetUrlTemplate) {
+    public CacheService(AccountCacheService accountCacheService, CacheTtl mediaTypeCacheTtl,
+                        HttpClient httpClient, String endpointUrl, String cachedAssetUrlTemplate) {
+        this.accountCacheService = Objects.requireNonNull(accountCacheService);
+        this.mediaTypeCacheTtl = Objects.requireNonNull(mediaTypeCacheTtl);
         this.httpClient = Objects.requireNonNull(httpClient);
         this.endpointUrl = Objects.requireNonNull(endpointUrl);
         this.cachedAssetUrlTemplate = Objects.requireNonNull(cachedAssetUrlTemplate);
     }
 
     /**
-     * Makes cache for bids (legacy).
+     * Makes cache for {@link Bid}s (legacy).
      * <p>
      * The returned result will always have the same number of elements as the values argument.
      */
@@ -60,12 +75,114 @@ public class CacheService {
     }
 
     /**
-     * Makes cache for bids with video media type only (legacy).
+     * Makes cache for {@link Bid}s with video media type only (legacy).
      * <p>
      * The returned result will always have the same number of elements as the values argument.
      */
     public Future<List<BidCacheResult>> cacheBidsVideoOnly(List<Bid> bids, Timeout timeout) {
         return doCache(bids, timeout, CacheService::createPutObjectVideoOnly, this::createBidCacheResult);
+    }
+
+    /**
+     * Generic method to work with cache service (legacy).
+     */
+    private <T, R> Future<List<R>> doCache(List<T> bids, Timeout timeout,
+                                           Function<T, PutObject> requestItemCreator,
+                                           Function<CacheObject, R> responseItemCreator) {
+        return makeRequest(toRequest(bids, requestItemCreator), bids.size(), timeout)
+                .map(bidCacheResponse -> toResponse(bidCacheResponse, responseItemCreator));
+    }
+
+    /**
+     * Makes cache for OpenRTB {@link com.iab.openrtb.response.Bid}s.
+     */
+    public Future<Map<com.iab.openrtb.response.Bid, CacheIdInfo>> cacheBidsOpenrtb(
+            List<com.iab.openrtb.response.Bid> bids, List<Imp> imps, CacheContext cacheContext, String publisherId,
+            Timeout timeout) {
+        final Future<Map<com.iab.openrtb.response.Bid, CacheIdInfo>> result;
+
+        if (CollectionUtils.isEmpty(bids)) {
+            result = Future.succeededFuture(Collections.emptyMap());
+        } else {
+            final Map<String, Integer> impIdToTtl = new HashMap<>(imps.size());
+            boolean impWithNoExpExists = false; // indicates at least one impression without expire presents
+            final List<String> videoImpIds = new ArrayList<>();
+            for (Imp imp : imps) {
+                impIdToTtl.put(imp.getId(), imp.getExp());
+                impWithNoExpExists |= imp.getExp() == null;
+                if (cacheContext.isShouldCacheVideoBids() && imp.getId() != null && imp.getVideo() != null) {
+                    videoImpIds.add(imp.getId());
+                }
+            }
+
+            result = CompositeFuture.all(
+                    getCacheBids(cacheContext.isShouldCacheBids(), bids, impIdToTtl, impWithNoExpExists,
+                            cacheContext.getCacheBidsTtl(), publisherId, timeout),
+                    getVideoCacheBids(cacheContext.isShouldCacheVideoBids(), bids, impIdToTtl, videoImpIds,
+                            impWithNoExpExists, cacheContext.getCacheVideoBidsTtl(), publisherId, timeout))
+                    .compose(composite -> doCacheOpenrtb(composite.<List<CacheBid>>list().get(0),
+                            composite.<List<CacheBid>>list().get(1), timeout));
+        }
+
+        return result;
+    }
+
+    /**
+     * Creates list of {@link CacheBid}s from the list of {@link com.iab.openrtb.response.Bid}s.
+     */
+    private Future<List<CacheBid>> getCacheBids(
+            boolean shouldCacheBids, List<com.iab.openrtb.response.Bid> bids, Map<String, Integer> impIdToTtl,
+            boolean impWithNoExpExists, Integer cacheBidsTtl, String publisherId, Timeout timeout) {
+
+        return shouldCacheBids
+                ? accountCacheTtlFrom(impWithNoExpExists, publisherId, timeout)
+                .map(accountCacheTtl -> bids.stream()
+                        .map(bid -> toCacheBid(bid, impIdToTtl, cacheBidsTtl, accountCacheTtl, false))
+                        .collect(Collectors.toList()))
+                : Future.succeededFuture(Collections.emptyList());
+    }
+
+    /**
+     * Creates list of video {@link CacheBid}s from the list of {@link com.iab.openrtb.response.Bid}s.
+     */
+    private Future<List<CacheBid>> getVideoCacheBids(
+            boolean shouldCacheVideoBids, List<com.iab.openrtb.response.Bid> bids, Map<String, Integer> impIdToTtl,
+            List<String> videoImpIds, boolean impWithNoExpExists, Integer cacheVideoBidsTtl, String publisherId,
+            Timeout timeout) {
+
+        return shouldCacheVideoBids
+                ? accountCacheTtlFrom(impWithNoExpExists, publisherId, timeout)
+                .map(accountCacheTtl -> bids.stream()
+                        .filter(bid -> videoImpIds.contains(bid.getImpid())) // bid is video
+                        .map(bid -> toCacheBid(bid, impIdToTtl, cacheVideoBidsTtl, accountCacheTtl, true))
+                        .collect(Collectors.toList()))
+                : Future.succeededFuture(Collections.emptyList());
+    }
+
+    /**
+     * Fetches {@link CacheTtl} for the given account.
+     */
+    private Future<CacheTtl> accountCacheTtlFrom(boolean impWithNoExpExists, String publisherId, Timeout timeout) {
+        return impWithNoExpExists && StringUtils.isNotEmpty(publisherId)
+                ? accountCacheService.getCacheTtlByAccountId(publisherId, timeout)
+                : Future.succeededFuture(CacheTtl.empty());
+    }
+
+    /**
+     * Creates {@link CacheBid} from given {@link com.iab.openrtb.response.Bid} and determined cache ttl.
+     */
+    private CacheBid toCacheBid(com.iab.openrtb.response.Bid bid, Map<String, Integer> impIdToTtl, Integer requestTtl,
+                                CacheTtl accountCacheTtl,
+                                boolean isVideoBid) {
+        final Integer bidTtl = bid.getExp();
+        final Integer impTtl = impIdToTtl.get(bid.getImpid());
+        final Integer accountMediaTypeTtl = isVideoBid
+                ? accountCacheTtl.getVideoCacheTtl() : accountCacheTtl.getBannerCacheTtl();
+        final Integer mediaTypeTtl = isVideoBid
+                ? mediaTypeCacheTtl.getVideoCacheTtl() : mediaTypeCacheTtl.getBannerCacheTtl();
+        final Integer ttl = ObjectUtils.firstNonNull(bidTtl, impTtl, requestTtl, accountMediaTypeTtl, mediaTypeTtl);
+
+        return CacheBid.of(bid, ttl);
     }
 
     /**
@@ -76,35 +193,17 @@ public class CacheService {
      * <p>
      * The returned result will always have the number of elements equals to sum of sizes of bids and video bids.
      */
-    public Future<Map<com.iab.openrtb.response.Bid, CacheIdInfo>> cacheBidsOpenrtb(
-            List<com.iab.openrtb.response.Bid> bids, List<com.iab.openrtb.response.Bid> videoBids, Integer bidsTtl,
-            Integer videoBidsTtl, Timeout timeout) {
-        final Future<Map<com.iab.openrtb.response.Bid, CacheIdInfo>> result;
+    private Future<Map<com.iab.openrtb.response.Bid, CacheIdInfo>> doCacheOpenrtb(
+            List<CacheBid> bids, List<CacheBid> videoBids, Timeout timeout) {
 
-        if (CollectionUtils.isEmpty(bids) && CollectionUtils.isEmpty(videoBids)) {
-            result = Future.succeededFuture(Collections.emptyMap());
-        } else {
-            final List<PutObject> putObjects = Stream.concat(
-                    bids.stream().map(bid -> createJsonPutObjectOpenrtb(bid, bidsTtl)),
-                    videoBids.stream().map(bid -> createXmlPutObjectOpenrtb(bid, videoBidsTtl)))
-                    .collect(Collectors.toList());
+        final List<PutObject> putObjects = Stream.concat(
+                bids.stream().map(CacheService::createJsonPutObjectOpenrtb),
+                videoBids.stream().map(CacheService::createXmlPutObjectOpenrtb))
+                .collect(Collectors.toList());
 
-            result = makeRequest(BidCacheRequest.of(putObjects), putObjects.size(), timeout)
-                    .map(bidCacheResponse -> toResponse(bidCacheResponse, CacheObject::getUuid))
-                    .map(uuids -> toResultMap(bids, videoBids, uuids));
-        }
-
-        return result;
-    }
-
-    /**
-     * Generic method to work with cache service.
-     */
-    private <T, R> Future<List<R>> doCache(List<T> bids, Timeout timeout,
-                                           Function<T, PutObject> requestItemCreator,
-                                           Function<CacheObject, R> responseItemCreator) {
-        return makeRequest(toRequest(bids, requestItemCreator), bids.size(), timeout)
-                .map(bidCacheResponse -> toResponse(bidCacheResponse, responseItemCreator));
+        return makeRequest(BidCacheRequest.of(putObjects), putObjects.size(), timeout)
+                .map(bidCacheResponse -> toResponse(bidCacheResponse, CacheObject::getUuid))
+                .map(uuids -> toResultMap(bids, videoBids, uuids));
     }
 
     /**
@@ -177,15 +276,15 @@ public class CacheService {
     /**
      * Makes JSON type {@link PutObject} from {@link com.iab.openrtb.response.Bid}. Used for OpenRTB auction request.
      */
-    private static PutObject createJsonPutObjectOpenrtb(com.iab.openrtb.response.Bid bid, Integer cacheTtl) {
-        return PutObject.of("json", Json.mapper.valueToTree(bid), cacheTtl);
+    private static PutObject createJsonPutObjectOpenrtb(CacheBid cacheBid) {
+        return PutObject.of("json", Json.mapper.valueToTree(cacheBid.getBid()), cacheBid.getTtl());
     }
 
     /**
      * Makes XML type {@link PutObject} from {@link com.iab.openrtb.response.Bid}. Used for OpenRTB auction request.
      */
-    private static PutObject createXmlPutObjectOpenrtb(com.iab.openrtb.response.Bid bid, Integer cacheTtl) {
-        return PutObject.of("xml", new TextNode(bid.getAdm()), cacheTtl);
+    private static PutObject createXmlPutObjectOpenrtb(CacheBid cacheBid) {
+        return PutObject.of("xml", new TextNode(cacheBid.getBid().getAdm()), cacheBid.getTtl());
     }
 
     /**
@@ -221,14 +320,20 @@ public class CacheService {
     /**
      * Creates a map with bids as a key and {@link CacheIdInfo} as a value from obtained UUIDs.
      */
-    private static <T> Map<T, CacheIdInfo> toResultMap(List<T> bids, List<T> videoBids, List<String> uuids) {
-        final Map<T, CacheIdInfo> result = new HashMap<>(uuids.size());
+    private static Map<com.iab.openrtb.response.Bid, CacheIdInfo> toResultMap(
+            List<CacheBid> cacheBids, List<CacheBid> cacheVideoBids, List<String> uuids) {
+        final Map<com.iab.openrtb.response.Bid, CacheIdInfo> result = new HashMap<>(uuids.size());
+
+        final List<com.iab.openrtb.response.Bid> bids = cacheBids.stream()
+                .map(CacheBid::getBid).collect(Collectors.toList());
+        final List<com.iab.openrtb.response.Bid> videoBids = cacheVideoBids.stream()
+                .map(CacheBid::getBid).collect(Collectors.toList());
 
         // here we assume "videoBids" is a sublist of "bids"
         // so, no need for a separate loop on "videoBids" if "bids" is not empty
         if (!bids.isEmpty()) {
             for (int i = 0; i < bids.size(); i++) {
-                final T bid = bids.get(i);
+                final com.iab.openrtb.response.Bid bid = bids.get(i);
 
                 // determine uuid for video bid
                 final int indexOfVideoBid = videoBids.indexOf(bid);
@@ -243,6 +348,10 @@ public class CacheService {
         }
 
         return result;
+    }
+
+    public String getEndpointUrl() {
+        return endpointUrl;
     }
 
     /**
