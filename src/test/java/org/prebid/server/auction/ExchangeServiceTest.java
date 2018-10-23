@@ -1015,10 +1015,11 @@ public class ExchangeServiceTest extends VertxTest {
                                 2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                         BigDecimal.valueOf(0.5))))), null, true, true), null,
                         ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, true),
-                                ExtRequestPrebidCacheVastxml.of(null, false)))))));
+                                ExtRequestPrebidCacheVastxml.of(null, false))), null))));
 
         // when
-        final BidResponse bidResponse = exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext)
+        final BidResponse bidResponse = exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext,
+                null)
                 .result();
 
         // then
@@ -1396,10 +1397,11 @@ public class ExchangeServiceTest extends VertxTest {
                                                         ExtGranularityRange.of(BigDecimal.valueOf(5),
                                                                 BigDecimal.valueOf(0.5))))), null, true, true),
                                         null,
-                                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null))))));
+                                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null)),
+                                        null))));
 
         // when
-        exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext);
+        exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null);
 
         // then
         verify(cacheService).cacheBidsOpenrtb(
@@ -1670,11 +1672,11 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
                                 2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                         BigDecimal.valueOf(0.5))))), null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null))))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null)), null))));
 
         // when
-        final BidResponse bidResponse = exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext)
-                .result();
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
 
         // then
         assertThat(bidResponse.getSeatbid()).flatExtracting(SeatBid::getBid)

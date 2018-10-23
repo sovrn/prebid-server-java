@@ -19,7 +19,6 @@ import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.json.Json;
 import io.vertx.ext.web.RoutingContext;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
