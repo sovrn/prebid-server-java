@@ -30,6 +30,8 @@ metrics:
 cache:
   scheme: https
   query: uuid=%PBS_CACHE_UUID%
+  banner-ttl-seconds: 300
+  video-ttl-seconds: 300
 settings:
   database:
     type: mysql
