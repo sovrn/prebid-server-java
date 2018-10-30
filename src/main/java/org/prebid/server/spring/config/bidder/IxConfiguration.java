@@ -5,12 +5,13 @@ import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
 import org.prebid.server.bidder.BidderRequester;
 import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpBidderRequester;
+import org.prebid.server.bidder.HttpAdapterRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
-import org.prebid.server.bidder.brightroll.BrightrollBidder;
-import org.prebid.server.bidder.brightroll.BrightrollMetaInfo;
-import org.prebid.server.bidder.brightroll.BrightrollUsersyncer;
+import org.prebid.server.bidder.ix.IxAdapter;
+import org.prebid.server.bidder.ix.IxBidder;
+import org.prebid.server.bidder.ix.IxMetaInfo;
+import org.prebid.server.bidder.ix.IxUsersyncer;
 import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,30 +20,32 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 @Configuration
-public class BrightrollConfiguration extends BidderConfiguration {
+public class IxConfiguration extends BidderConfiguration {
 
-    private static final String BIDDER_NAME = "brightroll";
+    private static final String BIDDER_NAME = "ix";
 
-    @Value("${adapters.brightroll.enabled}")
+    @Value("${adapters.ix.enabled}")
     private boolean enabled;
 
-    @Value("${adapters.brightroll.endpoint}")
+    @Value("${adapters.ix.endpoint:#{null}}")
     private String endpoint;
 
-    @Value("${adapters.brightroll.usersync-url}")
+    @Value("${adapters.ix.usersync-url}")
     private String usersyncUrl;
 
-    @Value("${adapters.brightroll.pbs-enforces-gdpr}")
+    @Value("${adapters.ix.pbs-enforces-gdpr}")
     private boolean pbsEnforcesGdpr;
 
-    @Value("${external-url}")
-    private String externalUrl;
-
-    @Value("${adapters.brightroll.deprecated-names}")
+    @Value("${adapters.ix.deprecated-names}")
     private List<String> deprecatedNames;
 
     @Bean
-    BidderDeps brightrollBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
+    BidderDeps ixBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
+        if (enabled && endpoint == null) {
+            throw new IllegalStateException(
+                    String.format("%s is enabled but has missing required configuration properties. "
+                            + "Please review configuration.", BIDDER_NAME));
+        }
         return bidderDeps(httpClient, httpAdapterConnector);
     }
 
@@ -58,27 +61,27 @@ public class BrightrollConfiguration extends BidderConfiguration {
 
     @Override
     protected MetaInfo createMetaInfo() {
-        return new BrightrollMetaInfo(enabled, pbsEnforcesGdpr);
+        return new IxMetaInfo(enabled, pbsEnforcesGdpr);
     }
 
     @Override
     protected Usersyncer createUsersyncer() {
-        return new BrightrollUsersyncer(usersyncUrl, externalUrl);
+        return new IxUsersyncer(usersyncUrl);
     }
 
     @Override
     protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new BrightrollBidder(endpoint);
+        return new IxBidder();
     }
 
     @Override
     protected Adapter<?, ?> createAdapter(Usersyncer usersyncer) {
-        return null;
+        return new IxAdapter(usersyncer, endpoint);
     }
 
     @Override
     protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
                                                     Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpBidderRequester<>(bidder, httpClient);
+        return new HttpAdapterRequester(BIDDER_NAME, adapter, usersyncer, httpAdapterConnector);
     }
 }

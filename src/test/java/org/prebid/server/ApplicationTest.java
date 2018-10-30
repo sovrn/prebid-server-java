@@ -42,7 +42,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalToIgnoreCase;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static io.restassured.RestAssured.given;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
@@ -58,8 +64,9 @@ public class ApplicationTest extends VertxTest {
     private static final String RUBICON = "rubicon";
     private static final String APPNEXUS = "appnexus";
     private static final String FACEBOOK = "audienceNetwork";
+    private static final String ADKERNELADN = "adkernelAdn";
     private static final String PULSEPOINT = "pulsepoint";
-    private static final String INDEXEXCHANGE = "indexExchange";
+    private static final String IX = "ix";
     private static final String LIFESTREET = "lifestreet";
     private static final String PUBMATIC = "pubmatic";
     private static final String CONVERSANT = "conversant";
@@ -140,10 +147,10 @@ public class ApplicationTest extends VertxTest {
                 .withRequestBody(equalToJson(jsonFrom("openrtb2/test-facebook-bid-request-1.json")))
                 .willReturn(aResponse().withBody(jsonFrom("openrtb2/test-facebook-bid-response-1.json"))));
 
-        // index bid response for imp 6
-        wireMockRule.stubFor(post(urlPathEqualTo("/indexexchange-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("openrtb2/test-indexexchange-bid-request-1.json")))
-                .willReturn(aResponse().withBody(jsonFrom("openrtb2/test-indexexchange-bid-response-1.json"))));
+        // ix bid response for imp 6 and imp 61
+        wireMockRule.stubFor(post(urlPathEqualTo("/ix-exchange"))
+                .withRequestBody(equalToJson(jsonFrom("openrtb2/test-ix-bid-request-1.json")))
+                .willReturn(aResponse().withBody(jsonFrom("openrtb2/test-ix-bid-response-1.json"))));
 
         // lifestreet bid response for imp 7
         wireMockRule.stubFor(post(urlPathEqualTo("/lifestreet-exchange"))
@@ -262,6 +269,24 @@ public class ApplicationTest extends VertxTest {
                 .withRequestBody(equalToJson(jsonFrom("openrtb2/test-beachfront-bid-request-1.json")))
                 .willReturn(aResponse().withBody(jsonFrom("openrtb2/test-beachfront-bid-response-1.json"))));
 
+        // adkernelAdn bid response for imp 021
+        wireMockRule.stubFor(post(urlPathEqualTo("/adkerneladn-exchange"))
+                .withQueryParam("account", equalTo("101"))
+                .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=UTF-8"))
+                .withHeader("Accept", equalTo("application/json"))
+                .withHeader("x-openrtb-version", equalTo("2.5"))
+                .withRequestBody(equalToJson(jsonFrom("openrtb2/test-adkerneladn-bid-request-1.json")))
+                .willReturn(aResponse().withBody(jsonFrom("openrtb2/test-adkerneladn-bid-response-1.json"))));
+
+        // adkernelAdn bid response for imp 022
+        wireMockRule.stubFor(post(urlPathEqualTo("/adkerneladn-exchange"))
+                .withQueryParam("account", equalTo("102"))
+                .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=UTF-8"))
+                .withHeader("Accept", equalTo("application/json"))
+                .withHeader("x-openrtb-version", equalTo("2.5"))
+                .withRequestBody(equalToJson(jsonFrom("openrtb2/test-adkerneladn-bid-request-2.json")))
+                .willReturn(aResponse().withBody(jsonFrom("openrtb2/test-adkerneladn-bid-response-2.json"))));
+
         // pre-bid cache
         wireMockRule.stubFor(post(urlPathEqualTo("/cache"))
                 .withRequestBody(equalToJson(jsonFrom("openrtb2/test-cache-request.json")))
@@ -274,15 +299,15 @@ public class ApplicationTest extends VertxTest {
                 .header("User-Agent", "userAgent")
                 .header("Origin", "http://www.example.com")
                 // this uids cookie value stands for
-                //{"uids":{"rubicon":"J5VLCWQP-26-CWFT","adnxs":"12345","audienceNetwork":"FB-UID","pulsepoint":"PP-UID",
-                // "indexExchange":"IE-UID","lifestreet":"LS-UID","pubmatic":"PM-UID","conversant":"CV-UID",
-                // "sovrn":"990011","adtelligent":"AT-UID","adform":"AF-UID","eplanning":"EP-UID","brightroll":"BR-UID",
-                // "somoaudience":"SM-UID"}}
-                .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIiwiYWRueHMiOiIxMjM0NSIsImF1ZGllb"
-                        + "mNlTmV0d29yayI6IkZCLVVJRCIsInB1bHNlcG9pbnQiOiJQUC1VSUQiLCJpbmRleEV4Y2hhbmdlIjoiSUUtVUlEIi"
-                        + "wibGlmZXN0cmVldCI6IkxTLVVJRCIsInB1Ym1hdGljIjoiUE0tVUlEIiwiY29udmVyc2FudCI6IkNWLVVJRCIsInN"
-                        + "vdnJuIjoiOTkwMDExIiwiYWR0ZWxsaWdlbnQiOiJBVC1VSUQiLCJhZGZvcm0iOiJBRi1VSUQiLCJlcGxhbm5pbmci"
-                        + "OiJFUC1VSUQiLCJicmlnaHRyb2xsIjoiQlItVUlEIiwic29tb2F1ZGllbmNlIjoiU00tVUlEIn19")
+//                {"uids":{"rubicon":"J5VLCWQP-26-CWFT","adnxs":"12345","audienceNetwork":"FB-UID","pulsepoint":"PP-UID",
+//                 "ix":"IE-UID","lifestreet":"LS-UID","pubmatic":"PM-UID","conversant":"CV-UID",
+//                 "sovrn":"990011","adtelligent":"AT-UID","adform":"AF-UID","eplanning":"EP-UID","brightroll":"BR-UID",
+//                 "somoaudience":"SM-UID"}}
+                .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIiwiYWRueHMiOiIxM"
+                        + "jM0NSIsImF1ZGllbmNlTmV0d29yayI6IkZCLVVJRCIsInB1bHNlcG9pbnQiOiJQUC1VSUQiLCJpeCI6IklFLVVJRCIs"
+                        + "ImxpZmVzdHJlZXQiOiJMUy1VSUQiLCJwdWJtYXRpYyI6IlBNLVVJRCIsImNvbnZlcnNhbnQiOiJDVi1VSUQiLCJzb3Z"
+                        + "ybiI6Ijk5MDAxMSIsImFkdGVsbGlnZW50IjoiQVQtVUlEIiwiYWRmb3JtIjoiQUYtVUlEIiwiZXBsYW5uaW5nIjoiRV"
+                        + "AtVUlEIiwiYnJpZ2h0cm9sbCI6IkJSLVVJRCIsInNvbW9hdWRpZW5jZSI6IlNNLVVJRCJ9fQ==")
                 .body(jsonFrom("openrtb2/test-auction-request.json"))
                 .post("/openrtb2/auction");
 
@@ -383,9 +408,9 @@ public class ApplicationTest extends VertxTest {
                 .willReturn(aResponse().withBody(jsonFrom("auction/test-pulsepoint-bid-response-1.json"))));
 
         // pulsepoint bid response for ad unit 7
-        wireMockRule.stubFor(post(urlPathEqualTo("/indexexchange-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("auction/test-indexexchange-bid-request-1.json")))
-                .willReturn(aResponse().withBody(jsonFrom("auction/test-indexexchange-bid-response-1.json"))));
+        wireMockRule.stubFor(post(urlPathEqualTo("/ix-exchange"))
+                .withRequestBody(equalToJson(jsonFrom("auction/test-ix-bid-request-1.json")))
+                .willReturn(aResponse().withBody(jsonFrom("auction/test-ix-bid-response-1.json"))));
 
         // pulsepoint bid response for ad unit 8
         wireMockRule.stubFor(post(urlPathEqualTo("/lifestreet-exchange"))
@@ -454,7 +479,7 @@ public class ApplicationTest extends VertxTest {
                 // "pulsepoint":"PP-UID","indexExchange":"IE-UID","lifestreet":"LS-UID","pubmatic":"PM-UID",
                 // "conversant":"CV-UID","sovrn":"990011","adform":"AF-UID"}}
                 .cookie("uids",
-                        "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIiwiYWRueHMiOiIxMjM0NSIsImF1ZGllbmNlTmV0d29yayI6IkZCLVVJRCIsInB1bHNlcG9pbnQiOiJQUC1VSUQiLCJpbmRleEV4Y2hhbmdlIjoiSUUtVUlEIiwibGlmZXN0cmVldCI6IkxTLVVJRCIsInB1Ym1hdGljIjoiUE0tVUlEIiwiY29udmVyc2FudCI6IkNWLVVJRCIsInNvdnJuIjoiOTkwMDExIiwiYWRmb3JtIjoiQUYtVUlEIn19")
+                        "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIiwiYWRueHMiOiIxMjM0NSIsImF1ZGllbmNlTmV0d29yayI6IkZCLVVJRCIsInB1bHNlcG9pbnQiOiJQUC1VSUQiLCJpeCI6IklFLVVJRCIsImxpZmVzdHJlZXQiOiJMUy1VSUQiLCJwdWJtYXRpYyI6IlBNLVVJRCIsImNvbnZlcnNhbnQiOiJDVi1VSUQiLCJzb3ZybiI6Ijk5MDAxMSIsImFkZm9ybSI6IkFGLVVJRCJ9fQ==")
                 .queryParam("debug", "1")
                 .body(jsonFrom("auction/test-auction-request.json"))
                 .post("/auction");
@@ -726,8 +751,9 @@ public class ApplicationTest extends VertxTest {
         exchanges.put(RUBICON, "http://localhost:" + WIREMOCK_PORT + "/rubicon-exchange?tk_xint=rp-pbs");
         exchanges.put(APPNEXUS, "http://localhost:" + WIREMOCK_PORT + "/appnexus-exchange");
         exchanges.put(FACEBOOK, "http://localhost:" + WIREMOCK_PORT + "/facebook-exchange");
+        exchanges.put(ADKERNELADN, "http://localhost:" + WIREMOCK_PORT + "/adkerneladn-exchange");
         exchanges.put(PULSEPOINT, "http://localhost:" + WIREMOCK_PORT + "/pulsepoint-exchange");
-        exchanges.put(INDEXEXCHANGE, "http://localhost:" + WIREMOCK_PORT + "/indexexchange-exchange");
+        exchanges.put(IX, "http://localhost:" + WIREMOCK_PORT + "/ix-exchange");
         exchanges.put(LIFESTREET, "http://localhost:" + WIREMOCK_PORT + "/lifestreet-exchange");
         exchanges.put(PUBMATIC, "http://localhost:" + WIREMOCK_PORT + "/pubmatic-exchange");
         exchanges.put(CONVERSANT, "http://localhost:" + WIREMOCK_PORT + "/conversant-exchange");

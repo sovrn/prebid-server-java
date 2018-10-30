@@ -5,42 +5,44 @@ import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
 import org.prebid.server.bidder.BidderRequester;
 import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpAdapterRequester;
+import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
-import org.prebid.server.bidder.index.IndexAdapter;
-import org.prebid.server.bidder.index.IndexBidder;
-import org.prebid.server.bidder.index.IndexMetaInfo;
-import org.prebid.server.bidder.index.IndexUsersyncer;
+import org.prebid.server.bidder.adkerneladn.AdkernelAdnBidder;
+import org.prebid.server.bidder.adkerneladn.AdkernelAdnMetaInfo;
+import org.prebid.server.bidder.adkerneladn.AdkernelAdnUsersyncer;
 import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 @Configuration
-public class IndexConfiguration extends BidderConfiguration {
+public class AdkernelAdnConfiguration extends BidderConfiguration {
 
-    private static final String BIDDER_NAME = "indexExchange";
+    private static final String BIDDER_NAME = "adkernelAdn";
 
-    @Value("${adapters.indexexchange.enabled}")
+    @Value("${adapters.adkerneladn.enabled}")
     private boolean enabled;
 
-    @Value("${adapters.indexexchange.endpoint:#{null}}")
+    @Value("${adapters.adkerneladn.endpoint}")
     private String endpoint;
 
-    @Value("${adapters.indexexchange.usersync-url}")
+    @Value("${adapters.adkerneladn.usersync-url}")
     private String usersyncUrl;
 
-    @Value("${adapters.indexexchange.pbs-enforces-gdpr}")
+    @Value("${adapters.adkerneladn.pbs-enforces-gdpr}")
     private boolean pbsEnforcesGdpr;
 
+    @Value("${external-url}")
+    private String externalUrl;
+
+    @Value("${adapters.adkerneladn.deprecated-names}")
+    private List<String> deprecatedNames;
+
     @Bean
-    BidderDeps indexexchangeBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
-        if (enabled && endpoint == null) {
-            throw new IllegalStateException(
-                    String.format("%s is enabled but has missing required configuration properties. "
-                            + "Please review configuration.", BIDDER_NAME));
-        }
+    BidderDeps adkernelAdnBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
         return bidderDeps(httpClient, httpAdapterConnector);
     }
 
@@ -50,28 +52,33 @@ public class IndexConfiguration extends BidderConfiguration {
     }
 
     @Override
+    protected List<String> deprecatedNames() {
+        return deprecatedNames;
+    }
+
+    @Override
     protected MetaInfo createMetaInfo() {
-        return new IndexMetaInfo(enabled, pbsEnforcesGdpr);
+        return new AdkernelAdnMetaInfo(enabled, pbsEnforcesGdpr);
     }
 
     @Override
     protected Usersyncer createUsersyncer() {
-        return new IndexUsersyncer(usersyncUrl);
+        return new AdkernelAdnUsersyncer(usersyncUrl, externalUrl);
     }
 
     @Override
     protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new IndexBidder();
+        return new AdkernelAdnBidder(endpoint);
     }
 
     @Override
     protected Adapter<?, ?> createAdapter(Usersyncer usersyncer) {
-        return new IndexAdapter(usersyncer, endpoint);
+        return null;
     }
 
     @Override
     protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
                                                     Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpAdapterRequester(BIDDER_NAME, adapter, usersyncer, httpAdapterConnector);
+        return new HttpBidderRequester<>(bidder, httpClient);
     }
 }

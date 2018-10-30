@@ -39,7 +39,6 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.gdpr.GdprService;
-import org.prebid.server.gdpr.model.GdprPurpose;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
@@ -69,7 +68,6 @@ import java.text.DecimalFormatSymbols;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -90,9 +88,6 @@ public class ExchangeService {
 
     private static final String PREBID_EXT = "prebid";
     private static final BigDecimal THOUSAND = BigDecimal.valueOf(1000);
-    private static final Set<GdprPurpose> GDPR_PURPOSES =
-            Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess,
-                    GdprPurpose.adSelectionAndDeliveryAndReporting));
     private static final DecimalFormat ROUND_TWO_DECIMALS =
             new DecimalFormat("###.##", DecimalFormatSymbols.getInstance(Locale.US));
 
@@ -253,7 +248,8 @@ public class ExchangeService {
      * {@link Imp}, and are known to {@link BidderCatalog} or aliases from {@link BidRequest}.ext.prebid.aliases.
      */
     private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest, UidsCookie uidsCookie,
-                                                              Map<String, String> aliases, Timeout timeout,
+                                                              Map<String, String> aliases,
+                                                              Timeout timeout,
                                                               RoutingContext context) {
         // sanity check: discard imps without extension
         final List<Imp> imps = bidRequest.getImp().stream()
@@ -287,7 +283,6 @@ public class ExchangeService {
                         userExtNode, extRegs, aliases, imps, gdprResponse.getVendorsToGdpr()));
     }
 
-
     /**
      * Returns {@link Future&lt;{@link GdprResponse}&gt;}, where bidders vendor id mapped
      * to enabling or disabling gdpr in scope of pbs server. If bidder vendor id is not present in map, it means that
@@ -306,7 +301,7 @@ public class ExchangeService {
         final Device device = bidRequest.getDevice();
         final String ipAddress = useGeoLocation && device != null ? device.getIp() : null;
 
-        return gdprService.resultByVendor(GDPR_PURPOSES, gdprEnforcedVendorIds, gdpr != null ? gdpr.toString() : null,
+        return gdprService.resultByVendor(gdprEnforcedVendorIds, gdpr != null ? gdpr.toString() : null,
                 gdprConsent, ipAddress, timeout, context);
     }
 
@@ -1046,7 +1041,7 @@ public class ExchangeService {
             targetingKeywords = keywordsCreator.makeFor(bid, bidder, isWinningBid, cacheId, videoCacheId);
             final CacheAsset bids = cacheId != null ? toCacheAsset(cacheId) : null;
             final CacheAsset vastXml = videoCacheId != null ? toCacheAsset(videoCacheId) : null;
-            cache = bids != null || vastXml != null ? ExtResponseCache.of(vastXml, bids) : null;
+            cache = bids != null || vastXml != null ? ExtResponseCache.of(bids, vastXml) : null;
         } else {
             targetingKeywords = null;
             cache = null;
@@ -1071,20 +1066,34 @@ public class ExchangeService {
      * Creates {@link ExtBidResponse} populated with response time, errors and debug info (if requested) from all
      * bidders
      */
-    private static ExtBidResponse toExtBidResponse(List<BidderResponse> results, BidRequest bidRequest) {
+    private ExtBidResponse toExtBidResponse(List<BidderResponse> results, BidRequest bidRequest) {
         final Map<String, List<ExtHttpCall>> httpCalls = Objects.equals(bidRequest.getTest(), 1)
                 ? results.stream().collect(
                 Collectors.toMap(BidderResponse::getBidder, r -> ListUtils.emptyIfNull(r.getSeatBid().getHttpCalls())))
                 : null;
         final ExtResponseDebug extResponseDebug = httpCalls != null ? ExtResponseDebug.of(httpCalls, bidRequest) : null;
 
-        final Map<String, List<String>> errors = results.stream()
-                .collect(Collectors.toMap(BidderResponse::getBidder, r -> messages(r.getSeatBid().getErrors())));
+        final Map<String, List<String>> errors = new HashMap<>();
+        for (BidderResponse bidderResponse : results) {
+            errors.put(bidderResponse.getBidder(), messages(bidderResponse.getSeatBid().getErrors()));
+        }
+
+        errors.putAll(extractDeprecatedBiddersErrors(bidRequest));
 
         final Map<String, Integer> responseTimeMillis = results.stream()
                 .collect(Collectors.toMap(BidderResponse::getBidder, BidderResponse::getResponseTime));
 
         return ExtBidResponse.of(extResponseDebug, errors, responseTimeMillis, null);
+    }
+
+    private Map<String, List<String>> extractDeprecatedBiddersErrors(BidRequest bidRequest) {
+        return bidRequest.getImp().stream()
+                .filter(imp -> imp.getExt() != null)
+                .flatMap(imp -> asStream(imp.getExt().fieldNames()))
+                .distinct()
+                .filter(bidderCatalog::isDeprecatedName)
+                .collect(Collectors.toMap(Function.identity(),
+                        bidder -> Collections.singletonList(bidderCatalog.errorForDeprecatedName(bidder))));
     }
 
     private static List<String> messages(List<BidderError> errors) {

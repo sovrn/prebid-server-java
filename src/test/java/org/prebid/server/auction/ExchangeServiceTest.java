@@ -80,6 +80,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,7 +155,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         given(currencyService.convertCurrency(any(), any(), any(), any()))
                 .willAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(1, true), null)));
         given(accountCacheService.getCacheTtlByAccountId(any(), any()))
                 .willReturn(Future.succeededFuture(CacheTtl.empty()));
@@ -202,9 +203,29 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         verify(bidderCatalog).isValidName(eq("invalid"));
-        verifyNoMoreInteractions(bidderCatalog);
+        verify(bidderCatalog).isDeprecatedName(eq("invalid"));
         verifyZeroInteractions(bidderRequester);
         assertThat(bidResponse).isNotNull();
+    }
+
+    @Test
+    public void shouldProcessRequestAndAddErrorAboutDeprecatedBidder() {
+        //given
+        final String invalidBidderName = "invalid";
+
+        given(bidderCatalog.isValidName(invalidBidderName)).willReturn(false);
+        given(bidderCatalog.isDeprecatedName(invalidBidderName)).willReturn(true);
+        given(bidderCatalog.errorForDeprecatedName(invalidBidderName)).willReturn("invalid has been deprecated and is no longer available. Use valid instead.");
+
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap(invalidBidderName, 0)));
+
+        //when
+        final BidResponse bidResponse = exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext).result();
+
+        //then
+        assertThat(bidResponse.getExt()).isEqualTo(mapper.valueToTree(ExtBidResponse.of(null,
+                Collections.singletonMap(invalidBidderName, Collections.singletonList("invalid has been deprecated and is no longer available. Use valid instead.")),
+                new HashMap<>(), null)));
     }
 
     @Test
@@ -293,7 +314,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         final Map<String, String> uids = singletonMap("someBidder", "uidval");
 
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(15, false), null)));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
@@ -339,7 +360,7 @@ public class ExchangeServiceTest extends VertxTest {
         givenHttpConnector("someBidder", bidderRequester, givenEmptySeatBid());
 
         given(metaInfo.info()).willReturn(givenBidderInfo(15, true));
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(15, true), null)));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
@@ -376,7 +397,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         final ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(gdprService).resultByVendor(any(), any(), any(), captor.capture(), any(), any(), any());
+        verify(gdprService).resultByVendor(any(), captor.capture(), any(), any(), any(), any());
         assertThat(captor.getValue()).isNull();
     }
 
@@ -387,7 +408,7 @@ public class ExchangeServiceTest extends VertxTest {
         givenHttpConnector("someBidder", bidderRequester, givenEmptySeatBid());
 
         given(metaInfo.info()).willReturn(givenBidderInfo(15, false));
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(15, false), null)));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
@@ -433,7 +454,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidderRequester bidderRequester = mock(BidderRequester.class);
         givenHttpConnector("someBidder", bidderRequester, givenEmptySeatBid());
 
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(15, false), null)));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("bidderAlias", 1)),
@@ -475,7 +496,7 @@ public class ExchangeServiceTest extends VertxTest {
         given(bidderCatalog.metaInfoByName("bidder2")).willReturn(metaInfo2);
         given(bidderCatalog.metaInfoByName("bidder3")).willReturn(metaInfo3);
 
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(doubleMap(2, true, 3, false), null)));
 
         final Map<String, String> uids = new HashMap<>();
@@ -511,7 +532,7 @@ public class ExchangeServiceTest extends VertxTest {
         givenHttpConnector("someBidder", bidderRequester, givenEmptySeatBid());
 
         given(metaInfo.info()).willReturn(givenBidderInfo(15, true));
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.failedFuture("The gdpr param must be either 0 or 1, given: -1"));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
