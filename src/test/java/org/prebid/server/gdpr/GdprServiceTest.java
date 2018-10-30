@@ -201,8 +201,8 @@ public class GdprServiceTest {
 
         // when
         final Future<?> future =
-                gdprService.resultByVendor(emptySet(), singleton(1), "1",
-                        "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA", null, null);
+                gdprService.resultByVendor(singleton(1), "1",
+                        "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA", null, null, null);
 
         // then
         assertThat(future.succeeded()).isTrue();
@@ -301,7 +301,7 @@ public class GdprServiceTest {
 
         // when
         final Future<?> future =
-                gdprService.resultByVendor(singleton(1), "1", "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA", null, null);
+                gdprService.resultByVendor(singleton(1), "1", "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA", null, null, null);
 
         // then
         assertThat(future.succeeded()).isTrue();
@@ -316,7 +316,7 @@ public class GdprServiceTest {
 
         // when
         final Future<?> future =
-                gdprService.resultByVendor(singleton(1), "1", "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA", null, null);
+                gdprService.resultByVendor(singleton(1), "1", "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA", null, null, null);
 
         // then
         assertThat(future.succeeded()).isTrue();

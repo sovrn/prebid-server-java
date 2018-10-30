@@ -60,7 +60,8 @@ public class GdprService {
      * [true/false] and country user comes from.
      */
     public Future<GdprResponse> resultByVendor(Set<GdprPurpose> purposes, Set<Integer> vendorIds, String gdpr,
-                                               String gdprConsent, String ipAddress, Timeout timeout) {
+                                               String gdprConsent, String ipAddress, Timeout timeout,
+                                               RoutingContext context) {
         return toGdprInfo(gdpr, gdprConsent, ipAddress, timeout, context)
                 .compose(gdprInfo -> toResultByVendor(gdprInfo, vendorIds,
                         purposesForVendorCheck(gdprInfo, purposes), GdprService::verdictForVendorHasAllGivenPurposes)
@@ -77,8 +78,9 @@ public class GdprService {
      * GDPR purposes will be fetched from consent string.
      */
     public Future<GdprResponse> resultByVendor(Set<Integer> vendorIds, String gdpr,
-                                               String gdprConsent, String ipAddress, Timeout timeout) {
-        return toGdprInfo(gdpr, gdprConsent, ipAddress, timeout)
+                                               String gdprConsent, String ipAddress, Timeout timeout,
+                                               RoutingContext context) {
+        return toGdprInfo(gdpr, gdprConsent, ipAddress, timeout, context)
                 .compose(gdprInfo -> toResultByVendor(gdprInfo, vendorIds,
                         purposesForConsentCheck(gdprInfo), GdprService::verdictForConsentHasAllVendorPurposes)
                         .map(vendorIdToResult -> GdprResponse.of(vendorIdToResult, gdprInfo.getCountry())));
@@ -91,32 +93,6 @@ public class GdprService {
         return !Objects.equals(gdprInfo.getGdpr(), "0") && gdprInfo.getVendorConsent() != null
                 ? purposes.stream().map(GdprPurpose::getId).collect(Collectors.toSet())
                 : null;
-    private Future<GdprWithCountry> resolveGdprWithCountryValue(String gdpr, String ipAddress, Timeout timeout,
-                                                                RoutingContext context) {
-        // from request param
-        final String gdprFromRequest = StringUtils.stripToNull(gdpr);
-
-        if (isValidGdpr(gdprFromRequest)) {
-            return Future.succeededFuture(GdprWithCountry.of(gdprFromRequest, null));
-        }
-
-        // from RSID cookie
-        final Rsid rsid = rsidCookieService.parseFromRequest(context);
-        final String country = rsid != null ? rsid.getCountry() : null;
-        if (country != null) {
-            return Future.succeededFuture(createGdprWithCountry(country));
-        }
-
-        // from geo location
-        if (ipAddress != null && geoLocationService != null) {
-            return geoLocationService.lookup(ipAddress, timeout)
-                    .map(GeoInfo::getCountry)
-                    .map(this::createGdprWithCountry)
-                    .otherwise(GdprWithCountry.of(gdprDefaultValue, null));
-        }
-
-        // use default
-        return Future.succeededFuture(GdprWithCountry.of(gdprDefaultValue, null));
     }
 
     /**
@@ -228,26 +204,35 @@ public class GdprService {
     /**
      * Resolves GDPR internal flag and returns {@link GdprInfoWithCountry} model.
      */
-    private Future<GdprInfoWithCountry> toGdprInfo(String gdpr, String gdprConsent, String ipAddress, Timeout timeout) {
-        final Future<GdprInfoWithCountry> result;
-
+    private Future<GdprInfoWithCountry> toGdprInfo(String gdpr, String gdprConsent, String ipAddress, Timeout timeout,
+                                                   RoutingContext context) {
+        // from request param
         final String gdprFromRequest = StringUtils.stripToNull(gdpr);
         if (isValidGdpr(gdprFromRequest)) {
-            result = Future.succeededFuture(
+            return Future.succeededFuture(
                     GdprInfoWithCountry.of(gdprFromRequest, vendorConsentFrom(gdprFromRequest, gdprConsent), null));
-        } else if (ipAddress != null && geoLocationService != null) {
-            result = geoLocationService.lookup(ipAddress, timeout)
+        }
+
+        // from RSID cookie
+        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        final String country = rsid != null ? rsid.getCountry() : null;
+        if (country != null) {
+            return Future.succeededFuture(createGdprInfoWithCountry(gdprConsent, country));
+        }
+
+        // from geo location
+        if (ipAddress != null && geoLocationService != null) {
+            return geoLocationService.lookup(ipAddress, timeout)
                     .map(GeoInfo::getCountry)
-                    .map(country -> createGdprInfoWithCountry(gdprConsent, country))
+                    .map(resolvedCountry -> createGdprInfoWithCountry(gdprConsent, resolvedCountry))
                     .otherwise(
                             GdprInfoWithCountry.of(gdprDefaultValue, vendorConsentFrom(gdprDefaultValue, gdprConsent),
                                     null));
-        } else {
-            result = Future.succeededFuture(
-                    GdprInfoWithCountry.of(gdprDefaultValue, vendorConsentFrom(gdprDefaultValue, gdprConsent), null));
         }
 
-        return result;
+        // use default
+        return Future.succeededFuture(
+                GdprInfoWithCountry.of(gdprDefaultValue, vendorConsentFrom(gdprDefaultValue, gdprConsent), null));
     }
 
     /**
