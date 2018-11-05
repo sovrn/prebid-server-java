@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.bidder.BidderCatalog;
+import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.rubicon.analytics.RubiconAnalyticsModule;
 import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,11 +32,12 @@ public class RubiconAnalyticsConfiguration {
             RubiconAnalyticsModuleProperties properties,
             ImplicitParametersExtractor implicitParametersExtractor,
             BidderCatalog bidderCatalog,
+            UidsCookieService uidsCookieService,
             HttpClient httpClient) {
 
         return new RubiconAnalyticsModule(properties.getHostUrl(), properties.getSamplingFactor(),
                 properties.getPbsVersion(), implicitParametersExtractor.domainFrom(externalUrl), dataCenterRegion,
-                bidderCatalog, httpClient);
+                bidderCatalog, uidsCookieService, httpClient);
     }
 
     @Component

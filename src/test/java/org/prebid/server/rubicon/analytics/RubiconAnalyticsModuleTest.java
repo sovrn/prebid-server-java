@@ -27,6 +27,8 @@ import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
+import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -67,6 +69,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Mock
     private BidderCatalog bidderCatalog;
     @Mock
+    private UidsCookieService uidsCookieService;
+    @Mock
     private Usersyncer rubiconUsersyncer;
     @Mock
     private Usersyncer appnexusUsersyncer;
@@ -89,15 +93,17 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(uidsCookie.hasLiveUidFrom("rubicon")).willReturn(true);
         given(uidsCookie.hasLiveUidFrom("appnexus")).willReturn(false);
 
+        given(uidsCookieService.parseHostCookie(any())).willReturn("khaos-cookie-value");
+
         module = new RubiconAnalyticsModule("url", 1, "pbs-version-1", "pbsHostname", "dataCenterRegion", bidderCatalog,
-                httpClient);
+                uidsCookieService, httpClient);
     }
 
     @Test
     public void processEventShouldTakeIntoAccountSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule("url", 10, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, httpClient);
+                bidderCatalog, uidsCookieService, httpClient);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -224,13 +230,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldTakeIntoAccountSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule("url", 2, "pbs-version-1", "pbsHostname", "dataCenterRegion", bidderCatalog,
-                httpClient);
+                uidsCookieService, httpClient);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
 
         // when
         module.postProcess(
+                null,
                 BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
@@ -252,6 +259,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         module.postProcess(
+                null,
                 BidRequest.builder()
                         .imp(emptyList())
                         .build(),
@@ -271,7 +279,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final BidResponse bidResponse = sampleBidResponse();
 
         // when
-        final BidResponse returnedBidResponse = module.postProcess(bidRequest, uidsCookie, bidResponse).result();
+        final BidResponse returnedBidResponse = module.postProcess(null, bidRequest, uidsCookie, bidResponse).result();
 
         // then
         then(returnedBidResponse.getSeatbid())
@@ -387,9 +395,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .price(BigDecimal.valueOf(4.56))
                                         .w(500)
                                         .h(600)
-                                        .ext(mapper.valueToTree(ExtBidPrebid.of(
+                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                 BidType.video,
-                                                singletonMap("key1", "value1"), null)))
+                                                singletonMap("key1", "value1"), null), null)))
                                         .build()))
                                 .build(),
                         SeatBid.builder()
@@ -401,9 +409,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .price(BigDecimal.valueOf(5.67))
                                                 .w(600)
                                                 .h(700)
-                                                .ext(mapper.valueToTree(ExtBidPrebid.of(
+                                                .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                         BidType.video,
-                                                        singletonMap("key21", "value21"), null)))
+                                                        singletonMap("key21", "value21"), null), null)))
                                                 .build(),
                                         Bid.builder()
                                                 .impid("impId2")
@@ -411,9 +419,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .price(BigDecimal.valueOf(6.78))
                                                 .w(600)
                                                 .h(700)
-                                                .ext(mapper.valueToTree(ExtBidPrebid.of(
+                                                .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                         BidType.video,
-                                                        singletonMap("key22", "value22"), null)))
+                                                        singletonMap("key22", "value22"), null), null)))
                                                 .build()))
                                 .build()))
                 .ext(mapper.valueToTree(

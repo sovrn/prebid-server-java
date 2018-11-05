@@ -64,6 +64,7 @@ public class AmpHandler implements Handler<RoutingContext> {
     private static final TypeReference<ExtBidResponse> EXT_BID_RESPONSE_TYPE_REFERENCE =
             new TypeReference<ExtBidResponse>() {
             };
+
     private static final MetricsContext METRICS_CONTEXT = MetricsContext.of(MetricName.amp);
 
     private final long defaultTimeout;

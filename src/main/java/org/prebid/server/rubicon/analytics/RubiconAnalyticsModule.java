@@ -1,6 +1,7 @@
 package org.prebid.server.rubicon.analytics;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
@@ -17,6 +18,7 @@ import io.vertx.core.Future;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.ext.web.RoutingContext;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
@@ -25,7 +27,9 @@ import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cache.proto.response.BidCacheResponse;
 import org.prebid.server.cookie.UidsCookie;
+import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -77,6 +81,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private static final Map<Integer, String> VIDEO_SIZE_AD_FORMATS;
 
+    private static final TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>> EXT_PREBID_TYPE_REFERENCE =
+            new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
+            };
+
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
         VIDEO_SIZE_AD_FORMATS.put(201, VideoAdFormat.PREROLL);
@@ -93,19 +101,22 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private final String pbsHostname;
     private final String dataCenterRegion;
     private final BidderCatalog bidderCatalog;
+    private final UidsCookieService uidsCookieService;
     private final HttpClient httpClient;
 
     private long auctionEventCount = 0;
     private long bidWonCount = 0;
 
     public RubiconAnalyticsModule(String endpointUrl, int samplingFactor, String pbsVersion, String pbsHostname,
-                                  String dataCenterRegion, BidderCatalog bidderCatalog, HttpClient httpClient) {
+                                  String dataCenterRegion, BidderCatalog bidderCatalog,
+                                  UidsCookieService uidsCookieService, HttpClient httpClient) {
         this.endpointUrl = Objects.requireNonNull(endpointUrl) + EVENT_PATH;
         this.samplingFactor = samplingFactor;
         this.pbsVersion = pbsVersion;
         this.pbsHostname = Objects.requireNonNull(pbsHostname);
         this.dataCenterRegion = Objects.requireNonNull(dataCenterRegion);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
+        this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.httpClient = Objects.requireNonNull(httpClient);
     }
 
@@ -117,8 +128,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     @Override
-    public Future<BidResponse> postProcess(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
-        return Future.succeededFuture(processBidResponse(bidRequest, uidsCookie, bidResponse));
+    public Future<BidResponse> postProcess(RoutingContext context, BidRequest bidRequest, UidsCookie uidsCookie,
+                                           BidResponse bidResponse) {
+        return Future.succeededFuture(processBidResponse(context, bidRequest, uidsCookie, bidResponse));
     }
 
     private void processAuctionEvent(AuctionEvent event) {
@@ -134,10 +146,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         }
     }
 
-    private BidResponse processBidResponse(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
+    private BidResponse processBidResponse(RoutingContext context, BidRequest bidRequest,
+                                           UidsCookie uidsCookie, BidResponse bidResponse) {
         if (bidRequest.getApp() != null) {
             final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
-            final Boolean hasRubiconId = serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER);
+            final boolean hasRubiconId = uidsCookieService.parseHostCookie(context) != null;
 
             for (final SeatBid seatBid : bidResponse.getSeatbid()) {
                 final String bidder = seatBid.getSeat();
@@ -220,8 +233,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private static BidType mediaTypeFromBid(Bid bid) {
-        final ExtBidPrebid bidExt = readExt(bid.getExt(), ExtBidPrebid.class);
-        return bidExt != null ? bidExt.getType() : null;
+        final ExtPrebid<ExtBidPrebid, ObjectNode> extBid = readExtPrebid(bid.getExt());
+        final ExtBidPrebid extBidPrebid = extBid != null ? extBid.getPrebid() : null;
+        return extBidPrebid != null ? extBidPrebid.getType() : null;
     }
 
     private static String mediaTypeString(BidType bidType) {
@@ -236,7 +250,20 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         try {
             return Json.mapper.treeToValue(ext, type);
         } catch (JsonProcessingException e) {
-            logger.warn("Error unmarshalling ext", e);
+            logger.warn("Error unmarshalling ext by class {0}", e, type);
+            return null;
+        }
+    }
+
+    private static ExtPrebid<ExtBidPrebid, ObjectNode> readExtPrebid(ObjectNode ext) {
+        if (ext == null) {
+            return null;
+        }
+
+        try {
+            return Json.mapper.convertValue(ext, EXT_PREBID_TYPE_REFERENCE);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Error unmarshalling ext by type reference {0}", e, EXT_PREBID_TYPE_REFERENCE);
             return null;
         }
     }
@@ -348,13 +375,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private static Map<String, String> targetingFromBid(TwinBids bid) {
-        final ExtBidPrebid bidExt = readExt(bid.getOpenrtbBid().getExt(), ExtBidPrebid.class);
-
-        return bidExt != null ? bidExt.getTargeting() : null;
+        final ExtPrebid<ExtBidPrebid, ObjectNode> extBid = readExtPrebid(bid.getOpenrtbBid().getExt());
+        return extBid != null ? extBid.getPrebid().getTargeting() : null;
     }
 
-    private Event toAuctionEvent(BidRequest bidRequest, UidsCookie uidsCookie,
-                                 List<AdUnit> adUnits) {
+    private Event toAuctionEvent(BidRequest bidRequest, UidsCookie uidsCookie, List<AdUnit> adUnits) {
         return eventBuilderBase(bidRequest)
                 .auctions(Collections.singletonList(Auction.of(
                         bidRequest.getId(),
@@ -367,7 +392,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private Event toBidWonEvent(BidRequest bidRequest, String bidder, Integer serverLatencyMillis,
-                                Boolean serverHasUserId, Boolean hasRubiconId, Bid bid) {
+                                Boolean serverHasUserId, boolean hasRubiconId, Bid bid) {
         final Imp foundImp = findImpById(bidRequest.getImp(), bid.getImpid());
         final BidType bidType = mediaTypeFromBid(bid);
         final String bidTypeString = mediaTypeString(bidType);
