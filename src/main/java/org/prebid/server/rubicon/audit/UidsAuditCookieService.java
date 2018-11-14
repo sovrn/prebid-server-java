@@ -60,12 +60,15 @@ public class UidsAuditCookieService {
         final SecretKeySpec secretKeySpec = new SecretKeySpec(encryptionKey.getBytes(), ENCRYPTION_ALGORITHM);
         final Cipher encodingCipher = createCypher(Cipher.ENCRYPT_MODE, secretKeySpec);
         final Cipher decodingCipher = createCypher(Cipher.DECRYPT_MODE, secretKeySpec);
+        final String resolvedHostIp;
         if (hostIp == null) {
             logger.warn("Host ip config was not defined in configuration. Will try to find host ip with look up.");
-            hostIp = lookUpForHostIp();
+            resolvedHostIp = lookUpForHostIp();
+        } else {
+            resolvedHostIp = hostIp;
         }
         return new UidsAuditCookieService(encodingCipher, decodingCipher, Duration.ofDays(ttlDays).getSeconds(),
-                getDecimalIp(hostIp));
+                getDecimalIp(resolvedHostIp));
     }
 
     /**
@@ -108,6 +111,20 @@ public class UidsAuditCookieService {
     }
 
     /**
+     * Returns {@link UidAudit} or null if no audit cookie exists.
+     */
+    public UidAudit getUidsAudit(RoutingContext context) {
+        final Cookie uidAuditCookie = context.getCookie(COOKIE_NAME);
+        final String auditCookieValue = uidAuditCookie != null ? decrypt(uidAuditCookie.getValue()) : null;
+
+        try {
+            return auditCookieValue != null ? UidsAuditParser.parseCookieValue(auditCookieValue) : null;
+        } catch (InvalidAuditFormatException ex) {
+            return null;
+        }
+    }
+
+    /**
      * Creates uid audit {@link Cookie} using blowfish algorithm for data encryption and encrypt it with BASE64.
      */
     public Cookie createUidsAuditCookie(RoutingContext context, String uid, String accountId, String consent,
@@ -116,52 +133,46 @@ public class UidsAuditCookieService {
             throw new PreBidException("Uid was not defined. Should be present to set uid audit cookie.");
         }
 
-        final Cookie uidAuditCookie = context.getCookie(COOKIE_NAME);
-        final String auditCookieValue = uidAuditCookie != null ? decrypt(uidAuditCookie.getValue()) : null;
-        UidAudit previousUidAudit;
-
-        try {
-            previousUidAudit = auditCookieValue != null
-                    ? UidsAuditParser.parseCookieValue(auditCookieValue)
-                    : null;
-        } catch (InvalidAuditFormatException ex) {
-            previousUidAudit = null;
-        }
-
         final String referrer = context.request().getHeader(HttpHeaders.REFERER);
         final long renewedSeconds = ZonedDateTime.now(Clock.systemUTC()).toEpochSecond();
         final boolean isNotNullConsent = consent != null;
-        final UidAudit uidAudit;
 
-        if (previousUidAudit != null) {
-            final String previousConsent = previousUidAudit.getConsent();
-            final String previousConsentUsed = previousUidAudit.getConsentUsed();
-            final boolean updateConsent = previousConsent == null && consent != null;
+        final UidAudit uidAudit = UidAudit.builder()
+                .version(UidsAuditParser.VERSION)
+                .uid(uid)
+                .hostIp(hostIp)
+                .userIp(getMaskedIp(userIp))
+                .country(country)
+                .renewedSeconds(renewedSeconds)
+                .referringDomain(referrer)
+                .initiatorType(getInitiatorType())
+                .initiatorId(accountId)
+                .consentUsed(isNotNullConsent ? "1" : "0")
+                .consent(consent)
+                .build();
 
-            uidAudit = previousUidAudit.toBuilder()
-                    .referringDomain(referrer)
-                    .renewedSeconds(renewedSeconds)
-                    .consentUsed(updateConsent ? "1" : previousConsentUsed)
-                    .consent(updateConsent ? consent : previousConsent)
-                    .build();
-        } else {
-            uidAudit = UidAudit.builder()
-                    .version(UidsAuditParser.VERSION)
-                    .uid(uid)
-                    .hostIp(hostIp)
-                    .userIp(getMaskedIp(userIp))
-                    .country(country)
-                    .renewedSeconds(renewedSeconds)
-                    .referringDomain(referrer)
-                    .initiatorType(getInitiatorType())
-                    .initiatorId(accountId)
-                    .consentUsed(isNotNullConsent ? "1" : "0")
-                    .consent(consent)
-                    .build();
-        }
+        return toCookie(uidAudit);
+    }
 
-        final String uidAuditRow = encrypt(UidsAuditParser.uidAuditToRow(uidAudit));
-        return Cookie.cookie(COOKIE_NAME, uidAuditRow).setDomain(COOKIE_DOMAIN).setMaxAge(ttlSeconds);
+    /**
+     * Updates existing uid audit {@link Cookie}.
+     */
+    public Cookie updateUidsAuditCookie(RoutingContext context, String consent, UidAudit previousUidAudit) {
+        final String referrer = context.request().getHeader(HttpHeaders.REFERER);
+        final long renewedSeconds = ZonedDateTime.now(Clock.systemUTC()).toEpochSecond();
+
+        final String previousConsent = previousUidAudit.getConsent();
+        final String previousConsentUsed = previousUidAudit.getConsentUsed();
+        final boolean updateConsent = previousConsent == null && consent != null;
+
+        final UidAudit uidAudit = previousUidAudit.toBuilder()
+                .referringDomain(referrer)
+                .renewedSeconds(renewedSeconds)
+                .consentUsed(updateConsent ? "1" : previousConsentUsed)
+                .consent(updateConsent ? consent : previousConsent)
+                .build();
+
+        return toCookie(uidAudit);
     }
 
     /**
@@ -177,7 +188,7 @@ public class UidsAuditCookieService {
     }
 
     /**
-     * Return initiator type
+     * Return initiator type.
      */
     private static String getInitiatorType() {
         return null;
@@ -205,5 +216,13 @@ public class UidsAuditCookieService {
             logger.warn("Error occurred during encoding cookie. {0}", e.getMessage());
             throw new PreBidException(e.getMessage());
         }
+    }
+
+    /**
+     * Creates HTTP Cookie from {@link UidAudit}.
+     */
+    private Cookie toCookie(UidAudit uidAudit) {
+        final String uidAuditRow = encrypt(UidsAuditParser.uidAuditToRow(uidAudit));
+        return Cookie.cookie(COOKIE_NAME, uidAuditRow).setDomain(COOKIE_DOMAIN).setMaxAge(ttlSeconds);
     }
 }

@@ -72,11 +72,9 @@ public class RsidCookieService {
             if (key[keyPtr] == 0) {
                 key[keyPtr]++;
             }
-            if (++keyPtr >= key.length) {
-                keyPtr = 0;
-            }
+            final int updatedKeyPtr = keyPtr >= key.length - 1 ? 0 : keyPtr + 1;
 
-            decrypt(input, ++inputPtr, key, keyPtr, sb);
+            decrypt(input, inputPtr + 1, key, updatedKeyPtr, sb);
         }
     }
 }

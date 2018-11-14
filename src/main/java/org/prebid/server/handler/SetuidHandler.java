@@ -19,6 +19,7 @@ import org.prebid.server.gdpr.model.GdprPurpose;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.util.HttpUtil;
 
 import java.util.Collections;
@@ -108,12 +109,40 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 .iterator().next();
 
         if (allowedCookie) {
-            if (StringUtils.isBlank(account)) {
+            final UidAudit uidsAudit;
+            try {
+                uidsAudit = uidsAuditCookieService.getUidsAudit(context);
+            } catch (PreBidException e) {
+                final String errorMessage = String.format("Error retrieving of audit cookie: %s", e.getMessage());
+                logger.warn(errorMessage);
+                context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(errorMessage);
+                return;
+            }
+
+            // check do we really need account parameter
+            if (uidsAudit == null && StringUtils.isBlank(account)) {
                 respondWithMissingParamMessage(ACCOUNT_PARAM, context);
                 return;
             }
 
-            respondWithCookie(context, account, bidder, uidsCookie, gdprConsent, gdprResponse.getCountry(), ip);
+            final Cookie uidsAuditCookie;
+            try {
+                if (uidsAudit != null) {
+                    uidsAuditCookie = uidsAuditCookieService.updateUidsAuditCookie(context, gdprConsent, uidsAudit);
+                } else {
+                    final String uid = context.request().getParam("uid");
+                    uidsAuditCookie = uidsAuditCookieService
+                            .createUidsAuditCookie(context, uid, account, gdprConsent, gdprResponse.getCountry(), ip);
+                }
+            } catch (PreBidException ex) {
+                final String errorMessage = String.format("Error occurred on audit cookie creation, "
+                        + "uid cookie will not be set without audit: %s", ex.getMessage());
+                logger.warn(errorMessage);
+                context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(errorMessage);
+                return;
+            }
+
+            respondWithCookie(context, bidder, uidsCookie, uidsAuditCookie);
         } else {
             final int status;
             final String body;
@@ -130,20 +159,9 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
     }
 
-    private void respondWithCookie(RoutingContext context, String accountId, String bidder, UidsCookie uidsCookie,
-                                   String gdprConsent, String country, String ip) {
+    private void respondWithCookie(RoutingContext context, String bidder, UidsCookie uidsCookie,
+                                   Cookie uidsAuditCookie) {
         final String uid = context.request().getParam("uid");
-        final Cookie uidsAuditCookie;
-        try {
-            uidsAuditCookie = uidsAuditCookieService
-                    .createUidsAuditCookie(context, uid, accountId, gdprConsent, country, ip);
-        } catch (PreBidException ex) {
-            final String errorMessage = String.format("Error occurred on audit cookie creation, uid cookie will not be"
-                    + " set without audit: %s", ex.getMessage());
-            logger.warn(errorMessage);
-            context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(errorMessage);
-            return;
-        }
 
         final UidsCookie updatedUidsCookie;
         boolean successfullyUpdated = false;

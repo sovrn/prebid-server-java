@@ -28,6 +28,7 @@ import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.audit.proto.UidAudit;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -43,7 +44,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anySet;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 public class SetuidHandlerTest extends VertxTest {
 
@@ -154,6 +161,28 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
         given(httpRequest.getParam("account")).willReturn(null);
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(200));
+        verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
+        verifyNoMoreInteractions(httpResponse);
+    }
+
+    @Test
+    public void shouldNotRespondWithErrorIfAccountParamIsMissingButAuditCookieExistsAndUserInGdprScope() {
+        // given
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, false), null)));
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+        given(httpRequest.getParam("account")).willReturn(null);
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+        given(uidsAuditCookieService.getUidsAudit(any())).willReturn(UidAudit.builder().build());
 
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 

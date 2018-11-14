@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.rubicon.audit.proto.UidAudit;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -38,15 +39,12 @@ public class UidsAuditCookieServiceTest {
     @Mock
     private RoutingContext routingContext;
 
-    @Mock
-    private HttpServerRequest request;
-
-    @Mock
-    private Cookie uidAuditCookie;
-
     private Cipher decodingCipher;
 
     private UidsAuditCookieService uidsAuditCookieService;
+
+    @Mock
+    private HttpServerRequest request;
 
     @Before
     public void init() throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
@@ -66,7 +64,46 @@ public class UidsAuditCookieServiceTest {
         assertThatThrownBy(() -> UidsAuditCookieService.create(null, null, null))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Cookies audit encryption cannot be done without encryption key.");
+    }
 
+    @Test
+    public void getUidsAuditShouldReturnExpectedResultIfCookieExists() {
+        // given
+        // Base64 encoded Blowfish encrypted string - 1|uid^^^^1527684614^referrer|^|1^consent
+        given(routingContext.getCookie("audit")).willReturn(Cookie.cookie("audit",
+                "pMmn7z8bUD5mOWCasu0nA42E99uwy-gx6uIWeNPO2UpXs5Lhsj8uS9g992oiVBPB"));
+
+        // when
+        final UidAudit uidAudit = uidsAuditCookieService.getUidsAudit(routingContext);
+
+        // then
+        assertThat(uidAudit).isEqualTo(UidAudit.builder()
+                .version("1")
+                .uid("uid")
+                .renewedSeconds(1527684614L)
+                .referringDomain("referrer")
+                .consentUsed("1")
+                .consent("consent")
+                .build());
+    }
+
+    @Test
+    public void getUidsAuditShouldFailIfCookieCannotBeParsed() {
+        // given
+        given(routingContext.getCookie("audit")).willReturn(Cookie.cookie("audit", "invalid"));
+
+        // when and then
+        assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
+                .isExactlyInstanceOf(PreBidException.class);
+    }
+
+    @Test
+    public void getUidsAuditShouldReturnNullIfNoCookieExists() {
+        // when
+        final UidAudit uidAudit = uidsAuditCookieService.getUidsAudit(routingContext);
+
+        // then
+        assertThat(uidAudit).isNull();
     }
 
     @Test
@@ -75,7 +112,8 @@ public class UidsAuditCookieServiceTest {
         given(routingContext.getCookie("audit")).willReturn(null);
 
         // when
-        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", "accountId", "consent",
+        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", "accountId",
+                "consent",
                 "uk",
                 "1.2.3.0");
 
@@ -87,80 +125,14 @@ public class UidsAuditCookieServiceTest {
     }
 
     @Test
-    public void createUidsCookieShouldUpdateReferrerDomain() throws BadPaddingException, IllegalBlockSizeException {
-        // given
-        given(routingContext.getCookie("audit")).willReturn(uidAuditCookie);
-        // Base64 encoded Blowfish encrypted string - 1|uid^^^^1527684614^referrer|^|1^consent
-        given(uidAuditCookie.getValue()).willReturn("pMmn7z8bUD5mOWCasu0nA42E99uwy-gx6uIWeNPO2UpXs5Lhsj8uS9g992oiVBPB");
-        given(request.getHeader(HttpHeaders.REFERER)).willReturn("updatedReferrer");
-
-        // when
-        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, "consent", "uk",
-                "1.2.3.0");
-
-        // then
-        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
-                .endsWith("^updatedReferrer|^|1^consent");
-    }
-
-    @Test
-    public void createUidsAuditCookieShouldUpdateConsentFlagAndValueIfItWasAbsent() throws BadPaddingException,
-            IllegalBlockSizeException {
-        // given
-        given(routingContext.getCookie("audit")).willReturn(uidAuditCookie);
-        // Base64 encoded Blowfish encrypted string - 1|uid^^^^1527684614^referrer|^|0^
-        given(uidAuditCookie.getValue()).willReturn("pMmn7z8bUD5mOWCasu0nA42E99uwy-gx__Eaz45aJobTyHZ2tZJZzg==");
-
-        // when
-        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, "consent", "uk",
-                "1.2.3.0");
-
-        // then
-        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
-                .endsWith("1^consent");
-    }
-
-    @Test
-    public void createUidsAuditCookieShouldNotUpdateConsentIfItHasValueBefore() throws BadPaddingException,
-            IllegalBlockSizeException {
-        // given
-        given(routingContext.getCookie("audit")).willReturn(uidAuditCookie);
-        // Base64 encoded Blowfish encrypted string - 1|uid^^^^^|^|1^consent
-        given(uidAuditCookie.getValue()).willReturn("pMmn7z8bUD5RyvzuB-VDucAgztAL2CGK");
-
-        // when
-        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, "updatedConsent",
-                null, null);
-
-        // then
-        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
-                .endsWith("1^consent");
-    }
-
-    @Test
-    public void createUidsAuditCookieShouldReturnZeroFlagIfWithoutConsentIfConsentStringIsNull()
-            throws BadPaddingException, IllegalBlockSizeException {
-        // given
-        given(routingContext.getCookie("audit")).willReturn(null);
-
-        // when
-        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null,  null, null, null);
-
-        // then
-        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
-                .endsWith("|0^");
-    }
-
-    @Test
-    public void createUidsAuditCookieShouldDoIpLookUpIfHostIdIsNullInConfig() throws BadPaddingException,
+    public void createUidsAuditCookieShouldDoIpLookUpIfHostIpIsNullInConfig() throws BadPaddingException,
             IllegalBlockSizeException, SocketException, UnknownHostException {
         // given
-        given(routingContext.getCookie("audit")).willReturn(null);
-
         uidsAuditCookieService = UidsAuditCookieService.create("key", 10, null);
 
         // when
-        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, null, null, null);
+        final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, null, null,
+                null);
 
         // then
         assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
@@ -168,8 +140,7 @@ public class UidsAuditCookieServiceTest {
     }
 
     @Test
-    public void createUidsAuditCookieShouldThrowPrebidExceptionIfUidWasNotDefined() throws BadPaddingException,
-            IllegalBlockSizeException {
+    public void createUidsAuditCookieShouldThrowPrebidExceptionIfUidWasNotDefined() {
         // given
         given(routingContext.getCookie("audit")).willReturn(null);
 
@@ -190,6 +161,62 @@ public class UidsAuditCookieServiceTest {
                 "invalidIpFormat"))
                 .isExactlyInstanceOf(PreBidException.class)
                 .hasMessage("Incorrect ip address format - \"invalidIpFormat\".");
+    }
+
+    @Test
+    public void updateUidsCookieShouldUpdateReferrerDomain() throws BadPaddingException, IllegalBlockSizeException {
+        // given
+        given(request.getHeader(HttpHeaders.REFERER)).willReturn("updatedReferrer");
+        final UidAudit uidAudit = UidAudit.builder().build();
+
+        // when
+        final Cookie cookie = uidsAuditCookieService.updateUidsAuditCookie(routingContext, "consent", uidAudit);
+
+        // then
+        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
+                .endsWith("^updatedReferrer|^|1^consent");
+    }
+
+    @Test
+    public void updateUidsAuditCookieShouldUpdateConsentFlagAndValueIfItWasAbsent() throws BadPaddingException,
+            IllegalBlockSizeException {
+        // given
+        final UidAudit uidAudit = UidAudit.builder().build();
+
+        // when
+        final Cookie cookie = uidsAuditCookieService.updateUidsAuditCookie(routingContext, "consent", uidAudit);
+
+        // then
+        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
+                .endsWith("1^consent");
+    }
+
+    @Test
+    public void updateUidsAuditCookieShouldNotUpdateConsentIfItHasValueBefore() throws BadPaddingException,
+            IllegalBlockSizeException {
+        // given
+        final UidAudit uidAudit = UidAudit.builder().consent("consent").consentUsed("1").build();
+
+        // when
+        final Cookie cookie = uidsAuditCookieService.updateUidsAuditCookie(routingContext, "updatedConsent", uidAudit);
+
+        // then
+        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
+                .endsWith("1^consent");
+    }
+
+    @Test
+    public void updateUidsAuditCookieShouldReturnZeroFlagIfWithoutConsentIfConsentStringIsNull()
+            throws BadPaddingException, IllegalBlockSizeException {
+        // given
+        final UidAudit uidAudit = UidAudit.builder().consentUsed("0").build();
+
+        // when
+        final Cookie cookie = uidsAuditCookieService.updateUidsAuditCookie(routingContext, null, uidAudit);
+
+        // then
+        assertThat(new String(decodingCipher.doFinal(Base64.getUrlDecoder().decode(cookie.getValue().getBytes()))))
+                .endsWith("|0^");
     }
 
     private static String getHostIpFromJvm() throws UnknownHostException, SocketException {
