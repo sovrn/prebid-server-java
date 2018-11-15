@@ -64,3 +64,8 @@ gdpr:
   rubicon:
     enable-cookie: true
     rsid-cookie-encryption-key: fdvndnvavad jdavao89571-34242134fdfads
+analytics:
+  rp:
+    host-url: http://prebid-a-q.us-west-1.elasticbeanstalk.com
+    sampling-factor: 1
+    pbs-version: 0.0.1
