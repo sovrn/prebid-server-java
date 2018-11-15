@@ -8,6 +8,9 @@ vertx:
   http-server-instances: 1
 http:
   port: 8080
+  ssl: false
+  jks-path:
+  jks-password:
 admin:
   port: 8060
 http-client:
@@ -117,6 +120,12 @@ adapters:
     enabled: false
     endpoint: http://bid.contextweb.com/header/s/ortb/prebid-s2s
     usersync-url: //bh.contextweb.com/rtset?pid=561205&ev=1&rurl=
+    pbs-enforces-gdpr: true
+    deprecated-names:
+  rhythmone:
+    enabled: false
+    endpoint: http://tag.1rx.io/rmp
+    usersync-url: //sync.1rx.io/usersync2/rmphb?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&redir=
     pbs-enforces-gdpr: true
     deprecated-names:
   rubicon:
