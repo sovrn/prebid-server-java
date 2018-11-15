@@ -389,14 +389,14 @@ public class CookieSyncHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithNoCookieStatusIfHostVendorRejectedByGdpr() throws IOException {
         // given
-        cookieSyncHandler = new CookieSyncHandler(2000, uidsCookieService, bidderCatalog, gdprService, null, false,
-                analyticsReporter, metrics, timeoutFactory);
+        cookieSyncHandler = new CookieSyncHandler(true, 2000, uidsCookieService, bidderCatalog, gdprService, null,
+                false, analyticsReporter, metrics, timeoutFactory);
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null)));
+                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null)));
 
         givenUsersyncersReturningFamilyName();
 
