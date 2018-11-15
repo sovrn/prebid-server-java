@@ -15,6 +15,8 @@ import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.Future;
+import io.vertx.core.MultiMap;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -568,9 +570,21 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private void postEvent(Event event) {
-        httpClient.post(endpointUrl, Json.encode(event), 0L)
+        httpClient.post(endpointUrl, headers(event), Json.encode(event), 0L)
                 .compose(RubiconAnalyticsModule::processResponse)
                 .recover(RubiconAnalyticsModule::failResponse);
+    }
+
+    /**
+     * Returns headers needed for analytic request.
+     */
+    private static MultiMap headers(Event event) {
+        final MultiMap headers = MultiMap.caseInsensitiveMultiMap();
+        final String userAgent = event.getUserAgent();
+        if (userAgent != null) {
+            headers.add(HttpHeaders.USER_AGENT, userAgent);
+        }
+        return headers;
     }
 
     /**

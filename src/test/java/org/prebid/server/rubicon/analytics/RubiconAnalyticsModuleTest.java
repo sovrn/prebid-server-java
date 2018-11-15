@@ -14,6 +14,8 @@ import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.Future;
+import io.vertx.core.MultiMap;
+import io.vertx.core.http.HttpHeaders;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,6 +59,8 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.BDDAssertions.then;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -128,7 +132,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         }
 
         // then
-        verify(httpClient).post(anyString(), any(), anyLong());
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
     }
 
     @Test
@@ -154,7 +158,30 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void processEventShouldPostEventToEndpoint() throws IOException {
+    public void processEventShouldPostEventToEndpointWithExpectedHeaders() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .bidRequest(sampleBidRequest())
+                .uidsCookie(uidsCookie)
+                .bidResponse(sampleBidResponse())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        final ArgumentCaptor<MultiMap> captor = ArgumentCaptor.forClass(MultiMap.class);
+        verify(httpClient).post(anyString(), captor.capture(), any(), anyLong());
+
+        assertThat(captor.getValue().entries())
+                .extracting(Map.Entry::getKey, Map.Entry::getValue)
+                .containsOnly(tuple(HttpHeaders.USER_AGENT.toString(), "userAgent"));
+    }
+
+    @Test
+    public void processEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
         // given
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
@@ -170,7 +197,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
-        verify(httpClient).post(eq("url/event"), eventCaptor.capture(), anyLong());
+        verify(httpClient).post(eq("url/event"), any(), eventCaptor.capture(), anyLong());
 
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBase()
                 .auctions(singletonList(Auction.of(
@@ -545,7 +572,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @SuppressWarnings("SameParameterValue")
     private void givenHttpClientReturnsResponse(int statusCode, String response) {
         final HttpClientResponse httpClientResponse = HttpClientResponse.of(statusCode, null, response);
-        given(httpClient.post(anyString(), any(), anyLong()))
+        given(httpClient.post(anyString(), any(), any(), anyLong()))
                 .willReturn(Future.succeededFuture(httpClientResponse));
     }
 }
