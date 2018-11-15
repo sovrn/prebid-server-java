@@ -29,6 +29,7 @@ metrics:
     default-verbosity: detailed
 cache:
   scheme: https
+  path: /cache
   query: uuid=%PBS_CACHE_UUID%
   banner-ttl-seconds: 300
   video-ttl-seconds: 300
