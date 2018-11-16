@@ -65,7 +65,7 @@ public class RsidCookieService {
     private static void decrypt(byte[] input, int inputPtr, byte[] key, int keyPtr, StringBuilder sb) {
         if (inputPtr < input.length && keyPtr < key.length) {
             final int decrypted = input[inputPtr] ^ key[keyPtr] ^ (key[0] * keyPtr);
-            final byte value = Integer.valueOf(decrypted).byteValue();
+            final byte value = (byte) decrypted;
             sb.append((char) value);
 
             key[keyPtr] += keyPtr < (key.length - 1) ? key[keyPtr + 1] : key[0];

@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -44,14 +45,12 @@ public class UidsAuditParser {
 
         final UidAudit uidAudit;
 
-        // algorithm to parse cookie will depends on version
-        switch (version) {
-            case "1":
-                uidAudit = parseFirstVersionCookie(auditGroups);
-                break;
-            default:
-                throw new InvalidAuditFormatException(String.format(
-                        "Uids audit cookie has invalid version = %s", version));
+        // algorithm to parse cookie depends on version
+        if (Objects.equals(version, "1")) {
+            uidAudit = parseFirstVersionCookie(auditGroups);
+        } else {
+            throw new InvalidAuditFormatException(String.format(
+                    "Uids audit cookie has invalid version = %s", version));
         }
         return uidAudit;
     }
