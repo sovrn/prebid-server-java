@@ -30,5 +30,8 @@ public class Event {
     @JsonProperty("userAgent")
     String userAgent;
 
+    @JsonProperty("referrerUri")
+    String referrerUri;
+
     String country;
 }

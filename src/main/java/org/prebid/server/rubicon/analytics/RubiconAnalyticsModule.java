@@ -10,6 +10,7 @@ import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Publisher;
+import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.Video;
 import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
@@ -23,6 +24,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import lombok.Value;
 import org.prebid.server.analytics.AnalyticsReporter;
+import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.bidder.BidderCatalog;
@@ -107,6 +109,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private final HttpClient httpClient;
 
     private long auctionEventCount = 0;
+    private long ampEventCount = 0;
     private long bidWonCount = 0;
 
     public RubiconAnalyticsModule(String endpointUrl, int samplingFactor, String pbsVersion, String pbsHostname,
@@ -126,6 +129,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     public <T> void processEvent(T event) {
         if (event instanceof AuctionEvent) {
             processAuctionEvent((AuctionEvent) event);
+        } else if (event instanceof AmpEvent) {
+            processAmpEvent((AmpEvent) event);
         }
     }
 
@@ -176,54 +181,68 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private void processAuctionEvent(AuctionEvent event) {
-        // only send event for mobile requests
         final BidRequest bidRequest = event.getBidRequest();
-        if (bidRequest == null || event.getBidResponse() == null || bidRequest.getApp() == null) {
+        final UidsCookie uidsCookie = event.getUidsCookie();
+        final BidResponse bidResponse = event.getBidResponse();
+
+        // only send event for mobile requests
+        if (bidRequest == null || uidsCookie == null || bidResponse == null || bidRequest.getApp() == null) {
             return;
         }
 
         // only continue if counter matches sampling factor
         if (++auctionEventCount % samplingFactor == 0) {
-            sendAuctionData(event);
+            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
+            final Integer accountId = accountIdFromApp(bidRequest);
+            postEvent(toAuctionEvent(bidRequest, uidsCookie, adUnits, accountId, this::eventBuilderBaseFromDevice));
         }
     }
 
-    private void sendAuctionData(AuctionEvent auctionEvent) {
-        final BidRequest bidRequest = auctionEvent.getBidRequest();
-        final List<AdUnit> adUnits = toAdUnits(bidRequest, auctionEvent.getUidsCookie(), auctionEvent.getBidResponse());
+    private void processAmpEvent(AmpEvent ampEvent) {
+        final BidRequest bidRequest = ampEvent.getBidRequest();
+        final UidsCookie uidsCookie = ampEvent.getUidsCookie();
+        final BidResponse bidResponse = ampEvent.getBidResponse();
 
-        postEvent(toAuctionEvent(bidRequest, auctionEvent.getUidsCookie(), adUnits));
+        if (bidRequest == null || uidsCookie == null || bidResponse == null || bidRequest.getSite() == null) {
+            return;
+        }
+
+        // only continue if counter matches sampling factor
+        if (++ampEventCount % samplingFactor == 0) {
+            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
+            final Integer accountId = accountIdFromSite(bidRequest);
+            postEvent(toAuctionEvent(bidRequest, uidsCookie, adUnits, accountId, this::eventBuilderBaseFromSite));
+        }
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
-        final Map<String, List<TwinBids>> impIdToTwinBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse);
+        final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse);
 
         return bidRequest.getImp().stream()
-                .map(imp -> toAdUnit(imp, impIdToTwinBids.getOrDefault(imp.getId(), Collections.emptyList())))
+                .map(imp -> toAdUnit(imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList())))
                 .collect(Collectors.toList());
     }
 
     private Map<String, List<TwinBids>> toBidsByImpId(BidRequest bidRequest, UidsCookie uidsCookie,
                                                       BidResponse bidResponse) {
         final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
-        final Map<String, List<TwinBids>> impIdToTwinBids = new HashMap<>();
+        final Map<String, List<TwinBids>> impIdToBids = new HashMap<>();
 
-        populateSuccessfulBids(bidRequest, uidsCookie, bidResponse, extBidResponse, impIdToTwinBids);
-        populateFailedBids(bidRequest, uidsCookie, extBidResponse, impIdToTwinBids);
+        populateSuccessfulBids(bidRequest, uidsCookie, bidResponse, extBidResponse, impIdToBids);
+        populateFailedBids(bidRequest, uidsCookie, extBidResponse, impIdToBids);
 
-        return impIdToTwinBids;
+        return impIdToBids;
     }
 
     private void populateSuccessfulBids(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse,
-                                        ExtBidResponse extBidResponse,
-                                        Map<String, List<TwinBids>> impIdToTwinBids) {
+                                        ExtBidResponse extBidResponse, Map<String, List<TwinBids>> impIdToBids) {
         for (final SeatBid seatBid : bidResponse.getSeatbid()) {
             final String bidder = seatBid.getSeat();
             final Integer responseTime = serverLatencyMillisFrom(extBidResponse, bidder);
             final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
 
             for (final Bid bid : seatBid.getBid()) {
-                impIdToTwinBids.computeIfAbsent(bid.getImpid(), key -> new ArrayList<>())
+                impIdToBids.computeIfAbsent(bid.getImpid(), key -> new ArrayList<>())
                         .add(toTwinBids(bidder, findImpById(bidRequest.getImp(), bid.getImpid()),
                                 bid, responseTime, serverHasUserId));
             }
@@ -231,32 +250,32 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private void populateFailedBids(BidRequest bidRequest, UidsCookie uidsCookie, ExtBidResponse extBidResponse,
-                                    Map<String, List<TwinBids>> impIdToTwinBids) {
+                                    Map<String, List<TwinBids>> impIdToBids) {
         for (Imp imp : bidRequest.getImp()) {
-            final String impId = imp.getId();
             final ObjectNode impExt = imp.getExt();
             if (impExt == null) {
                 continue;
             }
 
+            final String impId = imp.getId();
             final Iterator<String> bidderIterator = impExt.fieldNames();
             while (bidderIterator.hasNext()) {
                 final String bidder = bidderIterator.next();
-                if (bidAlreadyExists(impIdToTwinBids, impId, bidder)) {
+                if (analyticsBidExists(impIdToBids, impId, bidder)) {
                     continue;
                 }
 
                 final Integer responseTime = serverLatencyMillisFrom(extBidResponse, bidder);
                 final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
 
-                impIdToTwinBids.computeIfAbsent(impId, key -> new ArrayList<>())
+                impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
                         .add(toTwinBids(bidder, imp, null, responseTime, serverHasUserId));
             }
         }
     }
 
-    private static boolean bidAlreadyExists(Map<String, List<TwinBids>> impIdToTwinBids, String impId, String bidder) {
-        return impIdToTwinBids.containsKey(impId) && impIdToTwinBids.get(impId).stream()
+    private static boolean analyticsBidExists(Map<String, List<TwinBids>> impIdToBids, String impId, String bidder) {
+        return impIdToBids.containsKey(impId) && impIdToBids.get(impId).stream()
                 .anyMatch(twinBids -> Objects.equals(bidder, twinBids.getAnalyticsBid().getBidder()));
     }
 
@@ -456,13 +475,14 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return extBid != null ? extBid.getPrebid().getTargeting() : null;
     }
 
-    private Event toAuctionEvent(BidRequest bidRequest, UidsCookie uidsCookie, List<AdUnit> adUnits) {
-        return eventBuilderBase(bidRequest)
+    private Event toAuctionEvent(BidRequest bidRequest, UidsCookie uidsCookie, List<AdUnit> adUnits,
+                                 Integer accountId, Function<BidRequest, Event.EventBuilder> eventBuilderBase) {
+        return eventBuilderBase.apply(bidRequest)
                 .auctions(Collections.singletonList(Auction.of(
                         bidRequest.getId(),
                         samplingFactor,
                         adUnits,
-                        accountId(bidRequest),
+                        accountId,
                         bidRequest.getTmax(),
                         serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))))
                 .build();
@@ -474,10 +494,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final BidType bidType = mediaTypeFromBid(bid);
         final String bidTypeString = mediaTypeString(bidType);
 
-        return eventBuilderBase(bidRequest)
+        return eventBuilderBaseFromDevice(bidRequest)
                 .bidsWon(Collections.singletonList(BidWon.builder()
                         .transactionId(bid.getImpid())
-                        .accountId(accountId(bidRequest))
+                        .accountId(accountIdFromApp(bidRequest))
                         .bidder(bidder)
                         .samplingFactor(samplingFactor)
                         .bidwonStatus(SUCCESS_STATUS)
@@ -497,8 +517,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .build();
     }
 
-    private static Integer accountId(BidRequest bidRequest) {
+    private static Integer accountIdFromApp(BidRequest bidRequest) {
         final Publisher publisher = bidRequest.getApp().getPublisher();
+        return publisher != null ? parseId(publisher.getId()) : null;
+    }
+
+    private static Integer accountIdFromSite(BidRequest bidRequest) {
+        final Publisher publisher = bidRequest.getSite().getPublisher();
         return publisher != null ? parseId(publisher.getId()) : null;
     }
 
@@ -534,9 +559,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return mediaTypes;
     }
 
-    private Event.EventBuilder eventBuilderBase(BidRequest bidRequest) {
+    /**
+     * Prepares event from request from mobile app.
+     */
+    private Event.EventBuilder eventBuilderBaseFromDevice(BidRequest bidRequest) {
         final App app = bidRequest.getApp();
-
         final ExtApp appExt = readExt(app.getExt(), ExtApp.class);
         final ExtAppPrebid appExtPrebid = appExt != null ? appExt.getPrebid() : null;
 
@@ -565,12 +592,40 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .userAgent(getIfNotNull(device, Device::getUa));
     }
 
+    /**
+     * Prepares event from request from mobile web.
+     */
+    private Event.EventBuilder eventBuilderBaseFromSite(BidRequest bidRequest) {
+        final Device device = bidRequest.getDevice();
+        final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
+
+        return Event.builder()
+                .integration(PBS_INTEGRATION)
+                .version(pbsVersion)
+                .client(Client.builder()
+                        .deviceClass(MOBILE_DEVICE_CLASS)
+                        .os(getIfNotNull(device, Device::getOs))
+                        .osVersion(getIfNotNull(device, Device::getOsv))
+                        .make(getIfNotNull(device, Device::getMake))
+                        .model(getIfNotNull(device, Device::getModel))
+                        .carrier(getIfNotNull(device, Device::getCarrier))
+                        .connectionType(getIfNotNull(device, Device::getConnectiontype))
+                        .build())
+                .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
+                .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
+                .userAgent(getIfNotNull(device, Device::getUa))
+                .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage));
+    }
+
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
         return target != null ? getter.apply(target) : null;
     }
 
+    /**
+     * Sends event to analytics service.
+     */
     private void postEvent(Event event) {
-        httpClient.post(endpointUrl, headers(event), Json.encode(event), 0L)
+        httpClient.post(endpointUrl, headers(event), Json.encode(event), 2000L)
                 .compose(RubiconAnalyticsModule::processResponse)
                 .recover(RubiconAnalyticsModule::failResponse);
     }
@@ -608,6 +663,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return Future.failedFuture(exception);
     }
 
+    /**
+     * Holds correspondence between OpenRTB Bid and Analytics Bid.
+     */
     @Value
     private static final class TwinBids {
 

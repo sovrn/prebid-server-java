@@ -21,7 +21,7 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
 @Configuration
-@ConditionalOnProperty(prefix = "analytics.rp", name = "host-url")
+@ConditionalOnProperty(prefix = "analytics.rp", name = "enabled", havingValue = "true")
 public class RubiconAnalyticsConfiguration {
 
     @Bean
@@ -42,7 +42,7 @@ public class RubiconAnalyticsConfiguration {
 
     @Component
     @ConfigurationProperties(prefix = "analytics.rp")
-    @ConditionalOnProperty(prefix = "analytics.rp", name = "host-url")
+    @ConditionalOnProperty(prefix = "analytics.rp", name = "enabled", havingValue = "true")
     @Validated
     @Data
     @NoArgsConstructor

@@ -163,7 +163,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .bidRequest(sampleBidRequest())
+                .bidRequest(sampleAuctionBidRequest())
                 .uidsCookie(uidsCookie)
                 .bidResponse(sampleBidResponse())
                 .build();
@@ -181,25 +181,154 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void processEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
+    public void processAuctionEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
         // given
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
 
-        final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .bidRequest(sampleBidRequest())
+        final AuctionEvent event = AuctionEvent.builder()
+                .bidRequest(sampleAuctionBidRequest())
                 .uidsCookie(uidsCookie)
                 .bidResponse(sampleBidResponse())
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        module.processEvent(event);
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
         verify(httpClient).post(eq("url/event"), any(), eventCaptor.capture(), anyLong());
 
-        then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBase()
+        then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBaseFromApp()
+                .auctions(singletonList(Auction.of(
+                        "bidRequestId",
+                        1,
+                        asList(
+                                AdUnit.builder()
+                                        .transactionId("impId1")
+                                        .status("success")
+                                        .mediaTypes(asList("banner", "video"))
+                                        .videoAdFormat("interstitial")
+                                        .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
+                                        .adServerTargeting(singletonMap("key1", "value1"))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("rubicon")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(123, 456, 789))
+                                                        .bidResponse(
+                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
+                                                                        345, BigDecimal.valueOf(4.56), "video",
+                                                                        Dimensions.of(500, 600)))
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("impId2")
+                                        .status("success")
+                                        .mediaTypes(singletonList("video"))
+                                        .videoAdFormat("mid-roll")
+                                        .dimensions(singletonList(Dimensions.of(100, 200)))
+                                        .adServerTargeting(singletonMap("key22", "value22"))
+                                        .bids(asList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .bidResponse(
+                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
+                                                                        456, BigDecimal.valueOf(5.67), "video",
+                                                                        Dimensions.of(600, 700)))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .bidResponse(
+                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
+                                                                        567, BigDecimal.valueOf(6.78), "video",
+                                                                        Dimensions.of(600, 700)))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("rubicon")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(null, null, null))
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("impId3")
+                                        .status("no-bid")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(400, 500)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("rubicon")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(321, 654, 987))
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("impId4")
+                                        .status("no-bid")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(500, 600)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("impId5")
+                                        .status("no-bid")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(600, 700)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("unknown")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .build()))
+                                        .build()),
+                        1234, 1000L, true)))
+                .build());
+    }
+
+    @Test
+    public void processAmpEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+        given(bidderCatalog.isValidName("unknown")).willReturn(false);
+
+        final AmpEvent event = AmpEvent.builder()
+                .bidRequest(sampleAmpBidRequest())
+                .uidsCookie(uidsCookie)
+                .bidResponse(sampleBidResponse())
+                .build();
+
+        // when
+        module.processEvent(event);
+
+        // then
+        final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(eq("url/event"), any(), eventCaptor.capture(), anyLong());
+
+        then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBaseFromSite()
                 .auctions(singletonList(Auction.of(
                         "bidRequestId",
                         1,
@@ -358,7 +487,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void postProcessShouldSetBidNurlWithEventData() {
         // given
-        final BidRequest bidRequest = sampleBidRequest();
+        final BidRequest bidRequest = sampleAuctionBidRequest();
         final BidResponse bidResponse = sampleBidResponse();
 
         // when
@@ -371,7 +500,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .allMatch(nurl -> nurl.startsWith("url/event?type=bidWon&data="))
                 .extracting(nurl -> nurl.replaceFirst("url/event\\?type=bidWon&data=", ""))
                 .extracting(payload -> mapper.readValue(Base64.getUrlDecoder().decode(payload), Event.class))
-                .containsOnly(expectedEventBuilderBase()
+                .containsOnly(expectedEventBuilderBaseFromApp()
                                 .bidsWon(singletonList(BidWon.builder()
                                         .transactionId("impId1")
                                         .accountId(1234)
@@ -389,7 +518,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .params(Params.of(123, 456, 789))
                                         .build()))
                                 .build(),
-                        expectedEventBuilderBase()
+                        expectedEventBuilderBaseFromApp()
                                 .bidsWon(singletonList(BidWon.builder()
                                         .transactionId("impId2")
                                         .accountId(1234)
@@ -406,7 +535,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .hasRubiconId(true)
                                         .build()))
                                 .build(),
-                        expectedEventBuilderBase()
+                        expectedEventBuilderBaseFromApp()
                                 .bidsWon(singletonList(BidWon.builder()
                                         .transactionId("impId2")
                                         .accountId(1234)
@@ -425,7 +554,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .build());
     }
 
-    private static BidRequest sampleBidRequest() {
+    private static BidRequest sampleAuctionBidRequest() {
         final ObjectNode multiBidderImpExt = mapper.createObjectNode();
         multiBidderImpExt.set("appnexus", mapper.createObjectNode());
         multiBidderImpExt.set("rubicon", mapper.createObjectNode());
@@ -446,6 +575,74 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .bundle("bundle")
                         .ver("version")
                         .ext(mapper.valueToTree(ExtApp.of(ExtAppPrebid.of("sdkVersion", "sdkSource"))))
+                        .publisher(Publisher.builder().id("1234").build())
+                        .build())
+                .imp(asList(
+                        Imp.builder().id("impId1")
+                                .banner(Banner.builder()
+                                        .format(asList(
+                                                Format.builder().w(200).h(300).build(),
+                                                Format.builder().w(300).h(400).build()))
+                                        .build())
+                                .video(Video.builder().build())
+                                .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
+                                        ExtImpRubicon.builder()
+                                                .video(RubiconVideoParams.builder().sizeId(202).build())
+                                                .accountId(123)
+                                                .siteId(456)
+                                                .zoneId(789)
+                                                .build())))
+                                .build(),
+                        Imp.builder().id("impId2")
+                                .video(Video.builder().startdelay(-1).w(100).h(200).build())
+                                .ext(multiBidderImpExt)
+                                .build(),
+                        Imp.builder().id("impId3")
+                                .banner(Banner.builder()
+                                        .format(singletonList(Format.builder().w(400).h(500).build()))
+                                        .build())
+                                .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
+                                        ExtImpRubicon.builder()
+                                                .video(RubiconVideoParams.builder().sizeId(202).build())
+                                                .accountId(321)
+                                                .siteId(654)
+                                                .zoneId(987)
+                                                .build())))
+                                .build(),
+                        Imp.builder().id("impId4")
+                                .banner(Banner.builder()
+                                        .format(singletonList(Format.builder().w(500).h(600).build()))
+                                        .build())
+                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .build(),
+                        Imp.builder().id("impId5")
+                                .banner(Banner.builder()
+                                        .format(singletonList(Format.builder().w(600).h(700).build()))
+                                        .build())
+                                .ext((ObjectNode) mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .build()))
+                .tmax(1000L)
+                .build();
+    }
+
+    private static BidRequest sampleAmpBidRequest() {
+        final ObjectNode multiBidderImpExt = mapper.createObjectNode();
+        multiBidderImpExt.set("appnexus", mapper.createObjectNode());
+        multiBidderImpExt.set("rubicon", mapper.createObjectNode());
+
+        return BidRequest.builder()
+                .id("bidRequestId")
+                .device(Device.builder()
+                        .os("os")
+                        .osv("2.23")
+                        .make("osMake")
+                        .model("osModel")
+                        .carrier("carrier")
+                        .connectiontype(17)
+                        .lmt(1)
+                        .ua("userAgent")
+                        .build())
+                .site(Site.builder()
                         .publisher(Publisher.builder().id("1234").build())
                         .build())
                 .imp(asList(
@@ -549,7 +746,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return map;
     }
 
-    private static Event.EventBuilder expectedEventBuilderBase() {
+    private static Event.EventBuilder expectedEventBuilderBaseFromApp() {
         return Event.builder()
                 .integration("pbs")
                 .version("pbs-version-1")
@@ -563,6 +760,24 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .connectionType(17)
                         .app(org.prebid.server.rubicon.analytics.proto.App.of("bundle", "version", "sdkVersion",
                                 "sdkSource"))
+                        .build())
+                .limitAdTracking(true)
+                .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
+                .userAgent("userAgent");
+    }
+
+    private static Event.EventBuilder expectedEventBuilderBaseFromSite() {
+        return Event.builder()
+                .integration("pbs")
+                .version("pbs-version-1")
+                .client(Client.builder()
+                        .deviceClass("mobile")
+                        .os("os")
+                        .osVersion("2.23")
+                        .make("osMake")
+                        .model("osModel")
+                        .carrier("carrier")
+                        .connectionType(17)
                         .build())
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
