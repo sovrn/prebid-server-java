@@ -11,12 +11,14 @@ adapters:
     enabled: true
   conversant:
     enabled: true
-  rubicon:
-    enabled: true
-    pbs-enforces-gdpr: false
   pubmatic:
     enabled: true
   pulsepoint:
+    enabled: true
+  rubicon:
+    enabled: true
+    pbs-enforces-gdpr: false
+  sovrn:
     enabled: true
 auction:
   ad-server-currency: USD
