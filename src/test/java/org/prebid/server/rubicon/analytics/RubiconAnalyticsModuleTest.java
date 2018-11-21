@@ -558,6 +558,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final ObjectNode multiBidderImpExt = mapper.createObjectNode();
         multiBidderImpExt.set("appnexus", mapper.createObjectNode());
         multiBidderImpExt.set("rubicon", mapper.createObjectNode());
+        multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
 
         return BidRequest.builder()
                 .id("bidRequestId")
@@ -629,6 +630,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final ObjectNode multiBidderImpExt = mapper.createObjectNode();
         multiBidderImpExt.set("appnexus", mapper.createObjectNode());
         multiBidderImpExt.set("rubicon", mapper.createObjectNode());
+        multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
 
         return BidRequest.builder()
                 .id("bidRequestId")
