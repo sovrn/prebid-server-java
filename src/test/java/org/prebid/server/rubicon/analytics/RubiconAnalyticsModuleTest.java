@@ -57,9 +57,11 @@ import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.BDDAssertions.then;
 import static org.mockito.ArgumentMatchers.any;
@@ -71,6 +73,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class RubiconAnalyticsModuleTest extends VertxTest {
+
+    private static final String HOST_URL = "http://host-url";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -105,15 +109,47 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         given(uidsCookieService.parseHostCookie(any())).willReturn("khaos-cookie-value");
 
-        module = new RubiconAnalyticsModule("url", 1, "pbs-version-1", "pbsHostname", "dataCenterRegion", bidderCatalog,
-                uidsCookieService, httpClient);
+        module = new RubiconAnalyticsModule(HOST_URL, 1, emptyMap(), "pbs-version-1", "pbsHostname", "dataCenterRegion",
+                bidderCatalog, uidsCookieService, httpClient);
     }
 
     @Test
-    public void processEventShouldTakeIntoAccountSamplingFactor() {
+    public void creationShouldFailOnInvalidEndpointUrl() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, null, null, null,
+                        null, null))
+                .withMessage("URL supplied is not valid: invalid_url/event");
+    }
+
+    @Test
+    public void creationShouldFailOnInvalidGlobalSamplingFactor() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new RubiconAnalyticsModule(HOST_URL, 0, emptyMap(), null, null, null, null,
+                        null, null))
+                .withMessage("Global sampling factor must be greater then 0, given: 0");
+    }
+
+    @Test
+    public void creationShouldFailOnInvalidAccountSamplingFactor() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new RubiconAnalyticsModule(HOST_URL, null, singletonMap(1, 0), null, null, null, null,
+                        null, null))
+                .withMessage("Sampling factor for account [1] must be greater then 0, given: 0");
+    }
+
+    @Test
+    public void creationShouldFailOnMissingSamplingFactor() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new RubiconAnalyticsModule(HOST_URL, null, emptyMap(), null, null, null, null,
+                        null, null))
+                .withMessage("Either global or per-account sampling factor must be defined");
+    }
+
+    @Test
+    public void processEventShouldUseGlobalSamplingFactor() {
         // given
-        module = new RubiconAnalyticsModule("url", 10, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, httpClient);
+        module = new RubiconAnalyticsModule(HOST_URL, 10, emptyMap(), "pbs-version-1", "pbsHostname",
+                "dataCenterRegion", bidderCatalog, uidsCookieService, httpClient);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -130,6 +166,27 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                             .build())
                     .build());
         }
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processEventShouldUseAccountSamplingFactorOverGlobal() {
+        // given
+        module = new RubiconAnalyticsModule(HOST_URL, 2, singletonMap(1234, 1), "pbs-version-1", "pbsHostname",
+                "dataCenterRegion", bidderCatalog, uidsCookieService, httpClient);
+
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .bidRequest(sampleAuctionBidRequest())
+                .uidsCookie(uidsCookie)
+                .bidResponse(sampleBidResponse())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
 
         // then
         verify(httpClient).post(anyString(), any(), any(), anyLong());
@@ -197,7 +254,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
-        verify(httpClient).post(eq("url/event"), any(), eventCaptor.capture(), anyLong());
+        verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
 
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBaseFromApp()
                 .auctions(singletonList(Auction.of(
@@ -326,7 +383,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
-        verify(httpClient).post(eq("url/event"), any(), eventCaptor.capture(), anyLong());
+        verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
 
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBaseFromSite()
                 .auctions(singletonList(Auction.of(
@@ -439,10 +496,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void postProcessShouldTakeIntoAccountSamplingFactor() {
+    public void postProcessShouldUseGlobalSamplingFactor() {
         // given
-        module = new RubiconAnalyticsModule("url", 2, "pbs-version-1", "pbsHostname", "dataCenterRegion", bidderCatalog,
-                uidsCookieService, httpClient);
+        module = new RubiconAnalyticsModule(HOST_URL, 2, emptyMap(), "pbs-version-1", "pbsHostname", "dataCenterRegion",
+                bidderCatalog, uidsCookieService, httpClient);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -453,6 +510,32 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
+                        .build(),
+                uidsCookie,
+                BidResponse.builder()
+                        .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
+                        .build());
+
+        // then
+        then(bid1.getNurl()).isNull();
+        then(bid2.getNurl()).isNotNull();
+    }
+
+    @Test
+    public void postProcessShouldUseAccountSamplingFactor() {
+        // given
+        module = new RubiconAnalyticsModule(HOST_URL, 1, singletonMap(1234, 2), "pbs-version-1", "pbsHostname",
+                "dataCenterRegion", bidderCatalog, uidsCookieService, httpClient);
+
+        final Bid bid1 = Bid.builder().build();
+        final Bid bid2 = Bid.builder().build();
+
+        // when
+        module.postProcess(
+                null,
+                BidRequest.builder()
+                        .imp(emptyList())
+                        .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
                         .build(),
                 uidsCookie,
                 BidResponse.builder()
@@ -497,8 +580,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         then(returnedBidResponse.getSeatbid())
                 .flatExtracting(SeatBid::getBid)
                 .extracting(Bid::getNurl)
-                .allMatch(nurl -> nurl.startsWith("url/event?type=bidWon&data="))
-                .extracting(nurl -> nurl.replaceFirst("url/event\\?type=bidWon&data=", ""))
+                .allMatch(nurl -> nurl.startsWith("http://host-url/event?type=bidWon&data="))
+                .extracting(nurl -> nurl.replaceFirst("http://host-url/event\\?type=bidWon&data=", ""))
                 .extracting(payload -> mapper.readValue(Base64.getUrlDecoder().decode(payload), Event.class))
                 .containsOnly(expectedEventBuilderBaseFromApp()
                                 .bidsWon(singletonList(BidWon.builder()

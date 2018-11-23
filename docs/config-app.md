@@ -170,11 +170,6 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 - `gdpr.vendorlist.http-default-timeout-ms` - default operation timeout for obtaining new vendor list.
 - `gdpr.vendorlist.filesystem-cache-dir` - directory for local storage cache for vendor list. Should be with `WRITE` permissions for user application run from.
 - `gdpr.geolocation.enabled` - if equals to `true` the geo location service will be used to determine the country for client request.
-- `gdpr.rubicon.enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints
-- `gdpr.rubicon.rsid-cookie-encryption-key` - encryption key to decode RSID cookie value.
-- `gdpr.rubicon.audit-cookie-encryption-key` - set key for uid audit cookie using Blowfish algorithm
-- `gdpr.rubicon.host-ip` - the ip pbs hosted on.
-- `gdpr.rubicon.geolocation-netacuity-server` - comma separated list of the NetAcuity database server addresses.
 
 ## General settings
 - `external-url` - the setting stands for external URL prebid server is reachable by, 

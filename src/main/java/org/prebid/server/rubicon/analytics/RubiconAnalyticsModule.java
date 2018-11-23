@@ -50,6 +50,7 @@ import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
 import org.prebid.server.rubicon.analytics.proto.VideoAdFormat;
+import org.prebid.server.util.HttpUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
@@ -102,8 +103,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private final String endpointUrl;
-    private final int samplingFactor;
     private final String pbsVersion;
+    private final Integer samplingFactor;
+    private Map<Integer, Integer> accountToSamplingFactor;
     private final String pbsHostname;
     private final String dataCenterRegion;
     private final BidderCatalog bidderCatalog;
@@ -114,17 +116,44 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private long ampEventCount = 0;
     private long bidWonCount = 0;
 
-    public RubiconAnalyticsModule(String endpointUrl, int samplingFactor, String pbsVersion, String pbsHostname,
-                                  String dataCenterRegion, BidderCatalog bidderCatalog,
+    private Map<Integer, Long> accountToAuctionEventCount = new HashMap<>();
+    private Map<Integer, Long> accountToAmpEventCount = new HashMap<>();
+    private Map<Integer, Long> accountToBidWonCount = new HashMap<>();
+
+    public RubiconAnalyticsModule(String endpointUrl, Integer samplingFactor,
+                                  Map<Integer, Integer> accountToSamplingFactor, String pbsVersion,
+                                  String pbsHostname, String dataCenterRegion, BidderCatalog bidderCatalog,
                                   UidsCookieService uidsCookieService, HttpClient httpClient) {
-        this.endpointUrl = Objects.requireNonNull(endpointUrl) + EVENT_PATH;
+        this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl) + EVENT_PATH);
+        validateSamplingFactors(samplingFactor, accountToSamplingFactor);
         this.samplingFactor = samplingFactor;
+        this.accountToSamplingFactor = accountToSamplingFactor;
         this.pbsVersion = pbsVersion;
         this.pbsHostname = Objects.requireNonNull(pbsHostname);
         this.dataCenterRegion = Objects.requireNonNull(dataCenterRegion);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.httpClient = Objects.requireNonNull(httpClient);
+    }
+
+    private static void validateSamplingFactors(Integer globalSamplingFactor,
+                                                Map<Integer, Integer> accountToSamplingFactor) {
+        if (globalSamplingFactor != null && globalSamplingFactor <= 0) {
+            throw new IllegalArgumentException(
+                    String.format("Global sampling factor must be greater then 0, given: %d", globalSamplingFactor));
+        }
+
+        for (Map.Entry<Integer, Integer> entry : Objects.requireNonNull(accountToSamplingFactor).entrySet()) {
+            if (entry.getValue() <= 0) {
+                throw new IllegalArgumentException(
+                        String.format("Sampling factor for account [%d] must be greater then 0, given: %d",
+                                entry.getKey(), entry.getValue()));
+            }
+        }
+
+        if (globalSamplingFactor == null && accountToSamplingFactor.isEmpty()) {
+            throw new IllegalArgumentException("Either global or per-account sampling factor must be defined");
+        }
     }
 
     @Override
@@ -147,6 +176,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         if (bidRequest.getApp() != null) {
             final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
             final boolean hasRubiconId = uidsCookieService.parseHostCookie(context) != null;
+            final Integer accountId = accountIdFromApp(bidRequest);
 
             for (final SeatBid seatBid : bidResponse.getSeatbid()) {
                 final String bidder = seatBid.getSeat();
@@ -155,15 +185,33 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
                 for (final Bid bid : seatBid.getBid()) {
                     // only continue if counter matches sampling factor
-                    if (++bidWonCount % samplingFactor == 0) {
+                    if (shouldProcessBidWon(accountId)) {
                         addEventCallbackToBid(bid,
-                                toBidWonEvent(bidRequest, bidder, responseTime, serverHasUserId, hasRubiconId, bid));
+                                toBidWonEvent(bidRequest, bidder, responseTime, serverHasUserId, hasRubiconId, bid,
+                                        accountId));
                     }
                 }
             }
         }
 
         return bidResponse;
+    }
+
+    private boolean shouldProcessBidWon(Integer accountId) {
+        final boolean result;
+
+        final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
+        if (accountSamplingFactor != null) {
+            final Long eventCount = accountToBidWonCount.compute(accountId,
+                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
+            result = eventCount % accountSamplingFactor == 0;
+        } else if (samplingFactor != null) {
+            result = ++bidWonCount % samplingFactor == 0;
+        } else {
+            result = false;
+        }
+
+        return result;
     }
 
     private void addEventCallbackToBid(Bid bid, Event event) {
@@ -192,12 +240,30 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             return;
         }
 
+        final Integer accountId = accountIdFromApp(bidRequest);
+
         // only continue if counter matches sampling factor
-        if (++auctionEventCount % samplingFactor == 0) {
+        if (shouldProcessAuctionEvent(accountId)) {
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
-            final Integer accountId = accountIdFromApp(bidRequest);
             postEvent(toAuctionEvent(bidRequest, uidsCookie, adUnits, accountId, this::eventBuilderBaseFromDevice));
         }
+    }
+
+    private boolean shouldProcessAuctionEvent(Integer accountId) {
+        final boolean result;
+
+        final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
+        if (accountSamplingFactor != null) {
+            final Long eventCount = accountToAuctionEventCount.compute(accountId,
+                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
+            result = eventCount % accountSamplingFactor == 0;
+        } else if (samplingFactor != null) {
+            result = ++auctionEventCount % samplingFactor == 0;
+        } else {
+            result = false;
+        }
+
+        return result;
     }
 
     private void processAmpEvent(AmpEvent ampEvent) {
@@ -209,12 +275,30 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             return;
         }
 
+        final Integer accountId = accountIdFromSite(bidRequest);
+
         // only continue if counter matches sampling factor
-        if (++ampEventCount % samplingFactor == 0) {
+        if (shouldProcessAmpEvent(accountId)) {
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
-            final Integer accountId = accountIdFromSite(bidRequest);
             postEvent(toAuctionEvent(bidRequest, uidsCookie, adUnits, accountId, this::eventBuilderBaseFromSite));
         }
+    }
+
+    private boolean shouldProcessAmpEvent(Integer accountId) {
+        final boolean result;
+
+        final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
+        if (accountSamplingFactor != null) {
+            final Long eventCount = accountToAmpEventCount.compute(accountId,
+                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
+            result = eventCount % accountSamplingFactor == 0;
+        } else if (samplingFactor != null) {
+            result = ++ampEventCount % samplingFactor == 0;
+        } else {
+            result = false;
+        }
+
+        return result;
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
@@ -482,7 +566,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return eventBuilderBase.apply(bidRequest)
                 .auctions(Collections.singletonList(Auction.of(
                         bidRequest.getId(),
-                        samplingFactor,
+                        accountToSamplingFactor.getOrDefault(accountId, samplingFactor),
                         adUnits,
                         accountId,
                         bidRequest.getTmax(),
@@ -491,7 +575,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private Event toBidWonEvent(BidRequest bidRequest, String bidder, Integer serverLatencyMillis,
-                                Boolean serverHasUserId, boolean hasRubiconId, Bid bid) {
+                                Boolean serverHasUserId, boolean hasRubiconId, Bid bid, Integer accountId) {
         final Imp foundImp = findImpById(bidRequest.getImp(), bid.getImpid());
         final BidType bidType = mediaTypeFromBid(bid);
         final String bidTypeString = mediaTypeString(bidType);
@@ -499,9 +583,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return eventBuilderBaseFromDevice(bidRequest)
                 .bidsWon(Collections.singletonList(BidWon.builder()
                         .transactionId(bid.getImpid())
-                        .accountId(accountIdFromApp(bidRequest))
+                        .accountId(accountId)
                         .bidder(bidder)
-                        .samplingFactor(samplingFactor)
+                        .samplingFactor(accountToSamplingFactor.getOrDefault(accountId, samplingFactor))
                         .bidwonStatus(SUCCESS_STATUS)
                         .mediaTypes(mediaTypesForBidWonFromImp(foundImp))
                         .videoAdFormat(bidType == BidType.video ? videoAdFormatFromImp(foundImp, bidder) : null)
