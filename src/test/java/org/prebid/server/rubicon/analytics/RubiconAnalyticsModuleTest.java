@@ -6,6 +6,7 @@ import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Format;
+import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
@@ -16,6 +17,7 @@ import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -46,6 +48,8 @@ import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.ExtApp;
 import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
 import org.prebid.server.rubicon.analytics.proto.Params;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
@@ -82,17 +86,22 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Mock
     private BidderCatalog bidderCatalog;
     @Mock
-    private UidsCookieService uidsCookieService;
-    @Mock
     private Usersyncer rubiconUsersyncer;
     @Mock
     private Usersyncer appnexusUsersyncer;
+    @Mock
+    private UidsCookieService uidsCookieService;
+    @Mock
+    private UidsAuditCookieService uidsAuditCookieService;
     @Mock
     private UidsCookie uidsCookie;
     @Mock
     private HttpClient httpClient;
 
     private RubiconAnalyticsModule module;
+
+    @Mock
+    private RoutingContext routingContext;
 
     @Before
     public void setUp() {
@@ -109,15 +118,18 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         given(uidsCookieService.parseHostCookie(any())).willReturn("khaos-cookie-value");
 
+        given(uidsAuditCookieService.getUidsAudit(any()))
+                .willReturn(UidAudit.builder().country("countryFromAuditCookie").build());
+
         module = new RubiconAnalyticsModule(HOST_URL, 1, emptyMap(), "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, httpClient);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, null, null, null,
-                        null, null))
+                        null, null, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -125,7 +137,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void creationShouldFailOnInvalidGlobalSamplingFactor() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule(HOST_URL, 0, emptyMap(), null, null, null, null,
-                        null, null))
+                        null, null, null))
                 .withMessage("Global sampling factor must be greater then 0, given: 0");
     }
 
@@ -133,7 +145,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void creationShouldFailOnInvalidAccountSamplingFactor() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule(HOST_URL, null, singletonMap(1, 0), null, null, null, null,
-                        null, null))
+                        null, null, null))
                 .withMessage("Sampling factor for account [1] must be greater then 0, given: 0");
     }
 
@@ -141,7 +153,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void creationShouldFailOnMissingSamplingFactor() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule(HOST_URL, null, emptyMap(), null, null, null, null,
-                        null, null))
+                        null, null, null))
                 .withMessage("Either global or per-account sampling factor must be defined");
     }
 
@@ -149,18 +161,19 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processEventShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, emptyMap(), "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
 
         givenHttpClientReturnsResponse(200, null);
 
         // when
         for (int i = 0; i < 10; i++) {
             module.processEvent(AuctionEvent.builder()
+                    .context(routingContext)
+                    .uidsCookie(uidsCookie)
                     .bidRequest(BidRequest.builder()
                             .imp(emptyList())
                             .app(App.builder().build())
                             .build())
-                    .uidsCookie(uidsCookie)
                     .bidResponse(BidResponse.builder()
                             .seatbid(emptyList())
                             .build())
@@ -175,13 +188,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 2, singletonMap(1234, 1), "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
 
         givenHttpClientReturnsResponse(200, null);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .bidRequest(sampleAuctionBidRequest())
+                .context(routingContext)
                 .uidsCookie(uidsCookie)
+                .bidRequest(sampleAuctionBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -220,8 +234,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .bidRequest(sampleAuctionBidRequest())
+                .context(routingContext)
                 .uidsCookie(uidsCookie)
+                .bidRequest(sampleAuctionBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -244,8 +259,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
 
         final AuctionEvent event = AuctionEvent.builder()
-                .bidRequest(sampleAuctionBidRequest())
+                .context(routingContext)
                 .uidsCookie(uidsCookie)
+                .bidRequest(sampleAuctionBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -373,8 +389,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
 
         final AmpEvent event = AmpEvent.builder()
-                .bidRequest(sampleAmpBidRequest())
+                .context(routingContext)
                 .uidsCookie(uidsCookie)
+                .bidRequest(sampleAmpBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -499,7 +516,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 2, emptyMap(), "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, httpClient);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -507,11 +524,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // when
         module.postProcess(
                 null,
-                BidRequest.builder()
+                uidsCookie, BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
                         .build(),
-                uidsCookie,
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
                         .build());
@@ -525,7 +541,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldUseAccountSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 1, singletonMap(1234, 2), "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -533,11 +549,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // when
         module.postProcess(
                 null,
-                BidRequest.builder()
+                uidsCookie, BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
                         .build(),
-                uidsCookie,
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
                         .build());
@@ -555,10 +570,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // when
         module.postProcess(
                 null,
-                BidRequest.builder()
+                null, BidRequest.builder()
                         .imp(emptyList())
                         .build(),
-                null,
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(singletonList(bid)).build()))
                         .build());
@@ -574,7 +588,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final BidResponse bidResponse = sampleBidResponse();
 
         // when
-        final BidResponse returnedBidResponse = module.postProcess(null, bidRequest, uidsCookie, bidResponse).result();
+        final BidResponse returnedBidResponse = module.postProcess(null, uidsCookie, bidRequest, bidResponse).result();
 
         // then
         then(returnedBidResponse.getSeatbid())
@@ -654,6 +668,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .connectiontype(17)
                         .lmt(1)
                         .ua("userAgent")
+                        .geo(Geo.builder().country("countryFromRequest").build())
                         .build())
                 .app(App.builder()
                         .bundle("bundle")
@@ -848,7 +863,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .build())
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
-                .userAgent("userAgent");
+                .userAgent("userAgent")
+                .country("countryFromRequest");
     }
 
     private static Event.EventBuilder expectedEventBuilderBaseFromSite() {
@@ -866,7 +882,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .build())
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
-                .userAgent("userAgent");
+                .userAgent("userAgent")
+                .country("countryFromAuditCookie");
     }
 
     @SuppressWarnings("SameParameterValue")

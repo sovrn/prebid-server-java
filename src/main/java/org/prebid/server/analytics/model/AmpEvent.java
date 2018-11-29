@@ -3,6 +3,7 @@ package org.prebid.server.analytics.model;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.response.BidResponse;
+import io.vertx.ext.web.RoutingContext;
 import lombok.Builder;
 import lombok.Value;
 import org.prebid.server.cookie.UidsCookie;
@@ -21,9 +22,11 @@ public class AmpEvent {
 
     List<String> errors;
 
-    BidRequest bidRequest;
+    RoutingContext context;
 
     UidsCookie uidsCookie;
+
+    BidRequest bidRequest;
 
     BidResponse bidResponse;
 

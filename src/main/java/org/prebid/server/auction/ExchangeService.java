@@ -159,7 +159,7 @@ public class ExchangeService {
                 .compose(result ->
                         toBidResponse(result, bidRequest, keywordsCreator, cacheInfo, publisherId, timeout))
                 .compose(bidResponse ->
-                        bidResponsePostProcessor.postProcess(context, bidRequest, uidsCookie, bidResponse));
+                        bidResponsePostProcessor.postProcess(context, uidsCookie, bidRequest, bidResponse));
     }
 
     /**

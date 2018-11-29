@@ -8,6 +8,7 @@ import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Format;
+import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
@@ -23,6 +24,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import lombok.Value;
+import org.apache.commons.lang3.ObjectUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
@@ -50,6 +52,8 @@ import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
 import org.prebid.server.rubicon.analytics.proto.VideoAdFormat;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
@@ -62,6 +66,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -110,20 +117,22 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private final String dataCenterRegion;
     private final BidderCatalog bidderCatalog;
     private final UidsCookieService uidsCookieService;
+    private final UidsAuditCookieService uidsAuditCookieService;
     private final HttpClient httpClient;
 
-    private long auctionEventCount = 0;
-    private long ampEventCount = 0;
-    private long bidWonCount = 0;
+    private AtomicLong auctionEventCount = new AtomicLong();
+    private AtomicLong ampEventCount = new AtomicLong();
+    private AtomicLong bidWonCount = new AtomicLong();
 
-    private Map<Integer, Long> accountToAuctionEventCount = new HashMap<>();
-    private Map<Integer, Long> accountToAmpEventCount = new HashMap<>();
-    private Map<Integer, Long> accountToBidWonCount = new HashMap<>();
+    private Map<Integer, Long> accountToAuctionEventCount = new ConcurrentHashMap<>();
+    private Map<Integer, Long> accountToAmpEventCount = new ConcurrentHashMap<>();
+    private Map<Integer, Long> accountToBidWonCount = new ConcurrentHashMap<>();
 
     public RubiconAnalyticsModule(String endpointUrl, Integer samplingFactor,
                                   Map<Integer, Integer> accountToSamplingFactor, String pbsVersion,
                                   String pbsHostname, String dataCenterRegion, BidderCatalog bidderCatalog,
-                                  UidsCookieService uidsCookieService, HttpClient httpClient) {
+                                  UidsCookieService uidsCookieService, UidsAuditCookieService uidsAuditCookieService,
+                                  HttpClient httpClient) {
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl) + EVENT_PATH);
         validateSamplingFactors(samplingFactor, accountToSamplingFactor);
         this.samplingFactor = samplingFactor;
@@ -133,6 +142,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         this.dataCenterRegion = Objects.requireNonNull(dataCenterRegion);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
+        this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
         this.httpClient = Objects.requireNonNull(httpClient);
     }
 
@@ -166,16 +176,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     @Override
-    public Future<BidResponse> postProcess(RoutingContext context, BidRequest bidRequest, UidsCookie uidsCookie,
+    public Future<BidResponse> postProcess(RoutingContext context, UidsCookie uidsCookie, BidRequest bidRequest,
                                            BidResponse bidResponse) {
-        return Future.succeededFuture(processBidResponse(context, bidRequest, uidsCookie, bidResponse));
-    }
-
-    private BidResponse processBidResponse(RoutingContext context, BidRequest bidRequest,
-                                           UidsCookie uidsCookie, BidResponse bidResponse) {
         if (bidRequest.getApp() != null) {
             final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
-            final boolean hasRubiconId = uidsCookieService.parseHostCookie(context) != null;
+            final boolean hasRubiconId = hasRubiconId(context);
             final Integer accountId = accountIdFromApp(bidRequest);
 
             for (final SeatBid seatBid : bidResponse.getSeatbid()) {
@@ -185,28 +190,29 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
                 for (final Bid bid : seatBid.getBid()) {
                     // only continue if counter matches sampling factor
-                    if (shouldProcessBidWon(accountId)) {
+                    if (shouldProcessEvent(accountId, accountToBidWonCount, bidWonCount)) {
                         addEventCallbackToBid(bid,
-                                toBidWonEvent(bidRequest, bidder, responseTime, serverHasUserId, hasRubiconId, bid,
-                                        accountId));
+                                toBidWonEvent(context, bidRequest, bidder, responseTime, serverHasUserId, hasRubiconId,
+                                        bid, accountId));
                     }
                 }
             }
         }
 
-        return bidResponse;
+        return Future.succeededFuture(bidResponse);
     }
 
-    private boolean shouldProcessBidWon(Integer accountId) {
+    private boolean shouldProcessEvent(Integer accountId, Map<Integer, Long> accountToEventCount,
+                                       AtomicLong globalEventCount) {
         final boolean result;
 
         final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
         if (accountSamplingFactor != null) {
-            final Long eventCount = accountToBidWonCount.compute(accountId,
+            final Long eventCount = accountToEventCount.compute(accountId,
                     (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
             result = eventCount % accountSamplingFactor == 0;
         } else if (samplingFactor != null) {
-            result = ++bidWonCount % samplingFactor == 0;
+            result = globalEventCount.incrementAndGet() % samplingFactor == 0;
         } else {
             result = false;
         }
@@ -230,75 +236,46 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         bid.setNurl(url);
     }
 
-    private void processAuctionEvent(AuctionEvent event) {
-        final BidRequest bidRequest = event.getBidRequest();
-        final UidsCookie uidsCookie = event.getUidsCookie();
-        final BidResponse bidResponse = event.getBidResponse();
+    private void processAuctionEvent(AuctionEvent auctionEvent) {
+        final RoutingContext context = auctionEvent.getContext();
+        final UidsCookie uidsCookie = auctionEvent.getUidsCookie();
+        final BidRequest bidRequest = auctionEvent.getBidRequest();
+        final BidResponse bidResponse = auctionEvent.getBidResponse();
 
         // only send event for mobile requests
-        if (bidRequest == null || uidsCookie == null || bidResponse == null || bidRequest.getApp() == null) {
+        if (context == null || uidsCookie == null || bidRequest == null || bidResponse == null
+                || bidRequest.getApp() == null) {
             return;
         }
 
         final Integer accountId = accountIdFromApp(bidRequest);
 
         // only continue if counter matches sampling factor
-        if (shouldProcessAuctionEvent(accountId)) {
+        if (shouldProcessEvent(accountId, accountToAuctionEventCount, auctionEventCount)) {
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
-            postEvent(toAuctionEvent(bidRequest, uidsCookie, adUnits, accountId, this::eventBuilderBaseFromDevice));
+            postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, this::eventBuilderBaseFromDevice));
         }
-    }
-
-    private boolean shouldProcessAuctionEvent(Integer accountId) {
-        final boolean result;
-
-        final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
-        if (accountSamplingFactor != null) {
-            final Long eventCount = accountToAuctionEventCount.compute(accountId,
-                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
-            result = eventCount % accountSamplingFactor == 0;
-        } else if (samplingFactor != null) {
-            result = ++auctionEventCount % samplingFactor == 0;
-        } else {
-            result = false;
-        }
-
-        return result;
     }
 
     private void processAmpEvent(AmpEvent ampEvent) {
-        final BidRequest bidRequest = ampEvent.getBidRequest();
+        final RoutingContext context = ampEvent.getContext();
         final UidsCookie uidsCookie = ampEvent.getUidsCookie();
+        final BidRequest bidRequest = ampEvent.getBidRequest();
         final BidResponse bidResponse = ampEvent.getBidResponse();
 
-        if (bidRequest == null || uidsCookie == null || bidResponse == null || bidRequest.getSite() == null) {
+        // only send event for web requests
+        if (context == null || uidsCookie == null || bidRequest == null || bidResponse == null
+                || bidRequest.getSite() == null) {
             return;
         }
 
         final Integer accountId = accountIdFromSite(bidRequest);
 
         // only continue if counter matches sampling factor
-        if (shouldProcessAmpEvent(accountId)) {
+        if (shouldProcessEvent(accountId, accountToAmpEventCount, ampEventCount)) {
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
-            postEvent(toAuctionEvent(bidRequest, uidsCookie, adUnits, accountId, this::eventBuilderBaseFromSite));
+            postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, this::eventBuilderBaseFromSite));
         }
-    }
-
-    private boolean shouldProcessAmpEvent(Integer accountId) {
-        final boolean result;
-
-        final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
-        if (accountSamplingFactor != null) {
-            final Long eventCount = accountToAmpEventCount.compute(accountId,
-                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
-            result = eventCount % accountSamplingFactor == 0;
-        } else if (samplingFactor != null) {
-            result = ++ampEventCount % samplingFactor == 0;
-        } else {
-            result = false;
-        }
-
-        return result;
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
@@ -375,6 +352,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return bidderCatalog.isValidName(bidder)
                 ? uidsCookie.hasLiveUidFrom(bidderCatalog.usersyncerByName(bidder).cookieFamilyName())
                 : null;
+    }
+
+    private boolean hasRubiconId(RoutingContext context) {
+        return uidsCookieService.parseHostCookie(context) != null;
     }
 
     private static Imp findImpById(List<Imp> imps, String impId) {
@@ -561,26 +542,27 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return extBid != null ? extBid.getPrebid().getTargeting() : null;
     }
 
-    private Event toAuctionEvent(BidRequest bidRequest, UidsCookie uidsCookie, List<AdUnit> adUnits,
-                                 Integer accountId, Function<BidRequest, Event.EventBuilder> eventBuilderBase) {
-        return eventBuilderBase.apply(bidRequest)
+    private Event toAuctionEvent(RoutingContext context, BidRequest bidRequest, List<AdUnit> adUnits, Integer accountId,
+                                 BiFunction<RoutingContext, BidRequest, Event.EventBuilder> eventBuilderBase) {
+        return eventBuilderBase.apply(context, bidRequest)
                 .auctions(Collections.singletonList(Auction.of(
                         bidRequest.getId(),
                         accountToSamplingFactor.getOrDefault(accountId, samplingFactor),
                         adUnits,
                         accountId,
                         bidRequest.getTmax(),
-                        serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))))
+                        hasRubiconId(context))))
                 .build();
     }
 
-    private Event toBidWonEvent(BidRequest bidRequest, String bidder, Integer serverLatencyMillis,
-                                Boolean serverHasUserId, boolean hasRubiconId, Bid bid, Integer accountId) {
+    private Event toBidWonEvent(RoutingContext context, BidRequest bidRequest, String bidder,
+                                Integer serverLatencyMillis, Boolean serverHasUserId, boolean hasRubiconId,
+                                Bid bid, Integer accountId) {
         final Imp foundImp = findImpById(bidRequest.getImp(), bid.getImpid());
         final BidType bidType = mediaTypeFromBid(bid);
         final String bidTypeString = mediaTypeString(bidType);
 
-        return eventBuilderBaseFromDevice(bidRequest)
+        return eventBuilderBaseFromDevice(context, bidRequest)
                 .bidsWon(Collections.singletonList(BidWon.builder()
                         .transactionId(bid.getImpid())
                         .accountId(accountId)
@@ -648,40 +630,31 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     /**
      * Prepares event from request from mobile app.
      */
-    private Event.EventBuilder eventBuilderBaseFromDevice(BidRequest bidRequest) {
+    private Event.EventBuilder eventBuilderBaseFromDevice(RoutingContext context, BidRequest bidRequest) {
         final App app = bidRequest.getApp();
         final ExtApp appExt = readExt(app.getExt(), ExtApp.class);
         final ExtAppPrebid appExtPrebid = appExt != null ? appExt.getPrebid() : null;
 
-        final Device device = bidRequest.getDevice();
-        final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
-
-        return Event.builder()
-                .integration(PBS_INTEGRATION)
-                .version(pbsVersion)
-                .client(Client.builder()
-                        .deviceClass(MOBILE_DEVICE_CLASS)
-                        .os(getIfNotNull(device, Device::getOs))
-                        .osVersion(getIfNotNull(device, Device::getOsv))
-                        .make(getIfNotNull(device, Device::getMake))
-                        .model(getIfNotNull(device, Device::getModel))
-                        .carrier(getIfNotNull(device, Device::getCarrier))
-                        .connectionType(getIfNotNull(device, Device::getConnectiontype))
-                        .app(org.prebid.server.rubicon.analytics.proto.App.of(
-                                app.getBundle(),
-                                app.getVer(),
-                                getIfNotNull(appExtPrebid, ExtAppPrebid::getVersion),
-                                getIfNotNull(appExtPrebid, ExtAppPrebid::getSource)))
-                        .build())
-                .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
-                .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
-                .userAgent(getIfNotNull(device, Device::getUa));
+        return eventBuilderBase(context, bidRequest, org.prebid.server.rubicon.analytics.proto.App.of(
+                app.getBundle(),
+                app.getVer(),
+                getIfNotNull(appExtPrebid, ExtAppPrebid::getVersion),
+                getIfNotNull(appExtPrebid, ExtAppPrebid::getSource)));
     }
 
     /**
      * Prepares event from request from mobile web.
      */
-    private Event.EventBuilder eventBuilderBaseFromSite(BidRequest bidRequest) {
+    private Event.EventBuilder eventBuilderBaseFromSite(RoutingContext context, BidRequest bidRequest) {
+        return eventBuilderBase(context, bidRequest, null)
+                .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage));
+    }
+
+    /**
+     * Prepares event from request.
+     */
+    private Event.EventBuilder eventBuilderBase(RoutingContext context, BidRequest bidRequest,
+                                                org.prebid.server.rubicon.analytics.proto.App clientApp) {
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
 
@@ -696,15 +669,26 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                         .model(getIfNotNull(device, Device::getModel))
                         .carrier(getIfNotNull(device, Device::getCarrier))
                         .connectionType(getIfNotNull(device, Device::getConnectiontype))
+                        .app(clientApp)
                         .build())
                 .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
                 .userAgent(getIfNotNull(device, Device::getUa))
-                .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage));
+                .country(ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(context)));
     }
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
         return target != null ? getter.apply(target) : null;
+    }
+
+    private String countryFrom(Device device) {
+        final Geo geo = device != null ? device.getGeo() : null;
+        return geo != null ? geo.getCountry() : null;
+    }
+
+    private String countryFrom(RoutingContext context) {
+        final UidAudit uidsAudit = uidsAuditCookieService.getUidsAudit(context);
+        return uidsAudit != null ? uidsAudit.getCountry() : null;
     }
 
     /**
