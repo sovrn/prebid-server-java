@@ -31,14 +31,15 @@ import java.util.Base64;
 public class UidsAuditCookieService {
 
     private static final Logger logger = LoggerFactory.getLogger(UidsAuditCookieService.class);
+
     private static final String COOKIE_NAME = "audit";
     private static final String COOKIE_DOMAIN = "rubiconproject.com";
     private static final String ENCRYPTION_ALGORITHM = "Blowfish";
 
-    private final Long ttlSeconds;
-    private final String hostIp;
     private final Cipher encryptor;
     private final Cipher decryptor;
+    private final Long ttlSeconds;
+    private final String hostIp;
 
     private UidsAuditCookieService(Cipher encryptor, Cipher decryptor, Long ttlSeconds, String hostIp) {
         this.encryptor = encryptor;
@@ -53,8 +54,7 @@ public class UidsAuditCookieService {
      */
     public static UidsAuditCookieService create(String encryptionKey, Integer ttlDays, String hostIp) {
         if (StringUtils.isEmpty(encryptionKey)) {
-            throw new IllegalArgumentException(
-                    "Cookies audit encryption cannot be done without encryption key.");
+            throw new IllegalArgumentException("Cookies audit encryption cannot be done without encryption key");
         }
 
         final SecretKeySpec secretKeySpec = new SecretKeySpec(encryptionKey.getBytes(), ENCRYPTION_ALGORITHM);
@@ -62,7 +62,7 @@ public class UidsAuditCookieService {
         final Cipher decodingCipher = createCypher(Cipher.DECRYPT_MODE, secretKeySpec);
         final String resolvedHostIp;
         if (hostIp == null) {
-            logger.warn("Host ip config was not defined in configuration. Will try to find host ip with look up.");
+            logger.warn("Host ip config was not defined in configuration. Will try to find host ip with look up");
             resolvedHostIp = lookUpForHostIp();
         } else {
             resolvedHostIp = hostIp;
@@ -72,14 +72,15 @@ public class UidsAuditCookieService {
     }
 
     /**
-     * Return ip in decimal format. Throws {@link PreBidException} in case any format exception occurred during
-     * converting ip address.
+     * Return ip in decimal format.
+     * <p>
+     * Throws {@link PreBidException} in case any format exception occurred during converting ip address.
      */
     private static String getDecimalIp(String ip) {
         try {
             return UidsAuditParser.ipToDecimal(ip);
-        } catch (InvalidAuditFormatException ex) {
-            throw new PreBidException(ex.getMessage());
+        } catch (InvalidAuditFormatException e) {
+            throw new PreBidException(e.getMessage());
         }
     }
 
@@ -104,7 +105,7 @@ public class UidsAuditCookieService {
             blowfishCipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
             blowfishCipher.init(mode, secretKeySpec);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
-            logger.error("UidsAuditCookieService was not created. Reason: {0}", e, e.getMessage());
+            logger.error("UidsAuditCookieService was not created: {0}", e, e.getMessage());
             throw new IllegalArgumentException(e.getMessage());
         }
         return blowfishCipher;
@@ -119,23 +120,22 @@ public class UidsAuditCookieService {
 
         try {
             return auditCookieValue != null ? UidsAuditParser.parseCookieValue(auditCookieValue) : null;
-        } catch (InvalidAuditFormatException ex) {
+        } catch (InvalidAuditFormatException e) {
             return null;
         }
     }
 
     /**
-     * Creates uid audit {@link Cookie} using blowfish algorithm for data encryption and encrypt it with BASE64.
+     * Creates uid audit {@link Cookie} using blowfish algorithm for data encryption and encrypt it with Base64.
      */
     public Cookie createUidsAuditCookie(RoutingContext context, String uid, String accountId, String consent,
                                         String country, String userIp) {
         if (uid == null) {
-            throw new PreBidException("Uid was not defined. Should be present to set uid audit cookie.");
+            throw new PreBidException("Uid was not defined, should be present to set uid audit cookie");
         }
 
         final String referrer = context.request().getHeader(HttpHeaders.REFERER);
         final long renewedSeconds = ZonedDateTime.now(Clock.systemUTC()).toEpochSecond();
-        final boolean isNotNullConsent = consent != null;
 
         final UidAudit uidAudit = UidAudit.builder()
                 .version(UidsAuditParser.VERSION)
@@ -147,7 +147,7 @@ public class UidsAuditCookieService {
                 .referringDomain(referrer)
                 .initiatorType(getInitiatorType())
                 .initiatorId(accountId)
-                .consentUsed(isNotNullConsent ? "1" : "0")
+                .consentUsed(consent != null ? "1" : "0")
                 .consent(consent)
                 .build();
 
@@ -176,14 +176,15 @@ public class UidsAuditCookieService {
     }
 
     /**
-     * Returns masked and converted ip address. Throws {@link PreBidException} in case of any format exception occurred
-     * during converting ip address.
+     * Returns masked and converted ip address.
+     * <p>
+     * Throws {@link PreBidException} in case of any format exception occurred during converting ip address.
      */
     private static String getMaskedIp(String ip) {
         try {
             return UidsAuditParser.getMaskedDecimalIp(ip);
-        } catch (InvalidAuditFormatException ex) {
-            throw new PreBidException(ex.getMessage());
+        } catch (InvalidAuditFormatException e) {
+            throw new PreBidException(e.getMessage());
         }
     }
 
@@ -195,25 +196,25 @@ public class UidsAuditCookieService {
     }
 
     /**
-     * Performs blowfish decryption of base64 encoded value.
+     * Performs blowfish decryption of Base64 encoded value.
      */
     private String decrypt(String encodedValue) {
         try {
             return new String(decryptor.doFinal(Base64.getUrlDecoder().decode(encodedValue.getBytes())));
-        } catch (IllegalBlockSizeException | BadPaddingException e) {
-            logger.warn("Error occurred during decoding cookie. {0}", e.getMessage());
+        } catch (IllegalArgumentException | IllegalBlockSizeException | BadPaddingException e) {
+            logger.warn("Error occurred during decoding cookie: {0}", e.getMessage());
             throw new PreBidException(e.getMessage());
         }
     }
 
     /**
-     * Performs blowfish value encryption, with base64 result encoding.
+     * Performs blowfish value encryption, with Base64 result encoding.
      */
     private String encrypt(String value) {
         try {
             return Base64.getUrlEncoder().encodeToString(encryptor.doFinal(value.getBytes()));
         } catch (IllegalBlockSizeException | BadPaddingException e) {
-            logger.warn("Error occurred during encoding cookie. {0}", e.getMessage());
+            logger.warn("Error occurred during encoding cookie: {0}", e.getMessage());
             throw new PreBidException(e.getMessage());
         }
     }

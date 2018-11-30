@@ -198,5 +198,4 @@ public class UidsAuditParser {
         }
         return new BigInteger(1, inetAddress.getAddress()).toString();
     }
-
 }

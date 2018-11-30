@@ -52,7 +52,7 @@ public class UidsAuditCookieServiceTest {
         given(routingContext.request()).willReturn(request);
         given(request.getHeader(HttpHeaders.REFERER)).willReturn("referrer");
 
-        // register blowfish decriptor to encode values to check
+        // register blowfish decryptor to encode values to check
         decodingCipher = Cipher.getInstance("Blowfish");
         final SecretKeySpec secretKeySpec = new SecretKeySpec("key".getBytes(), "Blowfish");
         decodingCipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
@@ -63,7 +63,7 @@ public class UidsAuditCookieServiceTest {
         // given, when and then
         assertThatThrownBy(() -> UidsAuditCookieService.create(null, null, null))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Cookies audit encryption cannot be done without encryption key.");
+                .hasMessage("Cookies audit encryption cannot be done without encryption key");
     }
 
     @Test
@@ -95,6 +95,17 @@ public class UidsAuditCookieServiceTest {
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
                 .isExactlyInstanceOf(PreBidException.class);
+    }
+
+    @Test
+    public void getUidsAuditShouldFailIfCookieCannotBeParsedBecauseOfIllegalBase64Character() {
+        // given
+        given(routingContext.getCookie("audit")).willReturn(Cookie.cookie("audit", "/contains-illegal-chars/"));
+
+        // when and then
+        assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
+                .isExactlyInstanceOf(PreBidException.class)
+                .hasMessage("Illegal base64 character 2f");
     }
 
     @Test
@@ -148,7 +159,7 @@ public class UidsAuditCookieServiceTest {
         assertThatThrownBy(() -> uidsAuditCookieService.createUidsAuditCookie(routingContext, null, null, null, null,
                 null))
                 .isExactlyInstanceOf(PreBidException.class)
-                .hasMessage("Uid was not defined. Should be present to set uid audit cookie.");
+                .hasMessage("Uid was not defined, should be present to set uid audit cookie");
     }
 
     @Test
