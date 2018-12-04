@@ -32,7 +32,7 @@ public class UidsAuditCookieService {
 
     private static final Logger logger = LoggerFactory.getLogger(UidsAuditCookieService.class);
 
-    private static final String COOKIE_NAME = "audit";
+    private static final String COOKIE_NAME = "uids-audit";
     private static final String COOKIE_DOMAIN = "rubiconproject.com";
     private static final String ENCRYPTION_ALGORITHM = "Blowfish";
 

@@ -85,7 +85,7 @@ public class SetuidHandlerTest extends VertxTest {
         given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(null, true), null)));
         given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
-                .willReturn(Cookie.cookie("audit", "value"));
+                .willReturn(Cookie.cookie("uids-audit", "value"));
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
         given(routingContext.addCookie(any())).willReturn(routingContext);
@@ -397,7 +397,7 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
-                .willReturn(Cookie.cookie("audit", "value").setDomain("rubicon"));
+                .willReturn(Cookie.cookie("uids-audit", "value").setDomain("rubicon"));
 
         // {"tempUIDs":{"adnxs":{"uid":"12345"}, "rubicon":{"uid":"updatedUid"}}}
         given(uidsCookieService.toCookie(any())).willReturn(Cookie

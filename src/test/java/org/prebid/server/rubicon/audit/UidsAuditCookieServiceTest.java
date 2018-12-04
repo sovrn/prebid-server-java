@@ -70,7 +70,7 @@ public class UidsAuditCookieServiceTest {
     public void getUidsAuditShouldReturnExpectedResultIfCookieExists() {
         // given
         // Base64 encoded Blowfish encrypted string - 1|uid^^^^1527684614^referrer|^|1^consent
-        given(routingContext.getCookie("audit")).willReturn(Cookie.cookie("audit",
+        given(routingContext.getCookie("uids-audit")).willReturn(Cookie.cookie("uids-audit",
                 "pMmn7z8bUD5mOWCasu0nA42E99uwy-gx6uIWeNPO2UpXs5Lhsj8uS9g992oiVBPB"));
 
         // when
@@ -90,7 +90,7 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void getUidsAuditShouldFailIfCookieCannotBeParsed() {
         // given
-        given(routingContext.getCookie("audit")).willReturn(Cookie.cookie("audit", "invalid"));
+        given(routingContext.getCookie("uids-audit")).willReturn(Cookie.cookie("uids-audit", "invalid"));
 
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
@@ -100,7 +100,8 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void getUidsAuditShouldFailIfCookieCannotBeParsedBecauseOfIllegalBase64Character() {
         // given
-        given(routingContext.getCookie("audit")).willReturn(Cookie.cookie("audit", "/contains-illegal-chars/"));
+        given(routingContext.getCookie("uids-audit")).willReturn(
+                Cookie.cookie("uids-audit", "/contains-illegal-chars/"));
 
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
@@ -120,7 +121,7 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void createUidsAuditCookieShouldReturnNewCookie() throws BadPaddingException, IllegalBlockSizeException {
         // given
-        given(routingContext.getCookie("audit")).willReturn(null);
+        given(routingContext.getCookie("uids-audit")).willReturn(null);
 
         // when
         final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", "accountId",
@@ -153,7 +154,7 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void createUidsAuditCookieShouldThrowPrebidExceptionIfUidWasNotDefined() {
         // given
-        given(routingContext.getCookie("audit")).willReturn(null);
+        given(routingContext.getCookie("uids-audit")).willReturn(null);
 
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.createUidsAuditCookie(routingContext, null, null, null, null,
@@ -165,7 +166,7 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void createUidsCookieShouldThrowPrebidExceptionIfIpHasIncorrectFormat() {
         // given
-        given(routingContext.getCookie("audit")).willReturn(null);
+        given(routingContext.getCookie("uids-audit")).willReturn(null);
 
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, null, null,
