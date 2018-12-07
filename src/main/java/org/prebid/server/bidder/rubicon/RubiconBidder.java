@@ -373,7 +373,7 @@ public class RubiconBidder implements Bidder<BidRequest> {
                 .map(SeatBid::getBid)
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
-                .map(bid -> overridePriceIfZeroForDebug(bid, cpmOverride, bidRequest))
+                .map(bid -> overridePriceForDebug(bid, cpmOverride))
                 .filter(bid -> bid.getPrice().compareTo(BigDecimal.ZERO) > 0)
                 .map(bid -> BidderBid.of(bid, bidType(bidRequest), DEFAULT_BID_CURRENCY))
                 .collect(Collectors.toList());
@@ -398,10 +398,8 @@ public class RubiconBidder implements Bidder<BidRequest> {
         return extRequestRubiconDebug != null ? extRequestRubiconDebug.getCpmOverride() : null;
     }
 
-    private static Bid overridePriceIfZeroForDebug(Bid bid, Float cpmOverride, BidRequest bidRequest) {
+    private static Bid overridePriceForDebug(Bid bid, Float cpmOverride) {
         return cpmOverride != null && cpmOverride > 0
-                && bid.getPrice().compareTo(BigDecimal.ZERO) <= 0
-                && bidType(bidRequest) == BidType.video
                 ? bid.toBuilder().price(BigDecimal.valueOf(cpmOverride)).build()
                 : bid;
     }

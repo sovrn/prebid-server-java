@@ -668,8 +668,7 @@ public class RubiconBidderTest extends VertxTest {
     }
 
     @Test
-    public void makeBidsShouldReturnOverriddenPriceForVideoBidIfPriceLessOrEqualToZero()
-            throws JsonProcessingException {
+    public void makeBidsShouldReturnBidWithPriceFromCpmOverride() throws JsonProcessingException {
         // given
         final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(mapper.valueToTree(
                 ExtBidRequest.of(null, ExtRequestRubicon.of(ExtRequestRubiconDebug.of(5.015f))))),
@@ -684,24 +683,6 @@ public class RubiconBidderTest extends VertxTest {
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.getValue())
                 .containsOnly(BidderBid.of(Bid.builder().price(BigDecimal.valueOf(5.015f)).build(), video, "USD"));
-    }
-
-    @Test
-    public void makeBidsShouldNotReturnImpForBannerBidIfPriceLessOrEqualToZeroAndCpmOverridePresents()
-            throws JsonProcessingException {
-        // given
-        final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(mapper.valueToTree(
-                ExtBidRequest.of(null, ExtRequestRubicon.of(ExtRequestRubiconDebug.of(5.015f))))),
-                identity(),
-                identity());
-        final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest, givenBidResponse(ZERO));
-
-        // when
-        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
-
-        // then
-        assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue()).isEmpty();
     }
 
     @Test

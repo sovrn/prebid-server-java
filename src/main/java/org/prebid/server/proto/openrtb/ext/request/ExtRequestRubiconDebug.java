@@ -16,8 +16,7 @@ public class ExtRequestRubiconDebug {
     /**
      * This should be used only for testing.
      * <p>
-     * Added for case Rubicon Exchange responds with a test bid with zero CPM.
-     * This field value will replace zero CPM for all bids
+     * CPM for all bids will be replaced with this field value
      * in {@link org.prebid.server.bidder.rubicon.RubiconBidder#makeBids(HttpCall, BidRequest)}.
      */
     @JsonProperty("cpmOverride")
