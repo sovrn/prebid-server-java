@@ -165,19 +165,21 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         givenHttpClientReturnsResponse(200, null);
 
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .context(routingContext)
+                .uidsCookie(uidsCookie)
+                .bidRequest(BidRequest.builder()
+                        .imp(emptyList())
+                        .app(App.builder().build())
+                        .build())
+                .bidResponse(BidResponse.builder()
+                        .seatbid(emptyList())
+                        .build())
+                .build();
+
         // when
         for (int i = 0; i < 10; i++) {
-            module.processEvent(AuctionEvent.builder()
-                    .context(routingContext)
-                    .uidsCookie(uidsCookie)
-                    .bidRequest(BidRequest.builder()
-                            .imp(emptyList())
-                            .app(App.builder().build())
-                            .build())
-                    .bidResponse(BidResponse.builder()
-                            .seatbid(emptyList())
-                            .build())
-                    .build());
+            module.processEvent(auctionEvent);
         }
 
         // then
@@ -187,7 +189,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
-        module = new RubiconAnalyticsModule(HOST_URL, 2, singletonMap(1234, 1), "pbs-version-1", "pbsHostname",
+        module = new RubiconAnalyticsModule(HOST_URL, 100, singletonMap(1234, 10), "pbs-version-1", "pbsHostname",
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
 
         givenHttpClientReturnsResponse(200, null);
@@ -200,7 +202,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        for (int i = 0; i < 10; i++) {
+            module.processEvent(auctionEvent);
+        }
 
         // then
         verify(httpClient).post(anyString(), any(), any(), anyLong());
@@ -249,7 +253,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         assertThat(captor.getValue().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
-                .containsOnly(tuple(HttpHeaders.USER_AGENT.toString(), "userAgent"));
+                .containsOnly(
+                        tuple(HttpHeaders.USER_AGENT.toString(), "userAgent"),
+                        tuple(HttpHeaders.CONTENT_TYPE.toString(), "application/json;charset=utf-8"));
     }
 
     @Test

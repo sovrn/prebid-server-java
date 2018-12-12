@@ -3,11 +3,11 @@ package org.prebid.server.rubicon.spring.config;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
-import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.rubicon.analytics.RubiconAnalyticsModule;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.util.HttpUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,7 +32,6 @@ public class RubiconAnalyticsConfiguration {
             @Value("${external-url}") String externalUrl,
             @Value("${datacenter-region}") String dataCenterRegion,
             RubiconAnalyticsModuleProperties properties,
-            ImplicitParametersExtractor implicitParametersExtractor,
             BidderCatalog bidderCatalog,
             UidsCookieService uidsCookieService,
             UidsAuditCookieService uidsAuditCookieService,
@@ -42,7 +41,7 @@ public class RubiconAnalyticsConfiguration {
 
         return new RubiconAnalyticsModule(properties.getHostUrl(), samplingFactor.getGlobal(),
                 ObjectUtils.defaultIfNull(samplingFactor.getAccount(), Collections.emptyMap()),
-                properties.getPbsVersion(), implicitParametersExtractor.domainFrom(externalUrl), dataCenterRegion,
+                properties.getPbsVersion(), HttpUtil.getDomainFromUrl(externalUrl), dataCenterRegion,
                 bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 

@@ -16,6 +16,7 @@ import com.iab.openrtb.request.Video;
 import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpHeaders;
@@ -108,6 +109,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         VIDEO_SIZE_AD_FORMATS.put(205, VideoAdFormat.POSTROLL);
         VIDEO_SIZE_AD_FORMATS.put(207, "vertical");
     }
+
+    private static final String APPLICATION_JSON =
+            HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
 
     private final String endpointUrl;
     private final String pbsVersion;
@@ -208,7 +212,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
         final Integer accountSamplingFactor = accountToSamplingFactor.get(accountId);
         if (accountSamplingFactor != null) {
-            final Long eventCount = accountToEventCount.compute(accountId,
+            final long eventCount = accountToEventCount.compute(accountId,
                     (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
             result = eventCount % accountSamplingFactor == 0;
         } else if (samplingFactor != null) {
@@ -704,7 +708,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
      * Returns headers needed for analytic request.
      */
     private static MultiMap headers(Event event) {
-        final MultiMap headers = MultiMap.caseInsensitiveMultiMap();
+        final MultiMap headers = MultiMap.caseInsensitiveMultiMap()
+                .add(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON);
+
         final String userAgent = event.getUserAgent();
         if (userAgent != null) {
             headers.add(HttpHeaders.USER_AGENT, userAgent);
