@@ -199,8 +199,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     @Test
     public void shouldNotSendResponseIfClientClosedConnection() {
         // given
-        given(routingContext.getBody()).willReturn(
-                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null)));
+        given(routingContext.getBody()).willReturn(givenRequestBody(CookieSyncRequest.of(emptyList(), null, null)));
 
         givenGdprServiceReturningResult(emptyMap());
 
@@ -496,7 +495,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithExpectedUsersyncInfoForBidderAlias() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList("rubiconAlias"), 0, null, null)));
+                CookieSyncRequest.of(singletonList("rubiconAlias"), 0, null)));
 
         given(bidderCatalog.isActive(RUBICON)).willReturn(true);
         given(bidderCatalog.isAlias("rubiconAlias")).willReturn(true);

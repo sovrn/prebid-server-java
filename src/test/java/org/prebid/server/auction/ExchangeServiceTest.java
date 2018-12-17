@@ -240,7 +240,7 @@ public class ExchangeServiceTest extends VertxTest {
                 Collections.singletonMap(invalidBidderName, Collections.singletonList(
                         ExtBidderError.of(BidderError.Type.bad_input.getCode(),
                                 "invalid has been deprecated and is no longer available. Use valid instead."))),
-                new HashMap<>(), null)));
+                new HashMap<>(), null, null)));
     }
 
     @Test
@@ -1852,7 +1852,7 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
                                 2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                         BigDecimal.valueOf(0.5))))), null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null)), null))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null))))));
 
         // when
         final BidResponse bidResponse =
@@ -1885,6 +1885,26 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     @Test
+    public void shouldContainBidRequestTmax() throws JsonProcessingException {
+        // given
+        final Bid bid = Bid.builder().id("bidId").impid("impId").price(BigDecimal.ONE).build();
+        givenHttpConnector("bidder", mock(BidderRequester.class), givenSeatBid(singletonList(givenBid(bid))));
+
+        final BidRequest bidRequest = givenBidRequest(singletonList(
+                // imp ids are not really used for matching, included them here for clarity
+                givenImp(singletonMap("bidder", 1), builder -> builder.id("impId"))),
+                builder -> builder.tmax(5000L));
+
+        // when
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
+
+        // then
+        final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(ext.getTmaxrequest()).isEqualTo(5000L);
+    }
+
+    @Test
     public void shouldContainCacheResponseTime() throws JsonProcessingException {
         // given
         final Bid bid = Bid.builder().id("bidId").impid("impId").price(BigDecimal.ONE).build();
@@ -1900,7 +1920,7 @@ public class ExchangeServiceTest extends VertxTest {
                         null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
                                 2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                         BigDecimal.valueOf(0.5))))), null, true, true), null,
-                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null)), null))));
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null))))));
 
         // when
         final BidResponse bidResponse =

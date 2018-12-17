@@ -303,8 +303,7 @@ public class AuctionRequestFactory {
                     ObjectUtils.defaultIfNull(extRequestTargeting,
                             getIfNotNull(prebid, ExtRequestPrebid::getTargeting)),
                     getIfNotNull(prebid, ExtRequestPrebid::getStoredrequest),
-                    getIfNotNull(prebid, ExtRequestPrebid::getCache)),
-                    extBidRequest.getRubicon()));
+                    getIfNotNull(prebid, ExtRequestPrebid::getCache))));
         }
         return null;
     }
