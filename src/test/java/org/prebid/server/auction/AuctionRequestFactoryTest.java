@@ -514,7 +514,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(asList(imp1, imp2))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
                         singletonMap("requestScopedBidderAlias", "bidder1"), null,
-                        ExtRequestTargeting.of(null, null, null, null), null, null))))
+                        ExtRequestTargeting.of(null, null, null, null), null, null), null)))
                 .build());
 
         given(bidderCatalog.isAlias("configScopedBidderAlias")).willReturn(true);

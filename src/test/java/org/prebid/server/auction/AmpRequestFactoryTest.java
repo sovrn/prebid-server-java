@@ -461,7 +461,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder().build());
 
         given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));

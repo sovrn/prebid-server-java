@@ -164,33 +164,6 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     }
 
     /**
-     * Fetches GDPR Vendor IDs for given bidders.
-     */
-    private Set<Integer> gdprVendorIdsFor(Collection<String> bidders) {
-        return bidders.stream()
-                .map(this::gdprVendorIdFor)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * Fetches GDPR Vendor ID for given bidder.
-     */
-    private Integer gdprVendorIdFor(String bidder) {
-        final String resolvedBidder = bidderNameFor(bidder);
-        return bidderCatalog.isActive(resolvedBidder)
-                ? bidderCatalog.metaInfoByName(resolvedBidder).info().getGdpr().getVendorId()
-                : null;
-    }
-
-    /**
-     * Determines original bidder's name.
-     */
-    private String bidderNameFor(String bidder) {
-        return bidderCatalog.isAlias(bidder) ? bidderCatalog.nameByAlias(bidder) : bidder;
-    }
-
-    /**
      * Handles GDPR verification result.
      */
     private void handleResult(AsyncResult<GdprResponse> asyncResult, RoutingContext context, UidsCookie uidsCookie,

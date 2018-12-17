@@ -292,13 +292,6 @@ public class ExchangeService {
     }
 
     /**
-     * Checks if bidder name is valid in case when bidder can also be alias name.
-     */
-    private boolean isValidBidder(String bidder, Map<String, String> aliases) {
-        return bidderCatalog.isValidName(bidder) || aliases.containsKey(bidder);
-    }
-
-    /**
      * Returns {@link Future&lt;{@link GdprResponse}&gt;}, where bidders vendor id mapped
      * to enabling or disabling gdpr in scope of pbs server. If bidder vendor id is not present in map, it means that
      * pbs not enforced particular bidder to follow pbs gdpr procedure.
