@@ -6,7 +6,7 @@
         {
           "id": "466223845",
           "impid": "impId-cache-update",
-          "price": 3.43382,
+          "price": 4.26,
           "adm": "adm2",
           "crid": "crid2",
           "dealid": "dealId2",
@@ -16,14 +16,13 @@
             "prebid": {
               "type": "banner",
               "targeting": {
-                "hb_pb": "3.40",
-                "hb_pb_rubicon": "3.40",
+                "hb_pb": "4.20",
+                "hb_pb_rubicon": "4.20",
                 "hb_deal_rubicon": "dealId2",
                 "hb_size": "120x600",
                 "hb_bidder": "rubicon",
                 "hb_size_rubicon": "120x600",
                 "hb_bidder_rubicon": "rubicon",
-                "hb_creative_loadtype": "html",
                 "hb_deal": "dealId2"
               }
             }
@@ -34,13 +33,13 @@
       "group": 0
     }
   ],
-  "cur": "EUR",
+  "cur": "USD",
   "ext": {
     "debug": {
       "httpcalls": {
         "rubicon": [
           {
-            "uri": "{{ rubicon.exchange_uri }}",
+            "uri": "{{ rubicon.exchange_uri }}?tk_xint=rp-pbs",
             "requestbody": "{\"id\":\"tid\",\"imp\":[{\"id\":\"impId-cache-update\",\"banner\":{\"format\":[{\"w\":120,\"h\":600}],\"w\":120,\"h\":600,\"ext\":{\"rp\":{\"size_id\":8,\"mime\":\"text/html\"}}},\"ext\":{\"rp\":{\"zone_id\":7001,\"track\":{\"mint\":\"\",\"mint_version\":\"\"}}}}],\"site\":{\"domain\":\"example.com\",\"page\":\"http://www.example.com\",\"publisher\":{\"ext\":{\"rp\":{\"account_id\":5001}}},\"ext\":{\"rp\":{\"site_id\":6001}}},\"device\":{\"ua\":\"userAgent\",\"ip\":\"192.168.244.1\",\"ext\":{\"rp\":{}}},\"user\":{\"buyeruid\":\"J5VLCWQP-26-CWFT\"},\"test\":1,\"at\":1,\"tmax\":1900,\"regs\":{\"ext\":{\"gdpr\":0}},\"ext\":{\"prebid\":{\"targeting\":{\"pricegranularity\":{\"precision\":2,\"ranges\":[{\"max\":20,\"increment\":0.1}]},\"currency\":{\"rates\":{\"EUR\":{\"USD\":1.2406},\"USD\":{\"EUR\":0.811}}},\"includewinners\":true,\"includebidderkeys\":true}}}}",
             "responsebody": "{\"id\":\"bidResponseId2\",\"seatbid\":[{\"bid\":[{\"id\":\"466223845\",\"impid\":\"impId-cache-update\",\"price\":4.26,\"adm\":\"adm2\",\"crid\":\"crid2\",\"dealid\":\"dealId2\",\"w\":120,\"h\":600}],\"seat\":\"seatId2\",\"group\":0}]}",
             "status": 200
@@ -78,7 +77,10 @@
         ],
         "site": {
           "domain": "example.com",
-          "page": "http://www.example.com"
+          "page": "http://www.example.com",
+          "ext": {
+            "amp": 0
+          }
         },
         "device": {
           "ua": "userAgent",
@@ -88,7 +90,7 @@
         "at": 1,
         "tmax": 1900,
         "cur": [
-          "EUR"
+          "USD"
         ],
         "ext": {
           "prebid": {
@@ -123,9 +125,6 @@
           }
         }
       }
-    },
-    "errors": {
-      "rubicon": []
     },
     "responsetimemillis": {
       "rubicon": "{{ rubicon.response_time_ms }}"

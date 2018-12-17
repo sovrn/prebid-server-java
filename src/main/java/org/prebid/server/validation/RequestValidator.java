@@ -3,6 +3,7 @@ package org.prebid.server.validation;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Asset;
 import com.iab.openrtb.request.Audio;
 import com.iab.openrtb.request.Banner;
@@ -35,12 +36,14 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.bidder.BidderCatalog;
+import org.prebid.server.proto.openrtb.ext.request.ExtApp;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
+import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
@@ -50,13 +53,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -118,6 +121,24 @@ public class RequestValidator {
                 throw new ValidationException("request.imp must contain at least one element");
             }
 
+            final List<Imp> imps = bidRequest.getImp();
+            final List<String> errors = new ArrayList<>();
+            final Map<String, Integer> uniqueImps = new HashMap<>();
+            for (int i = 0; i < imps.size(); i++) {
+                String impId = imps.get(i).getId();
+                if (uniqueImps.get(impId) != null) {
+                    errors.add(String.format(
+                            "request.imp[%d].id and request.imp[%d].id are both \"%s\". Imp IDs must be unique.",
+                            uniqueImps.get(impId), i, impId));
+                }
+
+                uniqueImps.put(impId, i);
+            }
+
+            if (errors.size() > 0) {
+                throw new ValidationException(String.join(System.lineSeparator(), errors));
+            }
+
             for (int index = 0; index < bidRequest.getImp().size(); index++) {
                 validateImp(bidRequest.getImp().get(index), aliases, index);
             }
@@ -128,6 +149,7 @@ public class RequestValidator {
                 throw new ValidationException("request.site or request.app must be defined, but not both");
             }
             validateSite(bidRequest.getSite());
+            validateApp(bidRequest.getApp());
             validateUser(bidRequest.getUser(), aliases);
             validateRegs(bidRequest.getRegs());
         } catch (ValidationException ex) {
@@ -143,10 +165,6 @@ public class RequestValidator {
         if (currencies == null) {
             throw new ValidationException(
                     "currency was not defined either in request.cur or in configuration field adServerCurrency");
-        }
-
-        if (currencies.size() != 1) {
-            throw new ValidationException("request.cur can contain exactly one element");
         }
     }
 
@@ -269,9 +287,34 @@ public class RequestValidator {
     }
 
     private void validateSite(Site site) throws ValidationException {
-        if (site != null && StringUtils.isBlank(site.getId()) && StringUtils.isBlank(site.getPage())) {
-            throw new ValidationException(
-                    "request.site should include at least one of request.site.id or request.site.page");
+        if (site != null) {
+            if (StringUtils.isBlank(site.getId()) && StringUtils.isBlank(site.getPage())) {
+                throw new ValidationException(
+                        "request.site should include at least one of request.site.id or request.site.page");
+            }
+
+            final ObjectNode siteExt = site.getExt();
+            if (siteExt != null && siteExt.size() > 0) {
+                try {
+                    final ExtSite extSite = Json.mapper.treeToValue(siteExt, ExtSite.class);
+                    final Integer amp = extSite.getAmp();
+                    if (amp != null && (amp < 0 || amp > 1)) {
+                        throw new ValidationException("request.site.ext.amp must be either 1, 0, or undefined");
+                    }
+                } catch (JsonProcessingException e) {
+                    throw new ValidationException("request.site.ext object is not valid: %s", e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void validateApp(App app) throws ValidationException {
+        if (app != null && app.getExt() != null) {
+            try {
+                Json.mapper.treeToValue(app.getExt(), ExtApp.class);
+            } catch (JsonProcessingException e) {
+                throw new ValidationException("request.app.ext object is not valid: %s", e.getMessage());
+            }
         }
     }
 
@@ -377,20 +420,21 @@ public class RequestValidator {
     private void validateNativeContextTypes(Integer context, Integer contextSubType, int index)
             throws ValidationException {
 
-        final int type = context != null ? context.intValue() : 0;
-        final int subType = contextSubType != null ? contextSubType.intValue() : 0;
+        final int type = context != null ? context : 0;
+        final int subType = contextSubType != null ? contextSubType : 0;
 
         if (type != 0 && (type < ContextType.CONTENT.getValue() || type > ContextType.PRODUCT.getValue())) {
             throw new ValidationException(
-                    "request.imp[%d].native.request.context is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
+                    "request.imp[%d].native.request.context is invalid. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
                     index);
         }
 
         if (subType < 0) {
             throw new ValidationException(
-                    "request.imp[%d].native.request.contextsubtype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
-                    index
-            );
+                    "request.imp[%d].native.request.contextsubtype is invalid. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
+                    index);
         }
 
         if (subType == 0) {
@@ -399,38 +443,36 @@ public class RequestValidator {
 
         if (subType >= 100) {
             throw new ValidationException(
-                    "request.imp[%d].native.request.contextsubtype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
-                    index
-            );
+                    "request.imp[%d].native.request.contextsubtype is invalid. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
+                    index);
         }
 
-        if (subType >= ContextSubType.GENERAL.getValue()
-                && subType <= ContextSubType.USER_GENERATED.getValue()) {
-            if (type != ContextType.CONTENT.getValue()) {
-                throw new ValidationException(
-                        "request.imp[%d].native.request.context is %d, but contextsubtype is %d. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
-                        index, context, contextSubType
-                );
-            }
+        if (subType >= ContextSubType.GENERAL.getValue() && subType <= ContextSubType.USER_GENERATED.getValue()
+                && type != ContextType.CONTENT.getValue()) {
+            throw new ValidationException(
+                    "request.imp[%d].native.request.context is %d, but contextsubtype is %d. This is an invalid "
+                            + "combination. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
+                    index, context, contextSubType);
         }
 
-        if (subType >= ContextSubType.SOCIAL.getValue()
-                && subType <= ContextSubType.CHAT.getValue()) {
-            if (type != ContextType.SOCIAL.getValue()) {
-                throw new ValidationException(
-                        "request.imp[%d].native.request.context is %d, but contextsubtype is %d. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
-                        index, context, contextSubType);
-            }
+        if (subType >= ContextSubType.SOCIAL.getValue() && subType <= ContextSubType.CHAT.getValue()
+                && type != ContextType.SOCIAL.getValue()) {
+            throw new ValidationException(
+                    "request.imp[%d].native.request.context is %d, but contextsubtype is %d. This is an invalid "
+                            + "combination. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2"
+                            + ".pdf#page=39", index, context, contextSubType);
         }
 
-        if (subType >= ContextSubType.SELLING.getValue()
-                && subType <= ContextSubType.PRODUCT_REVIEW.getValue()) {
-            if (type != ContextType.PRODUCT.getValue()) {
-                throw new ValidationException(
-                        "request.imp[%d].native.request.context is %d, but contextsubtype is %d. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39",
-                        index, context, contextSubType
-                );
-            }
+        if (subType >= ContextSubType.SELLING.getValue() && subType <= ContextSubType.PRODUCT_REVIEW.getValue()
+                && type != ContextType.PRODUCT.getValue()) {
+            throw new ValidationException(
+                    "request.imp[%d].native.request.context is %d, but contextsubtype is %d. This is an invalid "
+                            + "combination. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2"
+                            + ".pdf#page=39", index, context, contextSubType);
         }
     }
 
@@ -438,7 +480,8 @@ public class RequestValidator {
         if (placementType != null && (placementType < PlacementType.FEED.getValue()
                 || placementType > PlacementType.RECOMMENDATION_WIDGET.getValue())) {
             throw new ValidationException(
-                    "request.imp[%d].native.request.plcmttype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=40",
+                    "request.imp[%d].native.request.plcmttype is invalid. See https://iabtechlab"
+                            + ".com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=40",
                     index, placementType);
         }
     }
@@ -591,13 +634,14 @@ public class RequestValidator {
     private void validateNativeEventTracker(EventTracker eventTracker, int impIndex, int eventIndex)
             throws ValidationException {
         if (eventTracker != null) {
-            final int event = eventTracker.getEvent() != null ? eventTracker.getEvent().intValue() : 0;
+            final int event = eventTracker.getEvent() != null ? eventTracker.getEvent() : 0;
 
             if (event != 0 && (event < EventType.IMPRESSION.getValue()
                     || event > EventType.VIEWABLE_VIDEO50.getValue())) {
                 throw new ValidationException(
-                        "request.imp[%d].native.request.eventtrackers[%d].event is invalid. See section 7.6: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43",
-                        impIndex, eventIndex
+                        "request.imp[%d].native.request.eventtrackers[%d].event is invalid. See section 7.6: "
+                                + "https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification"
+                                + "-Final-1.2.pdf#page=43", impIndex, eventIndex
                 );
             }
 
@@ -605,18 +649,20 @@ public class RequestValidator {
 
             if (CollectionUtils.isEmpty(methods)) {
                 throw new ValidationException(
-                        "request.imp[%d].native.request.eventtrackers[%d].method is required. See section 7.7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43",
-                        impIndex, eventIndex
+                        "request.imp[%d].native.request.eventtrackers[%d].method is required. See section 7.7: "
+                                + "https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification"
+                                + "-Final-1.2.pdf#page=43", impIndex, eventIndex
                 );
             }
 
             for (int methodIndex = 0; methodIndex < methods.size(); methodIndex++) {
-                int method = methods.get(methodIndex) != null ? methods.get(methodIndex).intValue() : 0;
+                int method = methods.get(methodIndex) != null ? methods.get(methodIndex) : 0;
                 if (method < EventTrackingMethod.IMAGE.getValue()
                         || method > EventTrackingMethod.JS.getValue()) {
                     throw new ValidationException(
-                            "request.imp[%d].native.request.eventtrackers[%d].methods[%d] is invalid. See section 7.7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43",
-                            impIndex, eventIndex, methodIndex
+                            "request.imp[%d].native.request.eventtrackers[%d].methods[%d] is invalid. See section 7"
+                                    + ".7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads"
+                                    + "-Specification-Final-1.2.pdf#page=43", impIndex, eventIndex, methodIndex
                     );
                 }
             }
@@ -654,9 +700,9 @@ public class RequestValidator {
             final Set<String> messages = bidderParamValidator.validate(bidderName, bidderExtension.getValue());
             if (!messages.isEmpty()) {
                 throw new ValidationException("request.imp[%d].ext.%s failed validation.\n%s", impIndex,
-                        bidderName, messages.stream().collect(Collectors.joining("\n")));
+                        bidderName, String.join("\n", messages));
             }
-        } else if (!bidderCatalog.isDeprecatedName(bidderName)) {
+        } else if (!bidderCatalog.isDeprecatedName(bidderName) && !bidderCatalog.isAlias(bidderName)) {
             throw new ValidationException(
                     "request.imp[%d].ext contains unknown bidder: %s", impIndex, bidderName);
         }
@@ -675,8 +721,8 @@ public class RequestValidator {
 
     private void validateBanner(Banner banner, int impIndex) throws ValidationException {
         if (banner != null) {
-            final boolean hasWidth = banner.getW() != null && banner.getW() > 0;
-            final boolean hasHeight = banner.getH() != null && banner.getH() > 0;
+            final boolean hasWidth = hasPositiveValue(banner.getW());
+            final boolean hasHeight = hasPositiveValue(banner.getH());
             final boolean hasSize = hasWidth && hasHeight;
 
             if (CollectionUtils.isEmpty(banner.getFormat()) && !hasSize) {
@@ -693,11 +739,11 @@ public class RequestValidator {
     }
 
     private void validateFormat(Format format, int impIndex, int formatIndex) throws ValidationException {
-        final boolean usesH = hasValue(format.getH());
-        final boolean usesW = hasValue(format.getW());
-        final boolean usesWmin = hasValue(format.getWmin());
-        final boolean usesWratio = hasValue(format.getWratio());
-        final boolean usesHratio = hasValue(format.getHratio());
+        final boolean usesH = hasPositiveValue(format.getH());
+        final boolean usesW = hasPositiveValue(format.getW());
+        final boolean usesWmin = hasPositiveValue(format.getWmin());
+        final boolean usesWratio = hasPositiveValue(format.getWratio());
+        final boolean usesHratio = hasPositiveValue(format.getHratio());
         final boolean usesHW = usesH || usesW;
         final boolean usesRatios = usesWmin || usesWratio || usesHratio;
 
@@ -710,16 +756,16 @@ public class RequestValidator {
         if (!usesHW && !usesRatios) {
             throw new ValidationException("Request imp[%d].banner.format[%d] should define *either*"
                     + " {w, h} (for static size requirements) *or* {wmin, wratio, hratio} (for flexible sizes) "
-                    + "to be non-zero", impIndex, formatIndex);
+                    + "to be non-zero positive", impIndex, formatIndex);
         }
 
         if (usesHW && (!usesH || !usesW)) {
-            throw new ValidationException("Request imp[%d].banner.format[%d] must define non-zero"
+            throw new ValidationException("Request imp[%d].banner.format[%d] must define a valid"
                     + " \"h\" and \"w\" properties", impIndex, formatIndex);
         }
 
         if (usesRatios && (!usesWmin || !usesWratio || !usesHratio)) {
-            throw new ValidationException("Request imp[%d].banner.format[%d] must define non-zero"
+            throw new ValidationException("Request imp[%d].banner.format[%d] must define a valid"
                     + " \"wmin\", \"wratio\", and \"hratio\" properties", impIndex, formatIndex);
         }
     }
@@ -757,7 +803,7 @@ public class RequestValidator {
         }
     }
 
-    private static boolean hasValue(Integer value) {
-        return value != null && value != 0;
+    private static boolean hasPositiveValue(Integer value) {
+        return value != null && value > 0;
     }
 }

@@ -37,7 +37,6 @@ import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
-import org.prebid.server.vertx.ContextRunner;
 import org.prebid.server.vertx.http.BasicHttpClient;
 import org.prebid.server.vertx.http.CircuitBreakerSecuredHttpClient;
 import org.prebid.server.vertx.http.HttpClient;
@@ -137,10 +136,11 @@ public class ServiceConfiguration {
             StoredRequestProcessor storedRequestProcessor,
             ImplicitParametersExtractor implicitParametersExtractor,
             UidsCookieService uidsCookieService,
+            BidderCatalog bidderCatalog,
             RequestValidator requestValidator) {
 
         return new AuctionRequestFactory(defaultTimeout, maxRequestSize, adServerCurrency, storedRequestProcessor,
-                implicitParametersExtractor, uidsCookieService, requestValidator);
+                implicitParametersExtractor, uidsCookieService, bidderCatalog, requestValidator);
     }
 
     @Bean
@@ -368,23 +368,12 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    CurrencyConversionService currencyConversionRates(
+    CurrencyConversionService currencyConversionService(
             @Value("${auction.currency-rates-refresh-period-ms}") long refreshPeriod,
             @Value("${auction.currency-rates-url}") String currencyServerUrl,
             Vertx vertx,
-            HttpClient httpClient,
-            ContextRunner contextRunner,
-            // FIXME - 02/11 required dependency for httpClient
-            Metrics metrics) {
+            HttpClient httpClient) {
 
-        final CurrencyConversionService service = new CurrencyConversionService(currencyServerUrl, refreshPeriod,
-                vertx, httpClient);
-
-        contextRunner.runOnServiceContext(future -> {
-            service.initialize();
-            future.complete();
-        });
-
-        return service;
+        return new CurrencyConversionService(currencyServerUrl, refreshPeriod, vertx, httpClient);
     }
 }

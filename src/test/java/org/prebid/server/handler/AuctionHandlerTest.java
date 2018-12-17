@@ -65,7 +65,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -73,7 +76,15 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willReturn;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.same;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class AuctionHandlerTest extends VertxTest {
 
@@ -454,6 +465,23 @@ public class AuctionHandlerTest extends VertxTest {
     }
 
     @Test
+    public void shouldSupportOfBidderAlias() {
+        // given
+        given(bidderCatalog.isAlias("rubiconAlias")).willReturn(true);
+        given(bidderCatalog.nameByAlias("rubiconAlias")).willReturn(RUBICON);
+
+        final List<AdapterRequest> adapterRequests =
+                singletonList(AdapterRequest.of("rubiconAlias", singletonList(null)));
+        givenPreBidRequestContext(identity(), builder -> builder.adapterRequests(adapterRequests));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(httpAdapterConnector).call(eq(rubiconAdapter), any(), eq(adapterRequests.get(0)), any());
+    }
+
+    @Test
     public void shouldTolerateUnsupportedBidderInPreBidRequest() throws IOException {
         // given
         final List<AdapterRequest> adapterRequests = asList(
@@ -696,6 +724,22 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         verify(metrics, never()).updateRequestTypeMetric(eq(MetricName.legacy), eq(MetricName.networkerr));
+    }
+
+    @Test
+    public void shouldUpdateNetworkErrorMetricIfClientClosedConnection() {
+        // given
+        givenPreBidRequestContextWith1AdUnitAnd1Bid(identity());
+
+        givenBidderRespondingWithBids(RUBICON, identity(), "bidId1");
+
+        given(routingContext.response().closed()).willReturn(true);
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.legacy), eq(MetricName.networkerr));
     }
 
     @Test

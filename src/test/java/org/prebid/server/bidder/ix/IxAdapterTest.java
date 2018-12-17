@@ -1,8 +1,5 @@
 package org.prebid.server.bidder.ix;
 
-import com.fasterxml.jackson.databind.node.IntNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
@@ -45,6 +42,7 @@ import org.prebid.server.proto.response.BidderDebug;
 import org.prebid.server.proto.response.MediaType;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -52,9 +50,17 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
 import static java.util.function.Function.identity;
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 
@@ -63,6 +69,7 @@ public class IxAdapterTest extends VertxTest {
     private static final String BIDDER = "ix";
     private static final String ENDPOINT_URL = "http://exchange.org/";
     private static final String USERSYNC_URL = "//usersync.org/";
+    private static final String EXTERNAL_URL = "http://external.org/";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -81,7 +88,7 @@ public class IxAdapterTest extends VertxTest {
         adapterRequest = givenBidder(identity());
         preBidRequestContext = givenPreBidRequestContext(identity(), identity());
         exchangeCall = givenExchangeCall(identity(), identity());
-        usersyncer = new IxUsersyncer(USERSYNC_URL);
+        usersyncer = new IxUsersyncer(USERSYNC_URL, EXTERNAL_URL);
         adapter = new IxAdapter(usersyncer, ENDPOINT_URL);
     }
 
@@ -141,14 +148,25 @@ public class IxAdapterTest extends VertxTest {
     @Test
     public void makeHttpRequestsShouldFailIfAdUnitBidParamPublisherIdIsMissing() {
         // given
-        final ObjectNode params = mapper.createObjectNode();
-        params.set("siteId", null);
-        adapterRequest = givenBidder(builder -> builder.params(params));
+        adapterRequest = givenBidder(builder -> builder.params(
+                mapper.valueToTree(IxParams.of(null, null))));
 
         // when and then
         assertThatThrownBy(() -> adapter.makeHttpRequests(adapterRequest, preBidRequestContext))
                 .isExactlyInstanceOf(PreBidException.class)
                 .hasMessage("Missing siteId param");
+    }
+
+    @Test
+    public void makeHttpRequestsShouldFailIfAdUnitBidParamSizeIsInvalid() {
+        // given
+        adapterRequest = givenBidder(builder -> builder.params(
+                mapper.valueToTree(IxParams.of("id", singletonList(33)))));
+
+        // when and then
+        assertThatThrownBy(() -> adapter.makeHttpRequests(adapterRequest, preBidRequestContext))
+                .isExactlyInstanceOf(PreBidException.class)
+                .hasMessage("Incorrect Size param: expected at least 2 values");
     }
 
     @Test
@@ -164,11 +182,11 @@ public class IxAdapterTest extends VertxTest {
         // when and then
         assertThatThrownBy(() -> adapter.makeHttpRequests(adapterRequest, preBidRequestContext))
                 .isExactlyInstanceOf(PreBidException.class)
-                .hasMessage("openRTB bids need at least one Imp");
+                .hasMessage("Invalid ad unit/imp");
     }
 
     @Test
-    public void makeHttpRequestsShouldFailIfMediaTypeIsVideoAndMimesListIsEmpty() {
+    public void makeHttpRequestsShouldIgnoreVideoMediaTypeAndFail() {
         // given
         adapterRequest = AdapterRequest.of(BIDDER, singletonList(
                 givenAdUnitBid(builder -> builder
@@ -181,7 +199,7 @@ public class IxAdapterTest extends VertxTest {
         // when and then
         assertThatThrownBy(() -> adapter.makeHttpRequests(adapterRequest, preBidRequestContext))
                 .isExactlyInstanceOf(PreBidException.class)
-                .hasMessage("Invalid AdUnit: VIDEO media type with no video data");
+                .hasMessage("Invalid ad unit/imp");
     }
 
     @Test
@@ -194,7 +212,7 @@ public class IxAdapterTest extends VertxTest {
                         .instl(1)
                         .topframe(1)
                         .sizes(singletonList(Format.builder().w(300).h(250).build()))
-                        .params(mapper.valueToTree(IxParams.of("486"))));
+                        .params(mapper.valueToTree(IxParams.of("486", asList(300, 250)))));
 
         preBidRequestContext = givenPreBidRequestContext(
                 builder -> builder
@@ -258,7 +276,7 @@ public class IxAdapterTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldReturnListWithOneRequestIfMultipleAdUnitsInPreBidRequest() {
+    public void makeHttpRequestsShouldReturnListWithOneRequestPerAdUnit() {
         // given
         adapterRequest = AdapterRequest.of(BIDDER, asList(
                 givenAdUnitBid(builder -> builder.adUnitCode("adUnitCode1")),
@@ -269,9 +287,114 @@ public class IxAdapterTest extends VertxTest {
                 preBidRequestContext);
 
         // then
-        assertThat(httpRequests).hasSize(1)
+        assertThat(httpRequests).hasSize(2)
                 .flatExtracting(r -> r.getPayload().getImp()).hasSize(2)
                 .extracting(Imp::getId).containsOnly("adUnitCode1", "adUnitCode2");
+    }
+
+    @Test
+    public void makeHttpRequestsShouldReturnListWithOneRequestPerAdUnitsSize() {
+        // given
+        adapterRequest = AdapterRequest.of(BIDDER, singletonList(
+                givenAdUnitBid(builder -> builder
+                        .adUnitCode("adUnitCode1")
+                        .sizes(asList(Format.builder().w(300).h(250).build(),
+                                Format.builder().w(300).h(300).build()))
+                )));
+
+        // when
+        final List<AdapterHttpRequest<BidRequest>> httpRequests = adapter.makeHttpRequests(adapterRequest,
+                preBidRequestContext);
+
+        // then
+        assertThat(httpRequests).hasSize(2)
+                .extracting(AdapterHttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getBanner)
+                .flatExtracting(Banner::getFormat)
+                .containsOnly(Format.builder().w(300).h(250).build(),
+                        Format.builder().w(300).h(300).build());
+    }
+
+    @Test
+    public void makeHttpRequestsShouldReturnListWithOnlyOneRequestWithValidSizesFromParams() {
+        // given
+        adapterRequest = AdapterRequest.of(BIDDER, singletonList(
+                givenAdUnitBid(builder -> builder
+                        .adUnitCode("adUnitCode1")
+                        .sizes(asList(Format.builder().w(300).h(250).build(),
+                                Format.builder().w(300).h(300).build()))
+                        .params(mapper.valueToTree(IxParams.of("486", asList(300, 250))))
+                )));
+
+        // when
+        final List<AdapterHttpRequest<BidRequest>> httpRequests = adapter.makeHttpRequests(adapterRequest,
+                preBidRequestContext);
+
+        // then
+        assertThat(httpRequests).hasSize(1)
+                .extracting(AdapterHttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getBanner)
+                .flatExtracting(Banner::getFormat)
+                .containsOnly(Format.builder().w(300).h(250).build());
+    }
+
+    @Test
+    public void makeHttpRequestsShouldPrioritizeSlotsOverSizes() {
+        // given
+        adapterRequest = AdapterRequest.of(BIDDER, asList(
+                givenAdUnitBid(builder -> builder
+                        .adUnitCode("adUnitCode1")
+                        .sizes(asList(Format.builder().w(300).h(250).build(),
+                                Format.builder().w(300).h(300).build()))),
+                givenAdUnitBid(builder -> builder
+                        .adUnitCode("adUnitCode2")
+                        .sizes(singletonList(Format.builder().w(600).h(480).build())))
+        ));
+
+        // when
+        final List<AdapterHttpRequest<BidRequest>> httpRequests = adapter.makeHttpRequests(adapterRequest,
+                preBidRequestContext);
+
+        // then
+        assertThat(httpRequests).hasSize(3)
+                .extracting(AdapterHttpRequest::getPayload)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getBanner)
+                .flatExtracting(Banner::getFormat)
+                .containsOnly(Format.builder().w(300).h(250).build(),
+                        Format.builder().w(600).h(480).build(),
+                        Format.builder().w(300).h(300).build());
+    }
+
+    @Test
+    public void makeHttpRequestsShouldReturnListWithLimitedAmountOfRequests() {
+        // given
+        final List<AdUnitBid> adUnitBids = new ArrayList<>();
+        for (int i = 0; i < 21; i++) {
+            final String id = String.valueOf(i);
+            adUnitBids.add(givenAdUnitBid(builder -> builder.adUnitCode("adUnitCode" + id)));
+        }
+        adapterRequest = AdapterRequest.of(BIDDER, adUnitBids);
+
+        // when
+        final List<AdapterHttpRequest<BidRequest>> httpRequests = adapter.makeHttpRequests(adapterRequest,
+                preBidRequestContext);
+
+        // then
+        assertThat(httpRequests).hasSize(20);
+    }
+
+    @Test
+    public void makeHttpRequestsShouldFailIfResultingRequestsAreEmpty() {
+        // given
+        adapterRequest = AdapterRequest.of(BIDDER, emptyList());
+
+        // when and then
+        assertThatExceptionOfType(PreBidException.class)
+                .isThrownBy(() -> adapter.makeHttpRequests(adapterRequest, preBidRequestContext))
+                .withMessage("Invalid ad unit/imp");
     }
 
     @Test
@@ -291,7 +414,7 @@ public class IxAdapterTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldReturnListWithOneRequestIfAdUnitContainsBannerAndVideoMediaTypes() {
+    public void makeHttpRequestsShouldReturnOneRequestWithBannerIfAdUnitContainsBannerAndVideoMediaTypes() {
         // given
         adapterRequest = AdapterRequest.of(BIDDER, singletonList(
                 givenAdUnitBid(builder -> builder
@@ -309,9 +432,9 @@ public class IxAdapterTest extends VertxTest {
 
         // then
         assertThat(httpRequests).hasSize(1)
-                .flatExtracting(r -> r.getPayload().getImp()).hasSize(2)
+                .flatExtracting(r -> r.getPayload().getImp()).hasSize(1)
                 .extracting(imp -> imp.getVideo() == null, imp -> imp.getBanner() == null)
-                .containsOnly(tuple(true, false), tuple(false, true));
+                .containsOnly(tuple(true, false));
     }
 
     @Test
@@ -402,7 +525,7 @@ public class IxAdapterTest extends VertxTest {
     private static AdUnitBid givenAdUnitBid(Function<AdUnitBidBuilder, AdUnitBidBuilder> adUnitBidBuilderCustomizer) {
         final AdUnitBidBuilder adUnitBidBuilderMinimal = AdUnitBid.builder()
                 .sizes(singletonList(Format.builder().w(300).h(250).build()))
-                .params(mapper.valueToTree(IxParams.of("42")))
+                .params(mapper.valueToTree(IxParams.of("42", null)))
                 .mediaTypes(singleton(MediaType.banner));
 
         final AdUnitBidBuilder adUnitBidBuilderCustomized = adUnitBidBuilderCustomizer

@@ -239,7 +239,8 @@ public class GdprService {
      * Checks GDPR flag has valid value.
      */
     private boolean isValidGdpr(String gdprFromRequest) {
-        return gdprFromRequest != null && (gdprFromRequest.equals("0") || gdprFromRequest.equals("1"));
+        return gdprFromRequest != null
+                && (Objects.equals(gdprFromRequest, "0") || Objects.equals(gdprFromRequest, "1"));
     }
 
     /**

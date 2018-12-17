@@ -1,11 +1,11 @@
-package org.prebid.server.bidder.beachfront.model;
+package org.prebid.server.bidder.ttx.proto;
 
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
 @AllArgsConstructor(staticName = "of")
 @Value
-public class BeachfrontSite {
+public class TtxImpExt {
 
-    String page;
+    TtxImpExtTtx ttx;
 }

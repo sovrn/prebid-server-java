@@ -57,6 +57,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -193,6 +194,23 @@ public class CookieSyncHandlerTest extends VertxTest {
         verify(httpResponse).setStatusMessage(eq("gdpr_consent is required if gdpr is 1"));
         verify(httpResponse).end();
         verifyNoMoreInteractions(httpResponse, bidderCatalog);
+    }
+
+    @Test
+    public void shouldNotSendResponseIfClientClosedConnection() {
+        // given
+        given(routingContext.getBody()).willReturn(
+                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null)));
+
+        givenGdprServiceReturningResult(emptyMap());
+
+        given(routingContext.response().closed()).willReturn(true);
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse, never()).end();
     }
 
     @Test
@@ -456,7 +474,6 @@ public class CookieSyncHandlerTest extends VertxTest {
                 CookieSyncRequest.of(singletonList(APPNEXUS), 1, "gdpr_consent1", null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
-        given(bidderCatalog.names()).willReturn(singleton(APPNEXUS));
 
         givenUsersyncersReturningFamilyName();
         final UsersyncInfo appnexusUsersyncInfo = UsersyncInfo.of(
@@ -473,6 +490,32 @@ public class CookieSyncHandlerTest extends VertxTest {
         assertThat(cookieSyncResponse.getBidderStatus())
                 .extracting(bidderStatus -> bidderStatus.getUsersync().getUrl())
                 .containsOnly("http://adnxsexample.com/sync?gdpr=1&gdpr_consent=gdpr_consent1");
+    }
+
+    @Test
+    public void shouldRespondWithExpectedUsersyncInfoForBidderAlias() throws IOException {
+        // given
+        given(routingContext.getBody()).willReturn(givenRequestBody(
+                CookieSyncRequest.of(singletonList("rubiconAlias"), 0, null, null)));
+
+        given(bidderCatalog.isActive(RUBICON)).willReturn(true);
+        given(bidderCatalog.isAlias("rubiconAlias")).willReturn(true);
+        given(bidderCatalog.nameByAlias("rubiconAlias")).willReturn(RUBICON);
+
+        given(rubiconUsersyncer.usersyncInfo())
+                .willReturn(UsersyncInfo.of("http://rubiconexample.com", "redirect", false));
+
+        givenUsersyncersReturningFamilyName();
+        givenGdprServiceReturningResult(singletonMap(RUBICON, 1));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        final CookieSyncResponse cookieSyncResponse = captureCookieSyncResponse();
+        assertThat(cookieSyncResponse.getBidderStatus())
+                .extracting(bidderStatus -> bidderStatus.getUsersync().getUrl())
+                .containsOnly("http://rubiconexample.com");
     }
 
     @Test

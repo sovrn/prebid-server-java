@@ -42,6 +42,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
+import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
@@ -156,30 +157,6 @@ public class RequestValidatorTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1).containsOnly("currency was not defined either in request.cur or in"
                 + " configuration field adServerCurrency");
-    }
-
-    @Test
-    public void validateShouldReturnValidationMessageWhenCurHasMoreThanOneElement() {
-        // given
-        final BidRequest bidRequest = validBidRequestBuilder().cur(asList("USD", "EUR")).build();
-
-        // when
-        final ValidationResult result = requestValidator.validate(bidRequest);
-
-        // then
-        assertThat(result.getErrors()).hasSize(1).containsOnly("request.cur can contain exactly one element");
-    }
-
-    @Test
-    public void validateShouldReturnValidationMessageWhenCurIsEmpty() {
-        // given
-        final BidRequest bidRequest = validBidRequestBuilder().cur(emptyList()).build();
-
-        // when
-        final ValidationResult result = requestValidator.validate(bidRequest);
-
-        // then
-        assertThat(result.getErrors()).hasSize(1).containsOnly("request.cur can contain exactly one element");
     }
 
     @Test
@@ -448,6 +425,52 @@ public class RequestValidatorTest extends VertxTest {
     }
 
     @Test
+    public void validateShouldReturnValidationMessageWhenBannerHasEmptyFormatAndNegativeWidth() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(singletonList(Imp.builder()
+                        .id("11")
+                        .banner(Banner.builder()
+                                .h(600)
+                                .w(-300)
+                                .format(emptyList())
+                                .build())
+                        .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
+                        .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerHasEmptyFormatAndNegativeHeight() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(singletonList(Imp.builder()
+                        .id("11")
+                        .banner(Banner.builder()
+                                .h(-300)
+                                .w(600)
+                                .format(emptyList())
+                                .build())
+                        .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
+                        .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+    }
+
+    @Test
     public void validateShouldReturnValidationMessageWhenBannerFormatHWAndRatiosPresent() {
         // given
         final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
@@ -530,7 +553,7 @@ public class RequestValidatorTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Request imp[0].banner.format[0] should define *either* {w, h} (for static size "
-                        + "requirements) *or* {wmin, wratio, hratio} (for flexible sizes) to be non-zero");
+                        + "requirements) *or* {wmin, wratio, hratio} (for flexible sizes) to be non-zero positive");
     }
 
     @Test
@@ -544,7 +567,7 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"h\" and \"w\" properties");
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -558,7 +581,7 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"h\" and \"w\" properties");
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -572,7 +595,7 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"h\" and \"w\" properties");
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -586,7 +609,35 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"h\" and \"w\" properties");
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"h\" and \"w\" properties");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerFormatHeightIsNegative() {
+        // given
+        final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
+                formatBuilder -> Format.builder().h(-1).w(2));
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"h\" and \"w\" properties");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerFormatWidthIsNegative() {
+        // given
+        final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
+                formatBuilder -> Format.builder().h(2).w(-1));
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -601,7 +652,7 @@ public class RequestValidatorTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Request imp[0].banner.format[0] must define"
-                        + " non-zero \"wmin\", \"wratio\", and \"hratio\" properties");
+                        + " a valid \"wmin\", \"wratio\", and \"hratio\" properties");
     }
 
     @Test
@@ -615,7 +666,21 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1).containsOnly("Request imp[0].banner.format[0] must define "
-                + "non-zero \"wmin\", \"wratio\", and \"hratio\" properties");
+                + "a valid \"wmin\", \"wratio\", and \"hratio\" properties");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerFormatRatiosUsedAndWMinIsNegative() {
+        // given
+        final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
+                formatBuilder -> Format.builder().wmin(-1).wratio(2).hratio(1));
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1).containsOnly("Request imp[0].banner.format[0] must define "
+                + "a valid \"wmin\", \"wratio\", and \"hratio\" properties");
     }
 
     @Test
@@ -629,7 +694,7 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"wmin\", \"wratio\","
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"wmin\", \"wratio\","
                         + " and \"hratio\" properties");
     }
 
@@ -644,7 +709,22 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"wmin\", \"wratio\", and "
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"wmin\", \"wratio\", and "
+                        + "\"hratio\" properties");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerFormatRatiosUsedAndWRatioIsNegative() {
+        // given
+        final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
+                formatBuilder -> Format.builder().wmin(1).wratio(-1).hratio(1));
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"wmin\", \"wratio\", and "
                         + "\"hratio\" properties");
     }
 
@@ -659,7 +739,7 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"wmin\", \"wratio\", and"
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"wmin\", \"wratio\", and"
                         + " \"hratio\" properties");
     }
 
@@ -674,7 +754,22 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Request imp[0].banner.format[0] must define non-zero \"wmin\", \"wratio\", and"
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"wmin\", \"wratio\", and"
+                        + " \"hratio\" properties");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerFormatRatiosUsedAndHRatioIsNegative() {
+        // given
+        final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
+                formatBuilder -> Format.builder().wmin(1).wratio(5).hratio(-1));
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner.format[0] must define a valid \"wmin\", \"wratio\", and"
                         + " \"hratio\" properties");
     }
 
@@ -772,6 +867,75 @@ public class RequestValidatorTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("request.site should include at least one of request.site.id or request.site.page");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenSiteExtAmpIsNegative() {
+        // given
+        final BidRequest bidRequest = overwriteSite(validBidRequestBuilder(),
+                siteBuilder -> Site.builder().id("id").page("page").ext(mapper.valueToTree(ExtSite.of(-1)))).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.site.ext.amp must be either 1, 0, or undefined");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenSiteExtAmpIsGreaterThanOne() {
+        // given
+        final BidRequest bidRequest = overwriteSite(validBidRequestBuilder(),
+                siteBuilder -> Site.builder().id("id").page("page").ext(mapper.valueToTree(ExtSite.of(2)))).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.site.ext.amp must be either 1, 0, or undefined");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenSiteExtCannotBeParsed() {
+        // given
+        final BidRequest bidRequest = overwriteSite(validBidRequestBuilder(),
+                siteBuilder -> Site.builder()
+                        .id("id")
+                        .page("page")
+                        .ext(mapper.createObjectNode().put("amp", "value")))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1);
+        assertThat(result.getErrors().get(0)).startsWith("request.site.ext object is not valid: ");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenAppExtIsNotValid() {
+        // given
+        final ObjectNode invalidExt = mapper.createObjectNode();
+        invalidExt.put("prebid", "invalid");
+
+        final BidRequest bidRequest = overwriteApp(
+                BidRequest.builder()
+                        .id("123")
+                        .cur(singletonList("USD"))
+                        .imp(singletonList(validImpBuilder().build())),
+                appBuilder -> App.builder()
+                        .id("3").ext(invalidExt))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1).element(0).asString()
+                .startsWith("request.app.ext object is not valid: ");
     }
 
     @Test
@@ -2094,6 +2258,26 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).isEmpty();
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenRequestHaveDuplicatedImpIds() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(asList(Imp.builder()
+                                .id("11")
+                                .build(),
+                        Imp.builder()
+                                .id("11")
+                                .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1).containsOnly(
+                "request.imp[0].id and request.imp[1].id are both \"11\". Imp IDs must be unique.");
     }
 
     private static BidRequest.BidRequestBuilder validBidRequestBuilder() {

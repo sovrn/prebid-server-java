@@ -36,7 +36,7 @@
   "at": 1,
   "tmax": 1000,
   "cur": [
-    "EUR"
+    "USD"
   ],
   "source": {
     "fd": 1,
@@ -44,10 +44,6 @@
   },
   "ext": {
     "prebid": {
-      "aliases": {
-        "appnexusAlias": "appnexus",
-        "conversantAlias": "conversant"
-      },
       "targeting": {
         "pricegranularity": {
           "precision": 2,

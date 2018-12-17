@@ -295,7 +295,7 @@ public class ConversantAdapterTest extends VertxTest {
                         .secure(12)
                         .tagId("tagId42")
                         .position(3)
-                        .bidfloor(1.03F)
+                        .bidfloor(BigDecimal.valueOf(1.03))
                         .mobile(87)
                         .mimes(singletonList("mime42"))
                         .api(singletonList(10))
@@ -340,7 +340,7 @@ public class ConversantAdapterTest extends VertxTest {
                                         .build())
                                 .displaymanager("prebid-s2s")
                                 .displaymanagerver("1.0.1")
-                                .bidfloor(1.03F)
+                                .bidfloor(BigDecimal.valueOf(1.03))
                                 .secure(12)
                                 .build()))
                         .site(Site.builder()
@@ -411,7 +411,7 @@ public class ConversantAdapterTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldReturnListWithOneRequestIfAdUnitContainsBannerAndVideoMediaTypes() {
+    public void makeHttpRequestsShouldReturnListWithOneRequestWithOneImpIfAdUnitContainsBannerAndVideoMediaTypes() {
         // given
         adapterRequest = AdapterRequest.of(BIDDER, singletonList(
                 givenAdUnitBid(builder -> builder
@@ -430,9 +430,9 @@ public class ConversantAdapterTest extends VertxTest {
 
         // then
         assertThat(httpRequests).hasSize(1)
-                .flatExtracting(r -> r.getPayload().getImp()).hasSize(2)
+                .flatExtracting(r -> r.getPayload().getImp()).hasSize(1)
                 .extracting(imp -> imp.getVideo() == null, imp -> imp.getBanner() == null)
-                .containsOnly(tuple(true, false), tuple(false, true));
+                .containsOnly(tuple(false, false));
     }
 
     @Test
@@ -534,7 +534,7 @@ public class ConversantAdapterTest extends VertxTest {
                 .secure(42)
                 .tagId("tagId1")
                 .position(2)
-                .bidfloor(7.32F)
+                .bidfloor(BigDecimal.valueOf(7.32))
                 .mobile(64)
                 .mimes(singletonList("mime1"))
                 .api(singletonList(1))

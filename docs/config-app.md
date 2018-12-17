@@ -34,7 +34,7 @@ This parameter affects how many CPU cores will be utilized by the application. R
 - `auction.max-timeout-ms` - maximum operation timeout for OpenRTB Auction requests.
 - `auction.max-request-size` - set the maximum size in bytes of OpenRTB Auction request.
 - `auction.stored-requests-timeout-ms` - timeout for stored requests fetching.
-- `auction.ad-server-currency` - default currency for auction, if its value was not specified in request. Important note: PBS uses ISO 4217 codes for the representation of currencies.
+- `auction.ad-server-currency` - default currency for auction, if its value was not specified in request. Important note: PBS uses ISO-4217 codes for the representation of currencies.
 - `auction.currency-rates-refresh-period-ms` - default refresh period for currency rates updates.
 - `auction.currency-rates-url` - the url for Prebid.org’s currency file. [More details](http://prebid.org/dev-docs/modules/currency.html)
 - `auction.cache.expected-request-time-ms` - approximate value in milliseconds for Cache Service interacting. This time will be subtracted from global timeout.
@@ -59,21 +59,25 @@ There are several typical keys:
 - `adapters.<BIDDER_NAME>.usersync-url` - the url for synchronizing UIDs cookie.
 - `adapters.<BIDDER_NAME>.pbs-enforces-gdpr` - indicates if pbs server provides gdpr support for bidder or bidder will handle it itself.
 - `adapters.<BIDDER_NAME>.deprecated-names` - comma separated deprecated names of bidder.
+- `adapters.<BIDDER_NAME>.aliases` - comma separated aliases of bidder.
 
 But feel free to add additional bidder's specific options.
 
 ## Metrics
 - `metrics.metricType` - set the type of metric counter for [Dropwizard Metrics](http://metrics.dropwizard.io). Can be `flushingCounter` (default), `counter` or `meter`.
 
-Metrics can be submitted simultaneously to many backends. Currently we support `graphite` and `influxdb`.
+So far metrics cannot be submitted simultaneously to many backends. Currently we support `graphite` and `influxdb`. 
+Also, for debug purposes you can use `console` as metrics backend.
 
 For `graphite` backend type available next options:
+- `metrics.graphite.enabled` - if equals to `true` then `graphite` will be used to submit metrics.
 - `metrics.graphite.prefix` - the prefix of all metric names.
 - `metrics.graphite.host` - the graphite host for sending statistics.
 - `metrics.graphite.port` - the graphite port for sending statistics.
 - `metrics.graphite.interval` - interval in seconds between successive sending metrics.
 
 For `influxdb` backend type available next options:
+- `metrics.influxdb.enabled` - if equals to `true` then `influxdb` will be used to submit metrics.
 - `metrics.influxdb.prefix` - the prefix of all metric names.
 - `metrics.influxdb.protocol` - external service destination protocol.
 - `metrics.influxdb.host` - the influxDb host for sending metrics.
@@ -83,6 +87,10 @@ For `influxdb` backend type available next options:
 - `metrics.influxdb.connectTimeout` - the connect timeout.
 - `metrics.influxdb.readTimeout` - the response timeout.
 - `metrics.influxdb.interval` - interval in seconds between successive sending metrics.
+
+For `console` backend type available next options:
+- `metrics.console.enabled` - if equals to `true` then `console` will be used to submit metrics.
+- `metrics.console.interval` - interval in seconds between successive sending metrics.
 
 It is possible to define how many account-level metrics will be submitted on per-account basis.
 See [metrics documentation](metrics.md) for complete list of metrics submitted at each verbosity level.

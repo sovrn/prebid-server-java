@@ -69,6 +69,7 @@ import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
 import org.prebid.server.proto.response.BidderInfo;
@@ -100,6 +101,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
@@ -236,7 +238,8 @@ public class ExchangeServiceTest extends VertxTest {
         // then
         assertThat(bidResponse.getExt()).isEqualTo(mapper.valueToTree(ExtBidResponse.of(null,
                 Collections.singletonMap(invalidBidderName, Collections.singletonList(
-                        "invalid has been deprecated and is no longer available. Use valid instead.")),
+                        ExtBidderError.of(BidderError.Type.bad_input.getCode(),
+                                "invalid has been deprecated and is no longer available. Use valid instead."))),
                 new HashMap<>(), null)));
     }
 
@@ -775,8 +778,11 @@ public class ExchangeServiceTest extends VertxTest {
         final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
         assertThat(ext.getResponsetimemillis()).hasSize(2).containsOnlyKeys("bidder1", "bidder2");
         assertThat(ext.getErrors()).hasSize(2).containsOnly(
-                entry("bidder1", singletonList("bidder1_error1")),
-                entry("bidder2", asList("bidder2_error1", "bidder2_error2")));
+                entry("bidder1", singletonList(ExtBidderError.of(BidderError.Type.bad_server_response.getCode(),
+                        "bidder1_error1"))),
+                entry("bidder2", asList(ExtBidderError.of(BidderError.Type.bad_server_response.getCode(),
+                        "bidder2_error1"), ExtBidderError.of(BidderError.Type.bad_server_response.getCode(),
+                        "bidder2_error2"))));
     }
 
     @Test
@@ -946,7 +952,8 @@ public class ExchangeServiceTest extends VertxTest {
         // then
         final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
         assertThat(ext.getErrors()).hasSize(1).containsOnly(
-                entry("bidder1", singletonList("bid validation error")));
+                entry("bidder1", singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
+                        "bid validation error"))));
     }
 
     @Test
@@ -1452,8 +1459,7 @@ public class ExchangeServiceTest extends VertxTest {
         final Bid bid1 = Bid.builder().id("bidId1").impid("impId1").price(BigDecimal.valueOf(5.67)).build();
         final Bid bid2 = Bid.builder().id("bidId2").impid("impId2").price(BigDecimal.valueOf(7.19)).build();
         givenHttpConnector("bidder1", mock(BidderRequester.class), givenSeatBid(singletonList(givenBid(bid1))));
-        givenHttpConnector("bidder2", mock(BidderRequester.class), givenSeatBid(singletonList(
-                givenBid(bid2))));
+        givenHttpConnector("bidder2", mock(BidderRequester.class), givenSeatBid(singletonList(givenBid(bid2))));
 
         // imp ids are not really used for matching, included them here for clarity
         final Imp imp1 = givenImp(singletonMap("bidder1", 1), builder -> builder.id("impId1"));
@@ -1477,7 +1483,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         verify(cacheService).cacheBidsOpenrtb(
-                eq(asList(bid1, bid2)), eq(asList(imp1, imp2)),
+                argThat(t -> t.containsAll(asList(bid1, bid2))), eq(asList(imp1, imp2)),
                 eq(CacheContext.of(true, null, false, null)),
                 eq(""), eq(timeout));
     }
@@ -1549,7 +1555,8 @@ public class ExchangeServiceTest extends VertxTest {
         assertThat(bidResponse.getSeatbid()).flatExtracting(SeatBid::getBid).isEmpty();
         final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
         assertThat(ext.getErrors()).hasSize(1).containsOnly(
-                entry("bidder", singletonList("no currency conversion available")));
+                entry("bidder", singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
+                        "no currency conversion available"))));
     }
 
     @Test
@@ -1600,7 +1607,61 @@ public class ExchangeServiceTest extends VertxTest {
                 .extracting(Bid::getPrice).containsExactly(BigDecimal.valueOf(10.0));
         final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
         assertThat(ext.getErrors()).hasSize(1).containsOnly(
-                entry("bidder", singletonList("no currency conversion available")));
+                entry("bidder", singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
+                        "no currency conversion available"))));
+    }
+
+    @Test
+    public void shouldRespondWithErrorWhenBidsWithUnsupportedCurrency()
+            throws JsonProcessingException {
+        // given
+        final BidderRequester bidderRequester = mock(BidderRequester.class);
+        givenHttpConnector("bidder", bidderRequester, givenSeatBid(singletonList(
+                givenBid(Bid.builder().price(BigDecimal.valueOf(2.0)).build()))));
+
+        final BidRequest bidRequest = BidRequest.builder().cur(Collections.singletonList("EUR"))
+                .imp(singletonList(givenImp(singletonMap("bidder", 2), identity()))).build();
+
+        // returns the same price as in argument
+        given(currencyService.convertCurrency(any(), any(), any(), any()))
+                .willAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
+
+        // when
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid()).hasSize(0);
+        final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(ext.getErrors()).hasSize(1).containsOnly(entry("bidder",
+                singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
+                        "Bid currency is not allowed. Was EUR, wants: [USD]"))));
+    }
+
+    @Test
+    public void shouldRespondWithErrorWhenBidsWithDifferentCurrencies() throws JsonProcessingException {
+        // given
+        given(bidderCatalog.isValidName(anyString())).willReturn(true);
+
+        given(bidderRequester.requestBids(any(), any()))
+                .willReturn(Future.succeededFuture(givenSeatBid(asList(
+                        BidderBid.of(Bid.builder().price(TEN).build(), BidType.banner, "EUR"),
+                        BidderBid.of(Bid.builder().price(TEN).build(), BidType.banner, "USD")))));
+
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("somebidder", 1)),
+                builder -> builder.site(Site.builder().build()));
+
+        //when
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
+
+
+        //then
+        assertThat(bidResponse.getSeatbid()).hasSize(0);
+        final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(ext.getErrors()).hasSize(1).containsOnly(entry("somebidder",
+                singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
+                        "Bid currencies mismatch found. Expected all bids to have the same currencies."))));
     }
 
     @Test
@@ -1625,6 +1686,23 @@ public class ExchangeServiceTest extends VertxTest {
         verify(metrics).updateAdapterResponseTime(eq("somebidder"), eq("accountId"), anyInt());
         verify(metrics).updateAdapterRequestGotbidsMetrics(eq("somebidder"), eq("accountId"));
         verify(metrics).updateAdapterBidMetrics(eq("somebidder"), eq("accountId"), eq(10000L), eq(false), eq("banner"));
+    }
+
+    @Test
+    public void shouldUseEmptyStringIfPublisherIdIsNull() {
+        // given
+        given(bidderCatalog.isValidName(anyString())).willReturn(true);
+        given(bidderRequester.requestBids(any(), any()))
+                .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
+                        givenBid(Bid.builder().price(TEN).build())))));
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("somebidder", 1)),
+                builder -> builder.site(Site.builder().publisher(Publisher.builder().build()).build()));
+
+        // when
+        exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null);
+
+        // then
+        verify(metrics).updateAccountRequestMetrics(eq(""), eq(MetricName.openrtb2web));
     }
 
     @Test
@@ -1755,7 +1833,82 @@ public class ExchangeServiceTest extends VertxTest {
                 .extracting(extractedBid -> toExtPrebid(extractedBid.getExt()).getPrebid().getCache())
                 .extracting(ExtResponseCache::getBids, ExtResponseCache::getVastXml)
                 .containsExactly(tuple(CacheAsset.of(null, "cacheId"), null));
+    }
 
+    @Test
+    public void shouldReturnCacheError() throws JsonProcessingException {
+
+        // given
+        final Bid bid = Bid.builder().id("bidId").impid("impId").price(BigDecimal.ONE).build();
+        givenHttpConnector("bidder", mock(BidderRequester.class), givenSeatBid(singletonList(givenBid(bid))));
+
+        given(cacheService.cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any()))
+                .willReturn(Future.failedFuture(new RuntimeException("error")));
+
+        final BidRequest bidRequest = givenBidRequest(singletonList(
+                // imp ids are not really used for matching, included them here for clarity
+                givenImp(singletonMap("bidder", 1), builder -> builder.id("impId"))),
+                builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
+                        null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
+                                2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
+                                        BigDecimal.valueOf(0.5))))), null, true, true), null,
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null)), null))));
+
+        // when
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
+
+        // then
+        final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(ext.getErrors()).contains(entry("prebid",
+                singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
+                        "Error occurred while trying to cache bids. Message : error"))));
+    }
+
+    @Test
+    public void shouldNotContainErrorsIfBidderErrorsAreEmpty() throws JsonProcessingException {
+        // given
+        final Bid bid = Bid.builder().id("bidId").impid("impId").price(BigDecimal.ONE).build();
+        givenHttpConnector("bidder", mock(BidderRequester.class), givenSeatBid(singletonList(givenBid(bid))));
+
+        final BidRequest bidRequest = givenBidRequest(singletonList(
+                // imp ids are not really used for matching, included them here for clarity
+                givenImp(singletonMap("bidder", 1), builder -> builder.id("impId"))));
+
+        // when
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
+
+        // then
+        final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(ext.getErrors()).isNull();
+    }
+
+    @Test
+    public void shouldContainCacheResponseTime() throws JsonProcessingException {
+        // given
+        final Bid bid = Bid.builder().id("bidId").impid("impId").price(BigDecimal.ONE).build();
+        givenHttpConnector("bidder", mock(BidderRequester.class), givenSeatBid(singletonList(givenBid(bid))));
+
+        given(cacheService.cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(singletonMap(bid, CacheIdInfo.of("cacheId", null))));
+
+        final BidRequest bidRequest = givenBidRequest(singletonList(
+                // imp ids are not really used for matching, included them here for clarity
+                givenImp(singletonMap("bidder", 1), builder -> builder.id("impId"))),
+                builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
+                        null, null, ExtRequestTargeting.of(Json.mapper.valueToTree(ExtPriceGranularity.of(
+                                2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
+                                        BigDecimal.valueOf(0.5))))), null, true, true), null,
+                        ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null), null)), null))));
+
+        // when
+        final BidResponse bidResponse =
+                exchangeService.holdAuction(bidRequest, uidsCookie, timeout, metricsContext, null).result();
+
+        // then
+        final ExtBidResponse ext = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(ext.getResponsetimemillis()).containsKeys("cache");
     }
 
     private BidRequest captureBidRequest() {

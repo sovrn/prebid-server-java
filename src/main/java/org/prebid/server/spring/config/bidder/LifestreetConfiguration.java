@@ -5,7 +5,7 @@ import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
 import org.prebid.server.bidder.BidderRequester;
 import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpAdapterRequester;
+import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.lifestreet.LifestreetAdapter;
@@ -36,11 +36,14 @@ public class LifestreetConfiguration extends BidderConfiguration {
     @Value("${adapters.lifestreet.pbs-enforces-gdpr}")
     private boolean pbsEnforcesGdpr;
 
-    @Value("${external-url}")
-    private String externalUrl;
-
     @Value("${adapters.lifestreet.deprecated-names}")
     private List<String> deprecatedNames;
+
+    @Value("${adapters.lifestreet.aliases}")
+    private List<String> aliases;
+
+    @Value("${external-url}")
+    private String externalUrl;
 
     @Bean
     BidderDeps lifestreetBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
@@ -58,6 +61,11 @@ public class LifestreetConfiguration extends BidderConfiguration {
     }
 
     @Override
+    protected List<String> aliases() {
+        return aliases;
+    }
+
+    @Override
     protected MetaInfo createMetaInfo() {
         return new LifestreetMetaInfo(enabled, pbsEnforcesGdpr);
     }
@@ -69,7 +77,7 @@ public class LifestreetConfiguration extends BidderConfiguration {
 
     @Override
     protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new LifestreetBidder();
+        return new LifestreetBidder(endpoint);
     }
 
     @Override
@@ -80,6 +88,6 @@ public class LifestreetConfiguration extends BidderConfiguration {
     @Override
     protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
                                                     Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpAdapterRequester(BIDDER_NAME, adapter, usersyncer, httpAdapterConnector);
+        return new HttpBidderRequester<>(bidder, httpClient);
     }
 }

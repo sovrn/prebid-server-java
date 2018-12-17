@@ -6,7 +6,7 @@
         {
           "id": "impId12",
           "impid": "impId12",
-          "price": 8.46365,
+          "price": 10.5,
           "adm": "banner",
           "crid": "crid12",
           "w": 400,
@@ -15,25 +15,24 @@
             "prebid": {
               "type": "banner",
               "targeting": {
-                "hb_pb": "8.40",
+                "hb_pb": "10.50",
                 "hb_size_adform": "400x300",
                 "hb_size": "400x300",
                 "hb_bidder": "adform",
                 "hb_cache_id_adform": "ca2a4dd3-f974-4eff-be5c-986bf4e083ce",
                 "hb_cache_id": "ca2a4dd3-f974-4eff-be5c-986bf4e083ce",
                 "hb_bidder_adform": "adform",
-                "hb_creative_loadtype": "html",
-                "hb_pb_adform": "8.40",
-                "hb_cache_host": "{{ host }}",
-                "hb_cache_host_adform": "{{ host }}",
-                "hb_cache_path": "{{ path }}",
-                "hb_cache_path_adform": "{{ path }}",
-                "hb_cache_hostpath": "{{ hostpath }}",
-                "hb_cache_hostpath_adform": "{{ hostpath }}"
+                "hb_pb_adform": "10.50",
+                "hb_cache_host": "{{ cache.host }}",
+                "hb_cache_host_adform": "{{ cache.host }}",
+                "hb_cache_path": "{{ cache.path }}",
+                "hb_cache_path_adform": "{{ cache.path }}",
+                "hb_cache_hostpath": "{{ cache.hostpath }}",
+                "hb_cache_hostpath_adform": "{{ cache.hostpath }}"
               },
               "cache": {
                 "bids": {
-                  "url": "{{ cache_resource_url }}ca2a4dd3-f974-4eff-be5c-986bf4e083ce",
+                  "url": "{{ cache.resource_url }}ca2a4dd3-f974-4eff-be5c-986bf4e083ce",
                   "cacheId": "ca2a4dd3-f974-4eff-be5c-986bf4e083ce"
                 }
               }
@@ -45,7 +44,7 @@
       "group": 0
     }
   ],
-  "cur": "EUR",
+  "cur": "USD",
   "ext": {
     "debug": {
       "httpcalls": {
@@ -83,6 +82,9 @@
           "page": "http://www.example.com",
           "publisher": {
             "id": "publisherId"
+          },
+          "ext": {
+            "amp": 0
           }
         },
         "device": {
@@ -107,7 +109,7 @@
         "at": 1,
         "tmax": 1000,
         "cur": [
-          "EUR"
+          "USD"
         ],
         "source": {
           "fd": 1,
@@ -157,11 +159,9 @@
         }
       }
     },
-    "errors": {
-      "adform": []
-    },
     "responsetimemillis": {
-      "adform": "{{ adform.response_time_ms }}"
+      "adform": "{{ adform.response_time_ms }}",
+      "cache": "{{ cache.response_time_ms }}"
     }
   }
 }

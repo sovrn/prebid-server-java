@@ -1,13 +1,22 @@
 package org.prebid.server.spring.config;
 
+import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.ScheduledReporter;
+import com.codahale.metrics.SharedMetricRegistries;
 import com.codahale.metrics.graphite.Graphite;
 import com.codahale.metrics.graphite.GraphiteReporter;
 import com.izettle.metrics.influxdb.InfluxDbHttpSender;
 import com.izettle.metrics.influxdb.InfluxDbReporter;
 import com.izettle.metrics.influxdb.InfluxDbSender;
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.dropwizard.DropwizardExports;
+import io.prometheus.client.vertx.MetricsHandler;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpServer;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.ext.web.Router;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.metric.AccountMetricsVerbosity;
@@ -15,6 +24,7 @@ import org.prebid.server.metric.CounterType;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.metric.model.AccountMetricsVerbosityLevel;
 import org.prebid.server.vertx.CloseableAdapter;
+import org.prebid.server.vertx.ContextRunner;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,13 +46,16 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class MetricsConfiguration {
 
+    static final String METRIC_REGISTRY_NAME = "metric-registry";
+
     @Autowired(required = false)
     private List<ScheduledReporter> reporters = Collections.emptyList();
+
     @Autowired
     private Vertx vertx;
 
     @Bean
-    @ConditionalOnProperty(prefix = "metrics.graphite", name = "host")
+    @ConditionalOnProperty(prefix = "metrics.graphite", name = "enabled", havingValue = "true")
     ScheduledReporter graphiteReporter(GraphiteProperties graphiteProperties, MetricRegistry metricRegistry) {
         final Graphite graphite = new Graphite(graphiteProperties.getHost(), graphiteProperties.getPort());
         final ScheduledReporter reporter = GraphiteReporter.forRegistry(metricRegistry)
@@ -54,7 +67,7 @@ public class MetricsConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(prefix = "metrics.influxdb", name = "host")
+    @ConditionalOnProperty(prefix = "metrics.influxdb", name = "enabled", havingValue = "true")
     ScheduledReporter influxdbReporter(InfluxdbProperties influxdbProperties, MetricRegistry metricRegistry)
             throws Exception {
         final InfluxDbSender influxDbSender = new InfluxDbHttpSender(
@@ -74,6 +87,15 @@ public class MetricsConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "metrics.console", name = "enabled", havingValue = "true")
+    ScheduledReporter consoleReporter(ConsoleProperties consoleProperties, MetricRegistry metricRegistry) {
+        final ScheduledReporter reporter = ConsoleReporter.forRegistry(metricRegistry).build();
+        reporter.start(consoleProperties.getInterval(), TimeUnit.SECONDS);
+
+        return reporter;
+    }
+
+    @Bean
     Metrics metrics(@Value("${metrics.metricType}") CounterType counterType, MetricRegistry metricRegistry,
                     AccountMetricsVerbosity accountMetricsVerbosity) {
         return new Metrics(metricRegistry, counterType, accountMetricsVerbosity);
@@ -81,7 +103,7 @@ public class MetricsConfiguration {
 
     @Bean
     MetricRegistry metricRegistry() {
-        return new MetricRegistry();
+        return SharedMetricRegistries.getOrCreate(METRIC_REGISTRY_NAME);
     }
 
     @Bean
@@ -99,7 +121,7 @@ public class MetricsConfiguration {
 
     @Component
     @ConfigurationProperties(prefix = "metrics.graphite")
-    @ConditionalOnProperty(prefix = "metrics.graphite", name = "host")
+    @ConditionalOnProperty(prefix = "metrics.graphite", name = "enabled", havingValue = "true")
     @Validated
     @Data
     @NoArgsConstructor
@@ -118,7 +140,7 @@ public class MetricsConfiguration {
 
     @Component
     @ConfigurationProperties(prefix = "metrics.influxdb")
-    @ConditionalOnProperty(prefix = "metrics.influxdb", name = "host")
+    @ConditionalOnProperty(prefix = "metrics.influxdb", name = "enabled", havingValue = "true")
     @Validated
     @Data
     @NoArgsConstructor
@@ -148,6 +170,19 @@ public class MetricsConfiguration {
     }
 
     @Component
+    @ConfigurationProperties(prefix = "metrics.console")
+    @ConditionalOnProperty(prefix = "metrics.console", name = "enabled", havingValue = "true")
+    @Validated
+    @Data
+    @NoArgsConstructor
+    private static class ConsoleProperties {
+
+        @NotNull
+        @Min(1)
+        private Integer interval;
+    }
+
+    @Component
     @ConfigurationProperties(prefix = "metrics.accounts")
     @Validated
     @Data
@@ -158,5 +193,37 @@ public class MetricsConfiguration {
         private AccountMetricsVerbosityLevel defaultVerbosity;
         private List<String> basicVerbosity = new ArrayList<>();
         private List<String> detailedVerbosity = new ArrayList<>();
+    }
+
+    @Configuration
+    @ConditionalOnProperty(prefix = "metrics.prometheus", name = "port")
+    static class PrometheusServerConfiguration {
+        private static final Logger logger = LoggerFactory.getLogger(WebConfiguration.AdminServerConfiguration.class);
+
+        @Autowired
+        private ContextRunner contextRunner;
+
+        @Autowired
+        private Vertx vertx;
+
+        @Autowired
+        private MetricRegistry metricRegistry;
+
+        @Value("${metrics.prometheus.port}")
+        private int prometheusPort;
+
+        @PostConstruct
+        public void startPrometheusServer() {
+            logger.info("Starting Prometheus Server on port {0,number,#}", prometheusPort);
+            final Router router = Router.router(vertx);
+            router.route("/metrics").handler(new MetricsHandler());
+
+            CollectorRegistry.defaultRegistry.register(new DropwizardExports(metricRegistry));
+
+            contextRunner.<HttpServer>runOnServiceContext(future ->
+                    vertx.createHttpServer().requestHandler(router::accept).listen(prometheusPort, future));
+
+            logger.info("Successfully started Prometheus Server");
+        }
     }
 }

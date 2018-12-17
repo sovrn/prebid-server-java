@@ -27,7 +27,7 @@
       "width": 300,
       "height": 250,
       "cache_id": "9380cf5b-d1d3-4112-ae80-d4420052af3f",
-      "cache_url": "{{ cache_resource_url }}9380cf5b-d1d3-4112-ae80-d4420052af3f",
+      "cache_url": "{{ cache.resource_url }}9380cf5b-d1d3-4112-ae80-d4420052af3f",
       "response_time_ms": "{{ pulsepoint.response_time_ms }}",
       "ad_server_targeting": {
         "hb_pb": "5.70",
@@ -37,8 +37,7 @@
         "hb_size": "300x250",
         "hb_bidder_pulsepoint": "pulsepoint",
         "hb_bidder": "pulsepoint",
-        "hb_cache_id": "9380cf5b-d1d3-4112-ae80-d4420052af3f",
-        "hb_creative_loadtype": "html"
+        "hb_cache_id": "9380cf5b-d1d3-4112-ae80-d4420052af3f"
       }
     }
   ]

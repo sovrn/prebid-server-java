@@ -2,21 +2,12 @@ package org.prebid.server.spring.config;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
-import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.jdbc.JDBCClient;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
-import org.prebid.server.currency.CurrencyConversionService;
-import org.prebid.server.handler.CurrencyRatesHandler;
-import org.prebid.server.handler.SettingsCacheNotificationHandler;
-import org.prebid.server.handler.VersionHandler;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.CachingApplicationSettings;
@@ -42,7 +33,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
-import javax.annotation.PostConstruct;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
@@ -117,11 +107,12 @@ public class SettingsConfiguration {
 
         @Bean
         JDBCClient vertxJdbcClient(Vertx vertx, StoredRequestsDatabaseProperties storedRequestsDatabaseProperties) {
-            final String jdbcUrl = String.format("%s//%s:%d/%s?useSSL=false",
+            final String jdbcUrl = String.format("%s//%s:%d/%s?%s",
                     storedRequestsDatabaseProperties.getType().jdbcUrlPrefix,
                     storedRequestsDatabaseProperties.getHost(),
                     storedRequestsDatabaseProperties.getPort(),
-                    storedRequestsDatabaseProperties.getDbname());
+                    storedRequestsDatabaseProperties.getDbname(),
+                    storedRequestsDatabaseProperties.getType().jdbcUrlSuffix);
 
             return JDBCClient.createShared(vertx, new JsonObject()
                     .put("url", jdbcUrl)
@@ -160,11 +151,12 @@ public class SettingsConfiguration {
 
         @AllArgsConstructor
         private enum DbType {
-            postgres("jdbc:postgresql:", "org.postgresql.Driver"),
-            mysql("jdbc:mysql:", "com.mysql.cj.jdbc.Driver");
+            postgres("org.postgresql.Driver", "jdbc:postgresql:", "ssl=false&socketTimeout=1&tcpKeepAlive=true"),
+            mysql("com.mysql.cj.jdbc.Driver", "jdbc:mysql:", "useSSL=false&socketTimeout=1000&tcpKeepAlive=true");
 
-            private final String jdbcUrlPrefix;
             private final String jdbcDriver;
+            private final String jdbcUrlPrefix;
+            private final String jdbcUrlSuffix;
         }
     }
 
@@ -187,20 +179,6 @@ public class SettingsConfiguration {
             name = {"endpoint", "amp-endpoint", "refresh-rate", "timeout"})
     static class HttpPeriodicRefreshServiceConfiguration {
 
-        @Autowired
-        @Qualifier("settingsCache")
-        SettingsCache settingsCache;
-
-        @Autowired
-        @Qualifier("ampSettingsCache")
-        SettingsCache ampSettingsCache;
-
-        @Value("${settings.in-memory-cache.http-update.endpoint}")
-        String endpoint;
-
-        @Value("${settings.in-memory-cache.http-update.amp-endpoint}")
-        String ampEndpoint;
-
         @Value("${settings.in-memory-cache.http-update.refresh-rate}")
         long refreshPeriod;
 
@@ -213,27 +191,21 @@ public class SettingsConfiguration {
         @Autowired
         HttpClient httpClient;
 
-        @Autowired
-        ContextRunner contextRunner;
+        @Bean
+        public HttpPeriodicRefreshService httpPeriodicRefreshService(
+                @Value("${settings.in-memory-cache.http-update.endpoint}") String endpoint,
+                SettingsCache settingsCache) {
 
-        //FIXME - 05/11 required dependency for httpClient
-        @Autowired
-        Metrics metrics;
+            return new HttpPeriodicRefreshService(settingsCache, endpoint, refreshPeriod, timeout, vertx, httpClient);
+        }
 
-        @PostConstruct
-        public void httpPeriodicRefreshService() {
+        @Bean
+        public HttpPeriodicRefreshService ampHttpPeriodicRefreshService(
+                @Value("${settings.in-memory-cache.http-update.amp-endpoint}") String ampEndpoint,
+                SettingsCache ampSettingsCache) {
 
-            final HttpPeriodicRefreshService service = new HttpPeriodicRefreshService(settingsCache, endpoint,
-                    refreshPeriod, timeout, vertx, httpClient);
-
-            final HttpPeriodicRefreshService ampService = new HttpPeriodicRefreshService(ampSettingsCache, ampEndpoint,
-                    refreshPeriod, timeout, vertx, httpClient);
-
-            contextRunner.runOnServiceContext(future -> {
-                service.initialize();
-                ampService.initialize();
-                future.complete();
-            });
+            return new HttpPeriodicRefreshService(ampSettingsCache, ampEndpoint, refreshPeriod, timeout, vertx,
+                    httpClient);
         }
     }
 
@@ -322,81 +294,5 @@ public class SettingsConfiguration {
         @NotNull
         @Min(1)
         private Integer cacheSize;
-    }
-
-    @Configuration
-    @ConditionalOnProperty(prefix = "admin", name = "port")
-    public static class AdminServerConfiguration {
-
-        private static final Logger logger = LoggerFactory.getLogger(AdminServerConfiguration.class);
-
-        @Autowired
-        private ContextRunner contextRunner;
-
-        @Autowired
-        private Vertx vertx;
-
-        @Autowired
-        private BodyHandler bodyHandler;
-
-        @Autowired
-        private VersionHandler versionHandler;
-
-        @Autowired
-        private CurrencyRatesHandler currencyRatesHandler;
-
-        @Autowired(required = false)
-        private SettingsCacheNotificationHandler cacheNotificationHandler;
-
-        @Autowired(required = false)
-        private SettingsCacheNotificationHandler ampCacheNotificationHandler;
-
-        @Value("${admin.port}")
-        private int adminPort;
-
-        @Bean
-        @ConditionalOnProperty(prefix = "settings.in-memory-cache", name = "notification-endpoints-enabled",
-                havingValue = "true")
-        SettingsCacheNotificationHandler cacheNotificationHandler(SettingsCache settingsCache) {
-            return new SettingsCacheNotificationHandler(settingsCache);
-        }
-
-        @Bean
-        @ConditionalOnProperty(prefix = "settings.in-memory-cache", name = "notification-endpoints-enabled",
-                havingValue = "true")
-        SettingsCacheNotificationHandler ampCacheNotificationHandler(SettingsCache ampSettingsCache) {
-            return new SettingsCacheNotificationHandler(ampSettingsCache);
-        }
-
-        @Bean
-        VersionHandler versionHandler() {
-            return VersionHandler.create("git-revision.json");
-        }
-
-        @Bean
-        CurrencyRatesHandler currencyRatesHandler(CurrencyConversionService currencyConversionRates) {
-            return new CurrencyRatesHandler(currencyConversionRates);
-        }
-
-        @PostConstruct
-        public void startAdminServer() {
-            logger.info("Starting Admin Server to serve requests on port {0,number,#}", adminPort);
-
-            final Router router = Router.router(vertx);
-            router.route().handler(bodyHandler);
-            router.route("/version").handler(versionHandler);
-            router.route("/currency-rates").handler(currencyRatesHandler);
-            if (cacheNotificationHandler != null) {
-                router.route("/storedrequests/openrtb2").handler(cacheNotificationHandler);
-            }
-            if (ampCacheNotificationHandler != null) {
-                router.route("/storedrequests/amp").handler(ampCacheNotificationHandler);
-            }
-
-            contextRunner.<HttpServer>runOnServiceContext(future ->
-                    vertx.createHttpServer().requestHandler(router::accept).listen(adminPort, future));
-
-            logger.info("Successfully started Admin Server");
-        }
     }
 }

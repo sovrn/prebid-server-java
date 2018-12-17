@@ -29,6 +29,8 @@ public class CurrencyConversionService {
     private static final Logger logger = LoggerFactory.getLogger(CurrencyConversionService.class);
 
     private static final String DEFAULT_BID_CURRENCY = "USD";
+    //this number is chosen because of PriceGranularities default precision value of 2 + 1 for better accuracy
+    private static final int DEFAULT_PRICE_PRECISION = 3;
 
     private final String currencyServerUrl;
     private final long refreshPeriod;
@@ -128,30 +130,28 @@ public class CurrencyConversionService {
                                       String bidCurrency) {
         // use Default USD currency if bidder left this field empty. After, when bidder will implement multi currency
         // support it will be changed to throwing PrebidException.
-        if (bidCurrency == null) {
-            bidCurrency = DEFAULT_BID_CURRENCY;
-        }
+        final String effectiveBidCurrency = bidCurrency != null ? bidCurrency : DEFAULT_BID_CURRENCY;
 
-        if (Objects.equals(adServerCurrency, bidCurrency)) {
+        if (Objects.equals(adServerCurrency, effectiveBidCurrency)) {
             return price;
         }
 
         // get conversion rate from request currency rates if it is present
         BigDecimal conversionRate = null;
         if (requestCurrencyRates != null) {
-            conversionRate = getConversionRate(requestCurrencyRates, adServerCurrency, bidCurrency);
+            conversionRate = getConversionRate(requestCurrencyRates, adServerCurrency, effectiveBidCurrency);
         }
 
         // if conversion rate from requestCurrency was not found, try the same from latest currencies
         if (conversionRate == null) {
-            conversionRate = getConversionRate(latestCurrencyRates, adServerCurrency, bidCurrency);
+            conversionRate = getConversionRate(latestCurrencyRates, adServerCurrency, effectiveBidCurrency);
         }
 
         if (conversionRate == null) {
             throw new PreBidException("no currency conversion available");
         }
 
-        return price.divide(conversionRate, conversionRate.precision(), BigDecimal.ROUND_HALF_EVEN);
+        return price.divide(conversionRate, DEFAULT_PRICE_PRECISION, BigDecimal.ROUND_HALF_EVEN);
     }
 
     /**

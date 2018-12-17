@@ -40,6 +40,7 @@ import org.prebid.server.metric.model.MetricsContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseDebug;
 import org.prebid.server.proto.response.AmpResponse;
 import org.prebid.server.util.HttpUtil;
@@ -162,11 +163,17 @@ public class AmpHandler implements Handler<RoutingContext> {
                 .map(entry -> Tuple2.of(entry.getKey(), TextNode.valueOf(entry.getValue())))
                 .collect(Collectors.toMap(Tuple2::getLeft, Tuple2::getRight));
 
+        final ExtBidResponse extBidResponse = extResponseFrom(bidResponse);
+
         // fetch debug information from response if requested
         final ExtResponseDebug extResponseDebug = Objects.equals(bidRequest.getTest(), 1)
-                ? extResponseDebugFrom(bidResponse) : null;
+                ? extResponseDebugFrom(extBidResponse) : null;
 
-        return AmpResponse.of(targeting, extResponseDebug);
+        // fetch errors information from response if requested
+        final Map<String, List<ExtBidderError>> errors = Objects.equals(bidRequest.getTest(), 1)
+                ? errorsFrom(extBidResponse) : null;
+
+        return AmpResponse.of(targeting, extResponseDebug, errors);
     }
 
     private Map<String, String> targetingFrom(Bid bid, String bidder) {
@@ -216,7 +223,7 @@ public class AmpHandler implements Handler<RoutingContext> {
         }
     }
 
-    private static ExtResponseDebug extResponseDebugFrom(BidResponse bidResponse) {
+    private static ExtBidResponse extResponseFrom(BidResponse bidResponse) {
         final ExtBidResponse extBidResponse;
         try {
             extBidResponse = Json.mapper.convertValue(bidResponse.getExt(), EXT_BID_RESPONSE_TYPE_REFERENCE);
@@ -224,21 +231,27 @@ public class AmpHandler implements Handler<RoutingContext> {
             throw new PreBidException(
                     String.format("Critical error while unpacking AMP bid response: %s", e.getMessage()), e);
         }
+        return extBidResponse;
+    }
+
+    private static ExtResponseDebug extResponseDebugFrom(ExtBidResponse extBidResponse) {
         return extBidResponse != null ? extBidResponse.getDebug() : null;
+    }
+
+    private static Map<String, List<ExtBidderError>> errorsFrom(ExtBidResponse extBidResponse) {
+        return extBidResponse != null ? extBidResponse.getErrors() : null;
     }
 
     private void handleResult(AsyncResult<AmpResponse> responseResult, AmpEvent.AmpEventBuilder ampEventBuilder,
                               RoutingContext context, long startTime) {
+        final MetricName requestType = METRICS_CONTEXT.getRequestType();
+
         // don't send the response if client has gone
         if (context.response().closed()) {
-            logger.warn("The client already closed connection, response will be skipped.");
+            logger.warn("The client already closed connection, response will be skipped");
+            metrics.updateRequestTypeMetric(requestType, MetricName.networkerr);
             return;
         }
-
-        final MetricName requestType = METRICS_CONTEXT.getRequestType();
-        final MetricName requestStatus;
-        final int status;
-        final List<String> errorMessages;
 
         context.response().exceptionHandler(throwable -> handleResponseException(throwable, requestType));
 
@@ -249,6 +262,10 @@ public class AmpHandler implements Handler<RoutingContext> {
         context.response()
                 .putHeader("AMP-Access-Control-Allow-Source-Origin", origin)
                 .putHeader("Access-Control-Expose-Headers", "AMP-Access-Control-Allow-Source-Origin");
+
+        final MetricName requestStatus;
+        final int status;
+        final List<String> errorMessages;
 
         if (responseResult.succeeded()) {
             context.response().putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON);
@@ -297,7 +314,7 @@ public class AmpHandler implements Handler<RoutingContext> {
         }
         if (origin == null) {
             // Just to be safe
-            origin = ObjectUtils.firstNonNull(context.request().headers().get("Origin"), StringUtils.EMPTY);
+            origin = ObjectUtils.defaultIfNull(context.request().headers().get("Origin"), StringUtils.EMPTY);
         }
         return origin;
     }

@@ -11,11 +11,13 @@
           }
         ]
       },
+      "bidfloor": 20,
       "ext": {
         "adtelligent": {
           "aid": 1000,
           "placementId": 10,
-          "siteId": 1234
+          "siteId": 1234,
+          "bidFloor": 20
         }
       }
     }
@@ -25,6 +27,9 @@
     "page": "http://www.example.com",
     "publisher": {
       "id": "publisherId"
+    },
+    "ext": {
+      "amp": 0
     }
   },
   "device": {
@@ -50,7 +55,7 @@
   "at": 1,
   "tmax": 1000,
   "cur": [
-    "EUR"
+    "USD"
   ],
   "source": {
     "fd": 1,
@@ -63,10 +68,6 @@
   },
   "ext": {
     "prebid": {
-      "aliases": {
-        "appnexusAlias": "appnexus",
-        "conversantAlias": "conversant"
-      },
       "targeting": {
         "pricegranularity": {
           "precision": 2,

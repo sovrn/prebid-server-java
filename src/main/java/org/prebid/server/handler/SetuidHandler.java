@@ -12,6 +12,7 @@ import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.SetuidEvent;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
@@ -30,6 +31,7 @@ import java.util.Set;
 public class SetuidHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(SetuidHandler.class);
+
     private static final Set<GdprPurpose> GDPR_PURPOSES =
             Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess));
     private static final String BIDDER_PARAM = "bidder";
@@ -103,6 +105,12 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     private void handleResult(AsyncResult<GdprResponse> asyncResult, RoutingContext context,
                               UidsCookie uidsCookie, String account, String bidder, String gdprConsent, String ip) {
+        // don't send the response if client has gone
+        if (context.response().closed()) {
+            logger.warn("The client already closed connection, response will be skipped");
+            return;
+        }
+
         final boolean gdprProcessingFailed = asyncResult.failed();
         final GdprResponse gdprResponse = asyncResult.result();
         final boolean allowedCookie = !gdprProcessingFailed && gdprResponse.getVendorsToGdpr().values()
@@ -148,8 +156,15 @@ public class SetuidHandler implements Handler<RoutingContext> {
             final String body;
 
             if (gdprProcessingFailed) {
-                status = HttpResponseStatus.BAD_REQUEST.code();
-                body = asyncResult.cause().getMessage();
+                final Throwable exception = asyncResult.cause();
+                if (exception instanceof InvalidRequestException) {
+                    status = HttpResponseStatus.BAD_REQUEST.code();
+                    body = String.format("GDPR processing failed with error: %s", exception.getMessage());
+                } else {
+                    status = HttpResponseStatus.INTERNAL_SERVER_ERROR.code();
+                    body = "Unexpected GDPR processing error";
+                    logger.warn(body, exception);
+                }
             } else {
                 status = HttpResponseStatus.OK.code();
                 body = "The gdpr_consent param prevents cookies from being saved";

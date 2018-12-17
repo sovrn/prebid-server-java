@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -128,6 +129,20 @@ public class AuctionHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(500));
         verify(httpResponse).end(eq("Critical error while running the auction: Unexpected exception"));
+    }
+
+    @Test
+    public void shouldNotSendResponseIfClientClosedConnection() {
+        // given
+        given(auctionRequestFactory.fromRequest(any())).willReturn(Future.failedFuture(new RuntimeException()));
+
+        given(routingContext.response().closed()).willReturn(true);
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse, never()).end(anyString());
     }
 
     @Test
@@ -405,6 +420,24 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         verify(metrics, never()).updateRequestTypeMetric(eq(MetricName.openrtb2web), eq(MetricName.networkerr));
+    }
+
+    @Test
+    public void shouldUpdateNetworkErrorMetricIfClientClosedConnection() {
+        // given
+        given(auctionRequestFactory.fromRequest(any()))
+                .willReturn(Future.succeededFuture(BidRequest.builder().imp(emptyList()).build()));
+
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(BidResponse.builder().build()));
+
+        given(routingContext.response().closed()).willReturn(true);
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(metrics).updateRequestTypeMetric(eq(MetricName.openrtb2web), eq(MetricName.networkerr));
     }
 
     @Test

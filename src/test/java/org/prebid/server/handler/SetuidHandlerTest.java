@@ -22,6 +22,7 @@ import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
+import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
@@ -149,7 +150,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(400));
         verify(httpResponse).end(eq("\"account\" query param is required"));
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test
@@ -170,7 +170,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(200));
         verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test
@@ -192,7 +191,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(200));
         verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test
@@ -232,14 +230,13 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any());
         verify(httpResponse).setStatusCode(eq(200));
         verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test
-    public void shouldRespondWithErrorIfGdprProcessingFails() {
+    public void shouldRespondWithBadRequestStatusIfGdprProcessingFailsWithInvalidRequestException() {
         // given
         given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
-                .willReturn(Future.failedFuture("gdpr exception"));
+                .willReturn(Future.failedFuture(new InvalidRequestException("gdpr exception")));
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
@@ -254,8 +251,29 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(routingContext, never()).addCookie(any());
         verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end(eq("gdpr exception"));
-        verifyNoMoreInteractions(httpResponse);
+        verify(httpResponse).end(eq("GDPR processing failed with error: gdpr exception"));
+    }
+
+    @Test
+    public void shouldRespondWithInternalServerErrorStatusIfGdprProcessingFailsWithUnexpectedException() {
+        // given
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
+                .willReturn(Future.failedFuture("unexpected error"));
+
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(routingContext, never()).addCookie(any());
+        verify(httpResponse).setStatusCode(eq(500));
+        verify(httpResponse).end(eq("Unexpected GDPR processing error"));
     }
 
     @Test
@@ -444,6 +462,24 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         verify(metrics).updateCookieSyncBadRequestMetric();
+    }
+
+    @Test
+    public void shouldNotSendResponseIfClientClosedConnection() {
+        // given
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+        given(httpRequest.getParam("uid")).willReturn("uid");
+
+        given(routingContext.response().closed()).willReturn(true);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse, never()).end();
     }
 
     @Test
