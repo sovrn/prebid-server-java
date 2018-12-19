@@ -547,7 +547,7 @@ public class ExchangeServiceTest extends VertxTest {
         given(metaInfo1.info()).willReturn(givenBidderInfo(1, true));
         given(bidderCatalog.metaInfoByName("bidder1")).willReturn(metaInfo1);
 
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(1, false), null)));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("bidder1", 1)),
@@ -576,7 +576,7 @@ public class ExchangeServiceTest extends VertxTest {
         given(metaInfo1.info()).willReturn(givenBidderInfo(1, false));
         given(bidderCatalog.metaInfoByName("bidder1")).willReturn(metaInfo1);
 
-        given(gdprService.resultByVendor(any(), any(), any(), any(), any()))
+        given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(1, true), null)));
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("bidder1", 1)),

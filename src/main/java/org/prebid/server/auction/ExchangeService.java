@@ -271,7 +271,7 @@ public class ExchangeService {
         final ObjectNode userExtNode = removeBuyeruidsFromUserExtPrebid(extUser);
         final ExtRegs extRegs = extRegs(bidRequest.getRegs());
 
-        return getVendorsToGdprPermission(bidRequest, bidders, extUser, aliases, extRegs, timeout)
+        return getVendorsToGdprPermission(bidRequest, bidders, extUser, aliases, extRegs, timeout, context)
                 .map(gdprResponse -> makeBidderRequests(bidders, bidRequest, uidsBody, uidsCookie,
                         userExtNode, extRegs, aliases, imps, gdprResponse.getVendorsToGdpr()));
     }
