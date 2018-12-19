@@ -192,7 +192,7 @@ public class ServiceConfiguration {
         final HttpClientOptions options = new HttpClientOptions()
                 .setMaxPoolSize(maxPoolSize)
                 .setConnectTimeout(connectTimeoutMs);
-        return new BasicHttpClient(vertx.createHttpClient(options));
+        return new BasicHttpClient(vertx, vertx.createHttpClient(options));
     }
 
     @Bean
