@@ -289,7 +289,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .mediaTypes(asList("banner", "video"))
                                         .videoAdFormat("interstitial")
                                         .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
-                                        .adServerTargeting(singletonMap("key1", "value1"))
+                                        .adserverTargeting(singletonMap("key1", "value1"))
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
@@ -310,7 +310,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .mediaTypes(singletonList("video"))
                                         .videoAdFormat("mid-roll")
                                         .dimensions(singletonList(Dimensions.of(100, 200)))
-                                        .adServerTargeting(singletonMap("key22", "value22"))
+                                        .adserverTargeting(singletonMap("key22", "value22"))
                                         .bids(asList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
@@ -419,7 +419,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .mediaTypes(asList("banner", "video"))
                                         .videoAdFormat("interstitial")
                                         .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
-                                        .adServerTargeting(singletonMap("key1", "value1"))
+                                        .adserverTargeting(singletonMap("key1", "value1"))
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
@@ -440,7 +440,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .mediaTypes(singletonList("video"))
                                         .videoAdFormat("mid-roll")
                                         .dimensions(singletonList(Dimensions.of(100, 200)))
-                                        .adServerTargeting(singletonMap("key22", "value22"))
+                                        .adserverTargeting(singletonMap("key22", "value22"))
                                         .bids(asList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
@@ -750,6 +750,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .build())
                 .site(Site.builder()
                         .publisher(Publisher.builder().id("1234").build())
+                        .page("http://referer/page")
                         .build())
                 .imp(asList(
                         Imp.builder().id("impId1")
@@ -889,7 +890,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
-                .country("countryFromAuditCookie");
+                .country("countryFromAuditCookie")
+                .referrerUri("http://referer/page");
     }
 
     @SuppressWarnings("SameParameterValue")

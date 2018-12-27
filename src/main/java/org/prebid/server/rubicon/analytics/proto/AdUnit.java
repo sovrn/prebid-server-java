@@ -29,8 +29,8 @@ public class AdUnit {
     @JsonProperty("adUnitCode")
     String adUnitCode;
 
-    @JsonProperty("adServerTargeting")
-    Map<String, String> adServerTargeting;
+    @JsonProperty("adserverTargeting")
+    Map<String, String> adserverTargeting;
 
     List<Bid> bids;
 }

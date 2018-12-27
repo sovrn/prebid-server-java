@@ -257,7 +257,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(accountId, accountToAuctionEventCount, auctionEventCount)) {
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
-            postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, this::eventBuilderBaseFromDevice));
+            postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, this::eventBuilderBaseFromApp));
         }
     }
 
@@ -459,7 +459,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
                 .dimensions(dimensions(imp))
                 .adUnitCode(null) // does not apply to mobile ads
-                .adServerTargeting(targetingForImp(bids))
+                .adserverTargeting(targetingForImp(bids))
                 .bids(bids.stream().map(TwinBids::getAnalyticsBid).collect(Collectors.toList()))
                 .build();
     }
@@ -566,7 +566,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final BidType bidType = mediaTypeFromBid(bid);
         final String bidTypeString = mediaTypeString(bidType);
 
-        return eventBuilderBaseFromDevice(context, bidRequest)
+        return eventBuilderBaseFromApp(context, bidRequest)
                 .bidsWon(Collections.singletonList(BidWon.builder()
                         .transactionId(bid.getImpid())
                         .accountId(accountId)
@@ -634,7 +634,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     /**
      * Prepares event from request from mobile app.
      */
-    private Event.EventBuilder eventBuilderBaseFromDevice(RoutingContext context, BidRequest bidRequest) {
+    private Event.EventBuilder eventBuilderBaseFromApp(RoutingContext context, BidRequest bidRequest) {
         final App app = bidRequest.getApp();
         final ExtApp appExt = readExt(app.getExt(), ExtApp.class);
         final ExtAppPrebid appExtPrebid = appExt != null ? appExt.getPrebid() : null;
