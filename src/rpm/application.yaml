@@ -70,5 +70,10 @@ gdpr:
     filesystem-cache-dir: /app/prebid-server/data/vendorlist-cache
   geolocation:
     enabled: true
+    circuit-breaker:
+      enabled: true
+      opening-threshold: 10
+      opening-interval-ms: 2000
+      closing-interval-ms: 20000
   rubicon:
     enable-cookie: true
