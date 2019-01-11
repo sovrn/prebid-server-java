@@ -3,22 +3,21 @@ package org.prebid.server.spring.config.bidder;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
-import org.prebid.server.bidder.BidderRequester;
-import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.beachfront.BeachfrontBidder;
 import org.prebid.server.bidder.beachfront.BeachfrontMetaInfo;
 import org.prebid.server.bidder.beachfront.BeachfrontUsersyncer;
-import org.prebid.server.vertx.http.HttpClient;
+import org.prebid.server.spring.env.YamlPropertySourceFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 import java.util.List;
 
 @Configuration
+@PropertySource(value = "classpath:/bidder-config/beachfront.yaml", factory = YamlPropertySourceFactory.class)
 public class BeachfrontConfiguration extends BidderConfiguration {
 
     private static final String BIDDER_NAME = "beachfront";
@@ -48,8 +47,8 @@ public class BeachfrontConfiguration extends BidderConfiguration {
     private List<String> aliases;
 
     @Bean
-    BidderDeps beachfrontBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
-        return bidderDeps(httpClient, httpAdapterConnector);
+    BidderDeps beachfrontBidderDeps() {
+        return bidderDeps();
     }
 
     @Override
@@ -87,9 +86,4 @@ public class BeachfrontConfiguration extends BidderConfiguration {
         return null;
     }
 
-    @Override
-    protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
-                                                    Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpBidderRequester<>(bidder, httpClient);
-    }
 }

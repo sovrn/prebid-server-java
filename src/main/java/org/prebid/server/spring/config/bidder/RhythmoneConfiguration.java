@@ -3,50 +3,45 @@ package org.prebid.server.spring.config.bidder;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
-import org.prebid.server.bidder.BidderRequester;
-import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.rhythmone.RhythmoneBidder;
 import org.prebid.server.bidder.rhythmone.RhythmoneMetaInfo;
 import org.prebid.server.bidder.rhythmone.RhythmoneUsersyncer;
-import org.prebid.server.vertx.http.HttpClient;
+import org.prebid.server.spring.config.bidder.model.BidderConfigurationProperties;
+import org.prebid.server.spring.env.YamlPropertySourceFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 import java.util.List;
 
 @Configuration
+@PropertySource(value = "classpath:/bidder-config/rhythmone.yaml", factory = YamlPropertySourceFactory.class)
 public class RhythmoneConfiguration extends BidderConfiguration {
 
     private static final String BIDDER_NAME = "rhythmone";
 
-    @Value("${adapters.rhythmone.enabled}")
-    private boolean enabled;
-
-    @Value("${adapters.rhythmone.endpoint}")
-    private String endpoint;
-
-    @Value("${adapters.rhythmone.usersync-url}")
-    private String usersyncUrl;
-
-    @Value("${adapters.rhythmone.pbs-enforces-gdpr}")
-    private boolean pbsEnforcesGdpr;
-
-    @Value("${adapters.rhythmone.deprecated-names}")
-    private List<String> deprecatedNames;
-
-    @Value("${adapters.rhythmone.aliases}")
-    private List<String> aliases;
+    @Autowired
+    @Qualifier("rhythmoneConfigurationProperties")
+    private BidderConfigurationProperties configProperties;
 
     @Value("${external-url}")
     private String externalUrl;
 
+    @Bean("rhythmoneConfigurationProperties")
+    @ConfigurationProperties("adapters.rhythmone")
+    BidderConfigurationProperties configurationProperties() {
+        return new BidderConfigurationProperties();
+    }
+
     @Bean
-    BidderDeps rhythmOneBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
-        return bidderDeps(httpClient, httpAdapterConnector);
+    BidderDeps rhythmOneBidderDeps() {
+        return bidderDeps();
     }
 
     @Override
@@ -56,27 +51,27 @@ public class RhythmoneConfiguration extends BidderConfiguration {
 
     @Override
     protected List<String> deprecatedNames() {
-        return deprecatedNames;
+        return configProperties.getDeprecatedNames();
     }
 
     @Override
     protected List<String> aliases() {
-        return aliases;
+        return configProperties.getAliases();
     }
 
     @Override
     protected MetaInfo createMetaInfo() {
-        return new RhythmoneMetaInfo(enabled, pbsEnforcesGdpr);
+        return new RhythmoneMetaInfo(configProperties.getEnabled(), configProperties.getPbsEnforcesGdpr());
     }
 
     @Override
     protected Usersyncer createUsersyncer() {
-        return new RhythmoneUsersyncer(usersyncUrl, externalUrl);
+        return new RhythmoneUsersyncer(configProperties.getUsersyncUrl(), externalUrl);
     }
 
     @Override
     protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new RhythmoneBidder(endpoint);
+        return new RhythmoneBidder(configProperties.getEndpoint());
     }
 
     @Override
@@ -84,9 +79,4 @@ public class RhythmoneConfiguration extends BidderConfiguration {
         return null;
     }
 
-    @Override
-    protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
-                                                    Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpBidderRequester<>(bidder, httpClient);
-    }
 }

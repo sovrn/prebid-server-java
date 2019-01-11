@@ -3,50 +3,45 @@ package org.prebid.server.spring.config.bidder;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
-import org.prebid.server.bidder.BidderRequester;
-import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.openx.OpenxBidder;
 import org.prebid.server.bidder.openx.OpenxMetaInfo;
 import org.prebid.server.bidder.openx.OpenxUsersyncer;
-import org.prebid.server.vertx.http.HttpClient;
+import org.prebid.server.spring.config.bidder.model.BidderConfigurationProperties;
+import org.prebid.server.spring.env.YamlPropertySourceFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 import java.util.List;
 
 @Configuration
+@PropertySource(value = "classpath:/bidder-config/openx.yaml", factory = YamlPropertySourceFactory.class)
 public class OpenxConfiguration extends BidderConfiguration {
 
     private static final String BIDDER_NAME = "openx";
 
-    @Value("${adapters.openx.enabled}")
-    private boolean enabled;
-
-    @Value("${adapters.openx.endpoint}")
-    private String endpoint;
-
-    @Value("${adapters.openx.usersync-url}")
-    private String usersyncUrl;
-
-    @Value("${adapters.openx.pbs-enforces-gdpr}")
-    private boolean pbsEnforcesGdpr;
-
-    @Value("${adapters.openx.deprecated-names}")
-    private List<String> deprecatedNames;
-
-    @Value("${adapters.openx.aliases}")
-    private List<String> aliases;
+    @Autowired
+    @Qualifier("openxConfigurationProperties")
+    private BidderConfigurationProperties openxProperties;
 
     @Value("${external-url}")
     private String externalUrl;
 
+    @Bean("openxConfigurationProperties")
+    @ConfigurationProperties("adapters.openx")
+    BidderConfigurationProperties openxProperties() {
+        return new BidderConfigurationProperties();
+    }
+
     @Bean
-    BidderDeps openxBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
-        return bidderDeps(httpClient, httpAdapterConnector);
+    BidderDeps openxBidderDeps() {
+        return bidderDeps();
     }
 
     @Override
@@ -56,27 +51,27 @@ public class OpenxConfiguration extends BidderConfiguration {
 
     @Override
     protected List<String> deprecatedNames() {
-        return deprecatedNames;
+        return openxProperties.getDeprecatedNames();
     }
 
     @Override
     protected List<String> aliases() {
-        return aliases;
+        return openxProperties.getAliases();
     }
 
     @Override
     protected MetaInfo createMetaInfo() {
-        return new OpenxMetaInfo(enabled, pbsEnforcesGdpr);
+        return new OpenxMetaInfo(openxProperties.getEnabled(), openxProperties.getPbsEnforcesGdpr());
     }
 
     @Override
     protected Usersyncer createUsersyncer() {
-        return new OpenxUsersyncer(usersyncUrl, externalUrl);
+        return new OpenxUsersyncer(openxProperties.getUsersyncUrl(), externalUrl);
     }
 
     @Override
     protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new OpenxBidder(endpoint);
+        return new OpenxBidder(openxProperties.getEndpoint());
     }
 
     @Override
@@ -84,9 +79,4 @@ public class OpenxConfiguration extends BidderConfiguration {
         return null;
     }
 
-    @Override
-    protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
-                                                    Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpBidderRequester<>(bidder, httpClient);
-    }
 }

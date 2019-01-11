@@ -3,50 +3,45 @@ package org.prebid.server.spring.config.bidder;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderDeps;
-import org.prebid.server.bidder.BidderRequester;
-import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.grid.GridBidder;
 import org.prebid.server.bidder.grid.GridMetaInfo;
 import org.prebid.server.bidder.grid.GridUsersyncer;
-import org.prebid.server.vertx.http.HttpClient;
+import org.prebid.server.spring.config.bidder.model.BidderConfigurationProperties;
+import org.prebid.server.spring.env.YamlPropertySourceFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
 
 import java.util.List;
 
 @Configuration
+@PropertySource(value = "classpath:/bidder-config/grid.yaml", factory = YamlPropertySourceFactory.class)
 public class GridConfiguration extends BidderConfiguration {
 
     private static final String BIDDER_NAME = "grid";
 
-    @Value("${adapters.grid.enabled}")
-    private boolean enabled;
-
-    @Value("${adapters.grid.endpoint}")
-    private String endpoint;
-
-    @Value("${adapters.grid.usersync-url}")
-    private String usersyncUrl;
-
-    @Value("${adapters.grid.pbs-enforces-gdpr}")
-    private boolean pbsEnforcesGdpr;
-
-    @Value("${adapters.grid.deprecated-names}")
-    private List<String> deprecatedNames;
-
-    @Value("${adapters.grid.aliases}")
-    private List<String> aliases;
+    @Autowired
+    @Qualifier("gridConfigurationProperties")
+    private BidderConfigurationProperties configProperties;
 
     @Value("${external-url}")
     private String externalUrl;
 
+    @Bean("gridConfigurationProperties")
+    @ConfigurationProperties("adapters.grid")
+    BidderConfigurationProperties configurationProperties() {
+        return new BidderConfigurationProperties();
+    }
+
     @Bean
-    BidderDeps gridBidderDeps(HttpClient httpClient, HttpAdapterConnector httpAdapterConnector) {
-        return bidderDeps(httpClient, httpAdapterConnector);
+    BidderDeps gridBidderDeps() {
+        return bidderDeps();
     }
 
     @Override
@@ -56,27 +51,27 @@ public class GridConfiguration extends BidderConfiguration {
 
     @Override
     protected List<String> deprecatedNames() {
-        return deprecatedNames;
+        return configProperties.getDeprecatedNames();
     }
 
     @Override
     protected List<String> aliases() {
-        return aliases;
+        return configProperties.getAliases();
     }
 
     @Override
     protected MetaInfo createMetaInfo() {
-        return new GridMetaInfo(enabled, pbsEnforcesGdpr);
+        return new GridMetaInfo(configProperties.getEnabled(), configProperties.getPbsEnforcesGdpr());
     }
 
     @Override
     protected Usersyncer createUsersyncer() {
-        return new GridUsersyncer(usersyncUrl, externalUrl);
+        return new GridUsersyncer(configProperties.getUsersyncUrl(), externalUrl);
     }
 
     @Override
     protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new GridBidder(endpoint);
+        return new GridBidder(configProperties.getEndpoint());
     }
 
     @Override
@@ -84,9 +79,4 @@ public class GridConfiguration extends BidderConfiguration {
         return null;
     }
 
-    @Override
-    protected BidderRequester createBidderRequester(HttpClient httpClient, Bidder<?> bidder, Adapter<?, ?> adapter,
-                                                    Usersyncer usersyncer, HttpAdapterConnector httpAdapterConnector) {
-        return new HttpBidderRequester<>(bidder, httpClient);
-    }
 }
