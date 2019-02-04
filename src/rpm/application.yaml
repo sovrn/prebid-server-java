@@ -24,6 +24,7 @@ auction:
   ad-server-currency: USD
 metrics:
   graphite:
+    enabled: true
     host: graphite
     port: 3003
     interval: 60
