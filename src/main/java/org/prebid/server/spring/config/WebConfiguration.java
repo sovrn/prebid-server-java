@@ -244,6 +244,7 @@ public class WebConfiguration {
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             @Value("${cookie-sync.default-timeout-ms}") int defaultTimeoutMs,
             UidsCookieService uidsCookieService,
+            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
             BidderCatalog bidderCatalog,
             GdprService gdprService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
@@ -252,9 +253,8 @@ public class WebConfiguration {
             Metrics metrics,
             TimeoutFactory timeoutFactory) {
 
-        return new CookieSyncHandler(enableCookie, defaultTimeoutMs, uidsCookieService, bidderCatalog, gdprService,
-                hostVendorId,
-                useGeoLocation, analyticsReporter, metrics, timeoutFactory);
+        return new CookieSyncHandler(enableCookie, defaultTimeoutMs, uidsCookieService, uidsAuditCookieService,
+                bidderCatalog, gdprService, hostVendorId, useGeoLocation, analyticsReporter, metrics, timeoutFactory);
     }
 
     @Bean

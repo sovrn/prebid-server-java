@@ -18,6 +18,7 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprPurpose;
@@ -26,8 +27,10 @@ import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.request.CookieSyncRequest;
 import org.prebid.server.proto.response.BidderUsersyncStatus;
 import org.prebid.server.proto.response.CookieSyncResponse;
+import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.util.HttpUtil;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -45,8 +48,11 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     private static final Set<GdprPurpose> GDPR_PURPOSES =
             Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess));
 
+    private static final String RUBICON_BIDDER = "rubicon";
+
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
+    private final UidsAuditCookieService uidsAuditCookieService;
     private final BidderCatalog bidderCatalog;
     private final GdprService gdprService;
     private final Integer gdprHostVendorId;
@@ -56,12 +62,13 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     private final TimeoutFactory timeoutFactory;
 
     public CookieSyncHandler(boolean enableCookie, long defaultTimeout, UidsCookieService uidsCookieService,
-                             BidderCatalog bidderCatalog, GdprService gdprService, Integer gdprHostVendorId,
-                             boolean useGeoLocation, AnalyticsReporter analyticsReporter, Metrics metrics,
-                             TimeoutFactory timeoutFactory) {
+                             UidsAuditCookieService uidsAuditCookieService, BidderCatalog bidderCatalog,
+                             GdprService gdprService, Integer gdprHostVendorId, boolean useGeoLocation,
+                             AnalyticsReporter analyticsReporter, Metrics metrics, TimeoutFactory timeoutFactory) {
         this.enableCookie = enableCookie;
         this.defaultTimeout = defaultTimeout;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
+        this.uidsAuditCookieService = uidsAuditCookieService;
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.gdprService = Objects.requireNonNull(gdprService);
         this.gdprHostVendorId = gdprHostVendorId;
@@ -208,8 +215,11 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 .filter(Objects::nonNull) // skip bidder with live Uid
                 .collect(Collectors.toList());
 
+        final List<BidderUsersyncStatus> updatedBidderStatuses = updateBidderStatuses(context, bidderStatuses, gdpr,
+                gdprConsent, account);
+
         final CookieSyncResponse response = CookieSyncResponse.of(uidsCookie.hasLiveUids() ? "ok" : "no_cookie",
-                bidderStatuses);
+                updatedBidderStatuses);
 
         context.response()
                 .putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
@@ -217,7 +227,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
         analyticsReporter.processEvent(CookieSyncEvent.builder()
                 .status(HttpResponseStatus.OK.code())
-                .bidderStatus(bidderStatuses)
+                .bidderStatus(updatedBidderStatuses)
                 .build());
     }
 
@@ -261,5 +271,62 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
     private static BidderUsersyncStatus.BidderUsersyncStatusBuilder bidderStatusBuilder(String bidder) {
         return BidderUsersyncStatus.builder().bidder(bidder);
+    }
+
+    private List<BidderUsersyncStatus> updateBidderStatuses(RoutingContext context,
+                                                            List<BidderUsersyncStatus> bidderStatuses,
+                                                            String gdpr, String gdprConsent, String account) {
+        final List<BidderUsersyncStatus> result;
+        final boolean placeRubiconAtFirstPosition;
+
+        // This trick is just to satisfy bidders' needs for obtaining new UIDs.
+        // Problem: If incoming request has no "uids-audit" cookie but Rubicon bidder already has live UID
+        // (no need for usersync), then /setuid processing for all bidders will fail because of absent account ID.
+        // Solution: Add Rubicon bidder status to response (at the beginning position). This will carry out
+        // the account param to /setuid endpoint for Rubicon and creates "uids-audit" cookie.
+        final boolean uidsAuditCookieIsPresent = uidsAuditCookieIsPresent(context);
+        final boolean rubiconBidderStatusIsPresent = rubiconBidderStatusIsPresent(bidderStatuses);
+
+        if (!uidsAuditCookieIsPresent && !rubiconBidderStatusIsPresent && !bidderStatuses.isEmpty()) {
+            final Usersyncer usersyncer = bidderCatalog.usersyncerByName(RUBICON_BIDDER);
+            final List<BidderUsersyncStatus> updatedBidderStatuses = new ArrayList<>(bidderStatuses);
+
+            updatedBidderStatuses.add(bidderStatusBuilder(RUBICON_BIDDER) // first item in list
+                    .noCookie(true)
+                    .usersync(usersyncer.usersyncInfo().withGdpr(gdpr, gdprConsent).withAccount(account))
+                    .build());
+
+            result = updatedBidderStatuses;
+            placeRubiconAtFirstPosition = true;
+        } else {
+            result = bidderStatuses;
+            placeRubiconAtFirstPosition = rubiconBidderStatusIsPresent;
+        }
+
+        return placeRubiconAtFirstPosition ? placeRubiconAtFirstPosition(result) : result;
+    }
+
+    private boolean uidsAuditCookieIsPresent(RoutingContext context) {
+        try {
+            return uidsAuditCookieService != null && uidsAuditCookieService.getUidsAudit(context) != null;
+        } catch (PreBidException e) {
+            final String errorMessage = String.format("Error retrieving of audit cookie: %s", e.getMessage());
+            logger.warn(errorMessage);
+            return false;
+        }
+    }
+
+    private boolean rubiconBidderStatusIsPresent(List<BidderUsersyncStatus> bidderStatuses) {
+        return bidderStatuses.stream()
+                .map(BidderUsersyncStatus::getBidder)
+                .map(this::bidderNameFor)
+                .anyMatch(bidder -> Objects.equals(bidder, RUBICON_BIDDER));
+    }
+
+    private List<BidderUsersyncStatus> placeRubiconAtFirstPosition(List<BidderUsersyncStatus> bidderStatuses) {
+        bidderStatuses.sort((o1, o2) -> Objects.equals(bidderNameFor(o1.getBidder()), RUBICON_BIDDER) ? -1
+                : Objects.equals(bidderNameFor(o2.getBidder()), RUBICON_BIDDER) ? 1 : 0);
+
+        return bidderStatuses;
     }
 }
