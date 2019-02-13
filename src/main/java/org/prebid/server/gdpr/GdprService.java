@@ -2,6 +2,7 @@ package org.prebid.server.gdpr;
 
 import com.iab.gdpr.consent.VendorConsent;
 import com.iab.gdpr.consent.VendorConsentDecoder;
+import com.iab.gdpr.exception.VendorConsentParseException;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -176,7 +177,7 @@ public class GdprService {
         final Map<Integer, Boolean> result = new HashMap<>(vendorIds.size());
         for (Integer vendorId : vendorIds) {
             // confirm consent is allowed the vendor
-            final boolean vendorIsAllowed = vendorId != null && isVendorAllowed(vendorConsent, vendorId);
+            final boolean vendorIsAllowed = isVendorAllowed(vendorConsent, vendorIdToPurposes, vendorId);
 
             // confirm purposes
             final boolean purposesAreMatched = vendorIsAllowed
@@ -192,10 +193,15 @@ public class GdprService {
      * Checks if vendorId is in list of allowed vendors in consent string. Throws {@link InvalidRequestException}
      * in case of gdpr sdk throws {@link ArrayIndexOutOfBoundsException} when consent string is not valid.
      */
-    private static boolean isVendorAllowed(VendorConsent vendorConsent, Integer vendorId) {
+    private static boolean isVendorAllowed(VendorConsent vendorConsent, Map<Integer, Set<Integer>> vendorIdToPurposes,
+                                           Integer vendorId) {
+        if (vendorId == null || !vendorIdToPurposes.containsKey(vendorId)) {
+            return false;
+        }
+
         try {
             return vendorConsent.isVendorAllowed(vendorId);
-        } catch (ArrayIndexOutOfBoundsException ex) {
+        } catch (ArrayIndexOutOfBoundsException | VendorConsentParseException e) {
             throw new InvalidRequestException(
                     "Error when checking if vendor is allowed in a reason of invalid consent string");
         }

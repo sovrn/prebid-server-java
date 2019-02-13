@@ -42,7 +42,7 @@ cache:
   path: /cache
   query: uuid=%PBS_CACHE_UUID%
   banner-ttl-seconds: 300
-  video-ttl-seconds: 300
+  video-ttl-seconds: 900
 settings:
   database:
     type: mysql
