@@ -38,8 +38,10 @@ import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.rubicon.analytics.proto.AdUnit;
 import org.prebid.server.rubicon.analytics.proto.Auction;
+import org.prebid.server.rubicon.analytics.proto.BidError;
 import org.prebid.server.rubicon.analytics.proto.BidWon;
 import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
@@ -57,11 +59,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -383,6 +387,21 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .status("no-bid")
                                                         .source("server")
                                                         .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("impId6")
+                                        .status("error")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(800, 900)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("error")
+                                                        .error(BidError.timeoutError("Timeout error"))
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .build()))
                                         .build()),
                         1234, 1000L, true)))
                 .build());
@@ -512,6 +531,21 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .bidder("unknown")
                                                         .status("no-bid")
                                                         .source("server")
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("impId6")
+                                        .status("error")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(800, 900)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("error")
+                                                        .error(BidError.timeoutError("Timeout error"))
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
                                                         .build()))
                                         .build()),
                         1234, 1000L, true)))
@@ -725,6 +759,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .format(singletonList(Format.builder().w(600).h(700).build()))
                                         .build())
                                 .ext((ObjectNode) mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .build(),
+                        Imp.builder().id("impId6")
+                                .banner(Banner.builder()
+                                        .format(singletonList(Format.builder().w(800).h(900).build()))
+                                        .build())
+                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
                 .tmax(1000L)
                 .build();
@@ -795,12 +835,21 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .format(singletonList(Format.builder().w(600).h(700).build()))
                                         .build())
                                 .ext((ObjectNode) mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .build(),
+                        Imp.builder().id("impId6")
+                                .banner(Banner.builder()
+                                        .format(singletonList(Format.builder().w(800).h(900).build()))
+                                        .build())
+                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
                 .tmax(1000L)
                 .build();
     }
 
     private static BidResponse sampleBidResponse() {
+        final Map<String, List<ExtBidderError>> errors = singletonMap("appnexus",
+                singletonList(ExtBidderError.of(1, "Timeout error", singleton("impId6"))));
+
         return BidResponse.builder()
                 .seatbid(asList(
                         SeatBid.builder()
@@ -841,7 +890,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .build()))
                                 .build()))
                 .ext(mapper.valueToTree(
-                        ExtBidResponse.of(null, null, doubleMap("rubicon", 101, "appnexus", 202), null, null)))
+                        ExtBidResponse.of(null, errors, doubleMap("rubicon", 101, "appnexus", 202), null, null)))
                 .build();
     }
 

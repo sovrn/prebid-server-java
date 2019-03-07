@@ -3,16 +3,24 @@ package org.prebid.server.bidder.model;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
+import java.util.Set;
+
 /**
  * Represents any kind of error produced by bidder.
  */
-@Value
 @AllArgsConstructor(staticName = "of")
+@Value
 public class BidderError {
 
     String message;
 
     Type type;
+
+    Set<String> impIds;
+
+    public static BidderError of(String message, Type type) {
+        return BidderError.of(message, type, null);
+    }
 
     public static BidderError create(String message, Type type) {
         return BidderError.of(message, type);
@@ -80,6 +88,15 @@ public class BidderError {
 
         public Integer getCode() {
             return code;
+        }
+
+        public static Type getByCode(int code) {
+            for (Type type : values()) {
+                if (code == type.code) {
+                    return type;
+                }
+            }
+            return null;
         }
     }
 }

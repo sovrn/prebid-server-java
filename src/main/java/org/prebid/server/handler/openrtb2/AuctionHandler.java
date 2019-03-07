@@ -1,5 +1,7 @@
 package org.prebid.server.handler.openrtb2;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.response.BidResponse;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -29,6 +31,7 @@ import org.prebid.server.util.HttpUtil;
 
 import java.time.Clock;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -150,7 +153,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
         if (responseSucceeded) {
             context.response()
                     .putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
-                    .end(Json.encode(responseResult.result().getLeft()));
+                    .end(Json.encode(cleanImpIdsFromErrors(responseResult.result().getLeft())));
 
             requestStatus = MetricName.ok;
             status = HttpResponseStatus.OK.code();
@@ -190,5 +193,30 @@ public class AuctionHandler implements Handler<RoutingContext> {
     private void handleResponseException(Throwable throwable, MetricName requestType) {
         logger.warn("Failed to send auction response", throwable);
         metrics.updateRequestTypeMetric(requestType, MetricName.networkerr);
+    }
+
+    private static BidResponse cleanImpIdsFromErrors(BidResponse bidResponse) {
+        final ObjectNode objectNode = bidResponse.getExt();
+        if (objectNode == null) {
+            return bidResponse;
+        }
+
+        final JsonNode errorNodes = objectNode.get("errors");
+        if (errorNodes == null) {
+            return bidResponse;
+        }
+
+        final Iterator<JsonNode> errorNodesIterator = errorNodes.elements();
+        while (errorNodesIterator.hasNext()) {
+            final JsonNode errorNode = errorNodesIterator.next();
+
+            final Iterator<JsonNode> errorsIterator = errorNode.elements();
+            while (errorsIterator.hasNext()) {
+                final ObjectNode error = (ObjectNode) errorsIterator.next();
+                error.remove("imp_ids");
+            }
+        }
+
+        return bidResponse;
     }
 }

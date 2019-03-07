@@ -25,12 +25,14 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import lombok.Value;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.bidder.BidderCatalog;
+import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.cache.proto.response.BidCacheResponse;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
@@ -41,8 +43,10 @@ import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.rubicon.analytics.proto.AdUnit;
 import org.prebid.server.rubicon.analytics.proto.Auction;
+import org.prebid.server.rubicon.analytics.proto.BidError;
 import org.prebid.server.rubicon.analytics.proto.BidWon;
 import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
@@ -67,6 +71,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
@@ -83,6 +88,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private static final String SUCCESS_STATUS = "success";
     private static final String NO_BID_STATUS = "no-bid";
+    private static final String ERROR_STATUS = "error";
 
     private static final String RUBICON_BIDDER = "rubicon";
 
@@ -309,9 +315,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
 
             for (final Bid bid : seatBid.getBid()) {
-                impIdToBids.computeIfAbsent(bid.getImpid(), key -> new ArrayList<>())
-                        .add(toTwinBids(bidder, findImpById(bidRequest.getImp(), bid.getImpid()),
-                                bid, responseTime, serverHasUserId));
+                final String impId = bid.getImpid();
+                final Imp imp = findImpById(bidRequest.getImp(), impId);
+
+                impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
+                        .add(toTwinBids(bidder, imp, bid, SUCCESS_STATUS, null, responseTime, serverHasUserId));
             }
         }
     }
@@ -332,13 +340,50 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                     continue;
                 }
 
+                final BidError bidError = bidErrorFrom(extBidResponse, bidder, impId);
+                final String status = bidError != null ? ERROR_STATUS : NO_BID_STATUS;
+
                 final Integer responseTime = serverLatencyMillisFrom(extBidResponse, bidder);
                 final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
-                        .add(toTwinBids(bidder, imp, null, responseTime, serverHasUserId));
+                        .add(toTwinBids(bidder, imp, null, status, bidError, responseTime, serverHasUserId));
             }
         }
+    }
+
+    /**
+     * Determines {@link BidError} if possible or returns null.
+     */
+    private static BidError bidErrorFrom(ExtBidResponse extBidResponse, String bidder, String impId) {
+        final Map<String, List<ExtBidderError>> bidderToErrors = extBidResponse.getErrors();
+        final List<ExtBidderError> bidderErrors = bidderToErrors != null ? bidderToErrors.get(bidder) : null;
+        if (bidderErrors != null) {
+            for (ExtBidderError extBidderError : bidderErrors) {
+                final Set<String> impIds = extBidderError.getImpIds();
+                if (CollectionUtils.isNotEmpty(impIds) && impIds.contains(impId)) {
+                    return bidErrorFrom(extBidderError);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static BidError bidErrorFrom(ExtBidderError extBidderError) {
+        final BidError result;
+
+        final BidderError.Type errorType = BidderError.Type.getByCode(extBidderError.getCode());
+        if (errorType != null) {
+            if (errorType == BidderError.Type.timeout) {
+                result = BidError.timeoutError(extBidderError.getMessage());
+            } else {
+                result = BidError.requestError(extBidderError.getMessage());
+            }
+        } else {
+            result = null;
+        }
+
+        return result;
     }
 
     private static boolean analyticsBidExists(Map<String, List<TwinBids>> impIdToBids, String impId, String bidder) {
@@ -369,13 +414,16 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .orElse(null);
     }
 
-    private static TwinBids toTwinBids(String bidder, Imp imp, Bid bid, Integer serverLatencyMillis,
+    private static TwinBids toTwinBids(String bidder, Imp imp, Bid bid, String status,
+                                       BidError bidError,
+                                       Integer serverLatencyMillis,
                                        Boolean serverHasUserId) {
 
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                         .bidder(bidder)
-                        .status(bid != null ? SUCCESS_STATUS : NO_BID_STATUS)
+                        .status(status)
+                        .error(bidError)
                         .source(SERVER_SOURCE)
                         .serverLatencyMillis(serverLatencyMillis)
                         .serverHasUserId(serverHasUserId)
@@ -451,10 +499,14 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private static AdUnit toAdUnit(Imp imp, List<TwinBids> bids) {
         final boolean openrtbBidsFound = bids.stream().map(TwinBids::getOpenrtbBid).anyMatch(Objects::nonNull);
 
+        final boolean errorsFound = bids.stream().map(TwinBids::getAnalyticsBid)
+                .map(org.prebid.server.rubicon.analytics.proto.Bid::getError)
+                .anyMatch(Objects::nonNull);
+
         return AdUnit.builder()
                 .transactionId(imp.getId())
-                .status(openrtbBidsFound ? SUCCESS_STATUS : NO_BID_STATUS)
-                .error(null) // we do not have insight into any bid errors from here
+                .status(errorsFound ? ERROR_STATUS : openrtbBidsFound ? SUCCESS_STATUS : NO_BID_STATUS)
+                .error(null) // multiple errors may exist, we do not have insight what to choose
                 .mediaTypes(mediaTypesFromImp(imp))
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
                 .dimensions(dimensions(imp))

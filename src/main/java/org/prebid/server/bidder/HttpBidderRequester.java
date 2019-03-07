@@ -1,6 +1,8 @@
 package org.prebid.server.bidder;
 
 import com.iab.openrtb.request.BidRequest;
+import com.iab.openrtb.request.Imp;
+import com.iab.openrtb.response.Bid;
 import io.netty.channel.ConnectTimeoutException;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.CompositeFuture;
@@ -23,11 +25,12 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Implements HTTP communication functionality common for {@link Bidder}'s.
@@ -150,7 +153,7 @@ public class HttpBidderRequester {
                 .flatMap(bidderBid -> bidderBid.getValue().stream())
                 .collect(Collectors.toList());
 
-        final List<BidderError> bidderErrors = errors(previousErrors, calls, createdBids);
+        final List<BidderError> bidderErrors = errors(previousErrors, calls, createdBids, bidRequest);
 
         return BidderSeatBid.of(bids, httpCalls, bidderErrors);
     }
@@ -176,14 +179,90 @@ public class HttpBidderRequester {
     /**
      * Assembles all errors for {@link BidderSeatBid} into the list of {@link List}&lt;{@link BidderError}&gt;
      */
-    private static <R> List<BidderError> errors(List<BidderError> previousErrors, List<HttpCall<R>> calls,
-                                                List<Result<List<BidderBid>>> createdBids) {
-        final List<BidderError> bidderErrors = new ArrayList<>(previousErrors);
-        bidderErrors.addAll(
-                Stream.concat(
-                        createdBids.stream().flatMap(bidResult -> bidResult.getErrors().stream()),
-                        calls.stream().map(HttpCall::getError).filter(Objects::nonNull))
-                        .collect(Collectors.toList()));
+    private static <R> List<BidderError> errors(List<BidderError> requestErrors, List<HttpCall<R>> calls,
+                                                List<Result<List<BidderBid>>> createdBids,
+                                                BidRequest bidRequest) {
+
+        final Set<String> impIdsFromPrebidRequest = impIdsFromPrebidRequest(bidRequest);
+        final Set<String> impIdsFromExchangeRequests = impIdsFromExchangeRequests(calls);
+        final Set<String> requestErrorImpIds = subtract(impIdsFromPrebidRequest, impIdsFromExchangeRequests);
+        final List<BidderError> requestErrorsWithImpIds = populateImpIds(requestErrorImpIds, requestErrors);
+
+        final Set<String> httpErrorImpIds = httpErrorImpIds(calls);
+        final List<BidderError> httpErrors = httpErrors(calls);
+        final List<BidderError> httpErrorsWithImpIds = populateImpIds(httpErrorImpIds, httpErrors);
+
+        final Set<String> impIdsWithoutHttpErrors = subtract(impIdsFromExchangeRequests, httpErrorImpIds);
+        final Set<String> impIdsFromResponse = impIdsFromResponse(createdBids);
+        final Set<String> responseErrorImpIds = subtract(impIdsWithoutHttpErrors, impIdsFromResponse);
+        final List<BidderError> responseErrors = responseErrors(createdBids);
+        final List<BidderError> responseErrorsWithImpIds = populateImpIds(responseErrorImpIds, responseErrors);
+
+        final List<BidderError> bidderErrors = new ArrayList<>(requestErrorsWithImpIds);
+        bidderErrors.addAll(httpErrorsWithImpIds);
+        bidderErrors.addAll(responseErrorsWithImpIds);
         return bidderErrors;
+    }
+
+    private static Set<String> impIdsFromPrebidRequest(BidRequest bidRequest) {
+        return bidRequest.getImp().stream()
+                .map(Imp::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private static <R> Set<String> impIdsFromExchangeRequests(List<HttpCall<R>> calls) {
+        return calls.stream()
+                .map(call -> call.getRequest().getPayload())
+                .filter(BidRequest.class::isInstance)
+                .map(BidRequest.class::cast)
+                .flatMap(request -> request.getImp().stream())
+                .map(Imp::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private static Set<String> impIdsFromResponse(List<Result<List<BidderBid>>> createdBids) {
+        return createdBids.stream()
+                .flatMap(listResult -> listResult.getValue().stream())
+                .map(BidderBid::getBid)
+                .filter(Objects::nonNull)
+                .map(Bid::getImpid)
+                .collect(Collectors.toSet());
+    }
+
+    private static <R> Set<String> httpErrorImpIds(List<HttpCall<R>> calls) {
+        return calls.stream()
+                .filter(call -> call.getError() != null)
+                .map(call -> call.getRequest().getPayload())
+                .filter(BidRequest.class::isInstance)
+                .map(BidRequest.class::cast)
+                .flatMap(request -> request.getImp().stream())
+                .map(Imp::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private static <R> List<BidderError> httpErrors(List<HttpCall<R>> calls) {
+        return calls.stream()
+                .map(HttpCall::getError)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    private static List<BidderError> responseErrors(List<Result<List<BidderBid>>> createdBids) {
+        return createdBids.stream()
+                .flatMap(bidResult -> bidResult.getErrors().stream())
+                .collect(Collectors.toList());
+    }
+
+    private static List<BidderError> populateImpIds(Set<String> impIds, List<BidderError> errors) {
+        return errors.stream()
+                .map(error -> BidderError.of(error.getMessage(), error.getType(),
+                        CollectionUtils.isNotEmpty(impIds) ? impIds : null))
+                .collect(Collectors.toList());
+    }
+
+    private static Set<String> subtract(Set<String> first, Set<String> second) {
+        final Set<String> result = new HashSet<>(first);
+        result.removeAll(second);
+        return result;
     }
 }

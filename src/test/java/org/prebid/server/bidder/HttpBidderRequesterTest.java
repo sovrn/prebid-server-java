@@ -1,6 +1,7 @@
 package org.prebid.server.bidder;
 
 import com.iab.openrtb.request.BidRequest;
+import com.iab.openrtb.response.Bid;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.CaseInsensitiveHeaders;
@@ -187,12 +188,15 @@ public class HttpBidderRequesterTest {
 
         givenHttpClientReturnsResponse(200, "responseBody");
 
-        final List<BidderBid> bids = asList(BidderBid.of(null, null, null), BidderBid.of(null, null, null));
+        final List<BidderBid> bids = asList(
+                BidderBid.of(Bid.builder().impid("123").build(), null, null),
+                BidderBid.of(Bid.builder().impid("456").build(), null, null));
         given(bidder.makeBids(any(), any())).willReturn(Result.of(bids, emptyList()));
 
         // when
         final BidderSeatBid bidderSeatBid =
-                bidderHttpConnector.requestBids(bidder, BidRequest.builder().build(), timeout).result();
+                bidderHttpConnector.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(),
+                        timeout).result();
 
         // then
         assertThat(bidderSeatBid.getBids()).containsOnlyElementsOf(bids);
@@ -224,7 +228,8 @@ public class HttpBidderRequesterTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                bidderHttpConnector.requestBids(bidder, BidRequest.builder().test(1).build(), timeout).result();
+                bidderHttpConnector.requestBids(bidder, BidRequest.builder().imp(emptyList()).test(1).build(),
+                        timeout).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(2).containsOnly(
@@ -248,7 +253,8 @@ public class HttpBidderRequesterTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                bidderHttpConnector.requestBids(bidder, BidRequest.builder().test(1).build(), expiredTimeout).result();
+                bidderHttpConnector.requestBids(bidder, BidRequest.builder().imp(emptyList()).test(1).build(),
+                        expiredTimeout).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(1).containsOnly(
@@ -271,7 +277,8 @@ public class HttpBidderRequesterTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                bidderHttpConnector.requestBids(bidder, BidRequest.builder().test(1).build(), timeout).result();
+                bidderHttpConnector.requestBids(bidder, BidRequest.builder().imp(emptyList()).test(1).build(),
+                        timeout).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(1).containsOnly(
@@ -294,7 +301,8 @@ public class HttpBidderRequesterTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                bidderHttpConnector.requestBids(bidder, BidRequest.builder().test(1).build(), timeout).result();
+                bidderHttpConnector.requestBids(bidder, BidRequest.builder().imp(emptyList()).test(1).build(),
+                        timeout).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(1).containsOnly(
@@ -319,7 +327,8 @@ public class HttpBidderRequesterTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                bidderHttpConnector.requestBids(bidder, BidRequest.builder().build(), expiredTimeout).result();
+                bidderHttpConnector.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(),
+                        expiredTimeout).result();
 
         // then
         assertThat(bidderSeatBid.getErrors()).hasSize(1)
@@ -392,12 +401,12 @@ public class HttpBidderRequesterTest {
                 .willReturn(Future.succeededFuture(HttpClientResponse.of(200, null, EMPTY)));
 
         given(bidder.makeBids(any(), any())).willReturn(
-                Result.of(singletonList(BidderBid.of(null, null, null)),
+                Result.of(singletonList(BidderBid.of(Bid.builder().impid("123").build(), null, null)),
                         singletonList(BidderError.badServerResponse("makeBidsError"))));
 
         // when
         final BidderSeatBid bidderSeatBid = bidderHttpConnector
-                .requestBids(bidder, BidRequest.builder().test(1).build(), timeout)
+                .requestBids(bidder, BidRequest.builder().imp(emptyList()).test(1).build(), timeout)
                 .result();
 
         // then

@@ -12,6 +12,8 @@ public class Bid {
 
     String status;
 
+    BidError error;
+
     String source;
 
     @JsonProperty("serverLatencyMillis")

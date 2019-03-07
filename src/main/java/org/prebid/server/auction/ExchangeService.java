@@ -1180,8 +1180,10 @@ public class ExchangeService {
     }
 
     private static List<ExtBidderError> errorsDetails(List<BidderError> errors) {
-        return CollectionUtils.emptyIfNull(errors).stream().map(bidderError -> ExtBidderError.of(
-                bidderError.getType().getCode(), bidderError.getMessage())).collect(Collectors.toList());
+        return CollectionUtils.emptyIfNull(errors).stream()
+                .map(bidderError -> ExtBidderError.of(bidderError.getType().getCode(), bidderError.getMessage(),
+                        CollectionUtils.isNotEmpty(bidderError.getImpIds()) ? bidderError.getImpIds() : null))
+                .collect(Collectors.toList());
     }
 
     /**
