@@ -60,6 +60,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon.ExtImpRubiconBuilder;
+import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubiconDebug;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 
 import java.math.BigDecimal;
@@ -629,7 +630,7 @@ public class RubiconBidderTest extends VertxTest {
                 givenBidResponse(ONE));
 
         // when
-        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, givenBidRequest(identity()));
 
         // then
         assertThat(result.getErrors()).isEmpty();
@@ -645,7 +646,7 @@ public class RubiconBidderTest extends VertxTest {
                 givenBidResponse(ONE));
 
         // when
-        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, givenBidRequest(identity()));
 
         // then
         assertThat(result.getErrors()).isEmpty();
@@ -660,7 +661,7 @@ public class RubiconBidderTest extends VertxTest {
                 givenBidResponse(ZERO));
 
         // when
-        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, givenBidRequest(identity()));
 
         // then
         assertThat(result.getErrors()).isEmpty();
@@ -668,7 +669,7 @@ public class RubiconBidderTest extends VertxTest {
     }
 
     @Test
-    public void makeBidsShouldReturnBidWithPriceFromCpmOverride() throws JsonProcessingException {
+    public void makeBidsShouldReturnBidWithPriceFromCpmOverrideInRequest() throws JsonProcessingException {
         // given
         final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(mapper.valueToTree(
                 ExtBidRequest.of(null, ExtRequestRubicon.of(ExtRequestRubiconDebug.of(5.015f))))),
@@ -677,12 +678,68 @@ public class RubiconBidderTest extends VertxTest {
         final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest, givenBidResponse(ZERO));
 
         // when
-        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, null);
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, bidRequest);
 
         // then
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.getValue())
                 .containsOnly(BidderBid.of(Bid.builder().price(BigDecimal.valueOf(5.015f)).build(), video, "USD"));
+    }
+
+    @Test
+    public void makeBidsShouldReturnBidWithPriceFromCpmOverrideInImp() throws JsonProcessingException {
+        // given
+        final BidRequest bidRequest = givenBidRequest(builder -> builder.id("impId1"),
+                builder -> builder.debug(ExtImpRubiconDebug.of(5.015f)));
+
+        final String bidResponse = mapper.writeValueAsString(BidResponse.builder()
+                .seatbid(singletonList(SeatBid.builder()
+                        .bid(singletonList(Bid.builder()
+                                .impid("impId1")
+                                .price(ZERO)
+                                .build()))
+                        .build()))
+                .build());
+
+        final HttpCall<BidRequest> httpCall = givenHttpCall(givenBidRequest(identity()), bidResponse);
+
+        // when
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue())
+                .containsOnly(BidderBid.of(Bid.builder().impid("impId1").price(BigDecimal.valueOf(5.015f)).build(),
+                        banner, "USD"));
+    }
+
+    @Test
+    public void makeBidsShouldReturnBidWithPriceFromCpmOverrideInImpOverRequest() throws JsonProcessingException {
+        // given
+        final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(mapper.valueToTree(
+                ExtBidRequest.of(null, ExtRequestRubicon.of(ExtRequestRubiconDebug.of(1.048f))))),
+                builder -> builder.id("impId1"),
+                builder -> builder.debug(ExtImpRubiconDebug.of(5.015f)));
+
+        final String bidResponse = mapper.writeValueAsString(BidResponse.builder()
+                .seatbid(singletonList(SeatBid.builder()
+                        .bid(singletonList(Bid.builder()
+                                .impid("impId1")
+                                .price(ZERO)
+                                .build()))
+                        .build()))
+                .build());
+
+        final HttpCall<BidRequest> httpCall = givenHttpCall(givenBidRequest(identity()), bidResponse);
+
+        // when
+        final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue())
+                .containsOnly(BidderBid.of(Bid.builder().impid("impId1").price(BigDecimal.valueOf(5.015f)).build(),
+                        banner, "USD"));
     }
 
     @Test
