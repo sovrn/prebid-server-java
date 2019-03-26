@@ -37,6 +37,7 @@ analytics:
     sampling-factor:
       account:
         15946: 1
+        12108: 1
 cache:
   scheme: https
   path: /cache
