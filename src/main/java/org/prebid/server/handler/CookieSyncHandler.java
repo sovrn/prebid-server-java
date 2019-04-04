@@ -227,7 +227,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         updateCookieSyncMatchMetrics(bidders, bidderStatuses);
 
         List<BidderUsersyncStatus> updatedBidderStatuses;
-        if (limit != null && limit > 0 && limit < bidders.size()) {
+        if (limit != null && limit > 0 && limit < bidderStatuses.size()) {
             Collections.shuffle(bidderStatuses);
             updatedBidderStatuses = bidderStatuses.subList(0, limit);
         } else {
