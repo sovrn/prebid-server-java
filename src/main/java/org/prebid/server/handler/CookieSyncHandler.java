@@ -224,6 +224,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                         account))
                 .filter(Objects::nonNull) // skip bidder with live UID
                 .collect(Collectors.toList());
+        updateCookieSyncMatchMetrics(bidders, bidderStatuses);
 
         List<BidderUsersyncStatus> updatedBidderStatuses;
         if (limit != null && limit > 0 && limit < bidders.size()) {
@@ -255,6 +256,13 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 metrics.updateCookieSyncGenMetric(bidder);
             }
         }
+    }
+
+    private void updateCookieSyncMatchMetrics(Collection<String> syncBidders,
+                                              Collection<BidderUsersyncStatus> requiredUsersyncs) {
+        syncBidders.stream()
+                .filter(bidder -> requiredUsersyncs.stream().noneMatch(usersync -> bidder.equals(usersync.getBidder())))
+                .forEach(metrics::updateCookieSyncMatchesMetric);
     }
 
     /**

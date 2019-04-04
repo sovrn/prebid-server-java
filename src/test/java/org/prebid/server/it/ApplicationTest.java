@@ -93,7 +93,7 @@ public class ApplicationTest extends IntegrationTest {
                 .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=utf-8"))
                 .withHeader("Accept", equalTo("application/json"))
                 .withHeader("User-Agent", equalTo("userAgent"))
-                .withHeader("X-Request-Agent", equalTo("PrebidAdapter 0.1.2"))
+                .withHeader("X-Request-Agent", equalTo("PrebidAdapter 0.1.3"))
                 .withHeader("X-Forwarded-For", equalTo("192.168.244.1"))
                 .withHeader("Cookie", equalTo(
                         "uid=AF-UID;DigiTrust.v1.identity="
@@ -286,7 +286,7 @@ public class ApplicationTest extends IntegrationTest {
                 .withHeader("Content-Type", equalToIgnoreCase("application/json;charset=utf-8"))
                 .withHeader("Accept", equalTo("application/json"))
                 .withHeader("User-Agent", equalTo("userAgent"))
-                .withHeader("X-Request-Agent", equalTo("PrebidAdapter 0.1.2"))
+                .withHeader("X-Request-Agent", equalTo("PrebidAdapter 0.1.3"))
                 .withHeader("X-Forwarded-For", equalTo("192.168.244.1"))
                 .withHeader("Cookie", equalTo("uid=AF-UID;DigiTrust.v1.identity"
                         //{"id":"id","version":1,"keyv":123,"privacy":{"optout":true}}
@@ -519,6 +519,22 @@ public class ApplicationTest extends IntegrationTest {
         assertThat(uids.getUids().get("adnxs").getUid()).isEqualTo("12345");
         assertThat(uids.getUids().get("adnxs").getExpires().toInstant())
                 .isCloseTo(Instant.now().minus(5, ChronoUnit.MINUTES), within(10, ChronoUnit.SECONDS));
+    }
+
+    @Test
+    public void getuidsShouldReturnJsonWithUids() throws JSONException {
+        // given and when
+        final Response response = given(spec)
+                // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT","adnxs":"12345"},
+                // "bday":"2017-08-15T19:47:59.523908376Z"}
+                .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIiwiYWRueHMiOiIxMjM0"
+                        + "NSJ9LCJiZGF5IjoiMjAxNy0wOC0xNVQxOTo0Nzo1OS41MjM5MDgzNzZaIn0=")
+                .when()
+                .get("/getuids");
+
+        // then
+        JSONAssert.assertEquals("{\"buyeruids\":{\"rubicon\":\"J5VLCWQP-26-CWFT\",\"adnxs\":\"12345\"}}",
+                response.asString(), JSONCompareMode.NON_EXTENSIBLE);
     }
 
     @Test
