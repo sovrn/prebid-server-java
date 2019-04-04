@@ -4,6 +4,8 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
+import io.vertx.ext.web.Cookie;
+import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.UnsupportedEncodingException;
@@ -11,18 +13,37 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * This class consists of {@code static} utility methods for operating HTTP requests.
  */
 public final class HttpUtil {
 
-    private static final String APPLICATION_JSON =
-            HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
+    public static final String APPLICATION_JSON_CONTENT_TYPE =
+            HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "="
+                    + StandardCharsets.UTF_8.toString().toLowerCase();
 
     public static final CharSequence X_FORWARDED_FOR_HEADER = HttpHeaders.createOptimized("X-Forwarded-For");
     public static final CharSequence DNT_HEADER = HttpHeaders.createOptimized("DNT");
     public static final CharSequence X_REQUEST_AGENT_HEADER = HttpHeaders.createOptimized("X-Request-Agent");
+    public static final CharSequence ORIGIN_HEADER = HttpHeaders.createOptimized("Origin");
+    public static final CharSequence ACCEPT_HEADER = HttpHeaders.createOptimized("Accept");
+    public static final CharSequence CONTENT_TYPE_HEADER = HttpHeaders.createOptimized("Content-Type");
+    public static final CharSequence X_REQUESTED_WITH_HEADER = HttpHeaders.createOptimized("X-Requested-With");
+    public static final CharSequence REFERER_HEADER = HttpHeaders.createOptimized("Referer");
+    public static final CharSequence USER_AGENT_HEADER = HttpHeaders.createOptimized("User-Agent");
+    public static final CharSequence COOKIE_HEADER = HttpHeaders.createOptimized("Cookie");
+    public static final CharSequence ACCEPT_LANGUAGE_HEADER = HttpHeaders.createOptimized("Accept-Language");
+    public static final CharSequence SET_COOKIE_HEADER = HttpHeaders.createOptimized("Set-Cookie");
+    public static final CharSequence AUTHORIZATION_HEADER = HttpHeaders.createOptimized("Authorization");
+    public static final CharSequence DATE_HEADER = HttpHeaders.createOptimized("Date");
+    public static final CharSequence CACHE_CONTROL_HEADER = HttpHeaders.createOptimized("Cache-Control");
+    public static final CharSequence EXPIRES_HEADER = HttpHeaders.createOptimized("Expires");
+    public static final CharSequence PRAGMA_HEADER = HttpHeaders.createOptimized("Pragma");
+    public static final CharSequence LOCATION_HEADER = HttpHeaders.createOptimized("Location");
 
     private HttpUtil() {
     }
@@ -85,8 +106,8 @@ public final class HttpUtil {
      */
     public static MultiMap headers() {
         return MultiMap.caseInsensitiveMultiMap()
-                .add(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON)
-                .add(HttpHeaders.ACCEPT, HttpHeaderValues.APPLICATION_JSON);
+                .add(HttpUtil.CONTENT_TYPE_HEADER, APPLICATION_JSON_CONTENT_TYPE)
+                .add(HttpUtil.ACCEPT_HEADER, HttpHeaderValues.APPLICATION_JSON);
     }
 
     /**
@@ -124,5 +145,10 @@ public final class HttpUtil {
         } catch (MalformedURLException e) {
             return null;
         }
+    }
+
+    public static Map<String, String> cookiesAsMap(RoutingContext context) {
+        return context.cookies().stream()
+                .collect(Collectors.toMap(Cookie::getName, Cookie::getValue));
     }
 }

@@ -75,7 +75,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         if (!uidsCookie.allowsSync()) {
             final int status = HttpResponseStatus.UNAUTHORIZED.code();
             context.response().setStatusCode(status).end();
-            metrics.updateCookieSyncOptoutMetric();
+            metrics.updateUserSyncOptoutMetric();
             analyticsReporter.processEvent(SetuidEvent.error(status));
             return;
         }
@@ -99,7 +99,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private void respondWithMissingParamMessage(String param, RoutingContext context) {
         final int status = HttpResponseStatus.BAD_REQUEST.code();
         context.response().setStatusCode(status).end(String.format("\"%s\" query param is required", param));
-        metrics.updateCookieSyncBadRequestMetric();
+        metrics.updateUserSyncBadRequestMetric();
         analyticsReporter.processEvent(SetuidEvent.error(status));
     }
 
@@ -112,9 +112,11 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
 
         final boolean gdprProcessingFailed = asyncResult.failed();
-        final GdprResponse gdprResponse = asyncResult.result();
-        final boolean allowedCookie = !gdprProcessingFailed && gdprResponse.getVendorsToGdpr().values()
-                .iterator().next();
+        final GdprResponse gdprResponse = !gdprProcessingFailed ? asyncResult.result() : null;
+
+        // allow cookie only if user is not in GDPR scope or vendor passes GDPR check
+        final boolean allowedCookie = gdprResponse != null
+                && (!gdprResponse.isUserInGdprScope() || gdprResponse.getVendorsToGdpr().values().iterator().next());
 
         if (allowedCookie) {
             final UidAudit uidsAudit;
@@ -190,7 +192,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         } else {
             updatedUidsCookie = uidsCookie.updateUid(bidder, uid);
             successfullyUpdated = true;
-            metrics.updateCookieSyncSetsMetric(bidder);
+            metrics.updateUserSyncSetsMetric(bidder);
         }
 
         final Cookie cookie = uidsCookieService.toCookie(updatedUidsCookie);
@@ -206,7 +208,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
         context.response().setStatusCode(status).end(body);
-        metrics.updateCookieSyncGdprPreventMetric(bidder);
+        metrics.updateUserSyncGdprPreventMetric(bidder);
         analyticsReporter.processEvent(SetuidEvent.error(status));
     }
 }

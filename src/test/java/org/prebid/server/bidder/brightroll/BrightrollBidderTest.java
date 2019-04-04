@@ -13,7 +13,6 @@ import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.Json;
 import org.junit.Before;
@@ -32,6 +31,8 @@ import org.prebid.server.proto.openrtb.ext.request.brightroll.ExtImpBrightroll;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.util.HttpUtil;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -43,9 +44,6 @@ import static org.assertj.core.api.Assertions.tuple;
 
 public class BrightrollBidderTest extends VertxTest {
 
-
-    private static final String APPLICATION_JSON = HttpHeaderValues.APPLICATION_JSON.toString() + ";"
-            + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
     private static final String ENDPOINT_URL = "http://brightroll.com";
 
     private BrightrollBidder brightrollBidder;
@@ -64,7 +62,7 @@ public class BrightrollBidderTest extends VertxTest {
                         .banner(Banner.builder().build())
                         .ext(Json.mapper.valueToTree(ExtPrebid.of(null, ExtImpBrightroll.of("publisher")))).build()))
                 .device(Device.builder().ua("ua").ip("192.168.0.1").language("en").dnt(1).build())
-                .user(User.builder().ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                .user(User.builder().ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                 .regs(Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1))))
                 .build();
 
@@ -78,10 +76,11 @@ public class BrightrollBidderTest extends VertxTest {
                 .containsExactly("http://brightroll.com?publisher=publisher");
         assertThat(result.getValue()).flatExtracting(httpRequest -> httpRequest.getHeaders().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
-                .containsOnly(tuple(HttpHeaders.CONTENT_TYPE.toString(), APPLICATION_JSON),
-                        tuple(HttpHeaders.ACCEPT.toString(), HttpHeaderValues.APPLICATION_JSON.toString()),
-                        tuple(HttpHeaders.USER_AGENT.toString(), "ua"),
-                        tuple(HttpHeaders.ACCEPT_LANGUAGE.toString(), "en"),
+                .containsOnly(
+                        tuple(HttpUtil.CONTENT_TYPE_HEADER.toString(), HttpUtil.APPLICATION_JSON_CONTENT_TYPE),
+                        tuple(HttpUtil.ACCEPT_HEADER.toString(), HttpHeaderValues.APPLICATION_JSON.toString()),
+                        tuple(HttpUtil.USER_AGENT_HEADER.toString(), "ua"),
+                        tuple(HttpUtil.ACCEPT_LANGUAGE_HEADER.toString(), "en"),
                         tuple(HttpUtil.X_FORWARDED_FOR_HEADER.toString(), "192.168.0.1"),
                         tuple(HttpUtil.DNT_HEADER.toString(), "1"),
                         tuple("x-openrtb-version", "2.5"));
@@ -91,7 +90,7 @@ public class BrightrollBidderTest extends VertxTest {
                                 .ext(Json.mapper.valueToTree(ExtPrebid.of(null, ExtImpBrightroll.of("publisher"))))
                                 .build()))
                         .device(Device.builder().ua("ua").ip("192.168.0.1").language("en").dnt(1).build())
-                        .user(User.builder().ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                        .user(User.builder().ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                         .regs(Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1))))
                         .at(1)
                         .build()
@@ -109,10 +108,8 @@ public class BrightrollBidderTest extends VertxTest {
         final Result<List<HttpRequest<BidRequest>>> result = brightrollBidder.makeHttpRequests(bidRequest);
 
         // then
-        assertThat(result.getErrors()).hasSize(2)
-                .containsOnly(BidderError.badInput(
-                        "Brightroll only supports banner and video imps. Ignoring imp id=impId"),
-                        BidderError.badInput("No valid impression in the bid request"));
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly(BidderError.badInput("ext.bidder not provided"));
         assertThat(result.getValue()).isEmpty();
     }
 
@@ -196,6 +193,56 @@ public class BrightrollBidderTest extends VertxTest {
     }
 
     @Test
+    public void makeHttpRequestsShouldUpdateEachImpIfExtPublisherIsAdthrive() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(Arrays.asList(Imp.builder()
+                                .banner(Banner.builder().build())
+                                .ext(Json.mapper.valueToTree(ExtPrebid.of(null, ExtImpBrightroll.of("adthrive"))))
+                                .build(),
+                        Imp.builder()
+                                .video(Video.builder().build())
+                                .ext(Json.mapper.valueToTree(ExtPrebid.of(null, ExtImpBrightroll.of("adthrive"))))
+                                .build()))
+                .build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = brightrollBidder.makeHttpRequests(bidRequest);
+
+        // then
+        final List<Integer> expectedBattr = Arrays.asList(1, 2, 3, 6, 9, 10);
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue()).hasSize(1)
+                .extracting(httpRequest -> mapper.readValue(httpRequest.getBody(), BidRequest.class))
+                .flatExtracting(BidRequest::getImp).hasSize(2)
+                .extracting(Imp::getBanner, Imp::getVideo)
+                .containsOnly(
+                        tuple(Banner.builder().battr(expectedBattr).build(), null),
+                        tuple(null, Video.builder().battr(expectedBattr).build()));
+    }
+
+    @Test
+    public void makeHttpRequestsShouldSetRequestBcatIfExtPublisherIsAdthrive() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(Collections.singletonList(Imp.builder()
+                        .banner(Banner.builder().build())
+                        .ext(Json.mapper.valueToTree(ExtPrebid.of(null, ExtImpBrightroll.of("adthrive"))))
+                        .build()))
+                .build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = brightrollBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue()).hasSize(1)
+                .extracting(httpRequest -> mapper.readValue(httpRequest.getBody(), BidRequest.class))
+                .flatExtracting(BidRequest::getBcat)
+                .hasSize(42);
+    }
+
+    @Test
     public void makeHttpRequestShouldDropNotValidImpsFromRequest() throws JsonProcessingException {
         // given
         final BidRequest bidRequest = BidRequest.builder()
@@ -236,8 +283,9 @@ public class BrightrollBidderTest extends VertxTest {
         // then
         assertThat(result.getValue()).flatExtracting(httpRequest -> httpRequest.getHeaders().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
-                .containsOnly(tuple(HttpHeaders.CONTENT_TYPE.toString(), APPLICATION_JSON),
-                        tuple(HttpHeaders.ACCEPT.toString(), HttpHeaderValues.APPLICATION_JSON.toString()),
+                .containsOnly(
+                        tuple(HttpUtil.CONTENT_TYPE_HEADER.toString(), HttpUtil.APPLICATION_JSON_CONTENT_TYPE),
+                        tuple(HttpUtil.ACCEPT_HEADER.toString(), HttpHeaderValues.APPLICATION_JSON.toString()),
                         tuple("x-openrtb-version", "2.5"));
     }
 
@@ -278,7 +326,7 @@ public class BrightrollBidderTest extends VertxTest {
         // then
         assertThat(result.getValue()).flatExtracting(httpRequest -> httpRequest.getHeaders().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
-                .doesNotContain(tuple(HttpHeaders.USER_AGENT.toString(), "ua"));
+                .doesNotContain(tuple(HttpUtil.USER_AGENT_HEADER.toString(), "ua"));
     }
 
     @Test
@@ -318,7 +366,7 @@ public class BrightrollBidderTest extends VertxTest {
         // then
         assertThat(result.getValue()).flatExtracting(httpRequest -> httpRequest.getHeaders().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
-                .doesNotContain(tuple(HttpHeaders.ACCEPT_LANGUAGE.toString(), "en"));
+                .doesNotContain(tuple(HttpUtil.ACCEPT_LANGUAGE_HEADER.toString(), "en"));
     }
 
     @Test

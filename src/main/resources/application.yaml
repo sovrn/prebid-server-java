@@ -16,25 +16,32 @@ admin:
 http-client:
   max-pool-size: 4000
   connect-timeout-ms: 2500
+  use-compression: false
+  max-redirects: 0
 external-url: http://localhost:8000
-default-timeout-ms: 250
+default-timeout-ms: 900
 max-timeout-ms: 5000
+timeout-adjustment-ms: 30
 auction:
-  default-timeout-ms: 2000
+  default-timeout-ms: 900
   max-timeout-ms: 5000
+  timeout-adjustment-ms: 30
   stored-requests-timeout-ms: 50
   max-request-size: 262144
-  currency-rates-refresh-period-ms: 900000
-  currency-rates-url: https://cdn.jsdelivr.net/gh/prebid/currency-file@1/latest.json
   cache:
     expected-request-time-ms: 10
 amp:
   default-timeout-ms: 900
+  max-timeout-ms: 5000
   timeout-adjustment-ms: 30
 setuid:
   default-timeout-ms: 2000
 cookie-sync:
   default-timeout-ms: 2000
+currency-converter:
+  enabled: true
+  url: https://cdn.jsdelivr.net/gh/prebid/currency-file@1/latest.json
+  refresh-period-ms: 900000
 metrics:
   metricType: flushingCounter
   accounts:
@@ -59,4 +66,6 @@ gdpr:
     http-endpoint-template: https://vendorlist.consensu.org/v-{VERSION}/vendorlist.json
     http-default-timeout-ms: 2000
   geolocation:
-    enabled: false
+    enabled: true
+    maxmind:
+      db-archive-path: /maxmind_db.tar.gz

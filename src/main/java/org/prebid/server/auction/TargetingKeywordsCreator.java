@@ -38,6 +38,11 @@ public class TargetingKeywordsCreator {
      * It will exist only if the incoming bidRequest defiend request.app instead of request.site.
      */
     private static final String HB_ENV_KEY = "hb_env";
+
+    /**
+     * Stores win type url to support event notification.
+     */
+    private static final String HB_WIN_URL = "hb_winurl";
     /**
      * Name of the Bidder. For example, "appnexus" or "rubicon".
      */
@@ -67,7 +72,6 @@ public class TargetingKeywordsCreator {
 
     private static final String HB_CACHE_HOST = "hb_cache_host";
     private static final String HB_CACHE_PATH = "hb_cache_path";
-    private static final String HB_CACHE_HOSTPATH = "hb_cache_hostpath";
 
     private final PriceGranularity priceGranularity;
     private final boolean includeWinners;
@@ -119,14 +123,6 @@ public class TargetingKeywordsCreator {
     }
 
     /**
-     * Compares given price to computed CPM value according to the price granularity.
-     */
-    boolean isNonZeroCpm(BigDecimal price) {
-        final BigDecimal cpm = CpmRange.fromCpmAsNumber(price, priceGranularity);
-        return cpm != null && cpm.compareTo(BigDecimal.ZERO) != 0;
-    }
-
-    /**
      * Creates map of keywords for the given {@link Bid}.
      */
     public Map<String, String> makeFor(Bid bid, boolean winningBid) {
@@ -139,9 +135,9 @@ public class TargetingKeywordsCreator {
      */
     Map<String, String> makeFor(com.iab.openrtb.response.Bid bid, String bidder, boolean winningBid,
                                 String cacheId, String vastCacheId, String cacheHost, String cachePath,
-                                String cacheHostPath) {
+                                String winUrl) {
         return makeFor(bidder, winningBid, bid.getPrice(), "0.0", bid.getW(), bid.getH(), cacheId, vastCacheId,
-                bid.getDealid(), cacheHost, cachePath, cacheHostPath);
+                bid.getDealid(), cacheHost, cachePath, winUrl);
     }
 
     /**
@@ -149,7 +145,7 @@ public class TargetingKeywordsCreator {
      */
     private Map<String, String> makeFor(String bidder, boolean winningBid, BigDecimal price, String defaultCpm,
                                         Integer width, Integer height, String cacheId, String vastCacheId,
-                                        String dealId, String cacheHost, String cachePath, String cacheHostPath) {
+                                        String dealId, String cacheHost, String cachePath, String winUrl) {
         final String roundedCpm = isPriceGranularityValid() ? CpmRange.fromCpm(price, priceGranularity) : defaultCpm;
         final String hbSize = sizeFrom(width, height);
 
@@ -166,16 +162,19 @@ public class TargetingKeywordsCreator {
             keywordMap.put(HB_VAST_ID_KEY, vastCacheId);
         }
         if ((StringUtils.isNotBlank(vastCacheId) || StringUtils.isNotBlank(cacheId))
-                && (cacheHost != null && cachePath != null && cacheHostPath != null)) {
+                && (cacheHost != null && cachePath != null)) {
             keywordMap.put(HB_CACHE_HOST, cacheHost);
             keywordMap.put(HB_CACHE_PATH, cachePath);
-            keywordMap.put(HB_CACHE_HOSTPATH, cacheHostPath);
         }
         if (StringUtils.isNotBlank(dealId)) {
             keywordMap.put(HB_DEAL_KEY, dealId);
         }
         if (isApp) {
             keywordMap.put(HB_ENV_KEY, HB_ENV_APP_VALUE);
+        }
+
+        if (winningBid && winUrl != null) {
+            keywordMap.put(HB_WIN_URL, winUrl);
         }
 
         return keywordMap.asMap();

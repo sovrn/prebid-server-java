@@ -11,7 +11,6 @@ import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.response.BidResponse;
 import io.vertx.core.MultiMap;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
@@ -25,7 +24,6 @@ import org.prebid.server.auction.model.AdapterRequest;
 import org.prebid.server.auction.model.PreBidRequestContext;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.OpenrtbAdapter;
-import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.model.AdUnitBidWithParams;
 import org.prebid.server.bidder.model.AdapterHttpRequest;
 import org.prebid.server.bidder.model.ExchangeCall;
@@ -61,8 +59,8 @@ public class PubmaticAdapter extends OpenrtbAdapter {
 
     private final String endpointUrl;
 
-    public PubmaticAdapter(Usersyncer usersyncer, String endpointUrl) {
-        super(usersyncer);
+    public PubmaticAdapter(String cookieFamilyName, String endpointUrl) {
+        super(cookieFamilyName);
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl));
     }
 
@@ -70,7 +68,7 @@ public class PubmaticAdapter extends OpenrtbAdapter {
     public List<AdapterHttpRequest<BidRequest>> makeHttpRequests(AdapterRequest adapterRequest,
                                                                  PreBidRequestContext preBidRequestContext) {
         final MultiMap headers = headers()
-                .add(HttpHeaders.SET_COOKIE, makeUserCookie(preBidRequestContext));
+                .add(HttpUtil.SET_COOKIE_HEADER, makeUserCookie(preBidRequestContext));
 
         final BidRequest bidRequest = createBidRequest(adapterRequest, preBidRequestContext);
         final AdapterHttpRequest<BidRequest> httpRequest = AdapterHttpRequest.of(HttpMethod.POST, endpointUrl,
@@ -349,7 +347,7 @@ public class PubmaticAdapter extends OpenrtbAdapter {
 
     private String makeUserCookie(PreBidRequestContext preBidRequestContext) {
         final UidsCookie uidsCookie = preBidRequestContext.getUidsCookie();
-        final String cookieValue = uidsCookie != null ? uidsCookie.uidFrom(usersyncer.cookieFamilyName()) : null;
+        final String cookieValue = uidsCookie != null ? uidsCookie.uidFrom(cookieFamilyName) : null;
 
         return Cookie.cookie("KADUSERCOOKIE", ObjectUtils.firstNonNull(cookieValue, "")).encode();
     }

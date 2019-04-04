@@ -67,9 +67,8 @@ import static org.mockito.BDDMockito.given;
 public class IxAdapterTest extends VertxTest {
 
     private static final String BIDDER = "ix";
+    private static final String COOKIE_FAMILY = BIDDER;
     private static final String ENDPOINT_URL = "http://exchange.org/";
-    private static final String USERSYNC_URL = "//usersync.org/";
-    private static final String EXTERNAL_URL = "http://external.org/";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -81,15 +80,13 @@ public class IxAdapterTest extends VertxTest {
     private PreBidRequestContext preBidRequestContext;
     private ExchangeCall<BidRequest, BidResponse> exchangeCall;
     private IxAdapter adapter;
-    private IxUsersyncer usersyncer;
 
     @Before
     public void setUp() {
         adapterRequest = givenBidder(identity());
         preBidRequestContext = givenPreBidRequestContext(identity(), identity());
         exchangeCall = givenExchangeCall(identity(), identity());
-        usersyncer = new IxUsersyncer(USERSYNC_URL, EXTERNAL_URL);
-        adapter = new IxAdapter(usersyncer, ENDPOINT_URL);
+        adapter = new IxAdapter(COOKIE_FAMILY, ENDPOINT_URL);
     }
 
     @Test
@@ -97,13 +94,13 @@ public class IxAdapterTest extends VertxTest {
         assertThatNullPointerException().isThrownBy(
                 () -> new IxAdapter(null, null));
         assertThatNullPointerException().isThrownBy(
-                () -> new IxAdapter(usersyncer, null));
+                () -> new IxAdapter(COOKIE_FAMILY, null));
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new IxAdapter(usersyncer, "invalid_url"))
+                .isThrownBy(() -> new IxAdapter(COOKIE_FAMILY, "invalid_url"))
                 .withMessage("URL supplied is not valid: invalid_url");
     }
 
@@ -223,7 +220,7 @@ public class IxAdapterTest extends VertxTest {
                 builder -> builder
                         .timeoutMillis(1500L)
                         .tid("tid1")
-                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                         .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1))))
         );
 
@@ -265,7 +262,7 @@ public class IxAdapterTest extends VertxTest {
                                 .build())
                         .user(User.builder()
                                 .buyeruid("buyerUid1")
-                                .ext(mapper.valueToTree(ExtUser.of(null, "consent", null)))
+                                .ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null)))
                                 .build())
                         .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1))))
                         .source(Source.builder()

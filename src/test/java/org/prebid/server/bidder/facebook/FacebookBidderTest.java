@@ -36,7 +36,10 @@ import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
+import static org.assertj.core.api.Assertions.tuple;
 
 public class FacebookBidderTest extends VertxTest {
 
@@ -283,7 +286,7 @@ public class FacebookBidderTest extends VertxTest {
                                 .build())
                         .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpFacebook.of("pub1_placement1"))))
                         .build()))
-                .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                 .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1))))
                 .site(Site.builder()
                         .publisher(Publisher.builder().build())
@@ -307,7 +310,7 @@ public class FacebookBidderTest extends VertxTest {
                                         .build())
                                 .tagid("pub1_placement1")
                                 .build()))
-                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                         .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1))))
                         .site(Site.builder()
                                 .publisher(Publisher.builder()
@@ -329,7 +332,7 @@ public class FacebookBidderTest extends VertxTest {
                                 .build())
                         .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpFacebook.of("pub1_placement1"))))
                         .build()))
-                .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                 .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1))))
                 .app(App.builder()
                         .publisher(Publisher.builder().build())
@@ -353,7 +356,7 @@ public class FacebookBidderTest extends VertxTest {
                                         .build())
                                 .tagid("pub1_placement1")
                                 .build()))
-                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                         .regs(Regs.of(0, mapper.valueToTree(ExtRegs.of(1))))
                         .app(App.builder()
                                 .publisher(Publisher.builder()

@@ -85,8 +85,8 @@ import static org.mockito.BDDMockito.given;
 public class RubiconAdapterTest extends VertxTest {
 
     private static final String BIDDER = "rubicon";
+    private static final String COOKIE_FAMILY = BIDDER;
     private static final String ENDPOINT_URL = "http://exchange.org/";
-    private static final String USERSYNC_URL = "//usersync.org/";
     private static final String USER = "user";
     private static final String PASSWORD = "password";
 
@@ -100,28 +100,26 @@ public class RubiconAdapterTest extends VertxTest {
     private PreBidRequestContext preBidRequestContext;
     private ExchangeCall<BidRequest, BidResponse> exchangeCall;
     private RubiconAdapter adapter;
-    private RubiconUsersyncer usersyncer;
 
     @Before
     public void setUp() {
         adapterRequest = givenBidderCustomizable(identity(), identity());
         preBidRequestContext = givenPreBidRequestContextCustomizable(identity(), identity());
-        usersyncer = new RubiconUsersyncer(USERSYNC_URL);
-        adapter = new RubiconAdapter(usersyncer, ENDPOINT_URL, USER, PASSWORD);
+        adapter = new RubiconAdapter(COOKIE_FAMILY, ENDPOINT_URL, USER, PASSWORD);
     }
 
     @Test
     public void creationShouldFailOnNullArguments() {
         assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(null, null, null, null));
-        assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(usersyncer, null, null, null));
-        assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(usersyncer, ENDPOINT_URL, null, null));
-        assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(usersyncer, ENDPOINT_URL, USER, null));
+        assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(COOKIE_FAMILY, null, null, null));
+        assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(COOKIE_FAMILY, ENDPOINT_URL, null, null));
+        assertThatNullPointerException().isThrownBy(() -> new RubiconAdapter(COOKIE_FAMILY, ENDPOINT_URL, USER, null));
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpoints() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new RubiconAdapter(usersyncer, "invalid_url", USER, PASSWORD))
+                .isThrownBy(() -> new RubiconAdapter(COOKIE_FAMILY, "invalid_url", USER, PASSWORD))
                 .withMessage("URL supplied is not valid: invalid_url");
     }
 
@@ -335,7 +333,7 @@ public class RubiconAdapterTest extends VertxTest {
                                 .publisher(Publisher.builder()
                                         .ext(mapper.valueToTree(RubiconPubExt.of(RubiconPubExtRp.of(2001))))
                                         .build())
-                                .ext(mapper.valueToTree(RubiconSiteExt.of(RubiconSiteExtRp.of(3001))))
+                                .ext(mapper.valueToTree(RubiconSiteExt.of(RubiconSiteExtRp.of(3001), null)))
                                 .build())
                         .device(Device.builder()
                                 .ua("userAgent")
@@ -539,7 +537,7 @@ public class RubiconAdapterTest extends VertxTest {
         // given
         preBidRequestContext = givenPreBidRequestContextCustomizable(identity(),
                 builder -> builder
-                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null)))
+                        .user(User.builder().ext(mapper.valueToTree(ExtUser.of(null, "consent", null, null)))
                                 .build()));
 
         // when

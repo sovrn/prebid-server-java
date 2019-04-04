@@ -16,9 +16,18 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.entry;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -50,9 +59,8 @@ public class CompositeApplicationSettingsTest {
     @Test
     public void getAccountByIdShouldReturnAccountFromFirstDelegateIfPresent() {
         // given
-        final Account account = Account.of("accountId1", "low");
-        given(delegate1.getAccountById(anyString(), any()))
-                .willReturn(Future.succeededFuture(account));
+        final Account account = Account.of("accountId1", "low", null, null, null);
+        given(delegate1.getAccountById(anyString(), any())).willReturn(Future.succeededFuture(account));
 
         // when
         final Future<Account> future = compositeApplicationSettings.getAccountById("ignore", null);
@@ -69,7 +77,7 @@ public class CompositeApplicationSettingsTest {
         given(delegate1.getAccountById(anyString(), any()))
                 .willReturn(Future.failedFuture(new PreBidException("error1")));
 
-        final Account account = Account.of("accountId1", "low");
+        final Account account = Account.of("accountId1", "low", null, null, null);
         given(delegate2.getAccountById(anyString(), any()))
                 .willReturn(Future.succeededFuture(account));
 

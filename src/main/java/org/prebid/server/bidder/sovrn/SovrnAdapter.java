@@ -7,7 +7,6 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.User;
 import com.iab.openrtb.response.BidResponse;
 import io.vertx.core.MultiMap;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.Json;
 import io.vertx.ext.web.Cookie;
@@ -17,7 +16,6 @@ import org.prebid.server.auction.model.AdapterRequest;
 import org.prebid.server.auction.model.PreBidRequestContext;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.OpenrtbAdapter;
-import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.model.AdUnitBidWithParams;
 import org.prebid.server.bidder.model.AdapterHttpRequest;
 import org.prebid.server.bidder.model.ExchangeCall;
@@ -43,8 +41,8 @@ public class SovrnAdapter extends OpenrtbAdapter {
 
     private final String endpointUrl;
 
-    public SovrnAdapter(Usersyncer usersyncer, String endpointUrl) {
-        super(usersyncer);
+    public SovrnAdapter(String cookieFamilyName, String endpointUrl) {
+        super(cookieFamilyName);
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl));
     }
 
@@ -133,8 +131,9 @@ public class SovrnAdapter extends OpenrtbAdapter {
 
         final Device device = bidRequest.getDevice();
         if (device != null) {
-            HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpHeaders.USER_AGENT.toString(), device.getUa());
-            HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpHeaders.ACCEPT_LANGUAGE.toString(), device.getLanguage());
+            HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.USER_AGENT_HEADER.toString(), device.getUa());
+            HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.ACCEPT_LANGUAGE_HEADER.toString(),
+                    device.getLanguage());
             HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.X_FORWARDED_FOR_HEADER.toString(), device.getIp());
             HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.DNT_HEADER.toString(),
                     Objects.toString(device.getDnt(), null));
@@ -143,7 +142,7 @@ public class SovrnAdapter extends OpenrtbAdapter {
         final User user = bidRequest.getUser();
         final String buyeruid = user != null ? StringUtils.trimToNull(user.getBuyeruid()) : null;
         if (buyeruid != null) {
-            headers.add(HttpHeaders.COOKIE.toString(), Cookie.cookie(LJT_READER_COOKIE_NAME, buyeruid).encode());
+            headers.add(HttpUtil.COOKIE_HEADER.toString(), Cookie.cookie(LJT_READER_COOKIE_NAME, buyeruid).encode());
         }
         return headers;
     }

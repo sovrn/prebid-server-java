@@ -12,7 +12,6 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -22,6 +21,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AmpEvent;
+import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.ExchangeService;
@@ -68,7 +68,6 @@ public class AmpHandler implements Handler<RoutingContext> {
 
     private static final MetricsContext METRICS_CONTEXT = MetricsContext.of(MetricName.amp);
 
-    private final long defaultTimeout;
     private final AmpRequestFactory ampRequestFactory;
     private final ExchangeService exchangeService;
     private final UidsCookieService uidsCookieService;
@@ -80,12 +79,11 @@ public class AmpHandler implements Handler<RoutingContext> {
     private final Clock clock;
     private final TimeoutFactory timeoutFactory;
 
-    public AmpHandler(long defaultTimeout, AmpRequestFactory ampRequestFactory, ExchangeService exchangeService,
+    public AmpHandler(AmpRequestFactory ampRequestFactory, ExchangeService exchangeService,
                       UidsCookieService uidsCookieService, Set<String> biddersSupportingCustomTargeting,
                       BidderCatalog bidderCatalog, AnalyticsReporter analyticsReporter,
                       AmpResponsePostProcessor ampResponsePostProcessor, Metrics metrics, Clock clock,
                       TimeoutFactory timeoutFactory) {
-        this.defaultTimeout = defaultTimeout;
         this.ampRequestFactory = Objects.requireNonNull(ampRequestFactory);
         this.exchangeService = Objects.requireNonNull(exchangeService);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
@@ -106,14 +104,13 @@ public class AmpHandler implements Handler<RoutingContext> {
         // more accurately if we note the real start time, and use it to compute the auction timeout.
         final long startTime = clock.millis();
 
-        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpHeaders.USER_AGENT));
+        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpUtil.USER_AGENT_HEADER));
         metrics.updateSafariRequestsMetric(isSafari);
 
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
 
         final AmpEvent.AmpEventBuilder ampEventBuilder = AmpEvent.builder()
-                .context(context)
-                .uidsCookie(uidsCookie);
+                .httpContext(HttpContext.from(context));
 
         ampRequestFactory.fromRequest(context)
                 .map(bidRequest -> addToEvent(bidRequest, ampEventBuilder::bidRequest, bidRequest))
@@ -128,7 +125,7 @@ public class AmpHandler implements Handler<RoutingContext> {
                         toAmpResponse(result.getLeft(), result.getRight())))
                 .compose((Tuple3<BidRequest, BidResponse, AmpResponse> result) ->
                         ampResponsePostProcessor.postProcess(result.getLeft(), result.getMiddle(), result.getRight(),
-                                context.queryParams()))
+                                context))
                 .map(ampResponse -> addToEvent(ampResponse.getTargeting(), ampEventBuilder::targeting, ampResponse))
                 .setHandler(responseResult -> handleResult(responseResult, ampEventBuilder, context, startTime));
     }
@@ -146,8 +143,7 @@ public class AmpHandler implements Handler<RoutingContext> {
     }
 
     private Timeout timeout(BidRequest bidRequest, long startTime) {
-        final Long tmax = bidRequest.getTmax();
-        return timeoutFactory.create(startTime, tmax != null && tmax > 0 ? tmax : defaultTimeout);
+        return timeoutFactory.create(startTime, bidRequest.getTmax());
     }
 
     private AmpResponse toAmpResponse(BidRequest bidRequest, BidResponse bidResponse) {
@@ -268,7 +264,7 @@ public class AmpHandler implements Handler<RoutingContext> {
         final List<String> errorMessages;
 
         if (responseResult.succeeded()) {
-            context.response().putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON);
+            context.response().putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON);
             context.response().end(Json.encode(responseResult.result()));
 
             requestStatus = MetricName.ok;

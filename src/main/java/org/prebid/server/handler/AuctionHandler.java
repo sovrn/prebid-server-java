@@ -5,7 +5,6 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -21,7 +20,6 @@ import org.prebid.server.auction.model.Tuple3;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.proto.BidCacheResult;
@@ -34,6 +32,7 @@ import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.request.PreBidRequest;
 import org.prebid.server.proto.response.Bid;
+import org.prebid.server.proto.response.BidderInfo;
 import org.prebid.server.proto.response.BidderStatus;
 import org.prebid.server.proto.response.MediaType;
 import org.prebid.server.proto.response.PreBidResponse;
@@ -101,7 +100,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
     public void handle(RoutingContext context) {
         final long startTime = clock.millis();
 
-        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpHeaders.USER_AGENT));
+        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpUtil.USER_AGENT_HEADER));
 
         metrics.updateSafariRequestsMetric(isSafari);
 
@@ -202,8 +201,8 @@ public class AuctionHandler implements Handler<RoutingContext> {
         return bidderCatalog.usersyncerByName(adapterNameFor(name));
     }
 
-    private MetaInfo metaInfoByName(String name) {
-        return bidderCatalog.metaInfoByName(adapterNameFor(name));
+    private BidderInfo bidderInfoByName(String name) {
+        return bidderCatalog.bidderInfoByName(adapterNameFor(name));
     }
 
     private Future<Map<Integer, Boolean>> resolveVendorsToGdpr(PreBidRequestContext preBidRequestContext,
@@ -212,7 +211,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
         final Set<Integer> vendorIds = adapterResponses.stream()
                 .map(adapterResponse -> adapterResponse.getBidderStatus().getBidder())
                 .filter(this::isValidAdapterName)
-                .map(bidder -> metaInfoByName(bidder).info().getGdpr().getVendorId())
+                .map(bidder -> bidderInfoByName(bidder).getGdpr().getVendorId())
                 .collect(Collectors.toSet());
 
         final boolean hostVendorIdIsMissing = gdprHostVendorId != null && !vendorIds.contains(gdprHostVendorId);
@@ -274,7 +273,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
     }
 
     private BidderStatus updateBidderStatus(BidderStatus bidderStatus, Map<Integer, Boolean> vendorsToGdpr) {
-        final int vendorId = metaInfoByName(bidderStatus.getBidder()).info().getGdpr().getVendorId();
+        final int vendorId = bidderInfoByName(bidderStatus.getBidder()).getGdpr().getVendorId();
         return Objects.equals(vendorsToGdpr.get(vendorId), true)
                 ? bidderStatus
                 : bidderStatus.toBuilder().usersync(null).build();
@@ -417,8 +416,8 @@ public class AuctionHandler implements Handler<RoutingContext> {
         context.response().exceptionHandler(this::handleResponseException);
 
         context.response()
-                .putHeader(HttpHeaders.DATE, date())
-                .putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
+                .putHeader(HttpUtil.DATE_HEADER, date())
+                .putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON)
                 .end(Json.encode(response));
 
         metrics.updateRequestTimeMetric(clock.millis() - startTime);

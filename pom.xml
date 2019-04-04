@@ -27,17 +27,16 @@
         <maven.compiler.target>1.8</maven.compiler.target>
 
         <!-- dependencies versions -->
-        <!-- FIXME: downgrading spring boot version to 1.5.9 because of this issue: -->
-        <!-- https://github.com/spring-projects/spring-boot/issues/11951 -->
-        <!-- It should be safe to switch to 1.5.11 once it is released -->
-        <spring.boot.version>1.5.9.RELEASE</spring.boot.version>
+        <spring.boot.version>2.1.1.RELEASE</spring.boot.version>
+        <javax.annotation-api.version>1.3.1</javax.annotation-api.version>
         <validation-api.version>2.0.1.Final</validation-api.version>
         <hibernate-validator.version>6.0.7.Final</hibernate-validator.version>
-        <vertx.version>3.5.4</vertx.version>
-        <lombok.version>1.16.16</lombok.version>
+        <vertx.version>3.6.2</vertx.version>
+        <lombok.version>1.18.4</lombok.version>
         <commons.version>3.6</commons.version>
         <commons.collections.version>4.1</commons.collections.version>
-        <jackson.version>2.9.7</jackson.version>
+        <commons.compress.version>1.18</commons.compress.version>
+        <jackson.version>2.9.8</jackson.version>
         <json.schema.validator.version>0.1.7</json.schema.validator.version>
         <jsonpatch.version>1.9</jsonpatch.version>
         <mysql.version>6.0.6</mysql.version>
@@ -48,12 +47,13 @@
         <metrics-influxdb.version>1.2.2</metrics-influxdb.version>
         <consent-string-sdk.version>2.0.2</consent-string-sdk.version>
         <metrics-prometheus.version>0.5.0</metrics-prometheus.version>
+        <maxmind-client.version>2.12.0</maxmind-client.version>
         <commons-validator.version>1.6</commons-validator.version>
         <netacuity.version>6.0.1.0</netacuity.version>
 
         <!-- test dependencies versions -->
         <junit.version>4.12</junit.version>
-        <mockito.version>2.10.0</mockito.version>
+        <mockito.version>2.23.4</mockito.version>
         <assertj.version>3.8.0</assertj.version>
         <wiremock.version>2.11.0</wiremock.version>
         <restassured.version>3.0.6</restassured.version>
@@ -61,10 +61,12 @@
 
         <!-- plugin versions -->
         <checkstyle-plugin.version>2.17</checkstyle-plugin.version>
-        <checkstyle.version>7.6</checkstyle.version>
+        <checkstyle.version>8.18</checkstyle.version>
         <download-plugin.version>1.2.0</download-plugin.version>
-        <jacoco-plugin.version>0.8.0</jacoco-plugin.version>
+        <jacoco-plugin.version>0.8.2</jacoco-plugin.version>
         <git-commmit-plugin.version>2.2.4</git-commmit-plugin.version>
+        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>2.22.1</maven-surefire-plugin.version>
     </properties>
 
     <repositories>
@@ -99,6 +101,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
             <version>${spring.boot.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>${javax.annotation-api.version}</version>
         </dependency>
         <dependency>
             <groupId>javax.validation</groupId>
@@ -160,6 +167,11 @@
             <groupId>commons-validator</groupId>
             <artifactId>commons-validator</artifactId>
             <version>${commons-validator.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>${commons.compress.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -267,6 +279,11 @@
             <artifactId>netacuity-api</artifactId>
             <version>${netacuity.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.maxmind.geoip2</groupId>
+            <artifactId>geoip2</artifactId>
+            <version>${maxmind-client.version}</version>
+        </dependency>
         <!-- Test -->
         <dependency>
             <groupId>junit</groupId>
@@ -337,6 +354,16 @@
             <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-checkstyle-plugin</artifactId>
                     <version>${checkstyle-plugin.version}</version>
                     <configuration>
@@ -383,6 +410,7 @@
                 <version>${download-plugin.version}</version>
                 <executions>
                     <execution>
+                        <id>tld_names</id>
                         <phase>generate-resources</phase>
                         <goals>
                             <goal>wget</goal>
@@ -391,6 +419,18 @@
                             <url>https://publicsuffix.org/list/effective_tld_names.dat</url>
                             <outputDirectory>${project.build.outputDirectory}</outputDirectory>
                             <outputFileName>effective_tld_names.dat</outputFileName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>maxmind_db</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz</url>
+                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                            <outputFileName>maxmind_db.tar.gz</outputFileName>
                         </configuration>
                     </execution>
                 </executions>
@@ -565,4 +605,44 @@
             </plugin>
         </plugins>
     </reporting>
+    <profiles>
+        <profile>
+            <id>java11</id>
+            <activation>
+                <jdk>[11,)</jdk>
+            </activation>
+            <properties>
+                <maven.compiler.source>11</maven.compiler.source>
+                <maven.compiler.target>11</maven.compiler.target>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <!--
+                             These are needed to silence warnings caused by:
+                                * 1 - jackson-afterburner
+                                * the rest - groovy
+                             Keep an eye on those dependencies and update their version as soon as they properly support
+                             Java 11. After this following arguments could be safely removed.
+                             -->
+                            <argLine>
+                                --add-opens java.base/java.lang=ALL-UNNAMED
+                                --add-opens java.base/java.lang.invoke=ALL-UNNAMED
+                                --add-opens java.base/java.lang.reflect=ALL-UNNAMED
+                                --add-opens java.base/java.util=ALL-UNNAMED
+                                --add-opens java.base/java.util.regex=ALL-UNNAMED
+                                --add-opens java.base/java.net=ALL-UNNAMED
+                                --add-opens java.base/java.io=ALL-UNNAMED
+                                --add-opens java.base/java.math=ALL-UNNAMED
+                                --add-opens java.base/sun.net.spi=ALL-UNNAMED
+                            </argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

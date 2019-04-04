@@ -66,7 +66,9 @@ import java.util.stream.Collectors;
 import static io.vertx.core.http.HttpMethod.GET;
 import static io.vertx.core.http.HttpMethod.POST;
 import static java.util.Arrays.asList;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,7 +78,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class HttpAdapterConnectorTest extends VertxTest {
 
@@ -90,8 +94,9 @@ public class HttpAdapterConnectorTest extends VertxTest {
 
     @Mock
     private Adapter<?, ?> adapter;
-    @Mock
+
     private Usersyncer usersyncer;
+
     @Mock
     private UidsCookie uidsCookie;
 
@@ -110,7 +115,7 @@ public class HttpAdapterConnectorTest extends VertxTest {
 
         httpAdapterConnector = new HttpAdapterConnector(httpClient, clock);
 
-        given(usersyncer.usersyncInfo()).willReturn(UsersyncInfo.of("", null, null));
+        usersyncer = new Usersyncer(null, "", "", null, null, false);
     }
 
     @Test
@@ -563,8 +568,7 @@ public class HttpAdapterConnectorTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200,
                 givenBidResponse(identity(), identity(), singletonList(identity())));
-
-        given(usersyncer.usersyncInfo()).willReturn(UsersyncInfo.of("url1", null, false));
+        usersyncer = new Usersyncer(null, "url1", null, null, null, false);
 
         // when
         final Future<AdapterResponse> adapterResponseFuture =
@@ -583,16 +587,15 @@ public class HttpAdapterConnectorTest extends VertxTest {
         // given
         final Regs regs = Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1)));
         final User user = User.builder()
-                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null)))
+                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null, null)))
                 .build();
         preBidRequestContext = givenPreBidRequestContext(identity(), builder -> builder.regs(regs).user(user));
 
         givenHttpClientReturnsResponse(200,
                 givenBidResponse(identity(), identity(), singletonList(identity())));
 
-        given(usersyncer.usersyncInfo()).willReturn(
-                UsersyncInfo.of("http://url?redir=%26gdpr%3D{{gdpr}}%26gdpr_consent%3D{{gdpr_consent}}",
-                        null, false));
+        usersyncer = new Usersyncer(null, "http://url?redir=%26gdpr%3D{{gdpr}}%26gdpr_consent%3D{{gdpr_consent}}",
+                null, null, null, false);
 
         // when
         final Future<AdapterResponse> adapterResponseFuture =
@@ -612,16 +615,15 @@ public class HttpAdapterConnectorTest extends VertxTest {
         // given
         final Regs regs = Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1)));
         final User user = User.builder()
-                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null)))
+                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null, null)))
                 .build();
         preBidRequestContext = givenPreBidRequestContext(identity(), builder -> builder.regs(regs).user(user).accountId("account"));
 
         givenHttpClientReturnsResponse(200,
                 givenBidResponse(identity(), identity(), singletonList(identity())));
 
-        given(usersyncer.usersyncInfo()).willReturn(
-                UsersyncInfo.of("http://url?redir=%26account%3D{{account}}%26gdpr%3D{{gdpr}}%26gdpr_consent%3D{{gdpr_consent}}",
-                        null, false));
+        usersyncer = new Usersyncer(null, "http://url?redir=%26account%3Daccount%26gdpr%3D1%26gdpr_consent%3Dconsent%241",
+                null, null, null, false);
 
         // when
         final Future<AdapterResponse> adapterResponseFuture =

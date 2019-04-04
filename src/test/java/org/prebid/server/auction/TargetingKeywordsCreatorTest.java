@@ -249,21 +249,6 @@ public class TargetingKeywordsCreatorTest {
     }
 
     @Test
-    public void isNonZeroCpmShouldReturnFalse() {
-        assertThat(TargetingKeywordsCreator.create(
-                ExtPriceGranularity.of(2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(20),
-                        BigDecimal.valueOf(0.1)))), true, true, false)
-                .isNonZeroCpm(BigDecimal.ZERO)).isFalse();
-    }
-
-    @Test
-    public void isNonZeroCpmShouldReturnTrue() {
-        assertThat(TargetingKeywordsCreator.create(ExtPriceGranularity.of(2, singletonList(ExtGranularityRange.of(
-                BigDecimal.valueOf(20), BigDecimal.valueOf(0.1)))), true, true, false)
-                .isNonZeroCpm(BigDecimal.ONE)).isTrue();
-    }
-
-    @Test
     public void shouldNotIncludeWinningBidTargetingIfIncludeWinnersFlagIsFalse() {
         // given
         final com.iab.openrtb.response.Bid bid = com.iab.openrtb.response.Bid.builder().price(BigDecimal.ONE).build();
@@ -313,5 +298,20 @@ public class TargetingKeywordsCreatorTest {
 
         // then
         assertThat(keywords).containsKeys("hb_bidder_bidder1", "hb_pb_bidder1");
+    }
+
+    @Test
+    public void shouldIncludeWinUrlWhenWinUrlIsNotNullAndBidIsWinning() {
+        // given
+        final com.iab.openrtb.response.Bid bid = com.iab.openrtb.response.Bid.builder().price(BigDecimal.ONE).build();
+
+        // when
+        final Map<String, String> keywords = TargetingKeywordsCreator.create((String) null, true, true, false)
+                .makeFor(bid, "bidder1", true, null, null, null, null, "http://extetranlUrl");
+
+        // then
+        assertThat(keywords).contains(
+                entry("hb_winurl", "http://extetranlUrl"),
+                entry("hb_winurl_bidder1", "http://extetranlUrl"));
     }
 }

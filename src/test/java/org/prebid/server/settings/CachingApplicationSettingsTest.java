@@ -18,9 +18,18 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -49,7 +58,7 @@ public class CachingApplicationSettingsTest {
     public void getAccountByIdShouldReturnResultFromCacheOnSuccessiveCalls() {
         // given
         given(applicationSettings.getAccountById(eq("accountId"), same(timeout)))
-                .willReturn(Future.succeededFuture(Account.of("accountId", "med")));
+                .willReturn(Future.succeededFuture(Account.of("accountId", "med", null, null, null)));
 
         // when
         final Future<Account> future = cachingApplicationSettings.getAccountById("accountId", timeout);
@@ -57,7 +66,7 @@ public class CachingApplicationSettingsTest {
 
         // then
         assertThat(future.succeeded()).isTrue();
-        assertThat(future.result()).isEqualTo(Account.of("accountId", "med"));
+        assertThat(future.result()).isEqualTo(Account.of("accountId", "med", null, null, null));
         verify(applicationSettings).getAccountById(eq("accountId"), same(timeout));
         verifyNoMoreInteractions(applicationSettings);
     }

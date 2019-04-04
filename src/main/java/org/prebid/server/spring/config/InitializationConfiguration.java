@@ -3,6 +3,7 @@ package org.prebid.server.spring.config;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.settings.service.HttpPeriodicRefreshService;
+import org.prebid.server.settings.service.JdbcPeriodicRefreshService;
 import org.prebid.server.vertx.ContextRunner;
 import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.ObjectProvider;
@@ -32,7 +33,7 @@ public class InitializationConfiguration {
     private ContextRunner contextRunner;
 
     @Autowired
-    private CurrencyConversionService currencyConversionService;
+    private ObjectProvider<CurrencyConversionService> currencyConversionServiceProvider;
 
     @Autowired
     @Qualifier("httpPeriodicRefreshService")
@@ -42,22 +43,44 @@ public class InitializationConfiguration {
     @Qualifier("ampHttpPeriodicRefreshService")
     private ObjectProvider<HttpPeriodicRefreshService> ampHttpPeriodicRefreshServiceProvider;
 
+    @Autowired
+    @Qualifier("jdbcPeriodicRefreshService")
+    private ObjectProvider<JdbcPeriodicRefreshService> jdbcPeriodicRefreshServiceProvider;
+
+    @Autowired
+    @Qualifier("ampJdbcPeriodicRefreshService")
+    private ObjectProvider<JdbcPeriodicRefreshService> ampJdbcPeriodicRefreshServiceProvider;
+
     @EventListener(ContextRefreshedEvent.class)
     public void initializeServices() {
 
+        final CurrencyConversionService currencyConversionService =
+                currencyConversionServiceProvider.getIfAvailable();
         final HttpPeriodicRefreshService httpPeriodicRefreshService =
                 httpPeriodicRefreshServiceProvider.getIfAvailable();
         final HttpPeriodicRefreshService ampHttpPeriodicRefreshService =
                 ampHttpPeriodicRefreshServiceProvider.getIfAvailable();
+        final JdbcPeriodicRefreshService jdbcPeriodicRefreshService =
+                jdbcPeriodicRefreshServiceProvider.getIfAvailable();
+        final JdbcPeriodicRefreshService ampJdbcPeriodicRefreshService =
+                ampJdbcPeriodicRefreshServiceProvider.getIfAvailable();
 
         contextRunner.runOnServiceContext(future -> {
-            currencyConversionService.initialize();
+            if (currencyConversionService != null) {
+                currencyConversionService.initialize();
+            }
 
             if (httpPeriodicRefreshService != null) {
                 httpPeriodicRefreshService.initialize();
             }
             if (ampHttpPeriodicRefreshService != null) {
                 ampHttpPeriodicRefreshService.initialize();
+            }
+            if (jdbcPeriodicRefreshService != null) {
+                jdbcPeriodicRefreshService.initialize();
+            }
+            if (ampJdbcPeriodicRefreshService != null) {
+                ampJdbcPeriodicRefreshService.initialize();
             }
 
             future.complete();

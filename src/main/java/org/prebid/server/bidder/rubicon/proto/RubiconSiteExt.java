@@ -8,4 +8,9 @@ import lombok.Value;
 public class RubiconSiteExt {
 
     RubiconSiteExtRp rp;
+
+    /**
+     * AMP should be 1 if the request comes from an AMP page, 0 if not or be undefined.
+     */
+    Integer amp;
 }

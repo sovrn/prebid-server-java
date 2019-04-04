@@ -9,6 +9,7 @@ import com.iab.openrtb.request.Audio;
 import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.DataObject;
+import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.EventTracker;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.ImageObject;
@@ -38,6 +39,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.proto.openrtb.ext.request.ExtApp;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtDevice;
+import org.prebid.server.proto.openrtb.ext.request.ExtDeviceInt;
+import org.prebid.server.proto.openrtb.ext.request.ExtDevicePrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
@@ -47,6 +51,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtUserTpId;
 import org.prebid.server.validation.model.ValidationResult;
 
 import java.io.IOException;
@@ -135,7 +140,7 @@ public class RequestValidator {
                 uniqueImps.put(impId, i);
             }
 
-            if (errors.size() > 0) {
+            if (CollectionUtils.isNotEmpty(errors)) {
                 throw new ValidationException(String.join(System.lineSeparator(), errors));
             }
 
@@ -150,6 +155,7 @@ public class RequestValidator {
             }
             validateSite(bidRequest.getSite());
             validateApp(bidRequest.getApp());
+            validateDevice(bidRequest.getDevice());
             validateUser(bidRequest.getUser(), aliases);
             validateRegs(bidRequest.getRegs());
         } catch (ValidationException ex) {
@@ -162,7 +168,7 @@ public class RequestValidator {
      * Validates request.cur field.
      */
     private void validateCur(List<String> currencies) throws ValidationException {
-        if (currencies == null) {
+        if (CollectionUtils.isEmpty(currencies)) {
             throw new ValidationException(
                     "currency was not defined either in request.cur or in configuration field adServerCurrency");
         }
@@ -318,12 +324,46 @@ public class RequestValidator {
         }
     }
 
+    private void validateDevice(Device device) throws ValidationException {
+        final ObjectNode extDeviceNode = device != null ? device.getExt() : null;
+        if (extDeviceNode != null && extDeviceNode.size() > 0) {
+            final ExtDevice extDevice = parseExtDevice(extDeviceNode);
+            final ExtDevicePrebid extDevicePrebid = extDevice.getPrebid();
+            final ExtDeviceInt interstitial = extDevicePrebid != null ? extDevicePrebid.getInterstitial() : null;
+            if (interstitial != null) {
+                validateInterstitial(interstitial);
+            }
+        }
+    }
+
+    private void validateInterstitial(ExtDeviceInt interstitial) throws ValidationException {
+        final Integer minWidthPerc = interstitial.getMinWidthPerc();
+        if (minWidthPerc == null || minWidthPerc < 0 || minWidthPerc > 100) {
+            throw new ValidationException(
+                    "request.device.ext.prebid.interstitial.minwidthperc must be a number between 0 and 100");
+        }
+        final Integer minHeightPerc = interstitial.getMinHeightPerc();
+        if (minHeightPerc == null || minHeightPerc < 0 || minHeightPerc > 100) {
+            throw new ValidationException(
+                    "request.device.ext.prebid.interstitial.minheightperc must be a number between 0 and 100");
+        }
+    }
+
+    private ExtDevice parseExtDevice(ObjectNode extDevice) throws ValidationException {
+        try {
+            return Json.mapper.treeToValue(extDevice, ExtDevice.class);
+        } catch (JsonProcessingException e) {
+            throw new ValidationException("request.device.ext is not valid", e.getMessage());
+        }
+    }
+
     private void validateUser(User user, Map<String, String> aliases) throws ValidationException {
         if (user != null && user.getExt() != null) {
             try {
                 final ExtUser extUser = Json.mapper.treeToValue(user.getExt(), ExtUser.class);
                 final ExtUserDigiTrust digitrust = extUser.getDigitrust();
                 final ExtUserPrebid prebid = extUser.getPrebid();
+                final List<ExtUserTpId> tpid = extUser.getTpid();
 
                 if (digitrust != null && digitrust.getPref() != 0) {
                     throw new ValidationException("request.user contains a digitrust object that is not valid");
@@ -341,6 +381,24 @@ public class RequestValidator {
                         if (isUnknownBidderOrAlias(bidder, aliases)) {
                             throw new ValidationException("request.user.ext.%s is neither a known bidder "
                                     + "name nor an alias in request.ext.prebid.aliases", bidder);
+                        }
+                    }
+                }
+
+                if (tpid != null) {
+                    if (tpid.isEmpty()) {
+                        throw new ValidationException(
+                                "request.user.ext.tpid must contain at least one element or be undefined");
+                    }
+                    for (int index = 0; index < tpid.size(); index++) {
+                        final ExtUserTpId extUserTpId = tpid.get(index);
+                        if (StringUtils.isBlank(extUserTpId.getSource())) {
+                            throw new ValidationException(
+                                    "request.user.ext.tpid[%s].source missing required field: \"source\"", index);
+                        }
+                        if (StringUtils.isBlank(extUserTpId.getUid())) {
+                            throw new ValidationException(
+                                    "request.user.ext.tpid[%s].uid missing required field: \"uid\"", index);
                         }
                     }
                 }
@@ -486,9 +544,7 @@ public class RequestValidator {
         }
     }
 
-    private List<Asset> validateAndGetUpdatedNativeAssets(List<Asset> assets, int impIndex)
-            throws ValidationException {
-
+    private List<Asset> validateAndGetUpdatedNativeAssets(List<Asset> assets, int impIndex) throws ValidationException {
         if (CollectionUtils.isEmpty(assets)) {
             throw new ValidationException(
                     "request.imp[%d].native.request.assets must be an array containing at least one object", impIndex);
@@ -721,18 +777,26 @@ public class RequestValidator {
 
     private void validateBanner(Banner banner, int impIndex) throws ValidationException {
         if (banner != null) {
-            final boolean hasWidth = hasPositiveValue(banner.getW());
-            final boolean hasHeight = hasPositiveValue(banner.getH());
+            final Integer width = banner.getW();
+            final Integer height = banner.getH();
+            final boolean hasWidth = hasPositiveValue(width);
+            final boolean hasHeight = hasPositiveValue(height);
             final boolean hasSize = hasWidth && hasHeight;
 
-            if (CollectionUtils.isEmpty(banner.getFormat()) && !hasSize) {
+            final List<Format> format = banner.getFormat();
+            if (CollectionUtils.isEmpty(format) && !hasSize) {
                 throw new ValidationException("request.imp[%d].banner has no sizes. Define \"w\" and \"h\", "
                         + "or include \"format\" elements", impIndex);
             }
 
-            if (banner.getFormat() != null) {
-                for (int formatIndex = 0; formatIndex < banner.getFormat().size(); formatIndex++) {
-                    validateFormat(banner.getFormat().get(formatIndex), impIndex, formatIndex);
+            if (width != null && height != null && !hasSize) {
+                throw new ValidationException("Request imp[%d].banner must define a valid"
+                        + " \"h\" and \"w\" properties", impIndex);
+            }
+
+            if (format != null) {
+                for (int formatIndex = 0; formatIndex < format.size(); formatIndex++) {
+                    validateFormat(format.get(formatIndex), impIndex, formatIndex);
                 }
             }
         }

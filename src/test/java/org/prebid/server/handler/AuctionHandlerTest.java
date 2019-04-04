@@ -6,7 +6,6 @@ import io.netty.util.AsciiString;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.http.CaseInsensitiveHeaders;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
@@ -28,7 +27,6 @@ import org.prebid.server.auction.model.PreBidRequestContext.PreBidRequestContext
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.HttpAdapterConnector;
-import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.proto.BidCacheResult;
@@ -51,6 +49,7 @@ import org.prebid.server.proto.response.PreBidResponse;
 import org.prebid.server.proto.response.UsersyncInfo;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
+import org.prebid.server.util.HttpUtil;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -123,29 +122,23 @@ public class AuctionHandlerTest extends VertxTest {
     private HttpServerRequest httpRequest;
     @Mock
     private HttpServerResponse httpResponse;
-    @Mock
-    private MetaInfo rubiconMetaInfo;
-    @Mock
-    private MetaInfo appnexusMetaInfo;
 
     @Before
     public void setUp() {
         given(applicationSettings.getAccountById(any(), any()))
-                .willReturn(Future.succeededFuture(Account.of(null, null)));
+                .willReturn(Future.succeededFuture(Account.of(null, null, null, null, null)));
 
         given(bidderCatalog.isValidAdapterName(eq(RUBICON))).willReturn(true);
         given(bidderCatalog.isValidName(eq(RUBICON))).willReturn(true);
         given(bidderCatalog.isActive(eq(RUBICON))).willReturn(true);
         willReturn(rubiconAdapter).given(bidderCatalog).adapterByName(eq(RUBICON));
-        given(bidderCatalog.metaInfoByName(eq(RUBICON))).willReturn(rubiconMetaInfo);
-        given(rubiconMetaInfo.info()).willReturn(givenBidderInfo(15, false));
+        given(bidderCatalog.bidderInfoByName(eq(RUBICON))).willReturn(givenBidderInfo(15, false));
 
         given(bidderCatalog.isValidAdapterName(eq(APPNEXUS))).willReturn(true);
         given(bidderCatalog.isValidName(eq(APPNEXUS))).willReturn(true);
         given(bidderCatalog.isActive(eq(APPNEXUS))).willReturn(true);
         willReturn(appnexusAdapter).given(bidderCatalog).adapterByName(eq(APPNEXUS));
-        given(bidderCatalog.metaInfoByName(eq(APPNEXUS))).willReturn(appnexusMetaInfo);
-        given(appnexusMetaInfo.info()).willReturn(givenBidderInfo(20, true));
+        given(bidderCatalog.bidderInfoByName(eq(APPNEXUS))).willReturn(givenBidderInfo(20, true));
 
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
@@ -158,7 +151,7 @@ public class AuctionHandlerTest extends VertxTest {
         clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
 
         given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(emptyMap(), null)));
+                .willReturn(Future.succeededFuture(GdprResponse.of(true, emptyMap(), null)));
 
         auctionHandler = new AuctionHandler(applicationSettings, bidderCatalog, preBidRequestContextFactory,
                 cacheService, metrics, httpAdapterConnector, clock, gdprService, null, false);
@@ -581,7 +574,7 @@ public class AuctionHandlerTest extends VertxTest {
         // given
         givenPreBidRequestContext(identity(), builder -> builder.noLiveUids(true));
 
-        httpRequest.headers().add(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) " +
+        httpRequest.headers().add(HttpUtil.USER_AGENT_HEADER, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) " +
                 "AppleWebKit/601.7.7 (KHTML, like Gecko) Version/9.1.2 Safari/601.7.7");
 
         // when
@@ -748,7 +741,7 @@ public class AuctionHandlerTest extends VertxTest {
         givenPreBidRequestContextWith2AdUnitsAnd2BidsEach(identity());
 
         given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(singletonMap(1, false), null)));
+                .willReturn(Future.succeededFuture(GdprResponse.of(true, singletonMap(1, false), null)));
 
         given(httpAdapterConnector.call(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
@@ -778,7 +771,7 @@ public class AuctionHandlerTest extends VertxTest {
         vendorsToGdpr.put(15, true); // Rubicon bidder
         vendorsToGdpr.put(20, false); // Appnexus bidder
         given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(vendorsToGdpr, null)));
+                .willReturn(Future.succeededFuture(GdprResponse.of(true, vendorsToGdpr, null)));
 
         given(httpAdapterConnector.call(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
@@ -807,7 +800,7 @@ public class AuctionHandlerTest extends VertxTest {
         vendorsToGdpr.put(1, true); // host vendor id from app config
         vendorsToGdpr.put(15, true); // Rubicon bidder
         given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(vendorsToGdpr, null)));
+                .willReturn(Future.succeededFuture(GdprResponse.of(true, vendorsToGdpr, null)));
 
         given(httpAdapterConnector.call(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(
@@ -862,6 +855,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(preBidRequestContextFactory.fromRequest(any())).willReturn(Future.succeededFuture(preBidRequestContext));
     }
 
+    @SuppressWarnings("SameParameterValue")
     private void givenBidderRespondingWithBids(String bidder, Function<BidderStatusBuilder, BidderStatusBuilder>
             bidderStatusBuilderCustomizer, String... bidIds) {
         given(httpAdapterConnector.call(any(), any(), any(), any()))
@@ -880,6 +874,7 @@ public class AuctionHandlerTest extends VertxTest {
                         null)));
     }
 
+    @SuppressWarnings("SameParameterValue")
     private void givenBidderRespondingWithError(String bidder, BidderError error) {
         given(httpAdapterConnector.call(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(AdapterResponse.of(

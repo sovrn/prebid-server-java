@@ -34,7 +34,9 @@ import java.util.Collections;
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
@@ -241,7 +243,7 @@ public class OpenxBidderTest extends VertxTest {
 
 
                         Imp.builder().id("impId1").audio(Audio.builder().build()).build()))
-                .user(User.builder().ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null))).build())
+                .user(User.builder().ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null, null))).build())
                 .regs(Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1))))
                 .build();
 
@@ -284,7 +286,7 @@ public class OpenxBidderTest extends VertxTest {
                                                 .build()))
                                 .ext(mapper.valueToTree(OpenxRequestExt.of("se-demo-d.openx.net", "hb_pbs_1.0.0")))
                                 .user(User.builder()
-                                        .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null)))
+                                        .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null, null)))
                                         .build())
                                 .regs(Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1))))
                                 .build(),
@@ -307,7 +309,7 @@ public class OpenxBidderTest extends VertxTest {
 
                                 .ext(mapper.valueToTree(OpenxRequestExt.of("se-demo-d.openx.net", "hb_pbs_1.0.0")))
                                 .user(User.builder()
-                                        .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null)))
+                                        .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null, null)))
                                         .build())
                                 .regs(Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1))))
                                 .build(),
@@ -328,7 +330,7 @@ public class OpenxBidderTest extends VertxTest {
                                                 .build()))
                                 .ext(mapper.valueToTree(OpenxRequestExt.of("se-demo-d.openx.net", "hb_pbs_1.0.0")))
                                 .user(User.builder()
-                                        .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null)))
+                                        .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent", null, null)))
                                         .build())
                                 .regs(Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1))))
                                 .build());

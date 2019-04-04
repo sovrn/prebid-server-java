@@ -2,7 +2,22 @@ adapters:
   facebook:
     enabled: false
     endpoint: https://an.facebook.com/placementbid.ortb
-    nonSecureEndpoint: http://an.facebook.com/placementbid.ortb
+    non-secure-endpoint: http://an.facebook.com/placementbid.ortb
+    platform-id:
     pbs-enforces-gdpr: true
     deprecated-names:
     aliases:
+    meta-info:
+      maintainer-email: info@prebid.org
+      app-media-types:
+      site-media-types:
+        - banner
+        - video
+      supported-vendors:
+      vendor-id: 0
+    usersync:
+      url:
+      redirect-url:
+      cookie-family-name: audienceNetwork
+      type: redirect
+      support-cors: false

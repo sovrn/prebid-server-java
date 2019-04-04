@@ -16,7 +16,9 @@ import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
+import io.vertx.core.http.CaseInsensitiveHeaders;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
@@ -28,10 +30,13 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
+import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.cookie.model.UidWithExpiry;
+import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
@@ -74,6 +79,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.BDDAssertions.then;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -106,6 +112,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
     @Mock
     private RoutingContext routingContext;
+    @Mock
+    private HttpServerRequest httpRequest;
+
+    private HttpContext httpContext;
 
     @Before
     public void setUp() {
@@ -114,16 +124,27 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(bidderCatalog.usersyncerByName("rubicon")).willReturn(rubiconUsersyncer);
         given(bidderCatalog.usersyncerByName("appnexus")).willReturn(appnexusUsersyncer);
 
-        given(rubiconUsersyncer.cookieFamilyName()).willReturn("rubicon");
-        given(appnexusUsersyncer.cookieFamilyName()).willReturn("appnexus");
+        given(rubiconUsersyncer.getCookieFamilyName()).willReturn("rubicon");
+        given(appnexusUsersyncer.getCookieFamilyName()).willReturn("appnexus");
 
         given(uidsCookie.hasLiveUidFrom("rubicon")).willReturn(true);
         given(uidsCookie.hasLiveUidFrom("appnexus")).willReturn(false);
 
         given(uidsCookieService.parseHostCookie(any())).willReturn("khaos-cookie-value");
+        given(uidsCookieService.parseFromCookies(any()))
+                .willReturn(new UidsCookie(Uids.builder()
+                        .uids(singletonMap("rubicon", UidWithExpiry.live("uid")))
+                        .build()));
 
-        given(uidsAuditCookieService.getUidsAudit(any()))
+        given(uidsAuditCookieService.getUidsAudit(anyMap()))
                 .willReturn(UidAudit.builder().country("countryFromAuditCookie").build());
+
+        given(routingContext.request()).willReturn(httpRequest);
+        given(httpRequest.uri()).willReturn("");
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap());
+        given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
+
+        httpContext = HttpContext.builder().cookies(emptyMap()).build();
 
         module = new RubiconAnalyticsModule(HOST_URL, 1, emptyMap(), "pbs-version-1", "pbsHostname", "dataCenterRegion",
                 bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -170,8 +191,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .context(routingContext)
-                .uidsCookie(uidsCookie)
+                .httpContext(httpContext)
                 .bidRequest(BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
@@ -199,8 +219,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .context(routingContext)
-                .uidsCookie(uidsCookie)
+                .httpContext(httpContext)
                 .bidRequest(sampleAuctionBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
@@ -242,8 +261,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
-                .context(routingContext)
-                .uidsCookie(uidsCookie)
+                .httpContext(httpContext)
                 .bidRequest(sampleAuctionBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
@@ -269,8 +287,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
 
         final AuctionEvent event = AuctionEvent.builder()
-                .context(routingContext)
-                .uidsCookie(uidsCookie)
+                .httpContext(httpContext)
                 .bidRequest(sampleAuctionBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
@@ -414,8 +431,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
 
         final AmpEvent event = AmpEvent.builder()
-                .context(routingContext)
-                .uidsCookie(uidsCookie)
+                .httpContext(httpContext)
                 .bidRequest(sampleAmpBidRequest())
                 .bidResponse(sampleBidResponse())
                 .build();
@@ -563,8 +579,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         module.postProcess(
-                null,
-                uidsCookie, BidRequest.builder()
+                routingContext,
+                uidsCookie,
+                BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
                         .build(),
@@ -588,8 +605,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         module.postProcess(
-                null,
-                uidsCookie, BidRequest.builder()
+                routingContext,
+                uidsCookie,
+                BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
                         .build(),
@@ -609,8 +627,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         module.postProcess(
-                null,
-                null, BidRequest.builder()
+                routingContext,
+                uidsCookie,
+                BidRequest.builder()
                         .imp(emptyList())
                         .build(),
                 BidResponse.builder()
@@ -628,7 +647,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final BidResponse bidResponse = sampleBidResponse();
 
         // when
-        final BidResponse returnedBidResponse = module.postProcess(null, uidsCookie, bidRequest, bidResponse).result();
+        final BidResponse returnedBidResponse = module.postProcess(routingContext, uidsCookie, bidRequest,
+                bidResponse).result();
 
         // then
         then(returnedBidResponse.getSeatbid())
@@ -862,7 +882,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .h(600)
                                         .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                 BidType.video,
-                                                singletonMap("key1", "value1"), null), null)))
+                                                singletonMap("key1", "value1"), null, null), null)))
                                         .build()))
                                 .build(),
                         SeatBid.builder()
@@ -876,7 +896,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .h(700)
                                                 .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                         BidType.video,
-                                                        singletonMap("key21", "value21"), null), null)))
+                                                        singletonMap("key21", "value21"), null, null), null)))
                                                 .build(),
                                         Bid.builder()
                                                 .impid("impId2")
@@ -886,7 +906,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .h(700)
                                                 .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                         BidType.video,
-                                                        singletonMap("key22", "value22"), null), null)))
+                                                        singletonMap("key22", "value22"), null, null), null)))
                                                 .build()))
                                 .build()))
                 .ext(mapper.valueToTree(

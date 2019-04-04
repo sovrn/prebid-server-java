@@ -2,8 +2,20 @@ adapters:
   ttx:
     enabled: false
     endpoint: http://ssc.33across.com/api/v1/hb
-    usersync-url: https://ssc-cms.33across.com/ps
-    partner-id:
     pbs-enforces-gdpr: true
     deprecated-names:
     aliases:
+    meta-info:
+      maintainer-email: dev@33across.com
+      app-media-types:
+        - banner
+      site-media-types:
+        - banner
+      supported-vendors:
+      vendor-id: 58
+    usersync:
+      url:
+      redirect-url:
+      cookie-family-name: ttx
+      type: redirect
+      support-cors: false

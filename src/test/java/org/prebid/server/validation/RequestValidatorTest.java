@@ -12,6 +12,7 @@ import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.DataObject;
 import com.iab.openrtb.request.Deal;
 import com.iab.openrtb.request.Deal.DealBuilder;
+import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.EventTracker;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Format.FormatBuilder;
@@ -37,6 +38,9 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtDevice;
+import org.prebid.server.proto.openrtb.ext.request.ExtDeviceInt;
+import org.prebid.server.proto.openrtb.ext.request.ExtDevicePrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
@@ -46,6 +50,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtUserTpId;
 import org.prebid.server.validation.model.ValidationResult;
 
 import java.math.BigDecimal;
@@ -288,7 +293,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
     }
 
     @Test
@@ -331,7 +337,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
     }
 
     @Test
@@ -353,7 +360,31 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerHasEmptyFormatAndNoWidth() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(singletonList(Imp.builder()
+                        .id("11")
+                        .banner(Banner.builder()
+                                .h(600)
+                                .format(emptyList())
+                                .build())
+                        .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
+                        .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
     }
 
     @Test
@@ -376,18 +407,20 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
     }
 
     @Test
-    public void validateShouldReturnValidationMessageWhenBannerHasEmptyFormatAndNoWidth() {
+    public void validateShouldReturnValidationMessageWhenBannerHasZeroHeight() {
         // given
         final BidRequest bidRequest = validBidRequestBuilder()
                 .imp(singletonList(Imp.builder()
                         .id("11")
                         .banner(Banner.builder()
-                                .h(600)
-                                .format(emptyList())
+                                .w(300)
+                                .h(0)
+                                .format(singletonList(Format.builder().build()))
                                 .build())
                         .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
                         .build()))
@@ -398,7 +431,7 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly("Request imp[0].banner must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -421,7 +454,31 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerHasZeroWidth() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(singletonList(Imp.builder()
+                        .id("11")
+                        .banner(Banner.builder()
+                                .h(600)
+                                .w(0)
+                                .format(singletonList(Format.builder().build()))
+                                .build())
+                        .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
+                        .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -444,7 +501,31 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerHasNegativeWidth() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(singletonList(Imp.builder()
+                        .id("11")
+                        .banner(Banner.builder()
+                                .h(600)
+                                .w(-300)
+                                .format(singletonList(Format.builder().build()))
+                                .build())
+                        .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
+                        .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -467,7 +548,31 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+                .containsOnly(
+                        "request.imp[0].banner has no sizes. Define \"w\" and \"h\", or include \"format\" elements");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenBannerHasNegativeHeight() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .imp(singletonList(Imp.builder()
+                        .id("11")
+                        .banner(Banner.builder()
+                                .h(-300)
+                                .w(600)
+                                .format(singletonList(Format.builder().build()))
+                                .build())
+                        .ext(mapper.valueToTree(singletonMap("rubicon", 0)))
+                        .build()))
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Request imp[0].banner must define a valid \"h\" and \"w\" properties");
     }
 
     @Test
@@ -487,7 +592,7 @@ public class RequestValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldReturnValidationMessageWhenBannerFormatHeightWeightAndOneOfRatiosPresent() {
-        //give
+        // given
         final BidRequest bidRequest = overwriteBannerFormatInFirstImp(validBidRequestBuilder().build(),
                 formatBuilder -> Format.builder().h(1).w(2).hratio(5));
 
@@ -971,6 +1076,90 @@ public class RequestValidatorTest extends VertxTest {
     }
 
     @Test
+    public void validateShouldReturnValidationMessageWhenMinWidthPercIsNull() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder().device(Device.builder()
+                .ext(mapper.valueToTree(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(null, null))))).build()).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.device.ext.prebid.interstitial.minwidthperc must be a number between 0 and 100");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenMinWidthPercIsLessThanZero() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder().device(Device.builder()
+                .ext(mapper.valueToTree(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(-1, null))))).build()).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.device.ext.prebid.interstitial.minwidthperc must be a number between 0 and 100");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenMinWidthPercGreaterThanHundred() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder().device(Device.builder()
+                .ext(mapper.valueToTree(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(101, null))))).build()).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.device.ext.prebid.interstitial.minwidthperc must be a number between 0 and 100");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenMinHeightPercIsNull() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder().device(Device.builder()
+                .ext(mapper.valueToTree(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(50, null))))).build()).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.device.ext.prebid.interstitial.minheightperc must be a number between 0 and 100");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenMinHeightPercIsLessThanZero() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder().device(Device.builder()
+                .ext(mapper.valueToTree(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(50, -1))))).build()).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.device.ext.prebid.interstitial.minheightperc must be a number between 0 and 100");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenMinHeightPercGreaterThanHundred() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder().device(Device.builder()
+                .ext(mapper.valueToTree(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(50, 101))))).build()).build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.device.ext.prebid.interstitial.minheightperc must be a number between 0 and 100");
+    }
+
+    @Test
     public void validateShouldReturnEmptyValidationMessagesWhenBidRequestIsOk() {
         // given
         final BidRequest bidRequest = validBidRequestBuilder().build();
@@ -1042,7 +1231,7 @@ public class RequestValidatorTest extends VertxTest {
     public void validateShouldNotReturnValidationMessageIfUserExtIsEmptyJsonObject() {
         // given
         final BidRequest bidRequest = validBidRequestBuilder().user(User.builder()
-                .ext(mapper.valueToTree(ExtUser.of(null, null, null))).build())
+                .ext(mapper.valueToTree(ExtUser.of(null, null, null, null))).build())
                 .build();
 
         // when
@@ -1070,7 +1259,7 @@ public class RequestValidatorTest extends VertxTest {
         // given
         final BidRequest bidRequest = validBidRequestBuilder().user(User.builder()
                 .ext(mapper.valueToTree(
-                        ExtUser.of(ExtUserPrebid.of(emptyMap()), null, ExtUserDigiTrust.of(null, null, 0)))).build())
+                        ExtUser.of(ExtUserPrebid.of(emptyMap()), null, ExtUserDigiTrust.of(null, null, 0), null))).build())
                 .build();
 
         // when
@@ -1251,7 +1440,7 @@ public class RequestValidatorTest extends VertxTest {
                 .ext(mapper.valueToTree(ExtUser.of(
                         ExtUserPrebid.of(singletonMap("unknown-bidder", "42")),
                         null,
-                        ExtUserDigiTrust.of(null, null, 0)))).build())
+                        ExtUserDigiTrust.of(null, null, 0), null))).build())
                 .build();
 
         // when
@@ -1272,7 +1461,7 @@ public class RequestValidatorTest extends VertxTest {
                         .ext(mapper.valueToTree(ExtUser.of(
                                 ExtUserPrebid.of(singletonMap("unknown-bidder", "42")),
                                 null,
-                                ExtUserDigiTrust.of(null, null, 0)))).build())
+                                ExtUserDigiTrust.of(null, null, 0), null))).build())
                 .build();
 
         // when
@@ -1290,7 +1479,7 @@ public class RequestValidatorTest extends VertxTest {
                         .ext(mapper.valueToTree(ExtUser.of(
                                 ExtUserPrebid.of(singletonMap("rubicon", "42")),
                                 null,
-                                ExtUserDigiTrust.of(null, null, 0)))).build())
+                                ExtUserDigiTrust.of(null, null, 0), null))).build())
                 .build();
 
         // when
@@ -1307,7 +1496,7 @@ public class RequestValidatorTest extends VertxTest {
                 .user(User.builder().ext(mapper.valueToTree(ExtUser.of(
                         ExtUserPrebid.of(singletonMap("bidder", "uidval")),
                         null,
-                        ExtUserDigiTrust.of(null, null, 1))))
+                        ExtUserDigiTrust.of(null, null, 1), null)))
                         .build())
                 .build();
 
@@ -1333,6 +1522,145 @@ public class RequestValidatorTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1).element(0).asString()
                 .contains("request.user.ext object is not valid:");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidIsEmpty() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0), emptyList()))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid must contain at least one element or be undefined");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidHasNullSource() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0),
+                                singletonList(ExtUserTpId.of(null, null))))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid[0].source missing required field: \"source\"");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidHasNullUid() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0),
+                                singletonList(ExtUserTpId.of("source", null))))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid[0].uid missing required field: \"uid\"");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidHasEmptySource() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0),
+                                singletonList(ExtUserTpId.of("", null))))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid[0].source missing required field: \"source\"");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidHasEmptyUid() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0),
+                                singletonList(ExtUserTpId.of("source", ""))))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid[0].uid missing required field: \"uid\"");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidHasBlankSource() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0),
+                                singletonList(ExtUserTpId.of("   ", null))))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid[0].source missing required field: \"source\"");
+    }
+
+    @Test
+    public void validateShouldReturnValidationMessageWhenTpidHasBlankUid() {
+        // given
+        final BidRequest bidRequest = validBidRequestBuilder()
+                .user(User.builder()
+                        .ext(mapper.valueToTree(ExtUser.of(
+                                ExtUserPrebid.of(singletonMap("rubicon", "42")),
+                                null,
+                                ExtUserDigiTrust.of(null, null, 0),
+                                singletonList(ExtUserTpId.of("source", "   "))))).build())
+                .build();
+
+        // when
+        final ValidationResult result = requestValidator.validate(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("request.user.ext.tpid[0].uid missing required field: \"uid\"");
     }
 
     @Test
@@ -1444,7 +1772,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.context is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
+                .containsOnly(
+                        "request.imp[0].native.request.context is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
     }
 
     @Test
@@ -1458,7 +1787,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.contextsubtype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
+                .containsOnly(
+                        "request.imp[0].native.request.contextsubtype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
 
     }
 
@@ -1473,7 +1803,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.context is 2, but contextsubtype is 11. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
+                .containsOnly(
+                        "request.imp[0].native.request.context is 2, but contextsubtype is 11. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
 
     }
 
@@ -1488,7 +1819,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.context is 3, but contextsubtype is 21. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
+                .containsOnly(
+                        "request.imp[0].native.request.context is 3, but contextsubtype is 21. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
 
     }
 
@@ -1503,7 +1835,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.context is 2, but contextsubtype is 31. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
+                .containsOnly(
+                        "request.imp[0].native.request.context is 2, but contextsubtype is 31. This is an invalid combination. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=39");
 
     }
 
@@ -1558,7 +1891,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.eventtrackers[0].event is invalid. See section 7.6: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43");
+                .containsOnly(
+                        "request.imp[0].native.request.eventtrackers[0].event is invalid. See section 7.6: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43");
 
     }
 
@@ -1574,7 +1908,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.eventtrackers[0].method is required. See section 7.7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43");
+                .containsOnly(
+                        "request.imp[0].native.request.eventtrackers[0].method is required. See section 7.7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43");
 
     }
 
@@ -1590,7 +1925,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.eventtrackers[0].methods[0] is invalid. See section 7.7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43");
+                .containsOnly(
+                        "request.imp[0].native.request.eventtrackers[0].methods[0] is invalid. See section 7.7: https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=43");
 
     }
 
@@ -1621,7 +1957,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.plcmttype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=40");
+                .containsOnly(
+                        "request.imp[0].native.request.plcmttype is invalid. See https://iabtechlab.com/wp-content/uploads/2016/07/OpenRTB-Native-Ads-Specification-Final-1.2.pdf#page=40");
     }
 
     @Test
@@ -2119,7 +2456,8 @@ public class RequestValidatorTest extends VertxTest {
 
         // then
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("request.imp[0].native.request.assets[0].video.protocols[0] must be in the range [1, 10]. Got 0");
+                .containsOnly(
+                        "request.imp[0].native.request.assets[0].video.protocols[0] must be in the range [1, 10]. Got 0");
     }
 
     @Test

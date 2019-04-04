@@ -24,6 +24,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Base64;
+import java.util.Map;
 
 /**
  * Service provides uid audit cookie support.
@@ -112,14 +113,25 @@ public class UidsAuditCookieService {
     }
 
     /**
-     * Returns {@link UidAudit} or null if no audit cookie exists.
+     * Returns {@link UidAudit} from {@link RoutingContext} or null if no audit cookie exists.
      */
     public UidAudit getUidsAudit(RoutingContext context) {
         final Cookie uidAuditCookie = context.getCookie(COOKIE_NAME);
-        final String auditCookieValue = uidAuditCookie != null ? decrypt(uidAuditCookie.getValue()) : null;
+        return uidAuditCookie != null ? getUidAudit(uidAuditCookie.getValue()) : null;
+    }
 
+    /**
+     * Returns {@link UidAudit} from cookies' map or null if no audit cookie exists.
+     */
+    public UidAudit getUidsAudit(Map<String, String> cookies) {
+        final String uidAuditCookieValue = cookies.get(COOKIE_NAME);
+        return getUidAudit(uidAuditCookieValue);
+    }
+
+    private UidAudit getUidAudit(String uidAuditCookieValue) {
         try {
-            return auditCookieValue != null ? UidsAuditParser.parseCookieValue(auditCookieValue) : null;
+            final String decryptedValue = uidAuditCookieValue != null ? decrypt(uidAuditCookieValue) : null;
+            return decryptedValue != null ? UidsAuditParser.parseCookieValue(decryptedValue) : null;
         } catch (InvalidAuditFormatException e) {
             return null;
         }

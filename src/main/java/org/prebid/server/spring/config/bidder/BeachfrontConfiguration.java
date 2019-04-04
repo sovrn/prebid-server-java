@@ -1,89 +1,95 @@
 package org.prebid.server.spring.config.bidder;
 
-import org.prebid.server.bidder.Adapter;
-import org.prebid.server.bidder.Bidder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.prebid.server.bidder.BidderDeps;
-import org.prebid.server.bidder.MetaInfo;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.beachfront.BeachfrontBidder;
-import org.prebid.server.bidder.beachfront.BeachfrontMetaInfo;
-import org.prebid.server.bidder.beachfront.BeachfrontUsersyncer;
+import org.prebid.server.proto.response.BidderInfo;
+import org.prebid.server.spring.config.bidder.model.MetaInfo;
+import org.prebid.server.spring.config.bidder.model.UsersyncConfigurationProperties;
 import org.prebid.server.spring.env.YamlPropertySourceFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.validation.annotation.Validated;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.util.List;
 
 @Configuration
 @PropertySource(value = "classpath:/bidder-config/beachfront.yaml", factory = YamlPropertySourceFactory.class)
-public class BeachfrontConfiguration extends BidderConfiguration {
+public class BeachfrontConfiguration {
 
     private static final String BIDDER_NAME = "beachfront";
 
-    @Value("${adapters.beachfront.enabled}")
-    private boolean enabled;
+    @Value("${external-url}")
+    @NotBlank
+    private String externalUrl;
 
-    @Value("${adapters.beachfront.banner-endpoint}")
-    private String bannerEndpoint;
+    @Autowired
+    @Qualifier("beachfrontConfigurationProperties")
+    private BeachfrontConfigurationProperties configProperties;
 
-    @Value("${adapters.beachfront.video-endpoint}")
-    private String videoEndpoint;
-
-    @Value("${adapters.beachfront.usersync-url}")
-    private String usersyncUrl;
-
-    @Value("${adapters.beachfront.platform-id}")
-    private String platformId;
-
-    @Value("${adapters.beachfront.pbs-enforces-gdpr}")
-    private boolean pbsEnforcesGdpr;
-
-    @Value("${adapters.beachfront.deprecated-names}")
-    private List<String> deprecatedNames;
-
-    @Value("${adapters.beachfront.aliases}")
-    private List<String> aliases;
+    @Bean("beachfrontConfigurationProperties")
+    @ConfigurationProperties("adapters.beachfront")
+    BeachfrontConfigurationProperties configurationProperties() {
+        return new BeachfrontConfigurationProperties();
+    }
 
     @Bean
     BidderDeps beachfrontBidderDeps() {
-        return bidderDeps();
+        final MetaInfo metaInfo = configProperties.getMetaInfo();
+        final BidderInfo bidderInfo = BidderInfo.create(configProperties.getEnabled(), metaInfo.getMaintainerEmail(),
+                metaInfo.getAppMediaTypes(), metaInfo.getSiteMediaTypes(), metaInfo.getSupportedVendors(),
+                metaInfo.getVendorId(), configProperties.getPbsEnforcesGdpr());
+
+        final UsersyncConfigurationProperties usersync = configProperties.getUsersync();
+
+        return BidderDepsAssembler.forBidder(BIDDER_NAME)
+                .enabled(configProperties.getEnabled())
+                .deprecatedNames(configProperties.getDeprecatedNames())
+                .aliases(configProperties.getAliases())
+                .bidderInfo(bidderInfo)
+                .usersyncerCreator(() -> new Usersyncer(usersync.getCookieFamilyName(), usersync.getUrl(),
+                        usersync.getRedirectUrl(), externalUrl, usersync.getType(), usersync.getSupportCors()))
+                .bidderCreator(() ->
+                        new BeachfrontBidder(configProperties.getBannerEndpoint(), configProperties.getVideoEndpoint()))
+                .assemble();
     }
 
-    @Override
-    protected String bidderName() {
-        return BIDDER_NAME;
-    }
+    @Validated
+    @Data
+    @NoArgsConstructor
+    private static class BeachfrontConfigurationProperties {
 
-    @Override
-    protected List<String> deprecatedNames() {
-        return deprecatedNames;
-    }
+        @NotNull
+        private Boolean enabled;
 
-    @Override
-    protected List<String> aliases() {
-        return aliases;
-    }
+        @NotBlank
+        private String bannerEndpoint;
 
-    @Override
-    protected MetaInfo createMetaInfo() {
-        return new BeachfrontMetaInfo(enabled, pbsEnforcesGdpr);
-    }
+        @NotBlank
+        private String videoEndpoint;
 
-    @Override
-    protected Usersyncer createUsersyncer() {
-        return new BeachfrontUsersyncer(usersyncUrl, platformId);
-    }
+        @NotNull
+        private Boolean pbsEnforcesGdpr;
 
-    @Override
-    protected Bidder<?> createBidder(MetaInfo metaInfo) {
-        return new BeachfrontBidder(bannerEndpoint, videoEndpoint);
-    }
+        @NotNull
+        private List<String> deprecatedNames;
 
-    @Override
-    protected Adapter<?, ?> createAdapter(Usersyncer usersyncer) {
-        return null;
-    }
+        @NotNull
+        private List<String> aliases;
 
+        @NotNull
+        private MetaInfo metaInfo;
+
+        @NotNull
+        private UsersyncConfigurationProperties usersync;
+    }
 }

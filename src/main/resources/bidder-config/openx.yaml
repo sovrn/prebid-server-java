@@ -2,7 +2,21 @@ adapters:
   openx:
     enabled: false
     endpoint: http://rtb.openx.net/prebid
-    usersync-url: https://rtb.openx.net/sync/prebid?r=
     pbs-enforces-gdpr: true
     deprecated-names:
     aliases:
+    meta-info:
+      maintainer-email: team-openx@openx.com
+      app-media-types:
+        - banner
+      site-media-types:
+        - banner
+        - video
+      supported-vendors:
+      vendor-id: 69
+    usersync:
+      url: https://rtb.openx.net/sync/prebid?r=
+      redirect-url: /setuid?bidder=openx&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&uid=${UID}
+      cookie-family-name: openx
+      type: redirect
+      support-cors: false

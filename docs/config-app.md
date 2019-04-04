@@ -28,24 +28,29 @@ This parameter affects how many CPU cores will be utilized by the application. R
 - `http-client.circuit-breaker.opening-threshold` - the number of failure before opening the circuit.
 - `http-client.circuit-breaker.opening-interval-ms` - time interval for opening the circuit breaker if failures count reached.
 - `http-client.circuit-breaker.closing-interval-ms` - time spent in open state before attempting to re-try.
+- `http-client.use-compression` - if equals to `true` httpclient compression is enabled for requests (see [also](https://vertx.io/docs/apidocs/io/vertx/core/http/HttpClientOptions.html#setTryUseCompression-boolean-))
+- `http-client.max-redirects` - set the maximum amount of HTTP redirections to follow. A value of 0 (the default) prevents redirections from being followed.
 
-## Auction
+## Auction (OpenRTB)
 - `auction.default-timeout-ms` - default operation timeout for OpenRTB Auction requests.
 - `auction.max-timeout-ms` - maximum operation timeout for OpenRTB Auction requests.
+- `auction.timeout-adjustment-ms` - reduces timeout value passed in Auction request so that Prebid Server can handle timeouts from adapters and respond to the request before it times out.
 - `auction.max-request-size` - set the maximum size in bytes of OpenRTB Auction request.
 - `auction.stored-requests-timeout-ms` - timeout for stored requests fetching.
 - `auction.ad-server-currency` - default currency for auction, if its value was not specified in request. Important note: PBS uses ISO-4217 codes for the representation of currencies.
-- `auction.currency-rates-refresh-period-ms` - default refresh period for currency rates updates.
-- `auction.currency-rates-url` - the url for Prebid.org’s currency file. [More details](http://prebid.org/dev-docs/modules/currency.html)
 - `auction.cache.expected-request-time-ms` - approximate value in milliseconds for Cache Service interacting. This time will be subtracted from global timeout.
 
-## Amp
+## Amp (OpenRTB)
 - `amp.default-timeout-ms` - default operation timeout for OpenRTB Amp requests.
+- `amp.max-timeout-ms` - maximum operation timeout for OpenRTB Amp requests.
 - `amp.timeout-adjustment-ms` - reduces timeout value passed in Amp request so that Prebid Server can handle timeouts from adapters and respond to the AMP RTC request before it times out.
 - `amp.custom-targeting` - a list of bidders whose custom targeting should be included in AMP responses.
 
 ## Setuid
 - `setuid.default-timeout-ms` - default operation timeout for requests to `/setuid` endpoint.
+
+## Events
+- `events.accounts-enabled` - a list of accounts supporting event notifications.   
 
 ## Cookie Sync
 - `cookie-sync.default-timeout-ms` - default operation timeout for requests to `/cookie_sync` endpoint.
@@ -56,12 +61,21 @@ This parameter affects how many CPU cores will be utilized by the application. R
 There are several typical keys:
 - `adapters.<BIDDER_NAME>.enabled` - indicates the bidder should be active and ready for auction. By default all bidders are disabled.
 - `adapters.<BIDDER_NAME>.endpoint` - the url for submitting bids.
-- `adapters.<BIDDER_NAME>.usersync-url` - the url for synchronizing UIDs cookie.
 - `adapters.<BIDDER_NAME>.pbs-enforces-gdpr` - indicates if pbs server provides gdpr support for bidder or bidder will handle it itself.
 - `adapters.<BIDDER_NAME>.deprecated-names` - comma separated deprecated names of bidder.
 - `adapters.<BIDDER_NAME>.aliases` - comma separated aliases of bidder.
+- `adapters.<BIDDER_NAME>.usersync.url` - the url for synchronizing UIDs cookie.
+- `adapters.<BIDDER_NAME>.usersync.redirect-url` - the redirect part of url for synchronizing UIDs cookie.
+- `adapters.<BIDDER_NAME>.usersync.cookie-family-name` - the family name by which user ids within adapter's realm are stored in uidsCookie.
+- `adapters.<BIDDER_NAME>.usersync.type` - usersync type (i.e. redirect, iframe)
+- `adapters.<BIDDER_NAME>.usersync.support-cors` - flag signals if CORS supported by usersync.
 
 But feel free to add additional bidder's specific options.
+
+## Currency Converter
+- `currency-converter.enabled` - if equals to `true` the currency conversion service will be enabled to fetch updated rates and convert bid currencies. Also enables `/currency-rates` endpoint on admin port.
+- `currency-converter.refresh-period-ms` - default refresh period for currency rates updates.
+- `currency-converter.url` - the url for Prebid.org’s currency file. [More details](http://prebid.org/dev-docs/modules/currency.html)
 
 ## Metrics
 - `metrics.metricType` - set the type of metric counter for [Dropwizard Metrics](http://metrics.dropwizard.io). Can be `flushingCounter` (default), `counter` or `meter`.
@@ -151,6 +165,14 @@ available: [/storedrequests/openrtb2](endpoints/storedrequests/openrtb2.md) and 
 - `settings.in-memory-cache.http-update.amp-endpoint` - the url to fetch AMP stored request updates.
 - `settings.in-memory-cache.http-update.refresh-rate` - refresh period in ms for stored request updates.
 - `settings.in-memory-cache.http-update.timeout` - timeout for obtaining stored request updates.
+- `settings.in-memory-cache.jdbc-update.init-query` - initial query for fetching all stored requests at the startup.
+- `settings.in-memory-cache.jdbc-update.update-query` - a query for periodical update of stored requests, that should
+contain 'WHERE last_updated > ?' to fetch only the records that were updated since previous check.
+- `settings.in-memory-cache.jdbc-update.amp-init-query` - initial query for fetching all AMP stored requests at the startup.
+- `settings.in-memory-cache.jdbc-update.amp-update-query` - a query for periodical update of AMP stored requests, that should
+contain 'WHERE last_updated > ?' to fetch only the records that were updated since previous check.
+- `settings.in-memory-cache.jdbc-update.refresh-rate` - refresh period in ms for stored request updates.
+- `settings.in-memory-cache.jdbc-update.timeout` - timeout for obtaining stored request updates.
 
 ## Host Cookie
 - `host-cookie.optout-cookie.name` - set the cookie name for optout checking.
@@ -179,9 +201,12 @@ If not defined in config, endpoint will respond with 'No Content' (204) status w
 - `gdpr.vendorlist.filesystem-cache-dir` - directory for local storage cache for vendor list. Should be with `WRITE` permissions for user application run from.
 - `gdpr.geolocation.enabled` - if equals to `true` the geo location service will be used to determine the country for client request.
 
+## Auction (Legacy)
+- `default-timeout-ms` - this setting controls default timeout for /auction endpoint.
+- `max-timeout-ms` - this setting controls maximum timeout for /auction endpoint.
+- `timeout-adjustment-ms` - reduces timeout value passed in legacy Auction request so that Prebid Server can handle timeouts from adapters and respond to the request before it times out.
+
 ## General settings
 - `external-url` - the setting stands for external URL prebid server is reachable by, 
 for example address of the load-balancer e.g. http://prebid.host.com.
-- `default-timeout-ms` - this setting controls default timeout for /auction endpoint.
-- `max-timeout-ms` - this setting controls maximum timeout for /auction endpoint.
 - `admin.port` - the port to listen on administration requests.

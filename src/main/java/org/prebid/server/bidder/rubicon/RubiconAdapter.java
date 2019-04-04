@@ -16,7 +16,6 @@ import com.iab.openrtb.request.User;
 import com.iab.openrtb.request.Video;
 import com.iab.openrtb.response.BidResponse;
 import io.vertx.core.MultiMap;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
@@ -29,7 +28,6 @@ import org.prebid.server.auction.model.PreBidRequestContext;
 import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.bidder.Adapter;
 import org.prebid.server.bidder.OpenrtbAdapter;
-import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.bidder.model.AdapterHttpRequest;
 import org.prebid.server.bidder.model.ExchangeCall;
 import org.prebid.server.bidder.rubicon.proto.RubiconBannerExt;
@@ -85,8 +83,8 @@ public class RubiconAdapter extends OpenrtbAdapter {
     private final String endpointUrl;
     private final String authHeader;
 
-    public RubiconAdapter(Usersyncer usersyncer, String endpointUrl, String xapiUsername, String xapiPassword) {
-        super(usersyncer);
+    public RubiconAdapter(String cookieFamilyName, String endpointUrl, String xapiUsername, String xapiPassword) {
+        super(cookieFamilyName);
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl));
         authHeader = "Basic " + Base64.getEncoder().encodeToString((Objects.requireNonNull(xapiUsername)
                 + ':' + Objects.requireNonNull(xapiPassword)).getBytes());
@@ -96,8 +94,8 @@ public class RubiconAdapter extends OpenrtbAdapter {
     public List<AdapterHttpRequest<BidRequest>> makeHttpRequests(AdapterRequest adapterRequest,
                                                                  PreBidRequestContext preBidRequestContext) {
         final MultiMap headers = headers()
-                .add(HttpHeaders.AUTHORIZATION, authHeader)
-                .add(HttpHeaders.USER_AGENT, PREBID_SERVER_USER_AGENT);
+                .add(HttpUtil.AUTHORIZATION_HEADER, authHeader)
+                .add(HttpUtil.USER_AGENT_HEADER, PREBID_SERVER_USER_AGENT);
 
         final List<AdUnitBid> adUnitBids = adapterRequest.getAdUnitBids();
 
@@ -282,7 +280,7 @@ public class RubiconAdapter extends OpenrtbAdapter {
     }
 
     private static RubiconSiteExt makeSiteExt(RubiconParams rubiconParams) {
-        return RubiconSiteExt.of(RubiconSiteExtRp.of(rubiconParams.getSiteId()));
+        return RubiconSiteExt.of(RubiconSiteExtRp.of(rubiconParams.getSiteId()), null);
     }
 
     private static Publisher makePublisher(RubiconParams rubiconParams) {
@@ -335,7 +333,7 @@ public class RubiconAdapter extends OpenrtbAdapter {
         final JsonNode visitor = rubiconParams.getVisitor();
         final boolean visitorIsNotNull = !visitor.isNull();
         return visitorIsNotNull || consent != null
-                ? RubiconUserExt.of(visitorIsNotNull ? RubiconUserExtRp.of(visitor) : null, consent, null)
+                ? RubiconUserExt.of(visitorIsNotNull ? RubiconUserExtRp.of(visitor) : null, consent, null, null)
                 : null;
     }
 

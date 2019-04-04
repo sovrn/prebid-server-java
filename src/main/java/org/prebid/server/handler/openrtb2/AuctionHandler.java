@@ -8,14 +8,13 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import org.apache.commons.lang3.ObjectUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AuctionEvent;
+import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.model.Tuple2;
@@ -41,8 +40,6 @@ public class AuctionHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AuctionHandler.class);
 
-    private final long defaultTimeout;
-    private final long maxTimeout;
     private final ExchangeService exchangeService;
     private final AuctionRequestFactory auctionRequestFactory;
     private final UidsCookieService uidsCookieService;
@@ -51,19 +48,9 @@ public class AuctionHandler implements Handler<RoutingContext> {
     private final Clock clock;
     private final TimeoutFactory timeoutFactory;
 
-    public AuctionHandler(long defaultTimeout, long maxTimeout, ExchangeService exchangeService,
-                          AuctionRequestFactory auctionRequestFactory, UidsCookieService uidsCookieService,
-                          AnalyticsReporter analyticsReporter, Metrics metrics, Clock clock,
-                          TimeoutFactory timeoutFactory) {
-
-        if (maxTimeout < defaultTimeout) {
-            throw new IllegalArgumentException(
-                    String.format("Max timeout cannot be less than default timeout: max=%d, default=%d", maxTimeout,
-                            defaultTimeout));
-        }
-
-        this.defaultTimeout = defaultTimeout;
-        this.maxTimeout = maxTimeout;
+    public AuctionHandler(ExchangeService exchangeService, AuctionRequestFactory auctionRequestFactory,
+                          UidsCookieService uidsCookieService, AnalyticsReporter analyticsReporter, Metrics metrics,
+                          Clock clock, TimeoutFactory timeoutFactory) {
         this.exchangeService = Objects.requireNonNull(exchangeService);
         this.auctionRequestFactory = Objects.requireNonNull(auctionRequestFactory);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
@@ -81,14 +68,13 @@ public class AuctionHandler implements Handler<RoutingContext> {
         // more accurately if we note the real start time, and use it to compute the auction timeout.
         final long startTime = clock.millis();
 
-        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpHeaders.USER_AGENT));
+        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpUtil.USER_AGENT_HEADER));
         metrics.updateSafariRequestsMetric(isSafari);
 
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
 
         final AuctionEvent.AuctionEventBuilder auctionEventBuilder = AuctionEvent.builder()
-                .context(context)
-                .uidsCookie(uidsCookie);
+                .httpContext(HttpContext.from(context));
 
         auctionRequestFactory.fromRequest(context)
                 .map(bidRequest -> addToEvent(bidRequest, auctionEventBuilder::bidRequest, bidRequest))
@@ -120,12 +106,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
     }
 
     private Timeout timeout(BidRequest bidRequest, long startTime) {
-        final long tmax = ObjectUtils.firstNonNull(bidRequest.getTmax(), 0L);
-
-        final long timeout = tmax <= 0 ? defaultTimeout
-                : tmax > maxTimeout ? maxTimeout : tmax;
-
-        return timeoutFactory.create(startTime, timeout);
+        return timeoutFactory.create(startTime, bidRequest.getTmax());
     }
 
     private void handleResult(AsyncResult<Tuple2<BidResponse, MetricsContext>> responseResult,
@@ -152,7 +133,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
 
         if (responseSucceeded) {
             context.response()
-                    .putHeader(HttpHeaders.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
+                    .putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON)
                     .end(Json.encode(cleanImpIdsFromErrors(responseResult.result().getLeft())));
 
             requestStatus = MetricName.ok;

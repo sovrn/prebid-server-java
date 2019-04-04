@@ -1,0 +1,20 @@
+adapters:
+  yieldmo:
+    enabled: false
+    endpoint: http://ads.yieldmo.com/exchange/prebid-server
+    pbs-enforces-gdpr: true
+    deprecated-names:
+    aliases:
+    meta-info:
+      maintainer-email: progsupport@yieldmo.com
+      app-media-types:
+      site-media-types:
+        - banner
+      supported-vendors:
+      vendor-id: 173
+    usersync:
+      url: https://ads.yieldmo.com/pbsync?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&redirectUri=
+      redirect-url: /setuid?bidder=yieldmo&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&uid=$UID
+      cookie-family-name: yieldmo
+      type: redirect
+      support-cors: false
