@@ -11,6 +11,8 @@ adapters:
     enabled: true
   conversant:
     enabled: true
+  ix:
+    enabled: true
   pubmatic:
     enabled: true
   pulsepoint:
