@@ -36,10 +36,6 @@ analytics:
   rp:
     enabled: true
     pbs-version: 0.0.1
-    sampling-factor:
-      account:
-        15946: 1
-        12108: 1
 cache:
   scheme: https
   path: /cache
