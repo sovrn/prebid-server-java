@@ -1,5 +1,6 @@
 package org.prebid.server.handler.openrtb2;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.BidRequest;
@@ -22,11 +23,13 @@ import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.InvalidRequestException;
+import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.metric.model.MetricsContext;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.util.HttpUtil;
 
 import java.time.Clock;
@@ -40,6 +43,10 @@ import java.util.stream.Collectors;
 public class AuctionHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(AuctionHandler.class);
+
+    private static final TypeReference<ExtBidResponse> EXT_BID_RESPONSE_TYPE_REFERENCE =
+            new TypeReference<ExtBidResponse>() {
+            };
 
     private final ExchangeService exchangeService;
     private final AuctionRequestFactory auctionRequestFactory;
@@ -87,8 +94,6 @@ public class AuctionHandler implements Handler<RoutingContext> {
                         exchangeService.holdAuction(result.getLeft(), uidsCookie, timeout(result.getLeft(), startTime),
                                 result.getRight(), context)
                                 .map(bidResponse -> Tuple2.of(bidResponse, result.getRight())))
-                .map((Tuple2<BidResponse, MetricsContext> result) ->
-                        addToEvent(result.getLeft(), auctionEventBuilder::bidResponse, result))
                 .setHandler(responseResult -> handleResult(responseResult, auctionEventBuilder, context, startTime));
     }
 
@@ -135,15 +140,24 @@ public class AuctionHandler implements Handler<RoutingContext> {
         final int status;
         final List<String> errorMessages;
 
+        final BidResponse bidResponse;
+        final ExtBidResponse extBidResponse;
+
         if (responseSucceeded) {
+            bidResponse = responseResult.result().getLeft();
+            extBidResponse = extResponseFrom(bidResponse); // holds impIds in response.ext.errors
+
             context.response()
                     .putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON)
-                    .end(Json.encode(cleanImpIdsFromErrors(responseResult.result().getLeft())));
+                    .end(Json.encode(cleanImpIdsFromErrors(bidResponse)));
 
             requestStatus = MetricName.ok;
             status = HttpResponseStatus.OK.code();
             errorMessages = Collections.emptyList();
         } else {
+            bidResponse = null;
+            extBidResponse = null;
+
             final Throwable exception = responseResult.cause();
             if (exception instanceof InvalidRequestException) {
                 requestStatus = MetricName.badinput;
@@ -172,12 +186,25 @@ public class AuctionHandler implements Handler<RoutingContext> {
 
         metrics.updateRequestTimeMetric(clock.millis() - startTime);
         metrics.updateRequestTypeMetric(requestType, requestStatus);
+
+        addBidResponseToEvent(bidResponse, extBidResponse, auctionEventBuilder);
         analyticsReporter.processEvent(auctionEventBuilder.status(status).errors(errorMessages).build());
     }
 
     private void handleResponseException(Throwable throwable, MetricName requestType) {
         logger.warn("Failed to send auction response", throwable);
         metrics.updateRequestTypeMetric(requestType, MetricName.networkerr);
+    }
+
+    private static ExtBidResponse extResponseFrom(BidResponse bidResponse) {
+        final ExtBidResponse extBidResponse;
+        try {
+            extBidResponse = Json.mapper.convertValue(bidResponse.getExt(), EXT_BID_RESPONSE_TYPE_REFERENCE);
+        } catch (IllegalArgumentException e) {
+            throw new PreBidException(
+                    String.format("Critical error while unpacking bid response: %s", e.getMessage()), e);
+        }
+        return extBidResponse;
     }
 
     private static BidResponse cleanImpIdsFromErrors(BidResponse bidResponse) {
@@ -203,5 +230,24 @@ public class AuctionHandler implements Handler<RoutingContext> {
         }
 
         return bidResponse;
+    }
+
+    private void addBidResponseToEvent(BidResponse bidResponse, ExtBidResponse extBidResponse,
+                                       AuctionEvent.AuctionEventBuilder auctionEventBuilder) {
+        final BidResponse updatedBidResponse;
+
+        if (bidResponse != null && extBidResponse != null) {
+            updatedBidResponse = BidResponse.builder()
+                    .id(bidResponse.getId())
+                    .cur(bidResponse.getCur())
+                    .nbr(bidResponse.getNbr())
+                    .seatbid(bidResponse.getSeatbid())
+                    .ext(Json.mapper.valueToTree(extBidResponse))
+                    .build();
+        } else {
+            updatedBidResponse = bidResponse;
+        }
+
+        auctionEventBuilder.bidResponse(updatedBidResponse);
     }
 }

@@ -33,6 +33,8 @@ import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.util.HttpUtil;
 
 import java.time.Clock;
@@ -42,7 +44,9 @@ import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
@@ -478,6 +482,31 @@ public class AuctionHandlerTest extends VertxTest {
                 .status(200)
                 .errors(emptyList())
                 .build());
+    }
+
+    @Test
+    public void shouldClearImpIdsFromErrorsInResponseButNotForAnalyticsEventResponse() {
+        // given
+        final BidRequest bidRequest = givenBidRequest(identity());
+        given(auctionRequestFactory.fromRequest(any())).willReturn(Future.succeededFuture(bidRequest));
+
+        given(exchangeService.holdAuction(any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(BidResponse.builder()
+                        .ext(mapper.valueToTree(
+                                ExtBidResponse.of(null, singletonMap("rubicon", singletonList(
+                                        ExtBidderError.of(1, "msg", singleton("impId1")))), null, null, null)))
+                        .build()));
+
+        // when
+        auctionHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).end(eq("{\"ext\":{\"errors\":{\"rubicon\":[{\"code\":1,\"message\":\"msg\"}]}}}"));
+
+        final AuctionEvent auctionEvent = captureAuctionEvent();
+        assertThat(auctionEvent.getBidResponse().getExt())
+                .isEqualTo(mapper.valueToTree(ExtBidResponse.of(null, singletonMap("rubicon", singletonList(
+                        ExtBidderError.of(1, "msg", singleton("impId1")))), null, null, null)));
     }
 
     @Test

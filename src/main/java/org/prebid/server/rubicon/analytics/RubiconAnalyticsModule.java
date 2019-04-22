@@ -34,7 +34,6 @@ import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderError;
-import org.prebid.server.cache.proto.response.BidCacheResponse;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.PreBidException;
@@ -772,12 +771,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     /**
      * Handles {@link HttpClientResponse}, analyzes response status
-     * and creates {@link Future} with {@link BidCacheResponse} from body content
+     * and creates {@link Future} of {@link Void} from body content
      * or throws {@link PreBidException} in case of errors.
      */
     private static Future<Void> processResponse(HttpClientResponse response) {
         final int statusCode = response.getStatusCode();
-        if (statusCode != 200) {
+        if (statusCode < 200 || statusCode > 299) {
             throw new PreBidException(String.format("HTTP status code %d", statusCode));
         }
         return Future.succeededFuture();
