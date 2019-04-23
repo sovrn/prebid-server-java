@@ -362,6 +362,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverLatencyMillis(101)
                                                         .serverHasUserId(true)
                                                         .params(Params.of(null, null, null))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("pubmatic")
+                                                        .status("error")
+                                                        .error(BidError.timeoutError("Timeout error"))
+                                                        .source("server")
                                                         .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -715,6 +721,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final ObjectNode multiBidderImpExt = mapper.createObjectNode();
         multiBidderImpExt.set("appnexus", mapper.createObjectNode());
         multiBidderImpExt.set("rubicon", mapper.createObjectNode());
+        multiBidderImpExt.set("pubmatic", mapper.createObjectNode());
         multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
 
         return BidRequest.builder()
@@ -867,8 +874,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     private static BidResponse sampleBidResponse() {
-        final Map<String, List<ExtBidderError>> errors = singletonMap("appnexus",
-                singletonList(ExtBidderError.of(1, "Timeout error", singleton("impId6"))));
+        final Map<String, List<ExtBidderError>> errors = doubleMap(
+                "appnexus", singletonList(ExtBidderError.of(1, "Timeout error", singleton("impId6"))),
+                "pubmatic", singletonList(ExtBidderError.of(1, "Timeout error", singleton("impId2"))));
 
         return BidResponse.builder()
                 .seatbid(asList(

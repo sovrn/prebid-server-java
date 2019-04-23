@@ -504,7 +504,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
         return AdUnit.builder()
                 .transactionId(imp.getId())
-                .status(errorsFound ? ERROR_STATUS : openrtbBidsFound ? SUCCESS_STATUS : NO_BID_STATUS)
+                .status(openrtbBidsFound ? SUCCESS_STATUS : errorsFound ? ERROR_STATUS : NO_BID_STATUS)
                 .error(null) // multiple errors may exist, we do not have insight what to choose
                 .mediaTypes(mediaTypesFromImp(imp))
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
