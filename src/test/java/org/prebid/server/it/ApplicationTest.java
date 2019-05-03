@@ -466,7 +466,8 @@ public class ApplicationTest extends IntegrationTest {
                                 .noCookie(true)
                                 .usersync(UsersyncInfo.of(
                                         "http://localhost:8000/setuid?bidder=rubicon"
-                                                + "&gdpr=1&gdpr_consent=" + gdprConsent + "&uid=host-cookie-uid",
+                                                + "&gdpr=1&gdpr_consent=" + gdprConsent + "&uid=host-cookie-uid"
+                                                + "&account=",
                                         "redirect", false))
                                 .build(),
                         BidderUsersyncStatus.builder()
@@ -604,7 +605,8 @@ public class ApplicationTest extends IntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(200);
         assertThat(response.getHeaders()).contains(new Header("content-type", "image/jpeg"));
-        assertThat(response.getBody().asByteArray()).isEqualTo(ResourceUtil.readByteArrayFromClassPath("static/tracking-pixel.jpg"));
+        assertThat(response.getBody().asByteArray()).isEqualTo(
+                ResourceUtil.readByteArrayFromClassPath("static/tracking-pixel.jpg"));
     }
 
     @Test

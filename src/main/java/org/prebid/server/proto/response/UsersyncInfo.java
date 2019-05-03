@@ -92,7 +92,7 @@ public class UsersyncInfo {
 
         public UsersyncInfoAssembler withAccount(String account) {
             usersyncUrl = usersyncUrl.replace(ACCOUNT_PLACEHOLDER,
-                    HttpUtil.encodeUrl(ObjectUtils.firstNonNull(account, "")));
+                    HttpUtil.encodeUrl(ObjectUtils.defaultIfNull(account, "")));
 
             return this;
         }

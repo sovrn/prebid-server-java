@@ -587,7 +587,36 @@ public class CookieSyncHandlerTest extends VertxTest {
                 .extracting(BidderUsersyncStatus::getUsersync)
                 .containsOnly(
                         UsersyncInfo.of("http://external-url/setuid?bidder=rubicon&gdpr=&gdpr_consent="
-                                + "&uid=host%2Fcookie%2Fvalue", "redirect", false));
+                                + "&uid=host%2Fcookie%2Fvalue&account=", "redirect", false));
+    }
+
+    @Test
+    public void shouldRespondWithUpdatedRubiconUsersyncInfoIfHostCookieAndUidsDiffers() throws IOException {
+        // given
+        given(routingContext.getBody()).willReturn(givenRequestBody(
+                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, "account$1")));
+
+        given(bidderCatalog.isActive(RUBICON)).willReturn(true);
+        rubiconUsersyncer = new Usersyncer(RUBICON, "http://rubiconexample.com", null, null, "redirect", false);
+        givenUsersyncersReturningFamilyName();
+
+        givenGdprServiceReturningResult(singletonMap(RUBICON, 1));
+
+        given(uidsCookieService.getHostCookieFamily()).willReturn(RUBICON);
+        given(uidsCookieService.parseHostCookie(any())).willReturn("host/cookie/value");
+        given(uidsCookieService.parseUids(any()))
+                .willReturn(Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("uid-cookie-value"))).build());
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        final CookieSyncResponse cookieSyncResponse = captureCookieSyncResponse();
+        assertThat(cookieSyncResponse.getBidderStatus())
+                .extracting(BidderUsersyncStatus::getUsersync)
+                .containsOnly(
+                        UsersyncInfo.of("http://external-url/setuid?bidder=rubicon&gdpr=&gdpr_consent="
+                                + "&uid=host%2Fcookie%2Fvalue&account=account%241", "redirect", false));
     }
 
     @Test

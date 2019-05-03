@@ -290,7 +290,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                     .build();
         } else {
             final Usersyncer usersyncer = bidderCatalog.usersyncerByName(bidderNameFor(bidder));
-            final UsersyncInfo hostBidderUsersyncInfo = hostBidderUsersyncInfo(context, gdpr, gdprConsent, usersyncer);
+            final UsersyncInfo hostBidderUsersyncInfo = hostBidderUsersyncInfo(context, gdpr, gdprConsent, account,
+                    usersyncer);
 
             if (hostBidderUsersyncInfo != null || !uidsCookie.hasLiveUidFrom(usersyncer.getCookieFamilyName())) {
                 result = bidderStatusBuilder(bidder)
@@ -324,7 +325,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      * 3. Host-bidder uid value in uids cookie should not exist or be different from host-cookie uid value.
      */
     private UsersyncInfo hostBidderUsersyncInfo(RoutingContext context, String gdpr, String gdprConsent,
-                                                Usersyncer usersyncer) {
+                                                String account, Usersyncer usersyncer) {
         final String cookieFamilyName = usersyncer.getCookieFamilyName();
         if (Objects.equals(cookieFamilyName, uidsCookieService.getHostCookieFamily())) {
 
@@ -339,9 +340,11 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
                 if (!Objects.equals(hostCookieUid, uid)) {
                     final String url = String.format("%s/setuid?bidder=%s&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}"
-                            + "&uid=%s", externalUrl, cookieFamilyName, HttpUtil.encodeUrl(hostCookieUid));
+                                    + "&uid=%s&account={{account}}", externalUrl, cookieFamilyName,
+                            HttpUtil.encodeUrl(hostCookieUid));
                     return UsersyncInfo.from(usersyncer).withUrl(url)
                             .withGdpr(gdpr, gdprConsent)
+                            .withAccount(account)
                             .assemble();
                 }
             }
