@@ -47,7 +47,7 @@ public class RsidCookieService {
         try {
             rsidBytes = Base64.getDecoder().decode(rsidRawValue);
         } catch (IllegalArgumentException e) {
-            logger.warn("Cannot decode RSID from: {0}", e, rsidRawValue);
+            logger.warn("Cannot decode RSID with error: {0} from: {1}", e.getMessage(), rsidRawValue);
             return null;
         }
 
