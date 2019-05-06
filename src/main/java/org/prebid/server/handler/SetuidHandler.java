@@ -133,7 +133,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
             }
 
             // check do we really need account parameter
-            if (uidsAudit == null && StringUtils.isBlank(account)) {
+            if (uidsAudit == null && StringUtils.isBlank(account) && gdprResponse.isUserInGdprScope()) {
                 respondWithMissingParamMessage(ACCOUNT_PARAM, context);
                 return;
             }
@@ -142,14 +142,16 @@ public class SetuidHandler implements Handler<RoutingContext> {
             try {
                 if (uidsAudit != null) {
                     uidsAuditCookie = uidsAuditCookieService.updateUidsAuditCookie(context, gdprConsent, uidsAudit);
-                } else {
+                } else if (StringUtils.isNotBlank(account)) {
                     final String uid = context.request().getParam(UID_PARAM);
                     uidsAuditCookie = uidsAuditCookieService
                             .createUidsAuditCookie(context, uid, account, gdprConsent, gdprResponse.getCountry(), ip);
+                } else {
+                    uidsAuditCookie = null; // user is not in GDPR scope, so uids-audit cookie is not required
                 }
-            } catch (PreBidException ex) {
+            } catch (PreBidException e) {
                 final String errorMessage = String.format("Error occurred on audit cookie creation, "
-                        + "uid cookie will not be set without audit: %s", ex.getMessage());
+                        + "uid cookie will not be set without audit: %s", e.getMessage());
                 logger.warn(errorMessage);
                 context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(errorMessage);
                 return;
@@ -198,7 +200,13 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
 
         final Cookie cookie = uidsCookieService.toCookie(updatedUidsCookie);
-        context.addCookie(cookie).addCookie(uidsAuditCookie).response().end();
+        context.addCookie(cookie);
+
+        if (uidsAuditCookie != null) {
+            context.addCookie(uidsAuditCookie);
+        }
+
+        context.response().end();
 
         analyticsReporter.processEvent(SetuidEvent.builder()
                 .status(HttpResponseStatus.OK.code())
