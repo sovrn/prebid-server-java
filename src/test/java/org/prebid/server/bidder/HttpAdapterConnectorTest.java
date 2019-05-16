@@ -587,7 +587,7 @@ public class HttpAdapterConnectorTest extends VertxTest {
         // given
         final Regs regs = Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1)));
         final User user = User.builder()
-                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null, null)))
+                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null, null, null)))
                 .build();
         preBidRequestContext = givenPreBidRequestContext(identity(), builder -> builder.regs(regs).user(user));
 
@@ -615,14 +615,16 @@ public class HttpAdapterConnectorTest extends VertxTest {
         // given
         final Regs regs = Regs.of(0, Json.mapper.valueToTree(ExtRegs.of(1)));
         final User user = User.builder()
-                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null, null)))
+                .ext(Json.mapper.valueToTree(ExtUser.of(null, "consent$1", null, null, null)))
                 .build();
-        preBidRequestContext = givenPreBidRequestContext(identity(), builder -> builder.regs(regs).user(user).accountId("account"));
+        preBidRequestContext = givenPreBidRequestContext(identity(),
+                builder -> builder.regs(regs).user(user).accountId("account"));
 
         givenHttpClientReturnsResponse(200,
                 givenBidResponse(identity(), identity(), singletonList(identity())));
 
-        usersyncer = new Usersyncer(null, "http://url?redir=%26account%3Daccount%26gdpr%3D1%26gdpr_consent%3Dconsent%241",
+        usersyncer = new Usersyncer(null,
+                "http://url?redir=%26account%3Daccount%26gdpr%3D1%26gdpr_consent%3Dconsent%241",
                 null, null, null, false);
 
         // when
@@ -634,7 +636,9 @@ public class HttpAdapterConnectorTest extends VertxTest {
         assertThat(adapterResponse.getBidderStatus().getNoCookie()).isTrue();
         assertThat(adapterResponse.getBidderStatus().getUsersync()).isNotNull();
         assertThat(adapterResponse.getBidderStatus().getUsersync())
-                .isEqualTo(UsersyncInfo.of("http://url?redir=%26account%3Daccount%26gdpr%3D1%26gdpr_consent%3Dconsent%241", null, false));
+                .isEqualTo(
+                        UsersyncInfo.of("http://url?redir=%26account%3Daccount%26gdpr%3D1%26gdpr_consent%3Dconsent%241",
+                                null, false));
     }
 
     @Test

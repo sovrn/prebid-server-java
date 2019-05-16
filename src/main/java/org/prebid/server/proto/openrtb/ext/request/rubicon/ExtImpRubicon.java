@@ -32,4 +32,6 @@ public class ExtImpRubicon {
     RubiconVideoParams video;
 
     ExtImpRubiconDebug debug;
+
+    RubiconImpExtContext context;
 }

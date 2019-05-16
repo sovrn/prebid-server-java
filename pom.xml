@@ -5,7 +5,7 @@
 
     <groupId>org.prebid</groupId>
     <artifactId>prebid-server</artifactId>
-    <version>1.17.2</version>
+    <version>1.18.0</version>
 
     <name>prebid-server</name>
     <description>Prebid Server (Server-side Header Bidding)</description>
@@ -16,7 +16,7 @@
 
     <scm>
         <developerConnection>scm:git:git@github.com:rubicon-project/prebid-server-java.git</developerConnection>
-      <tag>1.17.2</tag>
+      <tag>1.18.0</tag>
   </scm>
 
     <properties>

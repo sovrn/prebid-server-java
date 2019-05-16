@@ -17,6 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtCurrency;
+import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
@@ -142,14 +143,17 @@ public class AmpRequestFactory {
 
         final String debugQueryParam = context.request().getParam(DEBUG_REQUEST_PARAM);
         final Integer test = bidRequest.getTest();
-        final boolean setTestParam = !Objects.equals(test, 1) && Objects.equals(debugQueryParam, "1");
+        final boolean setTest = !Objects.equals(test, 1) && Objects.equals(debugQueryParam, "1");
 
-        return setDefaultTargeting || setDefaultCache || setSecure || setTestParam
+        final Boolean debug = prebid != null ? prebid.getDebug() : null;
+        final boolean setDebug = !Objects.equals(debug, true) && Objects.equals(debugQueryParam, "1");
+
+        return setDefaultTargeting || setDefaultCache || setSecure || setTest || setDebug
                 ? bidRequest.toBuilder()
-                .ext(createExtWithDefaults(bidRequest, prebid, setDefaultTargeting, setDefaultCache,
+                .ext(extBidRequest(bidRequest, prebid, setDefaultTargeting, setDefaultCache, setDebug,
                         requestExt.getRubicon()))
                 .imp(setSecure ? Collections.singletonList(imps.get(0).toBuilder().secure(1).build()) : imps)
-                .test(setTestParam ? Integer.valueOf(1) : test)
+                .test(setTest ? Integer.valueOf(1) : test)
                 .build()
                 : bidRequest;
     }
@@ -177,7 +181,8 @@ public class AmpRequestFactory {
                 siteBuilder.page(canonicalUrl);
             }
             if (shouldSetExtAmp) {
-                siteBuilder.ext(Json.mapper.valueToTree(ExtSite.of(1)));
+                final ObjectNode data = siteExt != null ? (ObjectNode) siteExt.get("data") : null;
+                siteBuilder.ext(Json.mapper.valueToTree(ExtSite.of(1, data)));
             }
             return siteBuilder.build();
         }
@@ -341,25 +346,28 @@ public class AmpRequestFactory {
     }
 
     /**
-     * Creates updated with default values bidrequest.ext {@link ObjectNode}
+     * Creates updated bidrequest.ext {@link ObjectNode}.
      */
-    private static ObjectNode createExtWithDefaults(BidRequest bidRequest, ExtRequestPrebid prebid,
-                                                    boolean setDefaultTargeting, boolean setDefaultCache,
-                                                    ExtRequestRubicon extRequestRubicon) {
+    private static ObjectNode extBidRequest(BidRequest bidRequest, ExtRequestPrebid prebid,
+                                            boolean setDefaultTargeting, boolean setDefaultCache, boolean setDebug,
+                                            ExtRequestRubicon extRequestRubicon) {
         final boolean isPrebidNull = prebid == null;
 
-        return setDefaultTargeting || setDefaultCache
+        return setDefaultTargeting || setDefaultCache || setDebug
                 ? Json.mapper.valueToTree(ExtBidRequest.of(
-                ExtRequestPrebid.of(
-                        isPrebidNull ? Collections.emptyMap() : prebid.getAliases(),
-                        isPrebidNull ? Collections.emptyMap() : prebid.getBidadjustmentfactors(),
-                        setDefaultTargeting || isPrebidNull
-                                ? createTargetingWithDefaults(prebid) : prebid.getTargeting(),
-                        isPrebidNull ? null : prebid.getStoredrequest(),
-                        setDefaultCache
+                ExtRequestPrebid.builder()
+                        .aliases(isPrebidNull ? Collections.emptyMap() : prebid.getAliases())
+                        .bidadjustmentfactors(isPrebidNull ? Collections.emptyMap() : prebid.getBidadjustmentfactors())
+                        .targeting(setDefaultTargeting || isPrebidNull
+                                ? createTargetingWithDefaults(prebid) : prebid.getTargeting())
+                        .storedrequest(isPrebidNull ? null : prebid.getStoredrequest())
+                        .cache(setDefaultCache
                                 ? ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null),
                                 ExtRequestPrebidCacheVastxml.of(null, null))
-                                : isPrebidNull ? null : prebid.getCache()), extRequestRubicon))
+                                : isPrebidNull ? null : prebid.getCache())
+                        .data(isPrebidNull ? null : prebid.getData())
+                        .debug(setDebug ? Boolean.TRUE : isPrebidNull ? null : prebid.getDebug())
+                        .build(), extRequestRubicon))
                 : bidRequest.getExt();
     }
 
@@ -377,6 +385,9 @@ public class AmpRequestFactory {
                 ? Json.mapper.valueToTree(ExtPriceGranularity.from(PriceGranularity.DEFAULT))
                 : priceGranularity;
 
+        final ExtMediaTypePriceGranularity mediaTypePriceGranularity = isTargetingNull
+                ? null : targeting.getMediatypepricegranularity();
+
         final ExtCurrency currency = isTargetingNull ? null : targeting.getCurrency();
 
         final boolean includeWinners = isTargetingNull || targeting.getIncludewinners() == null
@@ -385,6 +396,7 @@ public class AmpRequestFactory {
         final boolean includeBidderKeys = isTargetingNull || targeting.getIncludebidderkeys() == null
                 ? true : targeting.getIncludebidderkeys();
 
-        return ExtRequestTargeting.of(outgoingPriceGranularityNode, currency, includeWinners, includeBidderKeys);
+        return ExtRequestTargeting.of(outgoingPriceGranularityNode, mediaTypePriceGranularity, currency,
+                includeWinners, includeBidderKeys);
     }
 }

@@ -209,8 +209,10 @@ public class AuctionRequestFactory {
         final String page = site != null ? site.getPage() : null;
         final String domain = site != null ? site.getDomain() : null;
         final ObjectNode siteExt = site != null ? site.getExt() : null;
+        final ObjectNode data = siteExt != null ? (ObjectNode) siteExt.get("data") : null;
         final boolean shouldSetExtAmp = siteExt == null || siteExt.get("amp") == null;
-        final ObjectNode modifiedSiteExt = shouldSetExtAmp ? Json.mapper.valueToTree(ExtSite.of(0)) : null;
+        final ObjectNode modifiedSiteExt = shouldSetExtAmp ? Json.mapper.valueToTree(
+                ExtSite.of(0, data)) : null;
 
         String referer = null;
         String parsedDomain = null;
@@ -286,16 +288,18 @@ public class AuctionRequestFactory {
         final ExtRequestPrebid prebid = extBidRequest.getPrebid();
 
         final ExtRequestTargeting targeting = prebid != null ? prebid.getTargeting() : null;
-        final boolean isPriceGranularityNull = targeting != null && targeting.getPricegranularity().isNull();
-        final boolean isPriceGranularityTextual = targeting != null && targeting.getPricegranularity().isTextual();
-        final boolean isIncludeWinnersNull = targeting != null && targeting.getIncludewinners() == null;
-        final boolean isIncludeBidderKeysNull = targeting != null && targeting.getIncludebidderkeys() == null;
+        final boolean isTargetingNotNull = targeting != null;
+        final boolean isPriceGranularityNull = isTargetingNotNull && targeting.getPricegranularity().isNull();
+        final boolean isPriceGranularityTextual = isTargetingNotNull && targeting.getPricegranularity().isTextual();
+        final boolean isIncludeWinnersNull = isTargetingNotNull && targeting.getIncludewinners() == null;
+        final boolean isIncludeBidderKeysNull = isTargetingNotNull && targeting.getIncludebidderkeys() == null;
 
         final ExtRequestTargeting extRequestTargeting;
         if (isPriceGranularityNull || isPriceGranularityTextual || isIncludeWinnersNull || isIncludeBidderKeysNull) {
             extRequestTargeting = ExtRequestTargeting.of(
                     populatePriceGranularity(targeting.getPricegranularity(), isPriceGranularityNull,
                             isPriceGranularityTextual),
+                    targeting.getMediatypepricegranularity(),
                     targeting.getCurrency(),
                     isIncludeWinnersNull ? true : targeting.getIncludewinners(),
                     isIncludeBidderKeysNull ? true : targeting.getIncludebidderkeys());
@@ -306,14 +310,15 @@ public class AuctionRequestFactory {
         final Map<String, String> aliases = aliases(prebid, imps);
 
         if (extRequestTargeting != null || aliases != null) {
-            return Json.mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.of(
-                    ObjectUtils.defaultIfNull(aliases, getIfNotNull(prebid, ExtRequestPrebid::getAliases)),
-                    getIfNotNull(prebid, ExtRequestPrebid::getBidadjustmentfactors),
-                    ObjectUtils.defaultIfNull(extRequestTargeting,
-                            getIfNotNull(prebid, ExtRequestPrebid::getTargeting)),
-                    getIfNotNull(prebid, ExtRequestPrebid::getStoredrequest),
-                    getIfNotNull(prebid, ExtRequestPrebid::getCache)),
-                    extBidRequest.getRubicon()));
+            return Json.mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
+                    .aliases(ObjectUtils.defaultIfNull(aliases, getIfNotNull(prebid, ExtRequestPrebid::getAliases)))
+                    .bidadjustmentfactors(getIfNotNull(prebid, ExtRequestPrebid::getBidadjustmentfactors))
+                    .targeting(ObjectUtils.defaultIfNull(extRequestTargeting,
+                            getIfNotNull(prebid, ExtRequestPrebid::getTargeting)))
+                    .storedrequest(getIfNotNull(prebid, ExtRequestPrebid::getStoredrequest))
+                    .cache(getIfNotNull(prebid, ExtRequestPrebid::getCache))
+                    .data(getIfNotNull(prebid, ExtRequestPrebid::getData))
+                    .build(), extBidRequest.getRubicon()));
         }
         return null;
     }
