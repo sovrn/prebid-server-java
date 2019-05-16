@@ -19,7 +19,6 @@ adapters:
     enabled: true
   rubicon:
     enabled: true
-    pbs-enforces-gdpr: false
   sovrn:
     enabled: true
 auction:
