@@ -946,7 +946,7 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldPopulateBidResponseDebugExtensionIfExtPrebidDebugIsTrue() throws JsonProcessingException {
+    public void shouldPopulateBidResponseDebugExtensionIfExtPrebidDebugIsOn() throws JsonProcessingException {
         // given
         givenBidder("bidder1", mock(Bidder.class), BidderSeatBid.of(
                 singletonList(givenBid(Bid.builder().price(BigDecimal.ONE).build())),
@@ -977,7 +977,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(
                 givenSingleImp(doubleMap("bidder1", 1, "bidder2", 2)),
                 builder -> builder.ext(
-                        mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder().debug(true).build(), null))));
+                        mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder().debug(1).build(), null))));
 
         // when
         final BidResponse bidResponse =
@@ -1584,11 +1584,11 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldAlwaysRemoveRequestExtPrebidDataBidders() {
+    public void shouldCleanRequestExtPrebidDataBidders() {
         // given
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .data(ExtRequestPrebidData.of(singletonList("should_be_removed")))
+                        .data(ExtRequestPrebidData.of(asList("someBidder", "should_be_removed")))
                         .aliases(singletonMap("someBidder", "alias_should_stay"))
                         .build(), null))));
 
@@ -1600,6 +1600,7 @@ public class ExchangeServiceTest extends VertxTest {
         assertThat(capturedBidRequestExt).isEqualTo(mapper.valueToTree(
                 ExtBidRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("someBidder", "alias_should_stay"))
+                        .data(ExtRequestPrebidData.of(singletonList("someBidder")))
                         .build(), null)));
     }
 
