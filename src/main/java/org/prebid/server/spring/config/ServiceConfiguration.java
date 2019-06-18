@@ -73,14 +73,16 @@ public class ServiceConfiguration {
             @Value("${cache.query}") String query,
             @Value("${cache.banner-ttl-seconds:#{null}}") Integer bannerCacheTtl,
             @Value("${cache.video-ttl-seconds:#{null}}") Integer videoCacheTtl,
-            HttpClient httpClient) {
+            HttpClient httpClient,
+            Clock clock) {
 
         return new CacheService(
                 applicationSettings,
                 CacheTtl.of(bannerCacheTtl, videoCacheTtl),
                 httpClient,
                 CacheService.getCacheEndpointUrl(scheme, host, path),
-                CacheService.getCachedAssetUrlTemplate(scheme, host, path, query));
+                CacheService.getCachedAssetUrlTemplate(scheme, host, path, query),
+                clock);
     }
 
     @Bean
@@ -279,13 +281,15 @@ public class ServiceConfiguration {
     @Bean
     GdprService gdprService(
             RsidCookieService rsidCookieService,
+            ApplicationSettings applicationSettings,
             @Autowired(required = false) GeoLocationService geoLocationService,
             VendorListService vendorListService,
             @Value("${gdpr.eea-countries}") String eeaCountriesAsString,
             @Value("${gdpr.default-value}") String defaultValue) {
 
         final List<String> eeaCountries = Arrays.asList(eeaCountriesAsString.trim().split(","));
-        return new GdprService(rsidCookieService, geoLocationService, vendorListService, eeaCountries, defaultValue);
+        return new GdprService(rsidCookieService, applicationSettings, geoLocationService, vendorListService,
+                eeaCountries, defaultValue);
     }
 
     @ConditionalOnProperty(name = "gdpr.rubicon.enable-cookie", matchIfMissing = true)

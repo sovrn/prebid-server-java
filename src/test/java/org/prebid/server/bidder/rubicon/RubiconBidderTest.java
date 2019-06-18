@@ -473,7 +473,7 @@ public class RubiconBidderTest extends VertxTest {
         assertThat(result.getErrors()).hasSize(1);
         assertThat(result.getErrors().get(0).getMessage())
                 .startsWith("Cannot deserialize instance of `java.lang.String`");
-        assertThat(result.getValue()).hasSize(0);
+        assertThat(result.getValue()).isEmpty();
     }
 
     @Test
@@ -655,6 +655,24 @@ public class RubiconBidderTest extends VertxTest {
         assertThat(result.getValue()).hasSize(1).doesNotContainNull()
                 .extracting(httpRequest -> mapper.readValue(httpRequest.getBody(), BidRequest.class))
                 .extracting(BidRequest::getCur).hasSize(1).containsNull();
+    }
+
+    @Test
+    public void makeHttpRequestsShouldSuppressExtIfPresent() {
+        // given
+        final BidRequest bidRequest = givenBidRequest(
+                builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder().build(), null))),
+                builder -> builder.video(Video.builder().build()),
+                identity());
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = rubiconBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getValue()).hasSize(1).doesNotContainNull()
+                .extracting(httpRequest -> mapper.readValue(httpRequest.getBody(), BidRequest.class))
+                .extracting(BidRequest::getExt).hasSize(1).containsNull();
     }
 
     @Test
@@ -985,6 +1003,27 @@ public class RubiconBidderTest extends VertxTest {
         // then
         assertThat(result.getErrors()).hasSize(1);
         assertThat(result.getErrors().get(0).getMessage()).startsWith("Cannot deserialize instance");
+        assertThat(result.getValue()).hasSize(1);
+    }
+
+    @Test
+    public void makeHttpRequestsShouldReturnErrorIfNoImpFormat() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(asList(
+                        givenImp(builder -> builder.video(Video.builder().build())),
+                        givenImp(builder -> builder.banner(Banner.builder()
+                                .format(null).w(300).h(250)
+                                .build()))))
+                .build();
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = rubiconBidder.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getErrors()).hasSize(1);
+        assertThat(result.getErrors())
+                .containsOnly(BidderError.badInput("rubicon imps must have at least one imp.format element"));
         assertThat(result.getValue()).hasSize(1);
     }
 
