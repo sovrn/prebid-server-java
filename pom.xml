@@ -16,8 +16,8 @@
 
     <scm>
         <developerConnection>scm:git:git@github.com:rubicon-project/prebid-server-java.git</developerConnection>
-      <tag>1.19.0</tag>
-  </scm>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <!-- used for rpm packaging -->
