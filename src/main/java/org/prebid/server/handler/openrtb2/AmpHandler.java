@@ -27,6 +27,7 @@ import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.TimeoutResolver;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.auction.model.Tuple3;
 import org.prebid.server.bidder.BidderCatalog;
@@ -38,7 +39,6 @@ import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
-import org.prebid.server.metric.model.MetricsContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
@@ -69,8 +69,7 @@ public class AmpHandler implements Handler<RoutingContext> {
     private static final TypeReference<ExtBidResponse> EXT_BID_RESPONSE_TYPE_REFERENCE =
             new TypeReference<ExtBidResponse>() {
             };
-
-    private static final MetricsContext METRICS_CONTEXT = MetricsContext.of(MetricName.amp);
+    private static final MetricName REQUEST_TYPE_METRIC = MetricName.amp;
 
     private final AmpRequestFactory ampRequestFactory;
     private final ExchangeService exchangeService;
@@ -103,37 +102,46 @@ public class AmpHandler implements Handler<RoutingContext> {
     }
 
     @Override
-    public void handle(RoutingContext context) {
+    public void handle(RoutingContext routingContext) {
         // Prebid Server interprets request.tmax to be the maximum amount of time that a caller is willing to wait
         // for bids. However, tmax may be defined in the Stored Request data.
         // If so, then the trip to the backend might use a significant amount of this time. We can respect timeouts
         // more accurately if we note the real start time, and use it to compute the auction timeout.
         final long startTime = clock.millis();
 
-        final boolean isSafari = HttpUtil.isSafari(context.request().headers().get(HttpUtil.USER_AGENT_HEADER));
+        final boolean isSafari = HttpUtil.isSafari(routingContext.request().headers().get(HttpUtil.USER_AGENT_HEADER));
         metrics.updateSafariRequestsMetric(isSafari);
 
-        final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
+        final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(routingContext);
 
         final AmpEvent.AmpEventBuilder ampEventBuilder = AmpEvent.builder()
-                .httpContext(HttpContext.from(context));
+                .httpContext(HttpContext.from(routingContext));
 
-        ampRequestFactory.fromRequest(context)
+        ampRequestFactory.fromRequest(routingContext)
                 .map(bidRequest -> addToEvent(bidRequest, ampEventBuilder::bidRequest, bidRequest))
                 .map(bidRequest -> updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest, uidsCookie, isSafari))
-                .compose(bidRequest ->
-                        exchangeService.holdAuction(bidRequest, uidsCookie, timeout(bidRequest, startTime),
-                                METRICS_CONTEXT, context)
-                                .map(bidResponse -> Tuple2.of(bidRequest, bidResponse)))
-                .map((Tuple2<BidRequest, BidResponse> result) ->
-                        addToEvent(result.getRight(), ampEventBuilder::bidResponse, result))
-                .map((Tuple2<BidRequest, BidResponse> result) -> Tuple3.of(result.getLeft(), result.getRight(),
-                        toAmpResponse(result.getLeft(), result.getRight())))
-                .compose((Tuple3<BidRequest, BidResponse, AmpResponse> result) ->
-                        ampResponsePostProcessor.postProcess(result.getLeft(), result.getMiddle(), result.getRight(),
-                                context))
+
+                .map(bidRequest -> AuctionContext.builder()
+                        .routingContext(routingContext)
+                        .uidsCookie(uidsCookie)
+                        .bidRequest(bidRequest)
+                        .timeout(timeout(bidRequest, startTime))
+                        .requestTypeMetric(REQUEST_TYPE_METRIC)
+                        .build())
+
+                .compose(context ->
+                        exchangeService.holdAuction(context)
+                                .map(bidResponse -> Tuple2.of(bidResponse, context)))
+
+                .map(result -> addToEvent(result.getLeft(), ampEventBuilder::bidResponse, result))
+                .map(result -> Tuple3.of(result.getLeft(), result.getRight(),
+                        toAmpResponse(result.getRight().getBidRequest(), result.getLeft())))
+                .compose(result ->
+                        ampResponsePostProcessor.postProcess(result.getMiddle().getBidRequest(), result.getLeft(),
+                                result.getRight(), routingContext))
+
                 .map(ampResponse -> addToEvent(ampResponse.getTargeting(), ampEventBuilder::targeting, ampResponse))
-                .setHandler(responseResult -> handleResult(responseResult, ampEventBuilder, context, startTime));
+                .setHandler(responseResult -> handleResult(responseResult, ampEventBuilder, routingContext, startTime));
     }
 
     private static <T, R> R addToEvent(T field, Consumer<T> consumer, R result) {
@@ -273,16 +281,14 @@ public class AmpHandler implements Handler<RoutingContext> {
 
     private void handleResult(AsyncResult<AmpResponse> responseResult, AmpEvent.AmpEventBuilder ampEventBuilder,
                               RoutingContext context, long startTime) {
-        final MetricName requestType = METRICS_CONTEXT.getRequestType();
-
         // Don't send the response if client has gone
         if (context.response().closed()) {
             logger.warn("The client already closed connection, response will be skipped");
-            metrics.updateRequestTypeMetric(requestType, MetricName.networkerr);
+            metrics.updateRequestTypeMetric(REQUEST_TYPE_METRIC, MetricName.networkerr);
             return;
         }
 
-        context.response().exceptionHandler(throwable -> handleResponseException(throwable, requestType));
+        context.response().exceptionHandler(this::handleResponseException);
 
         final String origin = originFrom(context);
         ampEventBuilder.origin(origin);
@@ -331,7 +337,7 @@ public class AmpHandler implements Handler<RoutingContext> {
         }
 
         metrics.updateRequestTimeMetric(clock.millis() - startTime);
-        metrics.updateRequestTypeMetric(requestType, requestStatus);
+        metrics.updateRequestTypeMetric(REQUEST_TYPE_METRIC, requestStatus);
         analyticsReporter.processEvent(ampEventBuilder.status(status).errors(errorMessages).build());
     }
 
@@ -348,8 +354,8 @@ public class AmpHandler implements Handler<RoutingContext> {
         return origin;
     }
 
-    private void handleResponseException(Throwable throwable, MetricName requestType) {
+    private void handleResponseException(Throwable throwable) {
         logger.warn("Failed to send amp response", throwable);
-        metrics.updateRequestTypeMetric(requestType, MetricName.networkerr);
+        metrics.updateRequestTypeMetric(REQUEST_TYPE_METRIC, MetricName.networkerr);
     }
 }

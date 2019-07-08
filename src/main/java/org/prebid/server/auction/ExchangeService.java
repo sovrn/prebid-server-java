@@ -25,6 +25,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.BidderRequest;
 import org.prebid.server.auction.model.BidderResponse;
 import org.prebid.server.auction.model.Tuple2;
@@ -50,7 +51,6 @@ import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
-import org.prebid.server.metric.model.MetricsContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtApp;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
@@ -150,8 +150,13 @@ public class ExchangeService {
      * Runs an auction: delegates request to applicable bidders, gathers responses from them and constructs final
      * response containing returned bids and additional information in extensions.
      */
-    public Future<BidResponse> holdAuction(BidRequest bidRequest, UidsCookie uidsCookie, Timeout timeout,
-                                           MetricsContext metricsContext, RoutingContext context) {
+    public Future<BidResponse> holdAuction(AuctionContext context) {
+        final RoutingContext routingContext = context.getRoutingContext();
+        final UidsCookie uidsCookie = context.getUidsCookie();
+        final BidRequest bidRequest = context.getBidRequest();
+        final Timeout timeout = context.getTimeout();
+        final MetricName requestTypeMetric = context.getRequestTypeMetric();
+
         final ExtBidRequest requestExt;
         try {
             requestExt = requestExt(bidRequest);
@@ -170,9 +175,9 @@ public class ExchangeService {
         final boolean debugEnabled = isDebugEnabled(bidRequest, requestExt);
         final long startTime = clock.millis();
 
-        return extractBidderRequests(bidRequest, requestExt, uidsCookie, aliases, publisherId, timeout, context)
+        return extractBidderRequests(bidRequest, requestExt, uidsCookie, aliases, publisherId, timeout, routingContext)
                 .map(bidderRequests ->
-                        updateRequestMetric(bidderRequests, uidsCookie, aliases, publisherId, metricsContext))
+                        updateRequestMetric(bidderRequests, uidsCookie, aliases, publisherId, requestTypeMetric))
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(bidderRequest, startTime,
                                 auctionTimeout(timeout, cacheInfo.doCaching), debugEnabled, aliases,
@@ -188,7 +193,7 @@ public class ExchangeService {
                         toBidResponse(result.getLeft(), bidRequest, keywordsCreator, keywordsCreatorByBidType,
                                 cacheInfo, publisherId, timeout, result.getRight(), debugEnabled))
                 .compose(bidResponse ->
-                        bidResponsePostProcessor.postProcess(context, uidsCookie, bidRequest, bidResponse));
+                        bidResponsePostProcessor.postProcess(routingContext, uidsCookie, bidRequest, bidResponse));
     }
 
     /**
@@ -410,8 +415,7 @@ public class ExchangeService {
      * Determines if COPPA is required.
      */
     private static boolean isCoppaMaskingRequired(Regs regs) {
-        final Integer coppa = regs != null ? regs.getCoppa() : null;
-        return Objects.equals(coppa, 1);
+        return regs != null && Objects.equals(regs.getCoppa(), 1);
     }
 
     /**
@@ -561,7 +565,7 @@ public class ExchangeService {
     }
 
     /**
-     * Extracts {@link ExtUser} from {@link User} or returns null if not presents.
+     * Extracts {@link ExtUser} from request.user.ext or returns null if not presents.
      */
     private static ExtUser extUser(User user) {
         final ObjectNode userExt = user != null ? user.getExt() : null;
@@ -585,9 +589,9 @@ public class ExchangeService {
                              Map<String, String> uidsBody, UidsCookie uidsCookie,
                              boolean useFirstPartyData, boolean coppaMaskingRequired, boolean gdprMaskingRequired) {
 
-        final ObjectNode updatedExt = updatedUserExt(extUser, useFirstPartyData);
+        final ObjectNode updatedExt = updateUserExt(extUser, useFirstPartyData);
         final String updatedBuyerUid = !coppaMaskingRequired && !gdprMaskingRequired
-                ? updatedUserBuyerUid(user, bidder, aliases, uidsBody, uidsCookie)
+                ? updateUserBuyerUid(user, bidder, aliases, uidsBody, uidsCookie)
                 : null;
 
         if (updatedExt != null || updatedBuyerUid != null || coppaMaskingRequired || gdprMaskingRequired) {
@@ -628,25 +632,40 @@ public class ExchangeService {
     }
 
     /**
-     * Returns json encoded {@link ExtUser} without request.user.ext.prebid.buyeruids
-     * to avoid leaking of buyeruids across bidders.
+     * Returns json encoded {@link ObjectNode} of {@link ExtUser} with changes applied:
      * <p>
-     * Also, removes request.user.ext.data if bidder doesn't allow first party data to be passed.
+     * - Removes request.user.ext.prebid.buyeruids to avoid leaking of buyeruids across bidders.
+     * <p>
+     * - Removes request.user.ext.data if bidder doesn't allow first party data to be passed.
      * <p>
      * Returns null if {@link ExtUser} doesn't need to be updated.
      */
-    private static ObjectNode updatedUserExt(ExtUser extUser, boolean useFirstPartyData) {
-        return extUser != null && (extUser.getPrebid() != null || (!useFirstPartyData && extUser.getData() != null))
-                ? Json.mapper.valueToTree(ExtUser.of(null, extUser.getConsent(), extUser.getDigitrust(),
-                extUser.getTpid(), useFirstPartyData ? extUser.getData() : null))
-                : null;
+    private static ObjectNode updateUserExt(ExtUser extUser, boolean useFirstPartyData) {
+        if (extUser != null) {
+            final boolean removePrebid = extUser.getPrebid() != null;
+            final boolean removeFirstPartyData = !useFirstPartyData && extUser.getData() != null;
+
+            if (removePrebid || removeFirstPartyData) {
+                final ExtUser.ExtUserBuilder builder = extUser.toBuilder();
+
+                if (removePrebid) {
+                    builder.prebid(null);
+                }
+                if (removeFirstPartyData) {
+                    builder.data(null);
+                }
+
+                return Json.mapper.valueToTree(builder.build());
+            }
+        }
+        return null;
     }
 
     /**
      * Returns updated buyerUid or null if it doesn't need to be updated.
      */
-    private String updatedUserBuyerUid(User user, String bidder, Map<String, String> aliases,
-                                       Map<String, String> uidsBody, UidsCookie uidsCookie) {
+    private String updateUserBuyerUid(User user, String bidder, Map<String, String> aliases,
+                                      Map<String, String> uidsBody, UidsCookie uidsCookie) {
         final String buyerUidFromBodyOrCookie = extractUid(uidsBody, uidsCookie, resolveBidder(bidder, aliases));
         final String buyerUidFromUser = user != null ? user.getBuyeruid() : null;
 
@@ -779,10 +798,8 @@ public class ExchangeService {
      */
     private List<BidderRequest> updateRequestMetric(List<BidderRequest> bidderRequests, UidsCookie uidsCookie,
                                                     Map<String, String> aliases, String publisherId,
-                                                    MetricsContext metricsContext) {
-        final MetricName requestType = metricsContext.getRequestType();
-
-        metrics.updateAccountRequestMetrics(publisherId, requestType);
+                                                    MetricName requestTypeMetric) {
+        metrics.updateAccountRequestMetrics(publisherId, requestTypeMetric);
 
         for (BidderRequest bidderRequest : bidderRequests) {
             final String bidder = resolveBidder(bidderRequest.getBidder(), aliases);
@@ -790,7 +807,7 @@ public class ExchangeService {
             final boolean noBuyerId = !bidderCatalog.isActive(bidder) || StringUtils.isBlank(
                     uidsCookie.uidFrom(bidderCatalog.usersyncerByName(bidder).getCookieFamilyName()));
 
-            metrics.updateAdapterRequestTypeAndNoCookieMetrics(bidder, requestType, !isApp && noBuyerId);
+            metrics.updateAdapterRequestTypeAndNoCookieMetrics(bidder, requestTypeMetric, !isApp && noBuyerId);
         }
         return bidderRequests;
     }
@@ -1248,6 +1265,15 @@ public class ExchangeService {
     }
 
     /**
+     * Creates a map with {@link Bid} as a key and null as a value.
+     */
+    private static Map<Bid, CacheIdInfo> toMapBidsWithEmptyCacheIds(Set<Bid> bids) {
+        final Map<Bid, CacheIdInfo> result = new HashMap<>(bids.size());
+        bids.forEach(bid -> result.put(bid, CacheIdInfo.empty()));
+        return result;
+    }
+
+    /**
      * Adds bids with no cache id info.
      */
     private static CacheServiceResult addNotCachedBids(CacheServiceResult cacheResult, Set<Bid> bids) {
@@ -1266,15 +1292,6 @@ public class ExchangeService {
     }
 
     /**
-     * Creates a map with {@link Bid} as a key and null as a value.
-     */
-    private static Map<Bid, CacheIdInfo> toMapBidsWithEmptyCacheIds(Set<Bid> bids) {
-        final Map<Bid, CacheIdInfo> result = new HashMap<>(bids.size());
-        bids.forEach(bid -> result.put(bid, CacheIdInfo.empty()));
-        return result;
-    }
-
-    /**
      * Creates an OpenRTB {@link BidResponse} from the bids supplied by the bidder,
      * including processing of winning bids with cache IDs.
      */
@@ -1286,9 +1303,8 @@ public class ExchangeService {
                                                    boolean eventsEnabled, boolean debugEnabled) {
         final List<SeatBid> seatBids = bidderResponses.stream()
                 .filter(bidderResponse -> !bidderResponse.getSeatBid().getBids().isEmpty())
-                .map(bidderResponse ->
-                        toSeatBid(bidderResponse, keywordsCreator, keywordsCreatorByBidType, cacheResult,
-                                winningBids, winningBidsByBidder, cacheInfo, eventsEnabled))
+                .map(bidderResponse -> toSeatBid(bidderResponse, keywordsCreator, keywordsCreatorByBidType, cacheResult,
+                        winningBids, winningBidsByBidder, cacheInfo, eventsEnabled))
                 .collect(Collectors.toList());
 
         final ExtBidResponse bidResponseExt = toExtBidResponse(bidderResponses, bidRequest, cacheResult, debugEnabled);
