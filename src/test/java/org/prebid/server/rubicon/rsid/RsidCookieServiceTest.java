@@ -57,6 +57,22 @@ public class RsidCookieServiceTest {
     }
 
     @Test
+    public void shouldCutOutPipeAndAllCharactersBeforeItAndReturnExpectedResult() {
+        // given
+        given(context.getCookie(anyString()))
+                .willReturn(Cookie.cookie("rsid",
+                        "chars_before_pipe|B9qWECXyvoJUFeX6MlUI0rdsb6KO+1hVre/oD1mN/CN4VoLIUnj4T/IHduc/n6k03b" +
+                                "YgvBh7oB3JHIxCI7JZAa8E5oMBeRSWa9qr15frXLoJaNEy0hbrXDlIwC9iqGWqIrmhaA=="));
+
+        // when
+        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+
+        // then
+        assertThat(rsid).isEqualTo(Rsid.of("us"));
+    }
+
+
+    @Test
     public void shouldReturnExpectedResultsForVarianceOfInputs() {
         // given
         given(context.getCookie(anyString()))

@@ -36,18 +36,21 @@ public class RsidCookieService {
     }
 
     /**
-     * 1. Decodes input string from Base64.
+     * 1. Pre-process input string.
      * <p>
-     * 2. Decrypts decoded value to RSID string.
+     * 2. Decodes input string from Base64.
      * <p>
-     * 3. Creates {@link Rsid} result model.
+     * 3. Decrypts decoded value to RSID string.
+     * <p>
+     * 4. Creates {@link Rsid} result model.
      */
     private Rsid toRsid(String rsidRawValue) {
+        final String processedRsidValue = preProcessRsidValue(rsidRawValue);
         final byte[] rsidBytes;
         try {
-            rsidBytes = Base64.getDecoder().decode(rsidRawValue);
+            rsidBytes = Base64.getDecoder().decode(processedRsidValue);
         } catch (IllegalArgumentException e) {
-            logger.warn("Cannot decode RSID with error: {0} from: {1}", e.getMessage(), rsidRawValue);
+            logger.warn("Cannot decode RSID with error: {0} from: {1}", e.getMessage(), processedRsidValue);
             return null;
         }
 
@@ -57,6 +60,15 @@ public class RsidCookieService {
         final String[] groups = sb.toString().split("\\^");
         final String country = groups.length > 3 ? StringUtils.stripToNull(groups[3]) : null;
         return Rsid.of(country);
+    }
+
+    /**
+     * Checks if raw RSID string contains invalid character.
+     * If it does - excludes that char as well as all characters before it.
+     */
+    private static String preProcessRsidValue(String rsidRawValue) {
+        final int invalidCharIndex = rsidRawValue.indexOf("|");
+        return invalidCharIndex == -1 ? rsidRawValue : rsidRawValue.substring(invalidCharIndex + 1);
     }
 
     /**
