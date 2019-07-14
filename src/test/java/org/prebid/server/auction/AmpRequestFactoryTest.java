@@ -22,6 +22,7 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.mockito.stubbing.Answer;
 import org.prebid.server.VertxTest;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
@@ -43,6 +44,7 @@ import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -55,27 +57,27 @@ public class AmpRequestFactoryTest extends VertxTest {
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
     @Mock
-    private TimeoutResolver timeoutResolver;
-    @Mock
     private StoredRequestProcessor storedRequestProcessor;
     @Mock
     private AuctionRequestFactory auctionRequestFactory;
+    @Mock
+    private TimeoutResolver timeoutResolver;
 
     private AmpRequestFactory factory;
-
-    @Mock
-    private RoutingContext routingContext;
     @Mock
     private HttpServerRequest httpRequest;
+    @Mock
+    private RoutingContext routingContext;
 
     @Before
     public void setUp() {
         given(timeoutResolver.resolve(any())).willReturn(2000L);
+        given(timeoutResolver.adjustTimeout(anyLong())).willReturn(1900L);
 
         given(httpRequest.getParam(eq("tag_id"))).willReturn("tagId");
         given(routingContext.request()).willReturn(httpRequest);
 
-        factory = new AmpRequestFactory(timeoutResolver, storedRequestProcessor, auctionRequestFactory);
+        factory = new AmpRequestFactory(storedRequestProcessor, auctionRequestFactory, timeoutResolver);
     }
 
     @Test
@@ -84,7 +86,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("tag_id")).willReturn(null);
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
         verifyZeroInteractions(storedRequestProcessor);
@@ -97,11 +99,10 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnFailedFutureIfStoredBidRequestHasNoImp() {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
+        givenBidRequest(identity());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -114,11 +115,10 @@ public class AmpRequestFactoryTest extends VertxTest {
     public void shouldReturnFailedFutureIfStoredBidRequestHasMoreThenOneImp() {
         // given
         final Imp imp = Imp.builder().build();
-        final BidRequest bidRequest = givenBidRequest(identity(), imp, imp);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
+        givenBidRequest(identity(), imp, imp);
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -137,7 +137,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -149,11 +149,10 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnFailedFutureIfStoredBidRequestHasNoExt() {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity(), Imp.builder().build());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
+        givenBidRequest(identity(), Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -167,11 +166,10 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         final ObjectNode ext = (ObjectNode) mapper.createObjectNode()
                 .set("prebid", new TextNode("non-ExtBidRequest"));
-        final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(ext), Imp.builder().build());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
+        givenBidRequest(builder -> builder.ext(ext), Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -184,19 +182,15 @@ public class AmpRequestFactoryTest extends VertxTest {
     public void shouldReturnBidRequestWithDefaultPrebidValuesIfPrebidIsNull() {
         // given
         final ObjectNode extBidRequest = mapper.valueToTree(ExtBidRequest.of(null, null));
-        final BidRequest bidRequest = givenBidRequest(builder -> builder.ext(extBidRequest), Imp.builder().build());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(builder -> builder.ext(extBidRequest), Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
         // result was wrapped to list because extracting method works different on iterable and not iterable objects,
         // which force to make type casting or exception handling in lambdas
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> Json.mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -212,19 +206,16 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithDefaultTargetingIfStoredBidRequestExtHasNoTargeting() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(null, null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(null)),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        // result was wrapped to list because extracting method works different on iterable and not iterable objects,
-        // which force to make type casting or exception handling in lambdas
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -241,22 +232,18 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithDefaultIncludeWinnersIfStoredBidRequestExtTargetingHasNoIncludeWinners() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(
-                ExtRequestTargeting.of(mapper.createObjectNode().put("foo", "bar"), null,
-                        null, null, null), null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(
+                                ExtRequestTargeting.of(mapper.createObjectNode().put("foo", "bar"), null,
+                                        null, null, null))),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-
-        // result was wrapped to list because extracting method works different on iterable and not iterable objects,
-        // which force to make type casting or exception handling in lambdas
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -270,19 +257,18 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithIncludeWinnersFromStoredBidRequest() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(
-                ExtRequestTargeting.of(mapper.createObjectNode().put("foo", "bar"), null,
-                        null, false, null), null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(
+                                ExtRequestTargeting.of(mapper.createObjectNode().put("foo", "bar"), null,
+                                        null, false, null))),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -294,18 +280,17 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithDefaultIncludeBidderKeysIfStoredBidRequestExtTargetingHasNoIncludeBidderKeys() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(
-                ExtRequestTargeting.of(null, null, null, false, null), null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(
+                                ExtRequestTargeting.of(null, null, null, false, null))),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -318,20 +303,18 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithIncludeBidderKeysFromStoredBidRequest() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(
-                ExtRequestTargeting.of(mapper.createObjectNode().put("foo", "bar"), null,
-                        null, null, false), null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(
+                                ExtRequestTargeting.of(mapper.createObjectNode().put("foo", "bar"), null,
+                                        null, null, false))),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -343,20 +326,16 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithDefaultPriceGranularityIfStoredBidRequestExtTargetingHasNoPriceGranularity() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(
-                ExtRequestTargeting.of(null, null, null, false, null), null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(ExtRequestTargeting.of(null, null, null, false, null))),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        // result was wrapped to list because extracting method works different on iterable and not iterable objects,
-        // which force to make type casting or exception handling in lambdas
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class)).isNotNull()
                 .extracting(ExtBidRequest::getPrebid)
@@ -375,22 +354,18 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithDefaultCachingIfStoredBidRequestExtHasNoCaching() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(null, null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(null)),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-
-        // result was wrapped to list because extracting method works different on iterable and not iterable objects,
-        // which force to make type casting or exception handling in lambdas
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
-                .extracting(ext -> Json.mapper.treeToValue(future.result().getExt(), ExtBidRequest.class)).isNotNull()
+                .extracting(ext -> Json.mapper.treeToValue(request.getExt(), ExtBidRequest.class)).isNotNull()
                 .extracting(extBidRequest -> extBidRequest.getPrebid().getCache().getBids())
                 .containsExactly(ExtRequestPrebidCacheBids.of(null, null));
     }
@@ -398,17 +373,19 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithImpSecureEqualsToOneIfInitiallyItWasNotSecured() {
         // given
-        final BidRequest bidRequest = givenBidRequestWithExt(null, null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(null)),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        assertThat(future.result().getImp()).element(0).extracting(Imp::getSecure).containsExactly(1);
+        assertThat(singletonList(request))
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getSecure)
+                .containsExactly(1);
     }
 
     @Test
@@ -416,15 +393,14 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("debug")).willReturn("1");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .test(0)
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder().build());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
 
         // when
-        factory.fromRequest(routingContext);
+        factory.fromRequest(routingContext, 0L);
 
         // then
         final ArgumentCaptor<BidRequest> captor = ArgumentCaptor.forClass(BidRequest.class);
@@ -438,14 +414,13 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("debug")).willReturn("1");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder().debug(0).build(), null))),
                 Imp.builder().build());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
 
         // when
-        factory.fromRequest(routingContext);
+        factory.fromRequest(routingContext, 0L);
 
         // then
         final ArgumentCaptor<BidRequest> captor = ArgumentCaptor.forClass(BidRequest.class);
@@ -460,18 +435,16 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("slot")).willReturn("Overridden-tagId");
 
-        final BidRequest bidRequest = givenBidRequestWithExt(null, null);
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        givenBidRequest(
+                builder -> builder
+                        .ext(givenBidRequestExt(null)),
+                Imp.builder().build());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getTagid)
                 .containsOnly("Overridden-tagId");
@@ -482,21 +455,16 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("curl")).willReturn("");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder().build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getSite)
                 .extracting(Site::getExt)
                 .containsOnly(mapper.valueToTree(ExtSite.of(1, null)));
@@ -507,22 +475,17 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("curl")).willReturn("overridden-site-page");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null)))
                         .site(Site.builder().page("will-be-overridden").build()),
                 Imp.builder().build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getSite)
                 .extracting(Site::getPage, Site::getExt)
                 .containsOnly(tuple("overridden-site-page", mapper.valueToTree(ExtSite.of(1, null))));
@@ -533,22 +496,17 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("curl")).willReturn("overridden-site-page");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null)))
                         .site(null),
                 Imp.builder().build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(future.succeeded()).isTrue();
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getSite)
                 .extracting(Site::getPage, Site::getExt)
                 .containsOnly(tuple("overridden-site-page", mapper.valueToTree(ExtSite.of(1, null))));
@@ -563,7 +521,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("oh")).willReturn("2000");
         given(httpRequest.getParam("ms")).willReturn("44x88,66x99");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -574,15 +532,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -598,7 +552,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("h")).willReturn("40");
         given(httpRequest.getParam("ms")).willReturn("50x60");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -609,15 +563,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -633,7 +583,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("h")).willReturn("40");
         given(httpRequest.getParam("ms")).willReturn("50x60");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -644,15 +594,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -667,7 +613,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("h")).willReturn("40");
         given(httpRequest.getParam("ms")).willReturn("50x60");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -678,15 +624,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -700,7 +642,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("w")).willReturn("30");
         given(httpRequest.getParam("h")).willReturn("40");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -711,15 +653,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -732,7 +670,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("w")).willReturn("30");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -741,15 +679,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         Format.builder().w(3).h(4).build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -762,7 +696,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("h")).willReturn("40");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -771,15 +705,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         Format.builder().w(3).h(4).build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -792,7 +722,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("ms")).willReturn("44x88,66x99");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -803,15 +733,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -824,7 +750,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("ms")).willReturn(",");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -834,15 +760,12 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .h(2)
                                         .build()))
                                 .build()).build());
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
 
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -855,7 +778,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("ms")).willReturn(",33x,44x77,abc,");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -866,15 +789,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -887,7 +806,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("ms")).willReturn("900xZ");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -898,15 +817,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -919,7 +834,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("ms")).willReturn("44x77, 0x0");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -930,15 +845,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -951,7 +862,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("ms")).willReturn("33x,44x77");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -962,15 +873,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -987,7 +894,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("h")).willReturn("0");
         given(httpRequest.getParam("ms")).willReturn("0x0");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -998,15 +905,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -1021,7 +924,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         given(httpRequest.getParam("oh")).willReturn("invalid");
         given(httpRequest.getParam("h")).willReturn("200");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder()
@@ -1032,15 +935,11 @@ public class AmpRequestFactoryTest extends VertxTest {
                                         .build()))
                                 .build()).build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final Future<BidRequest> future = factory.fromRequest(routingContext);
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(future.result()))
+        assertThat(singletonList(request))
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBanner)
                 .flatExtracting(Banner::getFormat)
@@ -1053,41 +952,31 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         given(httpRequest.getParam("timeout")).willReturn("1000");
 
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null))),
                 Imp.builder().build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final BidRequest result = factory.fromRequest(routingContext).result();
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(result.getTmax()).isEqualTo(1000L);
+        assertThat(request.getTmax()).isEqualTo(1000L);
     }
 
     @Test
     public void shouldPassExtPrebidDebugFlagIfPresent() {
         // given
-        final BidRequest bidRequest = givenBidRequest(
+        givenBidRequest(
                 builder -> builder
-                        .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                                .debug(1)
-                                .build(), null))),
+                        .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder().debug(1).build(), null))),
                 Imp.builder().build());
 
-        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
-        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
-        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
-
         // when
-        final BidRequest result = factory.fromRequest(routingContext).result();
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
 
         // then
-        assertThat(singletonList(result))
+        assertThat(singletonList(request))
                 .extracting(BidRequest::getExt)
                 .extracting(ext -> mapper.treeToValue(ext, ExtBidRequest.class))
                 .extracting(ExtBidRequest::getPrebid)
@@ -1095,23 +984,27 @@ public class AmpRequestFactoryTest extends VertxTest {
                 .containsOnly(1);
     }
 
-    private static BidRequest givenBidRequest(
+    private void givenBidRequest(
             Function<BidRequest.BidRequestBuilder, BidRequest.BidRequestBuilder> bidRequestBuilderCustomizer,
             Imp... imps) {
         final List<Imp> impList = imps.length > 0 ? asList(imps) : null;
 
-        return bidRequestBuilderCustomizer.apply(BidRequest.builder().imp(impList)).build();
+        final BidRequest bidRequest = bidRequestBuilderCustomizer.apply(BidRequest.builder().imp(impList)).build();
+
+        given(storedRequestProcessor.processAmpRequest(anyString())).willReturn(Future.succeededFuture(bidRequest));
+
+        given(auctionRequestFactory.fillImplicitParameters(any(), any(), any())).willAnswer(answerWithFirstArgument());
+        given(auctionRequestFactory.validateRequest(any())).willAnswer(answerWithFirstArgument());
+        given(auctionRequestFactory.toAuctionContext(any(), any(), anyLong(), any()))
+                .willAnswer(invocationOnMock -> Future.succeededFuture(
+                        AuctionContext.builder()
+                                .bidRequest((BidRequest) invocationOnMock.getArguments()[1])
+                                .build()));
     }
 
-    private static BidRequest givenBidRequestWithExt(
-            ExtRequestTargeting extRequestTargeting, ExtRequestPrebidCache extRequestPrebidCache) {
-        return BidRequest.builder()
-                .imp(singletonList(Imp.builder().build()))
-                .ext(mapper.valueToTree(ExtBidRequest.of(
-                        ExtRequestPrebid.builder()
-                                .targeting(extRequestTargeting)
-                                .cache(extRequestPrebidCache)
-                                .build(), null)))
-                .build();
+    private static ObjectNode givenBidRequestExt(ExtRequestTargeting extRequestTargeting) {
+        return mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
+                .targeting(extRequestTargeting)
+                .build(), null));
     }
 }

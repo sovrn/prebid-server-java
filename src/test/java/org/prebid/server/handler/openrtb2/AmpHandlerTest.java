@@ -30,12 +30,12 @@ import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.ExchangeService;
-import org.prebid.server.auction.TimeoutResolver;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookie;
-import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.InvalidRequestException;
+import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
@@ -84,8 +84,6 @@ public class AmpHandlerTest extends VertxTest {
     @Mock
     private ExchangeService exchangeService;
     @Mock
-    private UidsCookieService uidsCookieService;
-    @Mock
     private BidderCatalog bidderCatalog;
     @Mock
     private AnalyticsReporter analyticsReporter;
@@ -93,11 +91,8 @@ public class AmpHandlerTest extends VertxTest {
     private Metrics metrics;
     @Mock
     private Clock clock;
-    @Mock
-    private TimeoutResolver timeoutResolver;
 
     private AmpHandler ampHandler;
-
     @Mock
     private RoutingContext routingContext;
     @Mock
@@ -107,10 +102,10 @@ public class AmpHandlerTest extends VertxTest {
     @Mock
     private UidsCookie uidsCookie;
 
+    private Timeout timeout;
+
     @Before
     public void setUp() {
-        given(timeoutResolver.adjustTimeout(anyLong())).willReturn(2000L);
-
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
 
@@ -124,20 +119,68 @@ public class AmpHandlerTest extends VertxTest {
         given(httpResponse.putHeader(anyString(), anyString())).willReturn(httpResponse);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
-        given(uidsCookieService.parseFromRequest(routingContext)).willReturn(uidsCookie);
+        given(uidsCookie.hasLiveUids()).willReturn(true);
 
         given(clock.millis()).willReturn(Instant.now().toEpochMilli());
-        final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
+        timeout = new TimeoutFactory(clock).create(2000L);
 
-        ampHandler = new AmpHandler(ampRequestFactory, exchangeService, uidsCookieService, singleton("bidder1"),
-                bidderCatalog, analyticsReporter, new AmpResponsePostProcessor.NoOpAmpResponsePostProcessor(), metrics,
-                clock, timeoutFactory, timeoutResolver);
+        ampHandler = new AmpHandler(ampRequestFactory, exchangeService, analyticsReporter, metrics, clock,
+                bidderCatalog, singleton("bidder1"), new AmpResponsePostProcessor.NoOpAmpResponsePostProcessor());
+    }
+
+    @Test
+    public void shouldSetRequestTypeMetricToAuctionContext() {
+        // given
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
+
+        // when
+        ampHandler.handle(routingContext);
+
+        // then
+        final AuctionContext auctionContext = captureAuctionContext();
+        assertThat(auctionContext.getRequestTypeMetric()).isNotNull();
+    }
+
+    @Test
+    public void shouldUseTimeoutFromAuctionContext() {
+        // given
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
+
+        given(exchangeService.holdAuction(any()))
+                .willReturn(Future.succeededFuture(BidResponse.builder().build()));
+
+        // when
+        ampHandler.handle(routingContext);
+
+        // then
+        assertThat(captureAuctionContext().getTimeout().remaining()).isEqualTo(2000L);
+    }
+
+    @Test
+    public void shouldComputeTimeoutBasedOnRequestProcessingStartTime() {
+        // given
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
+
+        given(exchangeService.holdAuction(any()))
+                .willReturn(Future.succeededFuture(BidResponse.builder().build()));
+
+        final Instant now = Instant.now();
+        given(clock.millis()).willReturn(now.toEpochMilli()).willReturn(now.plusMillis(50L).toEpochMilli());
+
+        // when
+        ampHandler.handle(routingContext);
+
+        // then
+        assertThat(captureAuctionContext().getTimeout().remaining()).isLessThanOrEqualTo(1950L);
     }
 
     @Test
     public void shouldRespondWithBadRequestIfRequestIsInvalid() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
                 .willReturn(Future.failedFuture(new InvalidRequestException("Request is invalid")));
 
         // when
@@ -154,8 +197,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithInternalServerErrorIfAuctionFails() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willThrow(new RuntimeException("Unexpected exception"));
@@ -173,8 +216,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithInternalServerErrorIfCannotExtractBidTargeting() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         final ObjectNode ext = mapper.createObjectNode();
         ext.set("prebid", new TextNode("non-ExtBidRequest"));
@@ -194,7 +237,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldNotSendResponseIfClientClosedConnection() {
         // given
-        given(ampRequestFactory.fromRequest(any())).willReturn(Future.failedFuture(new RuntimeException()));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.failedFuture(new RuntimeException()));
 
         given(routingContext.response().closed()).willReturn(true);
 
@@ -208,8 +252,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithExpectedResponse() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         final Map<String, String> targeting = new HashMap<>();
         targeting.put("key1", "value1");
@@ -231,8 +275,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithCustomTargetingIncluded() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         final Map<String, String> targeting = new HashMap<>();
         targeting.put("key1", "value1");
@@ -271,12 +315,14 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithDebugInfoIncludedIfTestFlagIsTrue() {
         // given
-        final BidRequest bidRequest = givenBidRequest(builder -> builder.id("reqId1").test(1));
-        given(ampRequestFactory.fromRequest(any())).willReturn(Future.succeededFuture(bidRequest));
+        final AuctionContext auctionContext = givenAuctionContext(builder -> builder.id("reqId1").test(1));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(auctionContext));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponseWithExt(mapper.valueToTree(
-                        ExtBidResponse.of(ExtResponseDebug.of(null, bidRequest), null, null, null, null))));
+                        ExtBidResponse.of(ExtResponseDebug.of(null, auctionContext.getBidRequest()), null, null, null,
+                                null))));
 
         // when
         ampHandler.handle(routingContext);
@@ -289,14 +335,16 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldRespondWithDebugInfoIncludedIfExtPrebidDebugIsOn() {
         // given
-        final BidRequest bidRequest = givenBidRequest(builder -> builder
+        final AuctionContext auctionContext = givenAuctionContext(builder -> builder
                 .id("reqId1")
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder().debug(1).build(), null))));
-        given(ampRequestFactory.fromRequest(any())).willReturn(Future.succeededFuture(bidRequest));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(auctionContext));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponseWithExt(mapper.valueToTree(
-                        ExtBidResponse.of(ExtResponseDebug.of(null, bidRequest), null, null, null, null))));
+                        ExtBidResponse.of(ExtResponseDebug.of(null, auctionContext.getBidRequest()), null, null, null,
+                                null))));
 
         // when
         ampHandler.handle(routingContext);
@@ -310,8 +358,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldIncrementOkAmpRequestMetrics() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -327,8 +375,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldIncrementAppRequestMetrics() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(builder -> builder.app(App.builder().build()))));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(builder -> builder.app(App.builder().build()))));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -344,8 +392,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldIncrementNoCookieMetrics() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -366,9 +414,9 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldIncrementImpsRequestedMetrics() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
                 .willReturn(Future.succeededFuture(
-                        givenBidRequest(builder -> builder.imp(singletonList(Imp.builder().build())))));
+                        givenAuctionContext(builder -> builder.imp(singletonList(Imp.builder().build())))));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -384,7 +432,7 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldIncrementBadinputAmpRequestMetrics() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
                 .willReturn(Future.failedFuture(new InvalidRequestException("Request is invalid")));
 
         // when
@@ -397,7 +445,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldIncrementErrAmpRequestMetrics() {
         // given
-        given(ampRequestFactory.fromRequest(any())).willReturn(Future.failedFuture(new RuntimeException()));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.failedFuture(new RuntimeException()));
 
         // when
         ampHandler.handle(routingContext);
@@ -414,8 +463,8 @@ public class AmpHandlerTest extends VertxTest {
         // set up clock mock to check that request_time metric has been updated with expected value
         given(clock.millis()).willReturn(5000L).willReturn(5500L);
 
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(Future.succeededFuture(BidResponse.builder().build()));
@@ -436,7 +485,7 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldNotUpdateRequestTimeMetricIfRequestFails() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
                 .willReturn(Future.failedFuture(new InvalidRequestException("Request is invalid")));
 
         // when
@@ -450,8 +499,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldUpdateNetworkErrorMetric() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -473,8 +522,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldNotUpdateNetworkErrorMetricIfResponseSucceeded() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -490,8 +539,8 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldUpdateNetworkErrorMetricIfClientClosedConnection() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(givenAuctionContext(identity())));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -509,7 +558,7 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldPassBadRequestEventToAnalyticsReporterIfBidRequestIsInvalid() {
         // given
-        given(ampRequestFactory.fromRequest(any()))
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
                 .willReturn(Future.failedFuture(new InvalidRequestException("Request is invalid")));
 
         // when
@@ -528,9 +577,9 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldPassInternalServerErrorEventToAnalyticsReporterIfAuctionFails() {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity());
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(bidRequest));
+        final AuctionContext auctionContext = givenAuctionContext(identity());
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(auctionContext));
 
         given(exchangeService.holdAuction(any()))
                 .willThrow(new RuntimeException("Unexpected exception"));
@@ -542,7 +591,7 @@ public class AmpHandlerTest extends VertxTest {
         final AmpEvent ampEvent = captureAmpEvent();
         assertThat(ampEvent).isEqualTo(AmpEvent.builder()
                 .httpContext(givenHttpContext(singletonMap("Origin", "http://example.com")))
-                .bidRequest(bidRequest)
+                .bidRequest(auctionContext.getBidRequest())
                 .origin("http://example.com")
                 .status(500)
                 .errors(singletonList("Unexpected exception"))
@@ -552,9 +601,9 @@ public class AmpHandlerTest extends VertxTest {
     @Test
     public void shouldPassSuccessfulEventToAnalyticsReporter() {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity());
-        given(ampRequestFactory.fromRequest(any()))
-                .willReturn(Future.succeededFuture(bidRequest));
+        final AuctionContext auctionContext = givenAuctionContext(identity());
+        given(ampRequestFactory.fromRequest(any(), anyLong()))
+                .willReturn(Future.succeededFuture(auctionContext));
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponse(mapper.valueToTree(
@@ -568,7 +617,7 @@ public class AmpHandlerTest extends VertxTest {
         final AmpEvent ampEvent = captureAmpEvent();
         assertThat(ampEvent).isEqualTo(AmpEvent.builder()
                 .httpContext(givenHttpContext(singletonMap("Origin", "http://example.com")))
-                .bidRequest(bidRequest)
+                .bidRequest(auctionContext.getBidRequest())
                 .bidResponse(BidResponse.builder().seatbid(singletonList(SeatBid.builder()
                         .bid(singletonList(Bid.builder()
                                 .ext(mapper.valueToTree(ExtPrebid.of(
@@ -585,9 +634,16 @@ public class AmpHandlerTest extends VertxTest {
                 .build());
     }
 
-    private static BidRequest givenBidRequest(
+    private AuctionContext givenAuctionContext(
             Function<BidRequest.BidRequestBuilder, BidRequest.BidRequestBuilder> bidRequestBuilderCustomizer) {
-        return bidRequestBuilderCustomizer.apply(BidRequest.builder().imp(emptyList()).tmax(1000L)).build();
+        final BidRequest bidRequest = bidRequestBuilderCustomizer.apply(BidRequest.builder()
+                .imp(emptyList()).tmax(1000L)).build();
+
+        return AuctionContext.builder()
+                .uidsCookie(uidsCookie)
+                .bidRequest(bidRequest)
+                .timeout(timeout)
+                .build();
     }
 
     private static Future<BidResponse> givenBidResponse(ObjectNode extBid) {
@@ -606,10 +662,16 @@ public class AmpHandlerTest extends VertxTest {
                 .build());
     }
 
+    private AuctionContext captureAuctionContext() {
+        final ArgumentCaptor<AuctionContext> captor = ArgumentCaptor.forClass(AuctionContext.class);
+        verify(exchangeService).holdAuction(captor.capture());
+        return captor.getValue();
+    }
+
     private AmpEvent captureAmpEvent() {
-        final ArgumentCaptor<AmpEvent> ampEventCaptor = ArgumentCaptor.forClass(AmpEvent.class);
-        verify(analyticsReporter).processEvent(ampEventCaptor.capture());
-        return ampEventCaptor.getValue();
+        final ArgumentCaptor<AmpEvent> captor = ArgumentCaptor.forClass(AmpEvent.class);
+        verify(analyticsReporter).processEvent(captor.capture());
+        return captor.getValue();
     }
 
     private static HttpContext givenHttpContext(Map<String, String> headers) {

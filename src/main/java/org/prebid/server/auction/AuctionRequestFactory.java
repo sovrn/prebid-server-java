@@ -3,9 +3,11 @@ package org.prebid.server.auction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Imp;
+import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
 import io.vertx.core.Future;
@@ -19,10 +21,13 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.execution.Timeout;
+import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
@@ -30,6 +35,8 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
+import org.prebid.server.settings.ApplicationSettings;
+import org.prebid.server.settings.model.Account;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.model.ValidationResult;
@@ -53,7 +60,6 @@ public class AuctionRequestFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(AuctionRequestFactory.class);
 
-    private final TimeoutResolver timeoutResolver;
     private final long maxRequestSize;
     private final String adServerCurrency;
     private final StoredRequestProcessor storedRequestProcessor;
@@ -62,14 +68,16 @@ public class AuctionRequestFactory {
     private final BidderCatalog bidderCatalog;
     private final RequestValidator requestValidator;
     private final InterstitialProcessor interstitialProcessor;
+    private final TimeoutResolver timeoutResolver;
+    private final TimeoutFactory timeoutFactory;
+    private final ApplicationSettings applicationSettings;
 
     public AuctionRequestFactory(
-            TimeoutResolver timeoutResolver, long maxRequestSize, String adServerCurrency,
-            StoredRequestProcessor storedRequestProcessor, ImplicitParametersExtractor paramsExtractor,
-            UidsCookieService uidsCookieService, BidderCatalog bidderCatalog, RequestValidator requestValidator,
-            InterstitialProcessor interstitialProcessor) {
+            long maxRequestSize, String adServerCurrency, StoredRequestProcessor storedRequestProcessor,
+            ImplicitParametersExtractor paramsExtractor, UidsCookieService uidsCookieService,
+            BidderCatalog bidderCatalog, RequestValidator requestValidator, InterstitialProcessor interstitialProcessor,
+            TimeoutResolver timeoutResolver, TimeoutFactory timeoutFactory, ApplicationSettings applicationSettings) {
 
-        this.timeoutResolver = Objects.requireNonNull(timeoutResolver);
         this.maxRequestSize = maxRequestSize;
         this.adServerCurrency = validateCurrency(adServerCurrency);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
@@ -78,6 +86,9 @@ public class AuctionRequestFactory {
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.requestValidator = Objects.requireNonNull(requestValidator);
         this.interstitialProcessor = Objects.requireNonNull(interstitialProcessor);
+        this.timeoutResolver = Objects.requireNonNull(timeoutResolver);
+        this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
+        this.applicationSettings = Objects.requireNonNull(applicationSettings);
     }
 
     /**
@@ -97,17 +108,67 @@ public class AuctionRequestFactory {
     }
 
     /**
-     * Method determines {@link BidRequest} properties which were not set explicitly by the client, but can be
-     * updated by values derived from headers and other request attributes.
+     * Creates {@link AuctionContext} based on {@link RoutingContext}.
      */
-    public Future<BidRequest> fromRequest(RoutingContext context) {
-        final BidRequest bidRequest;
+    public Future<AuctionContext> fromRequest(RoutingContext routingContext, long startTime) {
+        final BidRequest incomingBidRequest;
         try {
-            bidRequest = parseRequest(context);
+            incomingBidRequest = parseRequest(routingContext);
         } catch (InvalidRequestException e) {
             return Future.failedFuture(e);
         }
 
+        return updateBidRequest(routingContext, incomingBidRequest)
+                .compose(bidRequest -> toAuctionContext(routingContext, bidRequest, startTime, timeoutResolver));
+    }
+
+    /**
+     * Returns filled out {@link AuctionContext} based on given arguments.
+     * <p>
+     * Note: {@link TimeoutResolver} used here as argument because this method is utilized in AMP processing.
+     */
+    Future<AuctionContext> toAuctionContext(RoutingContext routingContext, BidRequest bidRequest,
+                                            long startTime, TimeoutResolver timeoutResolver) {
+        final Timeout timeout = timeout(bidRequest, startTime, timeoutResolver);
+
+        return accountFrom(bidRequest, timeout)
+                .map(account -> AuctionContext.builder()
+                        .routingContext(routingContext)
+                        .uidsCookie(uidsCookieService.parseFromRequest(routingContext))
+                        .bidRequest(bidRequest)
+                        .timeout(timeout)
+                        .account(account)
+                        .build());
+    }
+
+    /**
+     * Parses request body to {@link BidRequest}.
+     * <p>
+     * Throws {@link InvalidRequestException} if body is empty, exceeds max request size or couldn't be deserialized.
+     */
+    private BidRequest parseRequest(RoutingContext context) {
+        final Buffer body = context.getBody();
+        if (body == null) {
+            throw new InvalidRequestException("Incoming request has no body");
+        }
+
+        if (body.length() > maxRequestSize) {
+            throw new InvalidRequestException(
+                    String.format("Request size exceeded max size of %d bytes.", maxRequestSize));
+        }
+
+        try {
+            return Json.decodeValue(body, BidRequest.class);
+        } catch (DecodeException e) {
+            throw new InvalidRequestException(e.getMessage());
+        }
+    }
+
+    /**
+     * Sets {@link BidRequest} properties which were not set explicitly by the client, but can be
+     * updated by values derived from headers and other request attributes.
+     */
+    private Future<BidRequest> updateBidRequest(RoutingContext context, BidRequest bidRequest) {
         return storedRequestProcessor.processStoredRequests(bidRequest)
                 .map(resolvedBidRequest -> fillImplicitParameters(resolvedBidRequest, context, timeoutResolver))
                 .map(this::validateRequest)
@@ -115,28 +176,10 @@ public class AuctionRequestFactory {
     }
 
     /**
-     * Parses request body to bid request. Throws {@link InvalidRequestException} if body is empty, exceeds max
-     * request size or couldn't be deserialized to {@link BidRequest}.
-     */
-    private BidRequest parseRequest(RoutingContext context) {
-        final Buffer body = context.getBody();
-        if (body == null) {
-            throw new InvalidRequestException("Incoming request has no body");
-        } else if (body.length() > maxRequestSize) {
-            throw new InvalidRequestException(
-                    String.format("Request size exceeded max size of %d bytes.", maxRequestSize));
-        } else {
-            try {
-                return Json.decodeValue(body, BidRequest.class);
-            } catch (DecodeException e) {
-                throw new InvalidRequestException(e.getMessage());
-            }
-        }
-    }
-
-    /**
      * If needed creates a new {@link BidRequest} which is a copy of original but with some fields set with values
      * derived from request parameters (headers, cookie etc.).
+     * <p>
+     * Note: {@link TimeoutResolver} used here as argument because this method is utilized in AMP processing.
      */
     BidRequest fillImplicitParameters(BidRequest bidRequest, RoutingContext context, TimeoutResolver timeoutResolver) {
         final BidRequest result;
@@ -473,5 +516,59 @@ public class AuctionRequestFactory {
             throw new InvalidRequestException(validationResult.getErrors());
         }
         return bidRequest;
+    }
+
+    /**
+     * Returns {@link Timeout} based on request.tmax and adjustment value of {@link TimeoutResolver}.
+     */
+    private Timeout timeout(BidRequest bidRequest, long startTime, TimeoutResolver timeoutResolver) {
+        final long timeout = timeoutResolver.adjustTimeout(bidRequest.getTmax());
+        return timeoutFactory.create(startTime, timeout);
+    }
+
+    /**
+     * Returns {@link Account} fetched by {@link ApplicationSettings}.
+     */
+    private Future<Account> accountFrom(BidRequest bidRequest, Timeout timeout) {
+        final String accountId = accountIdFrom(bidRequest);
+
+        return StringUtils.isEmpty(accountId)
+                ? Future.succeededFuture(emptyAccount(accountId))
+                : applicationSettings.getAccountById(accountId, timeout)
+                .recover(exception -> accountFallback(exception, accountId));
+    }
+
+    /**
+     * Extracts publisher id either from {@link BidRequest}.app.publisher.id or {@link BidRequest}.site.publisher.id.
+     * If neither is present returns empty string.
+     */
+    private static String accountIdFrom(BidRequest bidRequest) {
+        final App app = bidRequest.getApp();
+        final Publisher appPublisher = app != null ? app.getPublisher() : null;
+        final Site site = bidRequest.getSite();
+        final Publisher sitePublisher = site != null ? site.getPublisher() : null;
+
+        final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
+
+        final String publisherId = publisher != null ? publisher.getId() : null;
+        return ObjectUtils.defaultIfNull(publisherId, StringUtils.EMPTY);
+    }
+
+    /**
+     * Returns empty account if it is not found or propagate exception if any except {@link PreBidException} occurred.
+     */
+    private static Future<Account> accountFallback(Throwable exception, String accountId) {
+        if (exception instanceof PreBidException) {
+            return Future.succeededFuture(emptyAccount(accountId)); // no worry, account not found
+        }
+        logger.warn("Error occurred while fetching account", exception);
+        return Future.failedFuture(exception);
+    }
+
+    /**
+     * Creates {@link Account} instance with filled out ID field only.
+     */
+    private static Account emptyAccount(String accountId) {
+        return Account.builder().id(accountId).build();
     }
 }

@@ -18,15 +18,11 @@ import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.ExchangeService;
-import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.cookie.UidsCookie;
-import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
-import org.prebid.server.execution.Timeout;
-import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
@@ -48,26 +44,19 @@ public class AuctionHandler implements Handler<RoutingContext> {
             new TypeReference<ExtBidResponse>() {
             };
 
-    private final ExchangeService exchangeService;
     private final AuctionRequestFactory auctionRequestFactory;
-    private final UidsCookieService uidsCookieService;
+    private final ExchangeService exchangeService;
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
     private final Clock clock;
-    private final TimeoutFactory timeoutFactory;
-    private final TimeoutResolver timeoutResolver;
 
-    public AuctionHandler(ExchangeService exchangeService, AuctionRequestFactory auctionRequestFactory,
-                          UidsCookieService uidsCookieService, AnalyticsReporter analyticsReporter, Metrics metrics,
-                          Clock clock, TimeoutFactory timeoutFactory, TimeoutResolver timeoutResolver) {
-        this.exchangeService = Objects.requireNonNull(exchangeService);
+    public AuctionHandler(AuctionRequestFactory auctionRequestFactory, ExchangeService exchangeService,
+                          AnalyticsReporter analyticsReporter, Metrics metrics, Clock clock) {
         this.auctionRequestFactory = Objects.requireNonNull(auctionRequestFactory);
-        this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
+        this.exchangeService = Objects.requireNonNull(exchangeService);
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
-        this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
-        this.timeoutResolver = Objects.requireNonNull(timeoutResolver);
     }
 
     @Override
@@ -81,22 +70,16 @@ public class AuctionHandler implements Handler<RoutingContext> {
         final boolean isSafari = HttpUtil.isSafari(routingContext.request().headers().get(HttpUtil.USER_AGENT_HEADER));
         metrics.updateSafariRequestsMetric(isSafari);
 
-        final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(routingContext);
-
         final AuctionEvent.AuctionEventBuilder auctionEventBuilder = AuctionEvent.builder()
                 .httpContext(HttpContext.from(routingContext));
 
-        auctionRequestFactory.fromRequest(routingContext)
-                .map(bidRequest -> addToEvent(bidRequest, auctionEventBuilder::bidRequest, bidRequest))
-                .map(bidRequest -> updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest, uidsCookie, isSafari))
-
-                .map(bidRequest -> AuctionContext.builder()
-                        .routingContext(routingContext)
-                        .uidsCookie(uidsCookie)
-                        .bidRequest(bidRequest)
-                        .timeout(timeout(bidRequest, startTime))
-                        .requestTypeMetric(requestTypeMetric(bidRequest))
+        auctionRequestFactory.fromRequest(routingContext, startTime)
+                .map(context -> context.toBuilder()
+                        .requestTypeMetric(requestTypeMetric(context.getBidRequest()))
                         .build())
+
+                .map(context -> addToEvent(context.getBidRequest(), auctionEventBuilder::bidRequest, context))
+                .map(context -> updateAppAndNoCookieAndImpsRequestedMetrics(context, isSafari))
 
                 .compose(context -> exchangeService.holdAuction(context)
                         .map(bidResponse -> Tuple2.of(bidResponse, context)))
@@ -105,25 +88,23 @@ public class AuctionHandler implements Handler<RoutingContext> {
                 .setHandler(result -> handleResult(result, auctionEventBuilder, routingContext, startTime));
     }
 
+    private static MetricName requestTypeMetric(BidRequest bidRequest) {
+        return bidRequest.getApp() != null ? MetricName.openrtb2app : MetricName.openrtb2web;
+    }
+
     private static <T, R> R addToEvent(T field, Consumer<T> consumer, R result) {
         consumer.accept(field);
         return result;
     }
 
-    private BidRequest updateAppAndNoCookieAndImpsRequestedMetrics(BidRequest bidRequest, UidsCookie uidsCookie,
-                                                                   boolean isSafari) {
+    private AuctionContext updateAppAndNoCookieAndImpsRequestedMetrics(AuctionContext context, boolean isSafari) {
+        final BidRequest bidRequest = context.getBidRequest();
+        final UidsCookie uidsCookie = context.getUidsCookie();
+
         metrics.updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest.getApp() != null, uidsCookie.hasLiveUids(),
                 isSafari, bidRequest.getImp().size());
-        return bidRequest;
-    }
 
-    private Timeout timeout(BidRequest bidRequest, long startTime) {
-        final long timeout = timeoutResolver.adjustTimeout(bidRequest.getTmax());
-        return timeoutFactory.create(startTime, timeout);
-    }
-
-    private static MetricName requestTypeMetric(BidRequest bidRequest) {
-        return bidRequest.getApp() != null ? MetricName.openrtb2app : MetricName.openrtb2web;
+        return context;
     }
 
     private void handleResult(AsyncResult<Tuple2<BidResponse, AuctionContext>> responseResult,
