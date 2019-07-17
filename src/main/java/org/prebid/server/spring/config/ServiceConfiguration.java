@@ -9,11 +9,13 @@ import io.vertx.ext.jdbc.JDBCClient;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
+import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.auction.InterstitialProcessor;
 import org.prebid.server.auction.PreBidRequestContextFactory;
+import org.prebid.server.auction.PrivacyEnforcementService;
 import org.prebid.server.auction.StoredRequestProcessor;
 import org.prebid.server.auction.StoredResponseProcessor;
 import org.prebid.server.auction.TimeoutResolver;
@@ -67,7 +69,6 @@ public class ServiceConfiguration {
 
     @Bean
     CacheService cacheService(
-            ApplicationSettings applicationSettings,
             @Value("${cache.scheme}") String scheme,
             @Value("${cache.host}") String host,
             @Value("${cache.path}") String path,
@@ -78,7 +79,6 @@ public class ServiceConfiguration {
             Clock clock) {
 
         return new CacheService(
-                applicationSettings,
                 CacheTtl.of(bannerCacheTtl, videoCacheTtl),
                 httpClient,
                 CacheService.getCacheEndpointUrl(scheme, host, path),
@@ -306,8 +306,8 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    EventsService eventsService(ApplicationSettings applicationSettings, @Value("${external-url}") String externalUrl) {
-        return new EventsService(applicationSettings, externalUrl);
+    EventsService eventsService(@Value("${external-url}") String externalUrl) {
+        return new EventsService(externalUrl);
     }
 
     @Bean
@@ -321,24 +321,30 @@ public class ServiceConfiguration {
     }
 
     @Bean
+    BidResponseCreator bidResponseCreator(BidderCatalog bidderCatalog, CacheService cacheService) {
+        return new BidResponseCreator(bidderCatalog, cacheService.getEndpointHost(),
+                cacheService.getEndpointPath(), cacheService.getCachedAssetURLTemplate());
+    }
+
+    @Bean
     ExchangeService exchangeService(
             BidderCatalog bidderCatalog,
+            StoredResponseProcessor storedResponseProcessor,
+            PrivacyEnforcementService privacyEnforcementService,
             HttpBidderRequester httpBidderRequester,
             ResponseBidValidator responseBidValidator,
-            CacheService cacheService,
             CurrencyConversionService currencyConversionService,
-            GdprService gdprService,
             EventsService eventsService,
-            StoredResponseProcessor storedResponseProcessor,
+            CacheService cacheService,
+            BidResponseCreator bidResponseCreator,
             BidResponsePostProcessor bidResponsePostProcessor,
             Metrics metrics,
             Clock clock,
-            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation,
             @Value("${auction.cache.expected-request-time-ms}") long expectedCacheTimeMs) {
 
-        return new ExchangeService(bidderCatalog, storedResponseProcessor, httpBidderRequester, responseBidValidator,
-                cacheService, bidResponsePostProcessor, currencyConversionService, gdprService, eventsService, metrics,
-                clock, useGeoLocation, expectedCacheTimeMs);
+        return new ExchangeService(bidderCatalog, storedResponseProcessor, privacyEnforcementService,
+                httpBidderRequester, responseBidValidator, currencyConversionService, eventsService, cacheService,
+                bidResponseCreator, bidResponsePostProcessor, metrics, clock, expectedCacheTimeMs);
     }
 
     @Bean
@@ -357,6 +363,15 @@ public class ServiceConfiguration {
             BidderCatalog bidderCatalog) {
 
         return new StoredResponseProcessor(applicationSettings, bidderCatalog);
+    }
+
+    @Bean
+    PrivacyEnforcementService privacyEnforcementService(
+            GdprService gdprService,
+            BidderCatalog bidderCatalog,
+            Metrics metrics,
+            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation) {
+        return new PrivacyEnforcementService(gdprService, bidderCatalog, metrics, useGeoLocation);
     }
 
     @Bean
