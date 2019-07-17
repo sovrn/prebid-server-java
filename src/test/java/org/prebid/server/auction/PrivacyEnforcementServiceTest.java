@@ -136,7 +136,6 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .result();
 
         // then
-
         verify(gdprService).isGdprEnforced(eq("1"), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
         verify(gdprService).resultByVendor(eq(singleton(15)), eq("1"), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
@@ -282,7 +281,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldMaskedForCoppaWhenRegsCoppaIsOne() {
+    public void shouldMaskForCoppaWhenRegsCoppaIsOne() {
         // given
         given(gdprService.isGdprEnforced(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(false));
@@ -316,7 +315,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldMaskedForGdprWhenGdprServiceRespondIsGdprEnforcedWithTrueAndResultByVendorWithEnforcementResponse() {
+    public void shouldMaskForGdprWhenGdprServiceRespondIsGdprEnforcedWithTrueAndResultByVendorWithEnforcementResponse() {
         // given
         final ExtUser extUser = ExtUser.builder().build();
         final User user = notMaskedUser();
@@ -351,7 +350,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldMaskedForGdprWhenGdprServiceRespondIsGdprEnforcedWithFalseAndDeviceLmtIsOne() {
+    public void shouldMaskForGdprWhenGdprServiceRespondIsGdprEnforcedWithFalseAndDeviceLmtIsOne() {
         // given
         given(gdprService.isGdprEnforced(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(false));
@@ -390,7 +389,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldMaskedForGdprAndCoppaWhenGdprServiceRespondIsGdprEnforcedWithFalseAndDeviceLmtIsOneAndRegsCoppaIsOne() {
+    public void shouldMaskForGdprAndCoppaWhenGdprServiceRespondIsGdprEnforcedWithFalseAndDeviceLmtIsOneAndRegsCoppaIsOne() {
         // given
         given(gdprService.isGdprEnforced(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(false));
@@ -427,6 +426,33 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 expectedRegs);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
+    }
+
+    @Test
+    public void shouldNotReturnUserIfMaskingAppliedAndUserBecameEmptyObject() {
+        // given
+        final User user = User.builder()
+                .buyeruid("buyeruid")
+                .build();
+        final Regs regs = Regs.of(1, null);
+        final Map<String, User> bidderToUser = singletonMap(BIDDER_NAME, user);
+
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(
+                singletonMap(BIDDER_NAME, 1)),
+                bidRequestBuilder -> bidRequestBuilder
+                        .user(user)
+                        .regs(regs));
+
+        // when
+        final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                        null)
+                .result();
+
+        // then
+        assertThat(result.values()).hasSize(1)
+                .extracting(PrivacyEnforcementResult::getUser)
+                .containsNull();
     }
 
     @Test
@@ -480,7 +506,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldMaskedForGdprAndCoppaWhenDeviceLmtIsOneAndRegsCoppaIsOneAndExtRegsGdprIsOneAndGdprServiceRespondWithEnforcement() {
+    public void shouldMaskForGdprAndCoppaWhenDeviceLmtIsOneAndRegsCoppaIsOneAndExtRegsGdprIsOneAndGdprServiceRespondWithEnforcement() {
         // given
         final ExtUser extUser = ExtUser.builder().build();
         final User user = notMaskedUser();
@@ -640,11 +666,8 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         return bidRequestBuilderCustomizer.apply(BidRequest.builder().cur(singletonList("USD")).imp(imp)).build();
     }
 
-    private static Device givenDevice(Function<Device.DeviceBuilder, Device.DeviceBuilder> deviceBuilderCustomizer) {
-        return deviceBuilderCustomizer.apply(Device.builder()).build();
-    }
-
     private static Device givenNotMaskedDevice(
+
             Function<Device.DeviceBuilder, Device.DeviceBuilder> deviceBuilderCustomizer) {
         return deviceBuilderCustomizer.apply(notMaskedDevice().toBuilder()).build();
     }

@@ -348,7 +348,7 @@ public class ExchangeService {
 
         return privacyEnforcementService
                 .mask(bidderToUser, extUser, bidders, aliases, bidRequest, publisherId, timeout, context)
-                .map(bidderToPrivacyEnforcementResult -> getShuffledBidderRequests(bidderToPrivacyEnforcementResult,
+                .map(bidderToPrivacyEnforcementResult -> getBidderRequests(bidderToPrivacyEnforcementResult,
                         bidRequest, requestExt, imps, firstPartyDataBidders));
     }
 
@@ -474,7 +474,7 @@ public class ExchangeService {
     /**
      * Returns Shuffled List of {@link BidderRequest}
      */
-    private static List<BidderRequest> getShuffledBidderRequests(
+    private static List<BidderRequest> getBidderRequests(
             Map<String, PrivacyEnforcementResult> bidderToPrivacyEnforcementResult, BidRequest bidRequest,
             ExtBidRequest requestExt, List<Imp> imps, List<String> firstPartyDataBidders) {
         final List<BidderRequest> bidderRequests = bidderToPrivacyEnforcementResult.entrySet().stream()

@@ -33,12 +33,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Service provides masking for User, Device, Regs.
+ * Service provides masking for OpenRTB user sensitive information.
  */
 public class PrivacyEnforcementService {
 
     private static final DecimalFormat ROUND_TWO_DECIMALS =
             new DecimalFormat("###.##", DecimalFormatSymbols.getInstance(Locale.US));
+    private static final User EMPTY_USER = User.builder().build();
 
     private final GdprService gdprService;
     private final BidderCatalog bidderCatalog;
@@ -55,7 +56,7 @@ public class PrivacyEnforcementService {
 
     /**
      * Returns {@link Future &lt;{@link Map}&lt;{@link String}, {@link PrivacyEnforcementResult }&gt;&gt;}, where
-     * bidders name mapped to masked {@link PrivacyEnforcementResult}
+     * bidders name mapped to masked {@link PrivacyEnforcementResult}.
      */
     Future<Map<String, PrivacyEnforcementResult>> mask(Map<String, User> bidderToUser, ExtUser extUser,
                                                        List<String> bidders, Map<String, String> aliases,
@@ -135,7 +136,7 @@ public class PrivacyEnforcementService {
 
     /**
      * Returns {@link Map}&lt;{@link String}, {@link PrivacyEnforcementResult}&gt;, where bidder name mapped to masked
-     * {@link PrivacyEnforcementResult}. Masking depends on GDPR and COPPA
+     * {@link PrivacyEnforcementResult}. Masking depends on GDPR and COPPA.
      */
     private Map<String, PrivacyEnforcementResult> getBidderToPrivacyEnforcementResult(
             Map<String, User> bidderToUser, Regs regs, ExtRegs extRegs, Device device, Map<String, String> aliases,
@@ -151,17 +152,18 @@ public class PrivacyEnforcementService {
     }
 
     /**
-     * Returns {@link PrivacyEnforcementResult} with GDPR and COPPA masking
+     * Returns {@link PrivacyEnforcementResult} with GDPR and COPPA masking.
      */
     private PrivacyEnforcementResult createPrivacyEnforcementResult(
             User user, Device device, Regs regs, ExtRegs extRegs, String bidder, Map<String, String> aliases,
             Integer deviceLmt, boolean coppaMasking, Map<Integer, Boolean> vendorToGdprPermission) {
 
         final boolean gdprMasking = isGdprMaskingRequiredFor(bidder, aliases, deviceLmt, vendorToGdprPermission);
-        final User maskUser = maskUser(user, coppaMasking, gdprMasking);
-        final Device maskDevice = maskDevice(device, coppaMasking, gdprMasking);
-        final Regs maskReges = maskRegs(regs, extRegs, gdprMasking);
-        return PrivacyEnforcementResult.of(maskUser, maskDevice, maskReges);
+
+        final User maskedUser = maskUser(user, coppaMasking, gdprMasking);
+        final Device maskedDevice = maskDevice(device, coppaMasking, gdprMasking);
+        final Regs updatedRegs = updateRegs(regs, extRegs, gdprMasking);
+        return PrivacyEnforcementResult.of(maskedUser, maskedDevice, updatedRegs);
     }
 
     /**
@@ -189,7 +191,7 @@ public class PrivacyEnforcementService {
     }
 
     /**
-     * Returns masked {@link User}.
+     * Returns masked {@link User} if COPPA or GDPR masking applied.
      */
     private static User maskUser(User user, boolean coppaMaskingRequired, boolean gdprMaskingRequired) {
         if (user != null && (coppaMaskingRequired || gdprMaskingRequired)) {
@@ -205,7 +207,7 @@ public class PrivacyEnforcementService {
                     .buyeruid(null)
                     .geo(coppaMaskingRequired ? maskGeoForCoppa(user.getGeo()) : maskGeoForGdpr(user.getGeo()));
 
-            return builder.build();
+            return nullIfEmpty(builder.build());
         }
         return user;
     }
@@ -237,6 +239,13 @@ public class PrivacyEnforcementService {
      */
     private static Float maskGeoCoordinate(Float coordinate) {
         return coordinate != null ? Float.valueOf(ROUND_TWO_DECIMALS.format(coordinate)) : null;
+    }
+
+    /**
+     * Returns null if {@link User} has no data in case of masking was applied.
+     */
+    private static User nullIfEmpty(User user) {
+        return Objects.equals(user, EMPTY_USER) ? null : user;
     }
 
     /**
@@ -280,7 +289,7 @@ public class PrivacyEnforcementService {
     /**
      * Sets GDPR value 1, if bidder required GDPR masking, but regs.ext.gdpr is not defined.
      */
-    private static Regs maskRegs(Regs regs, ExtRegs extRegs, boolean gdprMaskingRequired) {
+    private static Regs updateRegs(Regs regs, ExtRegs extRegs, boolean gdprMaskingRequired) {
         final Integer gdpr = extRegs != null ? extRegs.getGdpr() : null;
 
         return gdpr == null && gdprMaskingRequired
@@ -288,4 +297,3 @@ public class PrivacyEnforcementService {
                 : regs;
     }
 }
-
