@@ -13,6 +13,8 @@ adapters:
     enabled: true
   ix:
     enabled: true
+  openx:
+    enabled: true
   pubmatic:
     enabled: true
   pulsepoint:
