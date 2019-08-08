@@ -131,7 +131,9 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
             return;
         }
 
-        final Collection<String> biddersToSync = biddersToSync(cookieSyncRequest.getBidders());
+        final List<String> bidders = cookieSyncRequest.getBidders();
+        final boolean requestHasBidders = CollectionUtils.isNotEmpty(bidders);
+        final Collection<String> biddersToSync = biddersToSync(bidders);
 
         final Set<Integer> vendorIds = gdprVendorIdsFor(biddersToSync);
         vendorIds.add(gdprHostVendorId);
@@ -141,8 +143,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
         gdprService.resultByVendor(GDPR_PURPOSES, vendorIds, gdprAsString, gdprConsent, ip,
                 timeoutFactory.create(defaultTimeout), context)
-                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, biddersToSync,
-                        gdprAsString, gdprConsent, cookieSyncRequest.getLimit(), cookieSyncRequest.getAccount()));
+                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, biddersToSync, gdprAsString,
+                        gdprConsent, cookieSyncRequest.getLimit(), cookieSyncRequest.getAccount(), requestHasBidders));
     }
 
     /**
@@ -188,15 +190,17 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private void handleResult(AsyncResult<GdprResponse> asyncResult, RoutingContext context, UidsCookie uidsCookie,
                               Collection<String> biddersToSync, String gdpr, String gdprConsent, Integer limit,
-                              String account) {
+                              String account, boolean requestHasBidders) {
         if (asyncResult.failed()) {
-            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync, limit, account);
+            respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync, limit, account,
+                    requestHasBidders);
         } else {
             final Map<Integer, Boolean> vendorsToGdpr = asyncResult.result().getVendorsToGdpr();
 
             final Boolean gdprResult = vendorsToGdpr.get(gdprHostVendorId);
             if (gdprResult == null || !gdprResult) { // host vendor should be allowed by GDPR verification
-                respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync, limit, account);
+                respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersToSync, limit, account,
+                        requestHasBidders);
             } else {
                 final Set<Integer> vendorIds = vendorsToGdpr.entrySet().stream()
                         .filter(Map.Entry::getValue) // get only vendors passed GDPR verification
@@ -208,7 +212,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                         .collect(Collectors.toSet());
 
                 respondWith(context, uidsCookie, gdpr, gdprConsent, biddersToSync, biddersRejectedByGdpr, limit,
-                        account);
+                        account, requestHasBidders);
             }
         }
     }
@@ -218,7 +222,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private void respondWith(RoutingContext context, UidsCookie uidsCookie, String gdpr, String gdprConsent,
                              Collection<String> bidders, Collection<String> biddersRejectedByGdpr, Integer limit,
-                             String account) {
+                             String account, boolean requestHasBidders) {
         updateCookieSyncGdprMetrics(bidders, biddersRejectedByGdpr);
 
         // don't send the response if client has gone
@@ -237,11 +241,13 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         List<BidderUsersyncStatus> updatedBidderStatuses;
         if (limit != null && limit > 0 && limit < bidderStatuses.size()) {
             Collections.shuffle(bidderStatuses);
-            updatedBidderStatuses = bidderStatuses.subList(0, limit);
+
+            updatedBidderStatuses = requestHasBidders && !rubiconBidderStatusIsPresent(bidderStatuses)
+                    ? addRubiconBidderStatus(context, trimToLimit(bidderStatuses, limit), gdpr, gdprConsent, account)
+                    : trimToLimit(addRubiconBidderStatus(context, bidderStatuses, gdpr, gdprConsent, account), limit);
         } else {
-            updatedBidderStatuses = bidderStatuses;
+            updatedBidderStatuses = addRubiconBidderStatus(context, bidderStatuses, gdpr, gdprConsent, account);
         }
-        updatedBidderStatuses = addRubiconBidderStatus(context, updatedBidderStatuses, gdpr, gdprConsent, account);
 
         final CookieSyncResponse response = CookieSyncResponse.of(uidsCookie.hasLiveUids() ? "ok" : "no_cookie",
                 updatedBidderStatuses);
@@ -264,13 +270,6 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 metrics.updateCookieSyncGenMetric(bidder);
             }
         }
-    }
-
-    private void updateCookieSyncMatchMetrics(Collection<String> syncBidders,
-                                              Collection<BidderUsersyncStatus> requiredUsersyncs) {
-        syncBidders.stream()
-                .filter(bidder -> requiredUsersyncs.stream().noneMatch(usersync -> bidder.equals(usersync.getBidder())))
-                .forEach(metrics::updateCookieSyncMatchesMetric);
     }
 
     /**
@@ -358,6 +357,17 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
             }
         }
         return null;
+    }
+
+    private void updateCookieSyncMatchMetrics(Collection<String> syncBidders,
+                                              Collection<BidderUsersyncStatus> requiredUsersyncs) {
+        syncBidders.stream()
+                .filter(bidder -> requiredUsersyncs.stream().noneMatch(usersync -> bidder.equals(usersync.getBidder())))
+                .forEach(metrics::updateCookieSyncMatchesMetric);
+    }
+
+    private static List<BidderUsersyncStatus> trimToLimit(List<BidderUsersyncStatus> bidderStatuses, int limit) {
+        return bidderStatuses.subList(0, limit);
     }
 
     private List<BidderUsersyncStatus> addRubiconBidderStatus(RoutingContext context,

@@ -40,6 +40,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Arrays.asList;
@@ -66,6 +67,7 @@ public class CookieSyncHandlerTest extends VertxTest {
 
     private static final String APPNEXUS = "appnexus";
     private static final String APPNEXUS_COOKIE = "adnxs";
+    private static final String PUBMATIC = "pubmatic";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -783,7 +785,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldLimitBidderStatuses() throws IOException {
+    public void shouldLimitBidderStatusesAndPlaceRubiconFirst() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
                 CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, 1, null)));
@@ -804,7 +806,84 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         // then
         final CookieSyncResponse cookieSyncResponse = captureCookieSyncResponse();
-        assertThat(cookieSyncResponse.getBidderStatus()).hasSize(1);
+        assertThat(cookieSyncResponse.getBidderStatus()).hasSize(1)
+                .extracting(BidderUsersyncStatus::getBidder)
+                .containsOnly(RUBICON);
+    }
+
+    @Test
+    public void shouldExceedLimitByAddingRubiconToBidderStatusesAsFirstElement() throws IOException {
+        // given
+        given(routingContext.getBody()).willReturn(givenRequestBody(
+                CookieSyncRequest.of(asList(APPNEXUS, PUBMATIC), 0, null, 1, null)));
+
+        given(bidderCatalog.isActive(anyString())).willReturn(true);
+
+        given(bidderCatalog.bidderInfoByName(anyString())).willReturn(
+                BidderInfo.create(true, null, null, null, null, 1, false),
+                BidderInfo.create(true, null, null, null, null, 2, false));
+
+        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(null);
+
+        rubiconUsersyncer = new Usersyncer(RUBICON,
+                "http://adnxsexample.com/sync?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}",
+                null, null, "redirect", false);
+
+        given(bidderCatalog.usersyncerByName(anyString())).willReturn(rubiconUsersyncer, appnexusUsersyncer);
+
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(GdprResponse.of(false, singletonMap(1, true), null)));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        final List<BidderUsersyncStatus> bidderStatus = captureCookieSyncResponse().getBidderStatus();
+
+        assertThat(bidderStatus).hasSize(2)
+                .element(0)
+                .extracting(BidderUsersyncStatus::getBidder)
+                .containsOnly(RUBICON);
+        assertThat(bidderStatus.get(1).getBidder())
+                .isIn(APPNEXUS, PUBMATIC);
+    }
+
+    @Test
+    public void shouldLimitBidderStatusWhenNoBiddersWereSpecifiedAndAlwaysAddRubiconFirst() throws IOException {
+        // given
+        given(routingContext.getBody()).willReturn(givenRequestBody(
+                CookieSyncRequest.of(null, null, null, 2, null)));
+
+        given(bidderCatalog.names()).willReturn(new HashSet<>(asList("conversant", APPNEXUS, PUBMATIC)));
+        given(bidderCatalog.isActive(anyString())).willReturn(true);
+        given(bidderCatalog.bidderInfoByName(anyString())).willReturn(
+                BidderInfo.create(true, null, null, null, null, 1, false),
+                BidderInfo.create(true, null, null, null, null, 2, false),
+                BidderInfo.create(true, null, null, null, null, 3, false));
+
+        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(null);
+
+        rubiconUsersyncer = new Usersyncer(RUBICON,
+                "http://adnxsexample.com/sync?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}",
+                null, null, "redirect", false);
+
+        given(bidderCatalog.usersyncerByName(eq(RUBICON))).willReturn(rubiconUsersyncer);
+
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(GdprResponse.of(false, singletonMap(1, true), null)));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        final List<BidderUsersyncStatus> bidderStatus = captureCookieSyncResponse().getBidderStatus();
+
+        assertThat(bidderStatus).hasSize(2)
+                .element(0)
+                .extracting(BidderUsersyncStatus::getBidder)
+                .containsOnly(RUBICON);
+        assertThat(bidderStatus.get(1).getBidder())
+                .isIn(PUBMATIC, APPNEXUS, "conversant");
     }
 
     @Test
