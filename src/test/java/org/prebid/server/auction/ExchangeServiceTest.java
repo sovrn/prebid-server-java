@@ -7,6 +7,7 @@ import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.BidRequest.BidRequestBuilder;
+import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Imp.ImpBuilder;
@@ -172,7 +173,7 @@ public class ExchangeServiceTest extends VertxTest {
                 .willAnswer(inv ->
                         Future.succeededFuture(((Map<String, User>) inv.getArgument(0)).entrySet().stream()
                                 .collect(HashMap::new, (map, bidderToUserEntry) -> map.put(bidderToUserEntry.getKey(),
-                                        PrivacyEnforcementResult.of(bidderToUserEntry.getValue(), null, null)),
+                                        PrivacyEnforcementResult.of(bidderToUserEntry.getValue(), null)),
                                         HashMap::putAll)));
 
         given(privacyEnforcementService.mask(argThat(MapUtils::isEmpty), any(), any(), any(), any(), any(), any(),
@@ -841,6 +842,27 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     @Test
+    public void shouldNotChangeGdprFromRequestWhenDeviceLmtIsOne() {
+        // given
+        givenBidder(givenEmptySeatBid());
+
+        given(uidsCookie.uidFrom(anyString())).willReturn("buyeridFromCookie");
+
+        final Regs regs = Regs.of(null, null);
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
+                builder -> builder.user(User.builder().build())
+                        .device(Device.builder().lmt(1).build())
+                        .regs(regs));
+
+        // when
+        exchangeService.holdAuction(givenRequestContext(bidRequest));
+
+        // then
+        final Regs capturedRegs = captureBidRequest().getRegs();
+        assertThat(capturedRegs).isEqualTo(regs);
+    }
+
+    @Test
     public void shouldSetUserBuyerIdsFromUserExtPrebidAndClearPrebidBuyerIdsAfterwards() {
         // given
         givenBidder(givenEmptySeatBid());
@@ -1082,7 +1104,7 @@ public class ExchangeServiceTest extends VertxTest {
         verify(cacheService).cacheBidsOpenrtb(
                 argThat(t -> t.containsAll(asList(bid1, bid2))), eq(asList(imp1, imp2)),
                 eq(CacheContext.of(true, null, false, null)),
-                eq(Account.builder().eventsEnabled(false).build()), eq(timeout));
+                eq(Account.builder().id("accountId").eventsEnabled(false).build()), eq(timeout));
     }
 
     @Test
@@ -1105,7 +1127,7 @@ public class ExchangeServiceTest extends VertxTest {
         // then
         verify(cacheService).cacheBidsOpenrtb(argThat(bids -> bids.contains(bid1)), eq(singletonList(imp1)),
                 eq(CacheContext.of(true, null, false, null)),
-                eq(Account.builder().eventsEnabled(false).build()), eq(timeout));
+                eq(Account.builder().id("accountId").eventsEnabled(false).build()), eq(timeout));
     }
 
     @Test
@@ -1441,17 +1463,17 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldUseEmptyStringIfPublisherIdIsNull() {
+    public void shouldUseEmptyStringIfPublisherIdIsEmpty() {
         // given
         given(bidderCatalog.isValidName(anyString())).willReturn(true);
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().price(TEN).build())))));
-        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
-                builder -> builder.site(Site.builder().publisher(Publisher.builder().build()).build()));
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)));
+        final Account account = Account.builder().id("").build();
 
         // when
-        exchangeService.holdAuction(givenRequestContext(bidRequest));
+        exchangeService.holdAuction(givenRequestContext(bidRequest, account));
 
         // then
         verify(metrics).updateAccountRequestMetrics(eq(""), eq(MetricName.openrtb2web));
@@ -1463,8 +1485,7 @@ public class ExchangeServiceTest extends VertxTest {
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(emptyList())));
 
-        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
-                builder -> builder.app(App.builder().publisher(Publisher.builder().id("accountId").build()).build()));
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)));
 
         // when
         exchangeService.holdAuction(givenRequestContext(bidRequest));
@@ -1489,8 +1510,7 @@ public class ExchangeServiceTest extends VertxTest {
                                 BidderError.timeout("timeout error"),
                                 BidderError.generic("timeout error")))));
 
-        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
-                builder -> builder.site(Site.builder().publisher(Publisher.builder().id("accountId").build()).build()));
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)));
 
         // when
         exchangeService.holdAuction(givenRequestContext(bidRequest));
@@ -1566,7 +1586,7 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     private AuctionContext givenRequestContext(BidRequest bidRequest) {
-        return givenRequestContext(bidRequest, Account.builder().eventsEnabled(false).build());
+        return givenRequestContext(bidRequest, Account.builder().id("accountId").eventsEnabled(false).build());
     }
 
     private AuctionContext givenRequestContext(BidRequest bidRequest, Account account) {

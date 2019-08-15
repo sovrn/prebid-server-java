@@ -41,7 +41,6 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
-import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.entry;
@@ -60,7 +59,6 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
     private final static String BIDDER_NAME = "someBidder";
     private final static String BUYER_UID = "uidval";
-    private final static String PUBLISHER_ID = "pubId";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -79,8 +77,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     public void setUp() {
         given(bidderCatalog.bidderInfoByName(anyString())).willReturn(givenBidderInfo(15, true));
 
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(true));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(true);
         given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(true, singletonMap(15, false), null)));
 
@@ -99,11 +96,11 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                         .regs(null));
 
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(emptyMap(), null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout, null)
+                .mask(emptyMap(), null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, true, timeout, null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(true), eq(singleton(15)));
         verify(gdprService).resultByVendor(eq(singleton(15)), isNull(), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
 
@@ -111,7 +108,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     @Test
-    public void shouldNotMaskWhenDeviceLmtIsNullAndExtRegsGdprIsOneAndGdprServiceRespondIsGdprEnforcedWithTrueAndResultByVendorWithoutEnforcement() {
+    public void shouldNotMaskWhenDeviceLmtIsNullAndExtRegsGdprIsOneAndGdprEnforcedIsTrueAndResultByVendorWithoutEnforcement() {
         // given
         given(gdprService.resultByVendor(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(true, singletonMap(15, true), null)));
@@ -131,16 +128,16 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, true, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(eq("1"), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(eq("1"), eq(true), eq(singleton(15)));
         verify(gdprService).resultByVendor(eq(singleton(15)), eq("1"), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
 
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device, regs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
@@ -148,8 +145,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     @Test
     public void shouldNotMaskWhenExtDeviceLmtIsNullAndGdprServiceRespondIsGdprEnforcedWithFalse() {
         // given
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(false));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(false);
 
         final User user = notMaskedUser();
         final Device device = notMaskedDevice();
@@ -163,15 +159,15 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, false, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(false), eq(singleton(15)));
         verifyNoMoreInteractions(gdprService);
 
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device, null);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
@@ -179,8 +175,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     @Test
     public void shouldNotMaskWhenExtRegsGdprIsOneDeviceLmtIsNullAndGdprServiceRespondIsGdprEnforcedWithFalse() {
         // given
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(false));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(false);
 
         final User user = notMaskedUser();
         final Device device = notMaskedDevice();
@@ -196,24 +191,23 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, false, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(eq("1"), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(eq("1"), eq(false), eq(singleton(15)));
         verifyNoMoreInteractions(gdprService);
 
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device, regs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
 
     @Test
-    public void shouldNotMaskWhenDeviceLmtIsZeroAndRegsCoppaIsZeroAndExtRegsGdprIsZeroGdprServiceRespondIsGdprEnforcedWithFalse() {
+    public void shouldNotMaskWhenDeviceLmtIsZeroAndRegsCoppaIsZeroAndExtRegsGdprIsZeroAndGdprEnforcedIsFalse() {
         // given
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(false));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(false);
 
         final Regs regs = Regs.of(0, mapper.valueToTree(ExtRegs.of(0)));
         final User user = notMaskedUser();
@@ -229,15 +223,15 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, false, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(eq("0"), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(eq("0"), eq(false), eq(singleton(15)));
         verifyNoMoreInteractions(gdprService);
 
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device, regs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(user, device);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
@@ -261,21 +255,19 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, null, singletonList(BIDDER_NAME), aliases, bidRequest, PUBLISHER_ID, timeout, null)
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), aliases, bidRequest, true, timeout, null)
                 .result();
 
         // then
         verify(bidderCatalog, times(2)).bidderInfoByName(BIDDER_NAME);
         verifyNoMoreInteractions(bidderCatalog);
-        verify(gdprService).isGdprEnforced(eq("1"), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(eq("1"), eq(true), eq(singleton(15)));
         verify(gdprService).resultByVendor(eq(singleton(15)), eq("1"), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
         verify(metrics).updateGdprMaskedMetric(BIDDER_NAME);
         verifyNoMoreInteractions(metrics);
 
-        final Regs expectedRegs = Regs.of(null, mapper.valueToTree(ExtRegs.of(1)));
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userGdprMasked(), deviceGdprMasked(),
-                expectedRegs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userGdprMasked(), deviceGdprMasked());
         assertThat(result).hasSize(1)
                 .containsOnly(entry(alias, expected));
     }
@@ -283,8 +275,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     @Test
     public void shouldMaskForCoppaWhenRegsCoppaIsOne() {
         // given
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(false));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(false);
 
         final Regs regs = Regs.of(1, null);
         final User user = notMaskedUser();
@@ -300,22 +291,21 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, false, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(false), eq(singleton(15)));
         verifyNoMoreInteractions(gdprService);
 
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userCoppaMasked(), deviceCoppaMasked(),
-                regs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userCoppaMasked(), deviceCoppaMasked());
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
 
     @Test
-    public void shouldMaskForGdprWhenGdprServiceRespondIsGdprEnforcedWithTrueAndResultByVendorWithEnforcementResponse() {
+    public void shouldMaskForGdprWhenGdprEnforcedIsTrueAndResultByVendorWithEnforcementResponse() {
         // given
         final ExtUser extUser = ExtUser.builder().build();
         final User user = notMaskedUser();
@@ -331,20 +321,18 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, true, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(true), eq(singleton(15)));
         verify(gdprService).resultByVendor(eq(singleton(15)), isNull(), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
         verify(metrics).updateGdprMaskedMetric(eq(BIDDER_NAME));
         verifyNoMoreInteractions(metrics);
 
-        final Regs expectedRegs = Regs.of(null, mapper.valueToTree(ExtRegs.of(1)));
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userGdprMasked(), deviceGdprMasked(),
-                expectedRegs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userGdprMasked(), deviceGdprMasked());
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
@@ -352,8 +340,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     @Test
     public void shouldMaskForGdprWhenGdprServiceRespondIsGdprEnforcedWithFalseAndDeviceLmtIsOne() {
         // given
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(false));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(false);
 
         final ExtUser extUser = ExtUser.builder().build();
         final User user = notMaskedUser();
@@ -370,29 +357,26 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, false, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(false), eq(singleton(15)));
         verifyNoMoreInteractions(gdprService);
         verify(metrics).updateGdprMaskedMetric(eq(BIDDER_NAME));
         verifyNoMoreInteractions(metrics);
 
-        final Regs expectedRegs = Regs.of(0, mapper.valueToTree(ExtRegs.of(1)));
         final Device expectedDevice = givenGdprMaskedDevice(deviceBuilder -> deviceBuilder.lmt(1));
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userGdprMasked(), expectedDevice,
-                expectedRegs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userGdprMasked(), expectedDevice);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
 
     @Test
-    public void shouldMaskForGdprAndCoppaWhenGdprServiceRespondIsGdprEnforcedWithFalseAndDeviceLmtIsOneAndRegsCoppaIsOne() {
+    public void shouldMaskForGdprAndCoppaWhenGdprEnforcedIsFalseAndDeviceLmtIsOneAndRegsCoppaIsOne() {
         // given
-        given(gdprService.isGdprEnforced(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(false));
+        given(gdprService.isGdprEnforced(any(), any(), any())).willReturn(false);
 
         final ExtUser extUser = ExtUser.builder().build();
         final User user = notMaskedUser();
@@ -409,21 +393,19 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, false, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(false), eq(singleton(15)));
         verifyNoMoreInteractions(gdprService);
         verify(metrics).updateGdprMaskedMetric(eq(BIDDER_NAME));
         verifyNoMoreInteractions(metrics);
 
-        final Regs expectedRegs = Regs.of(1, mapper.valueToTree(ExtRegs.of(1)));
         //Coppa includes all masked fields for Gdpr
         final Device expectedDevice = givenCoppaMaskedDevice(deviceBuilder -> deviceBuilder.lmt(1));
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userCoppaMasked(), expectedDevice,
-                expectedRegs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userCoppaMasked(), expectedDevice);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
@@ -445,7 +427,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, null, singletonList(BIDDER_NAME), emptyMap(), bidRequest, true, timeout,
                         null)
                 .result();
 
@@ -477,11 +459,11 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Future<Map<String, PrivacyEnforcementResult>> firstFuture = privacyEnforcementService
-                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, true, timeout,
                         null);
 
         // then
-        verify(gdprService).isGdprEnforced(isNull(), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(isNull(), eq(true), eq(singleton(15)));
         verify(gdprService).resultByVendor(eq(singleton(15)), isNull(), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
         verifyZeroInteractions(metrics);
@@ -501,7 +483,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         // when and then
         assertThatExceptionOfType(PreBidException.class)
                 .isThrownBy(() -> privacyEnforcementService.mask(emptyMap(), null, singletonList(BIDDER_NAME),
-                        emptyMap(), bidRequest, PUBLISHER_ID, timeout, null))
+                        emptyMap(), bidRequest, true, timeout, null))
                 .withMessageStartingWith("Error decoding bidRequest.regs.ext:");
     }
 
@@ -523,22 +505,20 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, PUBLISHER_ID, timeout,
+                .mask(bidderToUser, extUser, singletonList(BIDDER_NAME), emptyMap(), bidRequest, true, timeout,
                         null)
                 .result();
 
         // then
-        verify(gdprService).isGdprEnforced(eq("1"), eq(PUBLISHER_ID), eq(singleton(15)), eq(timeout));
+        verify(gdprService).isGdprEnforced(eq("1"), eq(true), eq(singleton(15)));
         verify(gdprService).resultByVendor(eq(singleton(15)), eq("1"), any(), any(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
         verify(metrics).updateGdprMaskedMetric(eq(BIDDER_NAME));
         verifyNoMoreInteractions(metrics);
 
-        final Regs expectedRegs = Regs.of(1, mapper.valueToTree(ExtRegs.of(1)));
         //Coppa includes all masked fields for Gdpr
         final Device expectedDevice = givenCoppaMaskedDevice(deviceBuilder -> deviceBuilder.lmt(1));
-        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userCoppaMasked(), expectedDevice,
-                expectedRegs);
+        final PrivacyEnforcementResult expected = PrivacyEnforcementResult.of(userCoppaMasked(), expectedDevice);
         assertThat(result).hasSize(1)
                 .containsOnly(entry(BIDDER_NAME, expected));
     }
@@ -580,17 +560,15 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // when
         final Map<String, PrivacyEnforcementResult> result = privacyEnforcementService
-                .mask(bidderToUser, extUser, bidders, emptyMap(), bidRequest, PUBLISHER_ID, timeout, null)
+                .mask(bidderToUser, extUser, bidders, emptyMap(), bidRequest, true, timeout, null)
                 .result();
 
         // then
-        final Regs expectedRegs = Regs.of(0, mapper.valueToTree(ExtRegs.of(1)));
-
         final PrivacyEnforcementResult expectedMasked = PrivacyEnforcementResult.of(
-                userGdprMasked(), deviceGdprMasked(), expectedRegs);
-        final PrivacyEnforcementResult expectedNotMasked = PrivacyEnforcementResult.of(user, device, regs);
+                userGdprMasked(), deviceGdprMasked());
+        final PrivacyEnforcementResult expectedNotMasked = PrivacyEnforcementResult.of(user, device);
 
-        verify(gdprService).isGdprEnforced(eq("1"), eq(PUBLISHER_ID), anySet(), eq(timeout));
+        verify(gdprService).isGdprEnforced(eq("1"), eq(true), anySet());
         verify(gdprService).resultByVendor(anySet(), eq("1"), isNull(), isNull(), eq(timeout), any());
         verifyNoMoreInteractions(gdprService);
         verify(metrics).updateGdprMaskedMetric(bidder1Name);
@@ -683,7 +661,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     }
 
     private static <T> List<Imp> givenSingleImp(T ext) {
-        return singletonList(givenImp(ext, identity()));
+        return singletonList(givenImp(ext, Function.identity()));
     }
 
     private static <T> Imp givenImp(T ext, Function<Imp.ImpBuilder, Imp.ImpBuilder> impBuilderCustomizer) {

@@ -346,7 +346,7 @@ public class ApplicationTest extends IntegrationTest {
         // when
         final CookieSyncResponse cookieSyncResponse = given(spec)
                 .cookies("host-cookie-name", "host-cookie-uid")
-                .body(CookieSyncRequest.of(asList(RUBICON, APPNEXUS, ADFORM), 1, gdprConsent, null, null))
+                .body(CookieSyncRequest.of(asList(RUBICON, APPNEXUS, ADFORM), 1, gdprConsent, null, null, null))
                 .when()
                 .post("/cookie_sync")
                 .then()
@@ -503,8 +503,7 @@ public class ApplicationTest extends IntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(200);
         assertThat(response.getHeaders()).contains(new Header("content-type", "image/jpeg"));
         assertThat(response.getBody().asByteArray())
-                .isEqualTo(
-                ResourceUtil.readByteArrayFromClassPath("static/tracking-pixel.jpg"));
+                .isEqualTo(ResourceUtil.readByteArrayFromClassPath("static/tracking-pixel.jpg"));
     }
 
     @Test

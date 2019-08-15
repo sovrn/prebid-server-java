@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Imp;
-import com.iab.openrtb.request.Publisher;
+import com.iab.openrtb.request.Regs;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
 import com.iab.openrtb.response.Bid;
@@ -140,20 +140,20 @@ public class ExchangeService {
         }
 
         final Map<String, String> aliases = aliases(requestExt);
-        final String publisherId = publisherId(bidRequest);
+        final String publisherId = account.getId();
         final ExtRequestTargeting targeting = targeting(requestExt);
         final BidRequestCacheInfo cacheInfo = bidRequestCacheInfo(targeting, requestExt);
         final boolean debugEnabled = isDebugEnabled(bidRequest, requestExt);
         final boolean eventsEnabled = isEventsEnabled(account);
+        final Boolean isGdprEnforced = account.getEnforceGdpr();
         final long startTime = clock.millis();
         final List<Imp> imps = bidRequest.getImp();
         final List<SeatBid> storedResponse = new ArrayList<>();
 
-        return storedResponseProcessor
-                .getStoredResponseResult(imps, aliases, timeout)
+        return storedResponseProcessor.getStoredResponseResult(imps, aliases, timeout)
                 .map(storedResponseResult -> populateStoredResponse(storedResponseResult, storedResponse))
                 .compose(impsRequiredRequest -> extractBidderRequests(bidRequest, impsRequiredRequest, requestExt,
-                        uidsCookie, aliases, publisherId, timeout, routingContext))
+                        uidsCookie, aliases, isGdprEnforced, timeout, routingContext))
                 .map(bidderRequests ->
                         updateRequestMetric(bidderRequests, uidsCookie, aliases, publisherId,
                                 requestTypeMetric))
@@ -206,22 +206,6 @@ public class ExchangeService {
     }
 
     /**
-     * Extracts publisher id either from {@link BidRequest}.app.publisher.id or {@link BidRequest}.site.publisher.id.
-     * If neither is present returns empty string.
-     */
-    private static String publisherId(BidRequest bidRequest) {
-        final App app = bidRequest.getApp();
-        final Publisher appPublisher = app != null ? app.getPublisher() : null;
-        final Site site = bidRequest.getSite();
-        final Publisher sitePublisher = site != null ? site.getPublisher() : null;
-
-        final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
-
-        final String publisherId = publisher != null ? publisher.getId() : null;
-        return ObjectUtils.defaultIfNull(publisherId, StringUtils.EMPTY);
-    }
-
-    /**
      * Determines debug flag from {@link BidRequest} or {@link ExtBidRequest}.
      */
     private static boolean isDebugEnabled(BidRequest bidRequest, ExtBidRequest extBidRequest) {
@@ -237,7 +221,7 @@ public class ExchangeService {
      * <p>
      * This data is not critical, so returns false if null.
      */
-    private static Boolean isEventsEnabled(Account account) {
+    private static boolean isEventsEnabled(Account account) {
         return BooleanUtils.toBoolean(account.getEventsEnabled());
     }
 
@@ -287,7 +271,7 @@ public class ExchangeService {
      */
     private Future<List<BidderRequest>> extractBidderRequests(BidRequest bidRequest, List<Imp> requestedImps,
                                                               ExtBidRequest requestExt, UidsCookie uidsCookie,
-                                                              Map<String, String> aliases, String publisherId,
+                                                              Map<String, String> aliases, Boolean isGdprEnforced,
                                                               Timeout timeout, RoutingContext context) {
         // sanity check: discard imps without extension
         final List<Imp> imps = requestedImps.stream()
@@ -302,7 +286,7 @@ public class ExchangeService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        return makeBidderRequests(bidders, aliases, bidRequest, requestExt, uidsCookie, imps, publisherId, timeout,
+        return makeBidderRequests(bidders, aliases, bidRequest, requestExt, uidsCookie, imps, isGdprEnforced, timeout,
                 context);
     }
 
@@ -331,10 +315,9 @@ public class ExchangeService {
      * - bidrequest.user.ext.data, bidrequest.app.ext.data and bidrequest.site.ext.data will be removed for bidders
      * that don't have first party data allowed.
      */
-    private Future<List<BidderRequest>> makeBidderRequests(List<String> bidders, Map<String, String> aliases,
-                                                           BidRequest bidRequest, ExtBidRequest requestExt,
-                                                           UidsCookie uidsCookie, List<Imp> imps, String publisherId,
-                                                           Timeout timeout, RoutingContext context) {
+    private Future<List<BidderRequest>> makeBidderRequests(
+            List<String> bidders, Map<String, String> aliases, BidRequest bidRequest, ExtBidRequest requestExt,
+            UidsCookie uidsCookie, List<Imp> imps, Boolean isGdprEnforced, Timeout timeout, RoutingContext context) {
         final ExtUser extUser = extUser(bidRequest.getUser());
         final Map<String, String> uidsBody = uidsFromBody(extUser);
 
@@ -347,7 +330,7 @@ public class ExchangeService {
         }
 
         return privacyEnforcementService
-                .mask(bidderToUser, extUser, bidders, aliases, bidRequest, publisherId, timeout, context)
+                .mask(bidderToUser, extUser, bidders, aliases, bidRequest, isGdprEnforced, timeout, context)
                 .map(bidderToPrivacyEnforcementResult -> getBidderRequests(bidderToPrivacyEnforcementResult,
                         bidRequest, requestExt, imps, firstPartyDataBidders));
     }
@@ -494,6 +477,7 @@ public class ExchangeService {
     private static BidderRequest createBidderRequest(String bidder, BidRequest bidRequest, ExtBidRequest requestExt,
                                                      List<Imp> imps, PrivacyEnforcementResult privacyEnforcementResult,
                                                      List<String> firstPartyDataBidders) {
+        final Regs regs = bidRequest.getRegs();
         final App app = bidRequest.getApp();
         final ExtApp extApp = extApp(app);
         final Site site = bidRequest.getSite();
@@ -502,7 +486,6 @@ public class ExchangeService {
         return BidderRequest.of(bidder, bidRequest.toBuilder()
                 .user(privacyEnforcementResult.getUser())
                 .device(privacyEnforcementResult.getDevice())
-                .regs(privacyEnforcementResult.getRegs())
                 .imp(prepareImps(bidder, imps, firstPartyDataBidders.contains(bidder)))
                 .app(prepareApp(app, extApp, firstPartyDataBidders.contains(bidder)))
                 .site(prepareSite(site, extSite, firstPartyDataBidders.contains(bidder)))

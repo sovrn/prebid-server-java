@@ -38,6 +38,9 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private static final String GDPR_PARAM = "gdpr";
     private static final String GDPR_CONSENT_PARAM = "gdpr_consent";
     private static final String UID_PARAM = "uid";
+    private static final String FORMAT_PARAM = "format";
+    private static final String IMG_FORMAT_PARAM = "img";
+    private static final String PIXEL_FILE_PATH = "static/tracking-pixel.png";
     private static final String ACCOUNT_PARAM = "account";
 
     private final long defaultTimeout;
@@ -200,13 +203,19 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
 
         final Cookie cookie = uidsCookieService.toCookie(updatedUidsCookie);
-        context.addCookie(cookie);
+        addCookie(context, cookie);
 
         if (uidsAuditCookie != null) {
-            context.addCookie(uidsAuditCookie);
+            addCookie(context, uidsAuditCookie);
         }
 
-        context.response().end();
+        // Send pixel file to response if "format=img"
+        final String format = context.request().getParam(FORMAT_PARAM);
+        if (StringUtils.equals(format, IMG_FORMAT_PARAM)) {
+            context.response().sendFile(PIXEL_FILE_PATH);
+        } else {
+            context.response().end();
+        }
 
         analyticsReporter.processEvent(SetuidEvent.builder()
                 .status(HttpResponseStatus.OK.code())
@@ -214,6 +223,10 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 .uid(uid)
                 .success(successfullyUpdated)
                 .build());
+    }
+
+    private void addCookie(RoutingContext context, Cookie cookie) {
+        context.response().headers().add(HttpUtil.SET_COOKIE_HEADER, HttpUtil.toSetCookieHeaderValue(cookie));
     }
 
     private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {

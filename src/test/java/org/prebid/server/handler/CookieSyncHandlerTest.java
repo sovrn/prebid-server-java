@@ -72,6 +72,9 @@ public class CookieSyncHandlerTest extends VertxTest {
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
+    private final TimeoutFactory timeoutFactory =
+            new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault()));
+
     @Mock
     private UidsCookieService uidsCookieService;
     @Mock
@@ -84,9 +87,6 @@ public class CookieSyncHandlerTest extends VertxTest {
     private AnalyticsReporter analyticsReporter;
     @Mock
     private Metrics metrics;
-
-    private final TimeoutFactory timeoutFactory =
-            new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault()));
 
     private CookieSyncHandler cookieSyncHandler;
 
@@ -111,7 +111,7 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         cookieSyncHandler = new CookieSyncHandler(true, "http://external-url", 2000, uidsCookieService,
                 uidsAuditCookieService, bidderCatalog,
-                gdprService, 1, false, analyticsReporter, metrics, timeoutFactory);
+                emptyList(), gdprService, 1, false, false, analyticsReporter, metrics, timeoutFactory);
     }
 
     @Test
@@ -120,8 +120,8 @@ public class CookieSyncHandlerTest extends VertxTest {
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
         cookieSyncHandler = new CookieSyncHandler(false, "http://external-url", 2000, uidsCookieService,
-                uidsAuditCookieService, bidderCatalog,
-                gdprService, null, false, analyticsReporter, metrics, timeoutFactory);
+                uidsAuditCookieService, bidderCatalog, emptyList(),
+                gdprService, 1, false, false, analyticsReporter, metrics, timeoutFactory);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -189,7 +189,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithErrorIfGdprConsentIsMissing() {
         // given
         given(routingContext.getBody()).willReturn(
-                givenRequestBody(CookieSyncRequest.of(emptyList(), 1, null, null, null)));
+                givenRequestBody(CookieSyncRequest.of(emptyList(), 1, null, null, null, null)));
 
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
         given(httpResponse.setStatusMessage(anyString())).willReturn(httpResponse);
@@ -208,7 +208,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldNotSendResponseIfClientClosedConnection() {
         // given
         given(routingContext.getBody()).willReturn(
-                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null)));
+                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null, null)));
 
         givenGdprServiceReturningResult(emptyMap());
 
@@ -225,7 +225,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithExpectedHeaders() {
         // given
         given(routingContext.getBody()).willReturn(
-                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null)));
+                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null, null)));
 
         givenGdprServiceReturningResult(emptyMap());
 
@@ -244,7 +244,8 @@ public class CookieSyncHandlerTest extends VertxTest {
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -268,10 +269,80 @@ public class CookieSyncHandlerTest extends VertxTest {
     }
 
     @Test
+    public void shouldRespondWithCoopBiddersWhenRequestCoopSyncTrue() throws IOException {
+        // given
+        given(bidderCatalog.isActive(anyString())).willReturn(true);
+
+        final String disabledBidder = "disabled_bidder";
+        given(bidderCatalog.isActive(disabledBidder)).willReturn(false);
+
+        final List<List<String>> coopBidders = asList(singletonList(RUBICON), singletonList(disabledBidder));
+
+        cookieSyncHandler = new CookieSyncHandler(true, "http://external-url", 2000, uidsCookieService,
+                uidsAuditCookieService, bidderCatalog,
+                coopBidders, gdprService, 1, false, false, analyticsReporter, metrics, timeoutFactory);
+
+        given(routingContext.getBody()).willReturn(
+                givenRequestBody(CookieSyncRequest.of(singletonList(APPNEXUS), null, null, true, null, null)));
+
+        appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "http://adnxsexample.com", null, null, "redirect", false);
+        rubiconUsersyncer = new Usersyncer(RUBICON, "http://rubiconexample.com", null, null, "redirect", false);
+        givenUsersyncersReturningFamilyName();
+
+        givenGdprServiceReturningResult(doubleMap(RUBICON, 1, APPNEXUS, 2));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        final CookieSyncResponse cookieSyncResponse = captureCookieSyncResponse();
+        assertThat(cookieSyncResponse).isEqualTo(CookieSyncResponse.of("no_cookie", asList(
+                BidderUsersyncStatus.builder().bidder(RUBICON).noCookie(true).usersync(
+                        UsersyncInfo.of("http://rubiconexample.com", "redirect", false)).build(),
+                BidderUsersyncStatus.builder().bidder(disabledBidder).error("Unsupported bidder").build(),
+                BidderUsersyncStatus.builder().bidder(APPNEXUS).noCookie(true).usersync(
+                        UsersyncInfo.of("http://adnxsexample.com", "redirect", false)).build())));
+    }
+
+    @Test
+    public void shouldRespondWithPrioritisedCoopBidderWhenRequestCoopDefaultTrueAndLimitIsLessThanCoopSize()
+            throws IOException {
+        // given
+        given(bidderCatalog.isActive(anyString())).willReturn(true);
+
+        final List<List<String>> priorityBidders = asList(singletonList(APPNEXUS), singletonList(RUBICON),
+                asList("bidder1", "bidder2"), singletonList("spam"));
+
+        cookieSyncHandler = new CookieSyncHandler(true, "http://external-url", 2000, uidsCookieService,
+                uidsAuditCookieService, bidderCatalog,
+                priorityBidders, gdprService, 1, false, true, analyticsReporter, metrics, timeoutFactory);
+
+        given(routingContext.getBody()).willReturn(
+                givenRequestBody(CookieSyncRequest.of(singletonList(APPNEXUS), null, null, null, 2, null)));
+
+        appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "http://adnxsexample.com", null, null, "redirect", false);
+        rubiconUsersyncer = new Usersyncer(RUBICON, "http://rubiconexample.com", null, null, "redirect", false);
+        givenUsersyncersReturningFamilyName();
+
+        givenGdprServiceReturningResult(doubleMap(RUBICON, 1, APPNEXUS, 2));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        final CookieSyncResponse cookieSyncResponse = captureCookieSyncResponse();
+        assertThat(cookieSyncResponse).isEqualTo(CookieSyncResponse.of("no_cookie", asList(
+                BidderUsersyncStatus.builder().bidder(RUBICON).noCookie(true).usersync(
+                        UsersyncInfo.of("http://rubiconexample.com", "redirect", false)).build(),
+                BidderUsersyncStatus.builder().bidder(APPNEXUS).noCookie(true).usersync(
+                        UsersyncInfo.of("http://adnxsexample.com", "redirect", false)).build())));
+    }
+
+    @Test
     public void shouldRespondWithBidderStatusForAllBiddersIfBiddersListOmittedInRequest() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(
-                givenRequestBody(CookieSyncRequest.of(null, null, null, null, null)));
+                givenRequestBody(CookieSyncRequest.of(null, null, null, null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -309,7 +380,8 @@ public class CookieSyncHandlerTest extends VertxTest {
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "", null, null, null, false);
@@ -334,7 +406,8 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         given(routingContext.getBody())
                 .willReturn(
-                        givenRequestBody(CookieSyncRequest.of(asList(RUBICON, "unsupported"), null, null, null, null)));
+                        givenRequestBody(
+                                CookieSyncRequest.of(asList(RUBICON, "unsupported"), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         givenUsersyncersReturningFamilyName();
@@ -363,7 +436,8 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         given(routingContext.getBody())
                 .willReturn(
-                        givenRequestBody(CookieSyncRequest.of(asList(RUBICON, "disabled"), null, null, null, null)));
+                        givenRequestBody(
+                                CookieSyncRequest.of(asList(RUBICON, "disabled"), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         givenUsersyncersReturningFamilyName();
@@ -397,7 +471,8 @@ public class CookieSyncHandlerTest extends VertxTest {
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "", null, null, null, false);
@@ -426,7 +501,8 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldUpdateCookieSyncSetAndRejectByGdprMetricForEachRejectedAndSyncedBidder() {
         // given
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "", null, null, null, false);
@@ -455,7 +531,8 @@ public class CookieSyncHandlerTest extends VertxTest {
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "", null, null, null, false);
@@ -482,13 +559,14 @@ public class CookieSyncHandlerTest extends VertxTest {
         // given
         cookieSyncHandler = new CookieSyncHandler(true, "http://external-url", 2000, uidsCookieService,
                 uidsAuditCookieService, bidderCatalog,
-                gdprService, null, false, analyticsReporter, metrics, timeoutFactory);
+                emptyList(), gdprService, null, false, false, analyticsReporter, metrics, timeoutFactory);
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         rubiconUsersyncer = new Usersyncer(RUBICON, "", null, null, null, false);
         appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE, "", null, null, null, false);
@@ -519,7 +597,8 @@ public class CookieSyncHandlerTest extends VertxTest {
                 Uids.builder().uids(singletonMap(APPNEXUS_COOKIE, UidWithExpiry.expired("12345"))).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(singletonList(APPNEXUS), null, null, null, null)));
+                .willReturn(
+                        givenRequestBody(CookieSyncRequest.of(singletonList(APPNEXUS), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -545,7 +624,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithExpectedUsersyncInfo() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(APPNEXUS), 1, "gdpr_consent1", null, null)));
+                CookieSyncRequest.of(singletonList(APPNEXUS), 1, "gdpr_consent1", null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -570,7 +649,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithUpdatedUsersyncInfoIfHostCookieAndUidsDiffers() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null)));
+                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(RUBICON)).willReturn(true);
         rubiconUsersyncer = new Usersyncer(RUBICON, "http://rubiconexample.com", null, null, "redirect", false);
@@ -599,7 +678,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithUpdatedRubiconUsersyncInfoIfHostCookieAndUidsDiffers() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, "account$1")));
+                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null, "account$1")));
 
         given(bidderCatalog.isActive(RUBICON)).willReturn(true);
         rubiconUsersyncer = new Usersyncer(RUBICON, "http://rubiconexample.com", null, null, "redirect", false);
@@ -628,7 +707,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithOriginalUsersyncInfoIfNoHostCookieFamilyInBiddersCookieFamily() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(APPNEXUS), 1, "gdpr_consent1", null, null)));
+                CookieSyncRequest.of(singletonList(APPNEXUS), 1, "gdpr_consent1", null, null, null)));
 
         given(bidderCatalog.isActive(APPNEXUS)).willReturn(true);
         appnexusUsersyncer = new Usersyncer(APPNEXUS_COOKIE,
@@ -655,7 +734,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithOriginalUsersyncInfoIfNoHostCookieInRequest() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null)));
+                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(RUBICON)).willReturn(true);
 
@@ -682,7 +761,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithOriginalUsersyncInfoIfHostCookieAndUidsAreEqual() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null)));
+                CookieSyncRequest.of(singletonList(RUBICON), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(RUBICON)).willReturn(true);
 
@@ -710,7 +789,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithExpectedUsersyncInfoForBidderAlias() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList("rubiconAlias"), 0, null, null, null)));
+                CookieSyncRequest.of(singletonList("rubiconAlias"), 0, null, null, null, null)));
 
         given(bidderCatalog.isActive(RUBICON)).willReturn(true);
         given(bidderCatalog.isAlias("rubiconAlias")).willReturn(true);
@@ -734,7 +813,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldRespondWithExpectedUsersyncInfoForRubiconWithAccount() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(RUBICON), 1, "gdpr_consent1", null, "account")));
+                CookieSyncRequest.of(singletonList(RUBICON), 1, "gdpr_consent1", null, null, "account")));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
         given(bidderCatalog.names()).willReturn(singleton(RUBICON));
@@ -762,7 +841,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldTolerateMissingGdprParamsInRequestForUsersyncInfo() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(singletonList(APPNEXUS), null, "", null, null)));
+                CookieSyncRequest.of(singletonList(APPNEXUS), null, "", null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
         given(bidderCatalog.names()).willReturn(singleton(APPNEXUS));
@@ -788,7 +867,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldLimitBidderStatusesAndPlaceRubiconFirst() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, 1, null)));
+                CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, null, 1, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -815,7 +894,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldExceedLimitByAddingRubiconToBidderStatusesAsFirstElement() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(asList(APPNEXUS, PUBMATIC), 0, null, 1, null)));
+                CookieSyncRequest.of(asList(APPNEXUS, PUBMATIC), 0, null, null, 1, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -852,7 +931,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldLimitBidderStatusWhenNoBiddersWereSpecifiedAndAlwaysAddRubiconFirst() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(null, null, null, 2, null)));
+                CookieSyncRequest.of(null, null, null, null, 2, null)));
 
         given(bidderCatalog.names()).willReturn(new HashSet<>(asList("conversant", APPNEXUS, PUBMATIC)));
         given(bidderCatalog.isActive(anyString())).willReturn(true);
@@ -895,7 +974,7 @@ public class CookieSyncHandlerTest extends VertxTest {
                 Uids.builder().uids(liveUids).build()));
 
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, 1, null)));
+                CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, null, 1, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -920,7 +999,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldNotLimitBidderStatusesIfLimitIsBiggerThanBiddersList() throws IOException {
         // given
         given(routingContext.getBody()).willReturn(givenRequestBody(
-                CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, 3, null)));
+                CookieSyncRequest.of(asList(RUBICON, APPNEXUS), 0, null, null, 3, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -945,7 +1024,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     public void shouldIncrementMetrics() {
         // given
         given(routingContext.getBody()).willReturn(
-                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null)));
+                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null, null)));
 
         givenGdprServiceReturningResult(emptyMap());
 
@@ -1010,7 +1089,8 @@ public class CookieSyncHandlerTest extends VertxTest {
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -1046,7 +1126,8 @@ public class CookieSyncHandlerTest extends VertxTest {
         given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(null);
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 
@@ -1073,14 +1154,15 @@ public class CookieSyncHandlerTest extends VertxTest {
             throws IOException {
         // given
         cookieSyncHandler = new CookieSyncHandler(true, "http://external-url", 2000, uidsCookieService,
-                uidsAuditCookieService, bidderCatalog,
-                gdprService, 1, false, analyticsReporter, metrics, timeoutFactory);
+                uidsAuditCookieService, bidderCatalog, emptyList(),
+                gdprService, 1, false, false, analyticsReporter, metrics, timeoutFactory);
 
         given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
 
         given(routingContext.getBody())
-                .willReturn(givenRequestBody(CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null)));
+                .willReturn(givenRequestBody(
+                        CookieSyncRequest.of(asList(RUBICON, APPNEXUS), null, null, null, null, null)));
 
         given(bidderCatalog.isActive(anyString())).willReturn(true);
 

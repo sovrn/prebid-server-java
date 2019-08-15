@@ -105,8 +105,8 @@ public final class HttpUtil {
      */
     public static MultiMap headers() {
         return MultiMap.caseInsensitiveMultiMap()
-                .add(HttpUtil.CONTENT_TYPE_HEADER, APPLICATION_JSON_CONTENT_TYPE)
-                .add(HttpUtil.ACCEPT_HEADER, HttpHeaderValues.APPLICATION_JSON);
+                .add(CONTENT_TYPE_HEADER, APPLICATION_JSON_CONTENT_TYPE)
+                .add(ACCEPT_HEADER, HttpHeaderValues.APPLICATION_JSON);
     }
 
     /**
@@ -149,5 +149,9 @@ public final class HttpUtil {
     public static Map<String, String> cookiesAsMap(RoutingContext context) {
         return context.cookies().stream()
                 .collect(Collectors.toMap(Cookie::getName, Cookie::getValue));
+    }
+
+    public static String toSetCookieHeaderValue(Cookie cookie) {
+        return String.join("; ", cookie.encode(), "SameSite=none");
     }
 }

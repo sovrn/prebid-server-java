@@ -42,6 +42,8 @@ import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.geolocation.NetAcuityGeoLocationService;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
+import org.prebid.server.spring.config.model.CircuitBreakerProperties;
+import org.prebid.server.spring.config.model.HttpClientProperties;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
@@ -49,9 +51,11 @@ import org.prebid.server.vertx.http.BasicHttpClient;
 import org.prebid.server.vertx.http.CircuitBreakerSecuredHttpClient;
 import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
@@ -167,17 +171,27 @@ public class ServiceConfiguration {
     }
 
     @Bean
+    @ConfigurationProperties(prefix = "http-client")
+    HttpClientProperties httpClientProperties() {
+        return new HttpClientProperties();
+    }
+
+    @Bean
     @Scope(scopeName = VertxContextScope.NAME, proxyMode = ScopedProxyMode.INTERFACES)
     @ConditionalOnProperty(prefix = "http-client.circuit-breaker", name = "enabled", havingValue = "false",
             matchIfMissing = true)
-    BasicHttpClient basicHttpClient(
-            Vertx vertx,
-            @Value("${http-client.max-pool-size}") int maxPoolSize,
-            @Value("${http-client.connect-timeout-ms}") int connectTimeoutMs,
-            @Value("${http-client.use-compression}") boolean useCompression,
-            @Value("${http-client.max-redirects}") int maxRedirects) {
+    BasicHttpClient basicHttpClient(Vertx vertx, HttpClientProperties httpClientProperties) {
 
-        return createBasicHttpClient(vertx, maxPoolSize, connectTimeoutMs, useCompression, maxRedirects);
+        return createBasicHttpClient(vertx, httpClientProperties.getMaxPoolSize(),
+                httpClientProperties.getConnectTimeoutMs(), httpClientProperties.getUseCompression(),
+                httpClientProperties.getMaxRedirects());
+    }
+
+    @Bean
+    @ConfigurationProperties(prefix = "http-client.circuit-breaker")
+    @ConditionalOnProperty(prefix = "http-client.circuit-breaker", name = "enabled", havingValue = "true")
+    CircuitBreakerProperties httpClientCircuitBreakerProperties() {
+        return new CircuitBreakerProperties();
     }
 
     @Bean
@@ -186,18 +200,15 @@ public class ServiceConfiguration {
     CircuitBreakerSecuredHttpClient circuitBreakerSecuredHttpClient(
             Vertx vertx,
             Metrics metrics,
-            @Value("${http-client.max-pool-size}") int maxPoolSize,
-            @Value("${http-client.connect-timeout-ms}") int connectTimeoutMs,
-            @Value("${http-client.circuit-breaker.opening-threshold}") int openingThreshold,
-            @Value("${http-client.circuit-breaker.opening-interval-ms}") long openingIntervalMs,
-            @Value("${http-client.circuit-breaker.closing-interval-ms}") long closingIntervalMs,
-            @Value("${http-client.use-compression}") boolean useCompression,
-            @Value("${http-client.max-redirects}") int maxRedirects) {
+            HttpClientProperties httpClientProperties,
+            @Qualifier("httpClientCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties) {
 
-        final HttpClient httpClient = createBasicHttpClient(vertx, maxPoolSize, connectTimeoutMs, useCompression,
-                maxRedirects);
-        return new CircuitBreakerSecuredHttpClient(vertx, httpClient, metrics, openingThreshold, openingIntervalMs,
-                closingIntervalMs);
+        final HttpClient httpClient = createBasicHttpClient(vertx, httpClientProperties.getMaxPoolSize(),
+                httpClientProperties.getConnectTimeoutMs(), httpClientProperties.getUseCompression(),
+                httpClientProperties.getMaxRedirects());
+        return new CircuitBreakerSecuredHttpClient(vertx, httpClient, metrics,
+                circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
+                circuitBreakerProperties.getClosingIntervalMs());
     }
 
     private static BasicHttpClient createBasicHttpClient(Vertx vertx, int maxPoolSize, int connectTimeoutMs,
@@ -239,43 +250,6 @@ public class ServiceConfiguration {
                 hostVendorId, bidderCatalog);
     }
 
-    @Configuration
-    @ConditionalOnProperty(prefix = "gdpr.geolocation", name = "enabled", havingValue = "true")
-    static class GeoLocationConfiguration {
-
-        @Bean
-        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "false",
-                matchIfMissing = true)
-        GeoLocationService basicGeoLocationService(
-                Vertx vertx,
-                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
-
-            return createGeoLocationService(vertx, server);
-        }
-
-        @Bean
-        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
-        CircuitBreakerSecuredGeoLocationService circuitBreakerSecuredGeoLocationService(
-                Vertx vertx,
-                Metrics metrics,
-                @Value("${gdpr.geolocation.circuit-breaker.opening-threshold}") int openingThreshold,
-                @Value("${gdpr.geolocation.circuit-breaker.opening-interval-ms}") long openingIntervalMs,
-                @Value("${gdpr.geolocation.circuit-breaker.closing-interval-ms}") long closingIntervalMs,
-                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
-
-            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(vertx, server), metrics,
-                    openingThreshold, openingIntervalMs, closingIntervalMs);
-        }
-
-        /**
-         * Default geolocation service implementation.
-         */
-        private GeoLocationService createGeoLocationService(Vertx vertx, String server) {
-
-            return NetAcuityGeoLocationService.create(vertx, server);
-        }
-    }
-
     @Bean
     RsidCookieService rsidCookieService(@Value("${gdpr.rubicon.rsid-cookie-encryption-key}") String encryptionKey) {
         return new RsidCookieService(encryptionKey);
@@ -284,14 +258,13 @@ public class ServiceConfiguration {
     @Bean
     GdprService gdprService(
             RsidCookieService rsidCookieService,
-            ApplicationSettings applicationSettings,
             @Autowired(required = false) GeoLocationService geoLocationService,
             VendorListService vendorListService,
             @Value("${gdpr.eea-countries}") String eeaCountriesAsString,
             @Value("${gdpr.default-value}") String defaultValue) {
 
         final List<String> eeaCountries = Arrays.asList(eeaCountriesAsString.trim().split(","));
-        return new GdprService(rsidCookieService, applicationSettings, geoLocationService, vendorListService,
+        return new GdprService(rsidCookieService, geoLocationService, vendorListService,
                 eeaCountries, defaultValue);
     }
 
@@ -438,6 +411,49 @@ public class ServiceConfiguration {
             HttpClient httpClient) {
 
         return new CurrencyConversionService(currencyServerUrl, defaultTimeout, refreshPeriod, vertx, httpClient);
+    }
+
+    @Configuration
+    @ConditionalOnProperty(prefix = "gdpr.geolocation", name = "enabled", havingValue = "true")
+    static class GeoLocationConfiguration {
+
+        @Bean
+        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "false",
+                matchIfMissing = true)
+        GeoLocationService basicGeoLocationService(
+                Vertx vertx,
+                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
+
+            return createGeoLocationService(vertx, server);
+        }
+
+        @Bean
+        @ConfigurationProperties(prefix = "gdpr.geolocation.circuit-breaker")
+        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
+        CircuitBreakerProperties geolocationCircuitBreakerProperties() {
+            return new CircuitBreakerProperties();
+        }
+
+        @Bean
+        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
+        CircuitBreakerSecuredGeoLocationService circuitBreakerSecuredGeoLocationService(
+                Vertx vertx,
+                Metrics metrics,
+                @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
+                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
+
+            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(vertx, server), metrics,
+                    circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
+                    circuitBreakerProperties.getClosingIntervalMs());
+        }
+
+        /**
+         * Default geolocation service implementation.
+         */
+        private GeoLocationService createGeoLocationService(Vertx vertx, String server) {
+
+            return NetAcuityGeoLocationService.create(vertx, server);
+        }
     }
 
     @Configuration
