@@ -3,7 +3,7 @@ vertx:
 http-client:
   circuit-breaker:
     enabled: true
-    opening-threshold: 20
+    opening-threshold: 100
     opening-interval-ms: 2000
     closing-interval-ms: 20000
 adapters:
@@ -51,7 +51,7 @@ settings:
     stored-responses-query: SELECT resid, responseData FROM stored_responses WHERE resid IN (%RESPONSE_ID_LIST%)
     circuit-breaker:
       enabled: true
-      opening-threshold: 10
+      opening-threshold: 100
       opening-interval-ms: 2000
       closing-interval-ms: 20000
 recaptcha-url: https://www.google.com/recaptcha/api/siteverify
@@ -74,7 +74,7 @@ gdpr:
     enabled: true
     circuit-breaker:
       enabled: true
-      opening-threshold: 10
+      opening-threshold: 100
       opening-interval-ms: 2000
       closing-interval-ms: 20000
   rubicon:
