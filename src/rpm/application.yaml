@@ -41,8 +41,8 @@ cache:
   scheme: https
   path: /cache
   query: uuid=
-  banner-ttl-seconds: 300
-  video-ttl-seconds: 900
+  banner-ttl-seconds: 150
+  video-ttl-seconds: 450
 settings:
   database:
     type: mysql
