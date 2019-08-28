@@ -1,9 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
     <property name="LOG_FILE" value="${LOG_PATH}/prebid-server.log"/>
-    <include resource="org/springframework/boot/logging/logback/file-appender.xml"/>
-    <root level="ERROR">
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+        <file>${LOG_FILE}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%i.gz</fileNamePattern>
+            <minIndex>1</minIndex>
+            <maxIndex>20</maxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <MaxFileSize>${LOG_FILE_MAX_SIZE:-20MB}</MaxFileSize>
+        </triggeringPolicy>
+    </appender>
+
+    <root level="INFO">
         <appender-ref ref="FILE"/>
     </root>
 </configuration>
