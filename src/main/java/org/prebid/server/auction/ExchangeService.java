@@ -141,6 +141,7 @@ public class ExchangeService {
         final BidRequestCacheInfo cacheInfo = bidRequestCacheInfo(targeting, requestExt);
         final Boolean isGdprEnforced = account.getEnforceGdpr();
         final boolean debugEnabled = isDebugEnabled(bidRequest, requestExt);
+        final Integer samplingFactor = account.getAnalyticsSamplingFactor();
 
         return storedResponseProcessor.getStoredResponseResult(imps, aliases, timeout)
                 .map(storedResponseResult -> populateStoredResponse(storedResponseResult, storedResponse))
@@ -164,7 +165,8 @@ public class ExchangeService {
                         toBidResponse(bidderResponses, bidRequest, targeting, cacheInfo, account, timeout,
                                 debugEnabled))
                 .compose(bidResponse ->
-                        bidResponsePostProcessor.postProcess(routingContext, uidsCookie, bidRequest, bidResponse));
+                        bidResponsePostProcessor.postProcess(routingContext, uidsCookie, bidRequest, bidResponse,
+                                samplingFactor));
     }
 
     /**

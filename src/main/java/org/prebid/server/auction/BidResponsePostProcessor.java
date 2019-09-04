@@ -20,10 +20,11 @@ public interface BidResponsePostProcessor {
      * @param uidsCookie  auction request {@link Uids} container
      * @param bidRequest  original auction request
      * @param bidResponse auction result
+     * @param accountSamplingFactor number of requests to analytics
      * @return a {@link Future} with (possibly modified) auction result
      */
     Future<BidResponse> postProcess(RoutingContext context, UidsCookie uidsCookie, BidRequest bidRequest,
-                                    BidResponse bidResponse);
+                                    BidResponse bidResponse, Integer accountSamplingFactor);
 
     /**
      * Returns {@link NoOpBidResponsePostProcessor} instance that just does nothing to original auction result.
@@ -38,7 +39,7 @@ public interface BidResponsePostProcessor {
     class NoOpBidResponsePostProcessor implements BidResponsePostProcessor {
         @Override
         public Future<BidResponse> postProcess(RoutingContext context, UidsCookie uidsCookie, BidRequest bidRequest,
-                                               BidResponse bidResponse) {
+                                               BidResponse bidResponse, Integer accountSamplingFactor) {
             return Future.succeededFuture(bidResponse);
         }
     }

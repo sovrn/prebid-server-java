@@ -1404,7 +1404,7 @@ public class ExchangeServiceTest extends VertxTest {
         exchangeService.holdAuction(givenRequestContext(bidRequest));
 
         // then
-        verify(bidResponsePostProcessor).postProcess(any(), same(uidsCookie), same(bidRequest), any());
+        verify(bidResponsePostProcessor).postProcess(any(), same(uidsCookie), same(bidRequest), any(), any());
     }
 
     @Test
