@@ -25,6 +25,9 @@ adapters:
     enabled: true
 auction:
   ad-server-currency: USD
+cookie-sync:
+  coop-sync:
+    pri[0]: rubicon, appnexus, conversant, ix, openx, pubmatic, pulsepoint, sovrn
 metrics:
   graphite:
     enabled: true
