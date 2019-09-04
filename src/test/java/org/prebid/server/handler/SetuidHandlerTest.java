@@ -52,7 +52,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 public class SetuidHandlerTest extends VertxTest {
 
@@ -74,7 +73,6 @@ public class SetuidHandlerTest extends VertxTest {
     private Metrics metrics;
 
     private SetuidHandler setuidHandler;
-
     @Mock
     private RoutingContext routingContext;
     @Mock
@@ -91,6 +89,8 @@ public class SetuidHandlerTest extends VertxTest {
 
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
+
+//        given(httpResponse.headers()).willReturn(new CaseInsensitiveHeaders());
 
         given(uidsCookieService.toCookie(any()))
                 .willReturn(Cookie.cookie("test", "test"));
@@ -136,7 +136,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(401));
         verify(httpResponse).end();
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test
@@ -212,7 +211,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(400));
         verify(httpResponse).end(eq("\"bidder\" query param is required"));
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test
@@ -331,7 +329,6 @@ public class SetuidHandlerTest extends VertxTest {
         verify(httpResponse).sendFile(any());
 
         final String uidsCookie = captureCookie();
-        // this uids cookie value stands for {"uids":{"adnxs":"12345"}}
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(ADNXS).getUid()).isEqualTo("12345");
@@ -359,7 +356,6 @@ public class SetuidHandlerTest extends VertxTest {
         verify(httpResponse, never()).sendFile(any());
 
         final String uidsCookie = captureCookie();
-        // this uids cookie value stands for {"uids":{"audienceNetwork":"facebookUid"}}
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get("audienceNetwork").getUid()).isEqualTo("facebookUid");
@@ -418,7 +414,6 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any());
 
         final String uidsCookie = captureCookie();
-        // this uids cookie value stands for {"uids":{"adnxs":"12345","rubicon":"updatedUid"}}
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(2);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("updatedUid");
@@ -455,7 +450,6 @@ public class SetuidHandlerTest extends VertxTest {
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
     }
-
 
     @Test
     public void shouldSendBadRequestIfAuditCookieWasNotCreated() {
@@ -499,7 +493,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        final List<String> cookies = captureCookiesAsHeader();
+        final List<String> cookies = captureAllCookies();
         assertThat(cookies.get(0)).startsWith("uids=");
         assertThat(cookies.get(1)).startsWith("uids-audit=");
     }
@@ -692,18 +686,12 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     private String captureCookie() {
-        final ArgumentCaptor<String> cookieCaptor = ArgumentCaptor.forClass(String.class);
-        verify(responseHeaders).add(eq(new AsciiString("Set-Cookie")), cookieCaptor.capture());
-        return cookieCaptor.getValue();
+        final ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(responseHeaders).add(eq(new AsciiString("Set-Cookie")), captor.capture());
+        return captor.getValue();
     }
 
-    private List<Cookie> captureCookies() {
-        final ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor.forClass(Cookie.class);
-        verify(routingContext, times(2)).addCookie(cookieCaptor.capture());
-        return cookieCaptor.getAllValues();
-    }
-
-    private List<String> captureCookiesAsHeader() {
+    private List<String> captureAllCookies() {
         final ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(responseHeaders, times(2)).add(eq(new AsciiString("Set-Cookie")), captor.capture());
         return captor.getAllValues();

@@ -201,14 +201,15 @@ public class ServiceConfiguration {
             Vertx vertx,
             Metrics metrics,
             HttpClientProperties httpClientProperties,
-            @Qualifier("httpClientCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties) {
+            @Qualifier("httpClientCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
+            Clock clock) {
 
         final HttpClient httpClient = createBasicHttpClient(vertx, httpClientProperties.getMaxPoolSize(),
                 httpClientProperties.getConnectTimeoutMs(), httpClientProperties.getUseCompression(),
                 httpClientProperties.getMaxRedirects());
         return new CircuitBreakerSecuredHttpClient(vertx, httpClient, metrics,
                 circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
-                circuitBreakerProperties.getClosingIntervalMs());
+                circuitBreakerProperties.getClosingIntervalMs(), clock);
     }
 
     private static BasicHttpClient createBasicHttpClient(Vertx vertx, int maxPoolSize, int connectTimeoutMs,
@@ -294,8 +295,12 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    BidResponseCreator bidResponseCreator(BidderCatalog bidderCatalog, CacheService cacheService) {
-        return new BidResponseCreator(bidderCatalog, cacheService.getEndpointHost(),
+    BidResponseCreator bidResponseCreator(
+            BidderCatalog bidderCatalog,
+            EventsService eventsService,
+            CacheService cacheService) {
+
+        return new BidResponseCreator(bidderCatalog, eventsService, cacheService.getEndpointHost(),
                 cacheService.getEndpointPath(), cacheService.getCachedAssetURLTemplate());
     }
 
@@ -307,7 +312,6 @@ public class ServiceConfiguration {
             HttpBidderRequester httpBidderRequester,
             ResponseBidValidator responseBidValidator,
             CurrencyConversionService currencyConversionService,
-            EventsService eventsService,
             CacheService cacheService,
             BidResponseCreator bidResponseCreator,
             BidResponsePostProcessor bidResponsePostProcessor,
@@ -316,7 +320,7 @@ public class ServiceConfiguration {
             @Value("${auction.cache.expected-request-time-ms}") long expectedCacheTimeMs) {
 
         return new ExchangeService(bidderCatalog, storedResponseProcessor, privacyEnforcementService,
-                httpBidderRequester, responseBidValidator, currencyConversionService, eventsService, cacheService,
+                httpBidderRequester, responseBidValidator, currencyConversionService, cacheService,
                 bidResponseCreator, bidResponsePostProcessor, metrics, clock, expectedCacheTimeMs);
     }
 
@@ -440,11 +444,12 @@ public class ServiceConfiguration {
                 Vertx vertx,
                 Metrics metrics,
                 @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
-                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
+                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server,
+                Clock clock) {
 
             return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(vertx, server), metrics,
                     circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
-                    circuitBreakerProperties.getClosingIntervalMs());
+                    circuitBreakerProperties.getClosingIntervalMs(), clock);
         }
 
         /**

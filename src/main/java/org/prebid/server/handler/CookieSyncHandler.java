@@ -49,22 +49,23 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
     private static final Logger logger = LoggerFactory.getLogger(CookieSyncHandler.class);
 
-    private final boolean enableCookie;
     private static final Set<GdprPurpose> GDPR_PURPOSES =
             Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess));
 
     private static final String RUBICON_BIDDER = "rubicon";
 
+    private final boolean enableCookie;
     private final String externalUrl;
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
     private final UidsAuditCookieService uidsAuditCookieService;
     private final BidderCatalog bidderCatalog;
-    private final List<List<String>> listOfCoopSyncBidders;
+    private final Collection<String> activeBidders;
     private final GdprService gdprService;
     private final Integer gdprHostVendorId;
     private final boolean useGeoLocation;
     private final boolean defaultCoopSync;
+    private final List<Collection<String>> listOfCoopSyncBidders;
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
     private final TimeoutFactory timeoutFactory;
@@ -72,9 +73,10 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     public CookieSyncHandler(boolean enableCookie, String externalUrl, long defaultTimeout,
                              UidsCookieService uidsCookieService,
                              UidsAuditCookieService uidsAuditCookieService, BidderCatalog bidderCatalog,
-                             List<List<String>> listOfCoopSyncBidders,
-                             GdprService gdprService, Integer gdprHostVendorId, boolean useGeoLocation,
-                             boolean defaultCoopSync, AnalyticsReporter analyticsReporter, Metrics metrics,
+                             GdprService gdprService, Integer gdprHostVendorId,
+                             boolean useGeoLocation, boolean defaultCoopSync,
+                             List<Collection<String>> listOfCoopSyncBidders, AnalyticsReporter analyticsReporter,
+                             Metrics metrics,
                              TimeoutFactory timeoutFactory) {
         this.enableCookie = enableCookie;
         this.externalUrl = HttpUtil.validateUrl(Objects.requireNonNull(externalUrl));
@@ -82,14 +84,21 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.uidsAuditCookieService = uidsAuditCookieService;
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
-        this.listOfCoopSyncBidders = Objects.requireNonNull(listOfCoopSyncBidders);
+        activeBidders = activeBidders(bidderCatalog);
         this.gdprService = Objects.requireNonNull(gdprService);
         this.gdprHostVendorId = gdprHostVendorId;
         this.useGeoLocation = useGeoLocation;
         this.defaultCoopSync = defaultCoopSync;
+        this.listOfCoopSyncBidders = CollectionUtils.isNotEmpty(listOfCoopSyncBidders)
+                ? listOfCoopSyncBidders
+                : Collections.singletonList(activeBidders);
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
+    }
+
+    private static Collection<String> activeBidders(BidderCatalog bidderCatalog) {
+        return bidderCatalog.names().stream().filter(bidderCatalog::isActive).collect(Collectors.toSet());
     }
 
     @Override
@@ -163,7 +172,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private Collection<String> biddersToSync(List<String> requestBidders, Boolean requestCoop, Integer requestLimit) {
         if (CollectionUtils.isEmpty(requestBidders)) {
-            return bidderCatalog.names().stream().filter(bidderCatalog::isActive).collect(Collectors.toSet());
+            return activeBidders;
         }
 
         final boolean coop = requestCoop == null ? defaultCoopSync : requestCoop;
@@ -191,7 +200,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         }
         final Set<String> allBidders = new HashSet<>(bidders);
 
-        for (List<String> prioritisedBidders : listOfCoopSyncBidders) {
+        for (Collection<String> prioritisedBidders : listOfCoopSyncBidders) {
             int remaining = limit - allBidders.size();
             if (remaining <= 0) {
                 return allBidders;
@@ -281,12 +290,6 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                              String account, boolean requestHasBidders) {
         updateCookieSyncGdprMetrics(bidders, biddersRejectedByGdpr);
 
-        // don't send the response if client has gone
-        if (context.response().closed()) {
-            logger.warn("The client already closed connection, response will be skipped");
-            return;
-        }
-
         final List<BidderUsersyncStatus> bidderStatuses = bidders.stream()
                 .map(bidder -> bidderStatusFor(bidder, context, uidsCookie, biddersRejectedByGdpr, gdpr, gdprConsent,
                         account))
@@ -307,10 +310,16 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
         final CookieSyncResponse response = CookieSyncResponse.of(uidsCookie.hasLiveUids() ? "ok" : "no_cookie",
                 updatedBidderStatuses);
+        final String body = Json.encode(response);
 
+        // don't send the response if client has gone
+        if (context.response().closed()) {
+            logger.warn("The client already closed connection, response will be skipped");
+            return;
+        }
         context.response()
                 .putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON)
-                .end(Json.encode(response));
+                .end(body);
 
         analyticsReporter.processEvent(CookieSyncEvent.builder()
                 .status(HttpResponseStatus.OK.code())

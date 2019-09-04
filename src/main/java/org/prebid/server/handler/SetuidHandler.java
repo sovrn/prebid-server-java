@@ -34,6 +34,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     private static final Set<GdprPurpose> GDPR_PURPOSES =
             Collections.unmodifiableSet(EnumSet.of(GdprPurpose.informationStorageAndAccess));
+
     private static final String BIDDER_PARAM = "bidder";
     private static final String GDPR_PARAM = "gdpr";
     private static final String GDPR_CONSENT_PARAM = "gdpr_consent";
@@ -80,7 +81,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         final UidsCookie uidsCookie = uidsCookieService.parseFromRequest(context);
         if (!uidsCookie.allowsSync()) {
             final int status = HttpResponseStatus.UNAUTHORIZED.code();
-            context.response().setStatusCode(status).end();
+            respondWith(context, status, null);
             metrics.updateUserSyncOptoutMetric();
             analyticsReporter.processEvent(SetuidEvent.error(status));
             return;
@@ -88,7 +89,10 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
         final String bidder = context.request().getParam(BIDDER_PARAM);
         if (StringUtils.isBlank(bidder)) {
-            respondWithMissingParamMessage(BIDDER_PARAM, context);
+            final int status = HttpResponseStatus.BAD_REQUEST.code();
+            respondWith(context, status, "\"bidder\" query param is required");
+            metrics.updateUserSyncBadRequestMetric();
+            analyticsReporter.processEvent(SetuidEvent.error(status));
             return;
         }
 
@@ -111,11 +115,6 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     private void handleResult(AsyncResult<GdprResponse> asyncResult, RoutingContext context,
                               UidsCookie uidsCookie, String account, String bidder, String gdprConsent, String ip) {
-        // don't send the response if client has gone
-        if (context.response().closed()) {
-            logger.warn("The client already closed connection, response will be skipped");
-            return;
-        }
 
         final boolean gdprProcessingFailed = asyncResult.failed();
         final GdprResponse gdprResponse = !gdprProcessingFailed ? asyncResult.result() : null;
@@ -209,16 +208,18 @@ public class SetuidHandler implements Handler<RoutingContext> {
             addCookie(context, uidsAuditCookie);
         }
 
+        final int status = HttpResponseStatus.OK.code();
+
         // Send pixel file to response if "format=img"
         final String format = context.request().getParam(FORMAT_PARAM);
         if (StringUtils.equals(format, IMG_FORMAT_PARAM)) {
             context.response().sendFile(PIXEL_FILE_PATH);
         } else {
-            context.response().end();
+            respondWith(context, status, null);
         }
 
         analyticsReporter.processEvent(SetuidEvent.builder()
-                .status(HttpResponseStatus.OK.code())
+                .status(status)
                 .bidder(bidder)
                 .uid(uid)
                 .success(successfullyUpdated)
@@ -230,8 +231,23 @@ public class SetuidHandler implements Handler<RoutingContext> {
     }
 
     private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
-        context.response().setStatusCode(status).end(body);
+        respondWith(context, status, body);
         metrics.updateUserSyncGdprPreventMetric(bidder);
         analyticsReporter.processEvent(SetuidEvent.error(status));
+    }
+
+    private static void respondWith(RoutingContext context, int status, String body) {
+        // don't send the response if client has gone
+        if (context.response().closed()) {
+            logger.warn("The client already closed connection, response will be skipped");
+            return;
+        }
+
+        context.response().setStatusCode(status);
+        if (body != null) {
+            context.response().end(body);
+        } else {
+            context.response().end();
+        }
     }
 }

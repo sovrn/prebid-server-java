@@ -4,7 +4,6 @@ import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.BidResponse;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
@@ -50,6 +49,7 @@ import static java.util.Collections.singletonMap;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -97,7 +97,7 @@ public class AuctionHandlerTest extends VertxTest {
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap());
         given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
 
-        given(httpResponse.putHeader(any(CharSequence.class), any(CharSequence.class))).willReturn(httpResponse);
+        given(httpResponse.headers()).willReturn(new CaseInsensitiveHeaders());
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         given(clock.millis()).willReturn(Instant.now().toEpochMilli());
@@ -215,7 +215,9 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         verify(exchangeService).holdAuction(any());
-        verify(httpResponse).putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON);
+        assertThat(httpResponse.headers()).hasSize(1)
+                .extracting(Map.Entry::getKey, Map.Entry::getValue)
+                .containsOnly(tuple("Content-Type", "application/json"));
         verify(httpResponse).end(eq("{}"));
     }
 
@@ -479,9 +481,13 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         final AuctionEvent auctionEvent = captureAuctionEvent();
+        final AuctionContext expectedAuctionContext = auctionContext.toBuilder()
+                .requestTypeMetric(MetricName.openrtb2web)
+                .build();
+
         assertThat(auctionEvent).isEqualTo(AuctionEvent.builder()
                 .httpContext(givenHttpContext())
-                .bidRequest(auctionContext.getBidRequest())
+                .auctionContext(expectedAuctionContext)
                 .status(500)
                 .errors(singletonList("Unexpected exception"))
                 .build());
@@ -502,9 +508,13 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         final AuctionEvent auctionEvent = captureAuctionEvent();
+        final AuctionContext expectedAuctionContext = auctionContext.toBuilder()
+                .requestTypeMetric(MetricName.openrtb2web)
+                .build();
+
         assertThat(auctionEvent).isEqualTo(AuctionEvent.builder()
                 .httpContext(givenHttpContext())
-                .bidRequest(auctionContext.getBidRequest())
+                .auctionContext(expectedAuctionContext)
                 .bidResponse(BidResponse.builder().build())
                 .status(200)
                 .errors(emptyList())

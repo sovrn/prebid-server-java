@@ -31,6 +31,7 @@ import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
@@ -192,9 +193,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .httpContext(httpContext)
-                .bidRequest(BidRequest.builder()
-                        .imp(emptyList())
-                        .app(App.builder().build())
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(emptyList())
+                                .app(App.builder().build())
+                                .build())
                         .build())
                 .bidResponse(BidResponse.builder()
                         .seatbid(emptyList())
@@ -220,7 +223,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .httpContext(httpContext)
-                .bidRequest(sampleAuctionBidRequest())
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(sampleAuctionBidRequest())
+                        .build())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -236,7 +241,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processEventShouldIgnoreNonAuctionEvents() {
         // when
-        module.processEvent(AmpEvent.builder().build());
+        module.processEvent(AmpEvent.builder()
+                .auctionContext(AuctionContext.builder().build())
+                .build());
 
         // then
         verifyZeroInteractions(httpClient);
@@ -246,8 +253,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processEventShouldIgnoreNonMobileRequests() {
         // when
         module.processEvent(AuctionEvent.builder()
-                .bidRequest(BidRequest.builder()
-                        .site(Site.builder().build())
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .site(Site.builder().build())
+                                .build())
                         .build())
                 .build());
 
@@ -262,7 +271,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .httpContext(httpContext)
-                .bidRequest(sampleAuctionBidRequest())
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(sampleAuctionBidRequest())
+                        .build())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -288,7 +299,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         final AuctionEvent event = AuctionEvent.builder()
                 .httpContext(httpContext)
-                .bidRequest(sampleAuctionBidRequest())
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(sampleAuctionBidRequest())
+                        .build())
                 .bidResponse(sampleBidResponse())
                 .build();
 
@@ -438,7 +451,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         final AmpEvent event = AmpEvent.builder()
                 .httpContext(httpContext)
-                .bidRequest(sampleAmpBidRequest())
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(sampleAmpBidRequest())
+                        .build())
                 .bidResponse(sampleBidResponse())
                 .build();
 

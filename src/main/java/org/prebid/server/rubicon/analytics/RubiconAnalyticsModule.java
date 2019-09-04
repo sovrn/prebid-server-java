@@ -249,7 +249,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private void processAuctionEvent(AuctionEvent auctionEvent) {
         final HttpContext context = auctionEvent.getHttpContext();
-        final BidRequest bidRequest = auctionEvent.getBidRequest();
+        final BidRequest bidRequest = auctionEvent.getAuctionContext().getBidRequest();
         final BidResponse bidResponse = auctionEvent.getBidResponse();
 
         // only send event for mobile requests
@@ -269,7 +269,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private void processAmpEvent(AmpEvent ampEvent) {
         final HttpContext context = ampEvent.getHttpContext();
-        final BidRequest bidRequest = ampEvent.getBidRequest();
+        final BidRequest bidRequest = ampEvent.getAuctionContext().getBidRequest();
         final BidResponse bidResponse = ampEvent.getBidResponse();
 
         // only send event for web requests

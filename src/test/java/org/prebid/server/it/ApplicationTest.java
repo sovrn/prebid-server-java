@@ -346,7 +346,7 @@ public class ApplicationTest extends IntegrationTest {
         // when
         final CookieSyncResponse cookieSyncResponse = given(spec)
                 .cookies("host-cookie-name", "host-cookie-uid")
-                .body(CookieSyncRequest.of(asList(RUBICON, APPNEXUS, ADFORM), 1, gdprConsent, null, null, null))
+                .body(CookieSyncRequest.of(asList(RUBICON, APPNEXUS, ADFORM), 1, gdprConsent, false, null, null))
                 .when()
                 .post("/cookie_sync")
                 .then()
@@ -492,18 +492,18 @@ public class ApplicationTest extends IntegrationTest {
     }
 
     @Test
-    public void eventHandlerShouldRespondWithJPGTrackingPixel() throws IOException {
+    public void eventHandlerShouldRespondWithPNGTrackingPixel() throws IOException {
         final Response response = given(spec)
-                .queryParam("type", "win")
-                .queryParam("bidid", "bidId")
-                .queryParam("bidder", "rubicon")
-                .queryParam("format", "jpg")
+                .queryParam("t", "w")
+                .queryParam("b", "bidId")
+                .queryParam("a", "14062")
+                .queryParam("f", "i")
                 .get("/event");
 
         assertThat(response.getStatusCode()).isEqualTo(200);
-        assertThat(response.getHeaders()).contains(new Header("content-type", "image/jpeg"));
+        assertThat(response.getHeaders()).contains(new Header("content-type", "image/png"));
         assertThat(response.getBody().asByteArray())
-                .isEqualTo(ResourceUtil.readByteArrayFromClassPath("static/tracking-pixel.jpg"));
+                .isEqualTo(ResourceUtil.readByteArrayFromClassPath("static/tracking-pixel.png"));
     }
 
     @Test
