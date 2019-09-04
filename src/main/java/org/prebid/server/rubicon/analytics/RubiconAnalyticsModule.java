@@ -27,10 +27,13 @@ import io.vertx.ext.web.RoutingContext;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
+import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
@@ -55,6 +58,7 @@ import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.ExtApp;
 import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
+import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
 import org.prebid.server.rubicon.analytics.proto.VideoAdFormat;
@@ -65,6 +69,7 @@ import org.prebid.server.util.HttpUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -83,6 +88,9 @@ import java.util.stream.Collectors;
 public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePostProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
+    private static final String REFERER_HEADER = "Referer";
+    private static final String DNT_HEADER = "DNT";
+    private static final String USER_AGENT_HEADER = "User-Agent";
 
     private static final String EVENT_PATH = "/event";
 
@@ -160,6 +168,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             processAuctionEvent((AuctionEvent) event);
         } else if (event instanceof AmpEvent) {
             processAmpEvent((AmpEvent) event);
+        } else if (event instanceof NotificationEvent) {
+            processNotificationEvent((NotificationEvent) event);
         }
     }
 
@@ -270,6 +280,61 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, accountSamplingFactor,
                     this::eventBuilderBaseFromSite));
         }
+    }
+
+    private void processNotificationEvent(NotificationEvent notificationEvent) {
+        final HttpContext context = notificationEvent.getHttpContext();
+        if (context == null) {
+            return;
+        }
+
+        final NotificationEvent.Type type = notificationEvent.getType();
+        final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
+        final Event event = type.equals(NotificationEvent.Type.win)
+                ? makeWinEvent(notificationEvent, uidsCookie)
+                : makeImpEvent(notificationEvent, uidsCookie);
+
+        postEvent(event);
+    }
+
+    private Event makeWinEvent(NotificationEvent notificationEvent, UidsCookie uidsCookie) {
+        final HttpContext context = notificationEvent.getHttpContext();
+        return eventBuilderFromNotification(context)
+                .bidsWon(Collections.singletonList(BidWon.builder()
+                        .accountId(parseId(notificationEvent.getAccountId()))
+                        .bidId(notificationEvent.getBidId())
+                        .status(SUCCESS_STATUS)
+                        .source(SERVER_SOURCE)
+                        .serverHasUserId(serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))
+                        .hasRubiconId(hasRubiconId(context))
+                        .build()))
+                .build();
+    }
+
+    private Event makeImpEvent(NotificationEvent notificationEvent, UidsCookie uidsCookie) {
+        final HttpContext context = notificationEvent.getHttpContext();
+        return eventBuilderFromNotification(context)
+                .impression(Impression.builder()
+                        .bidder(RUBICON_BIDDER)
+                        .accountId(parseId(notificationEvent.getAccountId()))
+                        .bidId(notificationEvent.getBidId())
+                        .status(SUCCESS_STATUS)
+                        .source(SERVER_SOURCE)
+                        .serverHasUserId(serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))
+                        .hasRubiconId(hasRubiconId(context))
+                        .build())
+                .build();
+    }
+
+    private Event.EventBuilder eventBuilderFromNotification(HttpContext context) {
+        return Event.builder()
+                .eventTimeMillis(Instant.now().toEpochMilli())
+                .integration(PBS_INTEGRATION)
+                .version(pbsVersion)
+                .referrerUri(context.getHeaders().get(REFERER_HEADER))
+                .limitAdTracking(StringUtils.equals(context.getHeaders().get(DNT_HEADER), "1"))
+                .userAgent(context.getHeaders().get(USER_AGENT_HEADER))
+                .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion));
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
@@ -637,12 +702,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private static Integer parseId(String id) {
-        if (id == null) {
-            return null;
-        }
-
         try {
-            return Integer.parseInt(id);
+            return NumberUtils.createInteger(id);
         } catch (NumberFormatException e) {
             logger.warn("Id [{0}] is not a number", id);
             return null;

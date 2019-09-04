@@ -10,6 +10,9 @@ import java.util.List;
 @Value
 public class Event {
 
+    @JsonProperty("eventTimeMillis")
+    Long eventTimeMillis;
+
     String integration;
 
     String version;
@@ -26,6 +29,8 @@ public class Event {
 
     @JsonProperty("eventCreator")
     EventCreator eventCreator;
+
+    Impression impression;
 
     @JsonProperty("userAgent")
     String userAgent;

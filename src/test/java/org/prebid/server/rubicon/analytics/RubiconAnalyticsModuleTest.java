@@ -32,6 +32,7 @@ import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.model.AuctionContext;
+import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
@@ -55,6 +56,7 @@ import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.ExtApp;
 import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
+import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
@@ -64,6 +66,7 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -78,6 +81,7 @@ import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.api.BDDAssertions.then;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -412,6 +416,89 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .build()),
                         1234, 1000L, true)))
                 .build());
+    }
+
+    @Test
+    public void processNotificationEventShouldPostEventToEndpointWithWinExpectedBody() throws IOException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Referer", "http://referer");
+        headers.put("User-Agent", "ua");
+        headers.put("DNT", "1");
+        final HttpContext httpContext = HttpContext.builder().headers(headers).cookies(emptyMap()).build();
+        final NotificationEvent event = NotificationEvent.of(NotificationEvent.Type.win, "bidid", "123123", httpContext);
+
+        // when
+        module.processEvent(event);
+
+        // then
+        final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
+
+        final Event expectedWinEvent = Event.builder()
+                .integration("pbs")
+                .version("pbs-version-1")
+                .referrerUri("http://referer")
+                .limitAdTracking(true)
+                .userAgent("ua")
+                .bidsWon(singletonList(BidWon.builder()
+                        .accountId(123123)
+                        .bidId("bidid")
+                        .status("success")
+                        .source("server")
+                        .serverHasUserId(true)
+                        .hasRubiconId(true)
+                        .build()))
+                .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
+                .build();
+
+        final Event actual = mapper.readValue(eventCaptor.getValue(), Event.class);
+        then(actual).isEqualToIgnoringGivenFields(expectedWinEvent, "eventTimeMillis");
+        assertThat(actual.getEventTimeMillis()).isCloseTo(Instant.now().toEpochMilli(), within(400L));
+    }
+
+    @Test
+    public void processNotificationEventShouldPostEventToEndpointWithImpExpectedBody() throws IOException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Referer", "http://referer");
+        headers.put("User-Agent", "ua");
+        headers.put("DNT", "1");
+        final HttpContext httpContext = HttpContext.builder().headers(headers).cookies(emptyMap()).build();
+        final NotificationEvent event = NotificationEvent.of(NotificationEvent.Type.imp, "bidid", "222", httpContext);
+
+        // when
+        module.processEvent(event);
+
+        // then
+        final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
+
+        final Event expectedWinEvent = Event.builder()
+                .integration("pbs")
+                .version("pbs-version-1")
+                .referrerUri("http://referer")
+                .limitAdTracking(true)
+                .userAgent("ua")
+                .impression(Impression.builder()
+                        .bidder("rubicon")
+                        .accountId(222)
+                        .bidId("bidid")
+                        .status("success")
+                        .source("server")
+                        .serverHasUserId(true)
+                        .hasRubiconId(true)
+                        .build())
+                .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
+                .build();
+
+        final Event actual = mapper.readValue(eventCaptor.getValue(), Event.class);
+        then(actual).isEqualToIgnoringGivenFields(expectedWinEvent, "eventTimeMillis");
+        assertThat(actual.getEventTimeMillis()).isCloseTo(Instant.now().toEpochMilli(), within(400L));
     }
 
     @Test

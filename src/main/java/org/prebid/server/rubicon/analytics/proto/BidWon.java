@@ -18,8 +18,13 @@ public class BidWon {
 
     String bidder;
 
+    @JsonProperty("bidId")
+    String bidId;
+
     @JsonProperty("samplingFactor")
     Integer samplingFactor;
+
+    String status;
 
     @JsonProperty("bidwonStatus")
     String bidwonStatus;
