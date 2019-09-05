@@ -1074,7 +1074,7 @@ public class ExchangeServiceTest extends VertxTest {
                         .targeting(givenTargeting())
                         .cache(ExtRequestPrebidCache.of(ExtRequestPrebidCacheBids.of(null, null),
                                 ExtRequestPrebidCacheVastxml.of(null, true)))
-                        .build()))));
+                        .build(), null))));
 
         // when
         exchangeService.holdAuction(givenRequestContext(bidRequest,
