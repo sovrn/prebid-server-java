@@ -37,6 +37,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
+import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.validation.RequestValidator;
@@ -746,6 +747,30 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
         // then
         verify(applicationSettings).getAccountById(eq("accountId"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromRubiconImpExt() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubicon",
+                                ExtImpRubicon.builder().accountId(123).build())))
+                        .build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("accountId").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
 
         assertThat(account).isSameAs(givenAccount);
     }

@@ -19,11 +19,18 @@
                 "hb_pb": "4.20",
                 "hb_pb_rubicon": "4.20",
                 "hb_deal_rubicon": "dealId2",
+                "hb_winurl": "http://localhost:8000/event?t=win&b=BIDID&a=5001&f=i",
                 "hb_size": "120x600",
                 "hb_bidder": "rubicon",
                 "hb_size_rubicon": "120x600",
                 "hb_bidder_rubicon": "rubicon",
+                "hb_bidid_rubicon": "466223845",
+                "hb_bidid": "466223845",
                 "hb_deal": "dealId2"
+              },
+              "events": {
+                "win": "http://localhost:8000/event?t=win&b=466223845&a=5001&f=i",
+                "view": "http://localhost:8000/event?t=view&b=466223845&a=5001&f=i"
               }
             }
           }

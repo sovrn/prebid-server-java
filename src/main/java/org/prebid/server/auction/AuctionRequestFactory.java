@@ -36,6 +36,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
+import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.util.HttpUtil;
@@ -552,7 +553,26 @@ public class AuctionRequestFactory {
         final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
 
         final String publisherId = publisher != null ? resolvePublisherId(publisher) : null;
-        return ObjectUtils.defaultIfNull(publisherId, StringUtils.EMPTY);
+        final String publisherOrRubiconAccountId = publisherId != null
+                ? publisherId : resolveRubiconAccountId(bidRequest.getImp());
+        return ObjectUtils.defaultIfNull(publisherOrRubiconAccountId, StringUtils.EMPTY);
+    }
+
+    /**
+     * Checks request impression extensions whether they have a rubicon extension, picks first and
+     * takes account ID from it. If none is present - returns null.
+     */
+    private static String resolveRubiconAccountId(List<Imp> imps) {
+        return CollectionUtils.isEmpty(imps) ? null : imps.stream()
+                .map(Imp::getExt)
+                .filter(Objects::nonNull)
+                .map(objectNode -> objectNode.get("rubicon"))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .map(jsonNode -> Json.mapper.convertValue(jsonNode, ExtImpRubicon.class))
+                .map(ExtImpRubicon::getAccountId)
+                .map(Objects::toString)
+                .orElse(null);
     }
 
     /**
