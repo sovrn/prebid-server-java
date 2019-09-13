@@ -31,8 +31,8 @@ import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
-import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.analytics.model.NotificationEvent;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
@@ -428,7 +428,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         headers.put("User-Agent", "ua");
         headers.put("DNT", "1");
         final HttpContext httpContext = HttpContext.builder().headers(headers).cookies(emptyMap()).build();
-        final NotificationEvent event = NotificationEvent.of(NotificationEvent.Type.win, "bidid", "123123", httpContext);
+        final NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationEvent.Type.win)
+                .bidId("bidid")
+                .account(Account.builder().id("123123").build())
+                .httpContext(httpContext)
+                .build();
 
         // when
         module.processEvent(event);
@@ -469,7 +474,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         headers.put("User-Agent", "ua");
         headers.put("DNT", "1");
         final HttpContext httpContext = HttpContext.builder().headers(headers).cookies(emptyMap()).build();
-        final NotificationEvent event = NotificationEvent.of(NotificationEvent.Type.imp, "bidid", "222", httpContext);
+        final NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationEvent.Type.imp)
+                .bidId("bidid")
+                .account(Account.builder().id("222").build())
+                .httpContext(httpContext)
+                .build();
 
         // when
         module.processEvent(event);

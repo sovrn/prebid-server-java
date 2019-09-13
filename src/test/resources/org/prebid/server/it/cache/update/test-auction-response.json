@@ -30,7 +30,7 @@
               },
               "events": {
                 "win": "http://localhost:8000/event?t=win&b=466223845&a=5001&f=i",
-                "view": "http://localhost:8000/event?t=view&b=466223845&a=5001&f=i"
+                "imp": "http://localhost:8000/event?t=imp&b=466223845&a=5001&f=i"
               }
             }
           }

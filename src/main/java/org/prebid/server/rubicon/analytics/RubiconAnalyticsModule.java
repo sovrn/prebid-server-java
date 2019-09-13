@@ -88,6 +88,7 @@ import java.util.stream.Collectors;
 public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePostProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
+
     private static final String REFERER_HEADER = "Referer";
     private static final String DNT_HEADER = "DNT";
     private static final String USER_AGENT_HEADER = "User-Agent";
@@ -301,7 +302,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final HttpContext context = notificationEvent.getHttpContext();
         return eventBuilderFromNotification(context)
                 .bidsWon(Collections.singletonList(BidWon.builder()
-                        .accountId(parseId(notificationEvent.getAccountId()))
+                        .accountId(parseId(notificationEvent.getAccount().getId()))
                         .bidId(notificationEvent.getBidId())
                         .status(SUCCESS_STATUS)
                         .source(SERVER_SOURCE)
@@ -316,7 +317,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return eventBuilderFromNotification(context)
                 .impression(Impression.builder()
                         .bidder(RUBICON_BIDDER)
-                        .accountId(parseId(notificationEvent.getAccountId()))
+                        .accountId(parseId(notificationEvent.getAccount().getId()))
                         .bidId(notificationEvent.getBidId())
                         .status(SUCCESS_STATUS)
                         .source(SERVER_SOURCE)
