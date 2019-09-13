@@ -512,6 +512,28 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
+    public void processNotificationEventShouldUseAccountSamplingFactor() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final HttpContext httpContext = HttpContext.builder().headers(emptyMap()).cookies(emptyMap()).build();
+        final NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationEvent.Type.win)
+                .bidId("bidid")
+                .account(Account.builder().id("123123").analyticsSamplingFactor(10).build())
+                .httpContext(httpContext)
+                .build();
+
+        // when
+        for (int i = 0; i < 10; i++) {
+            module.processEvent(event);
+        }
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
     public void processAmpEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
         // given
         givenHttpClientReturnsResponse(200, null);

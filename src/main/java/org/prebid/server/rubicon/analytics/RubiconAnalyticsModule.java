@@ -147,6 +147,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private Map<Integer, Long> accountToAuctionEventCount = new ConcurrentHashMap<>();
     private Map<Integer, Long> accountToAmpEventCount = new ConcurrentHashMap<>();
     private Map<Integer, Long> accountToBidWonCount = new ConcurrentHashMap<>();
+    private Map<Integer, Long> accountToNotificationEventCount = new ConcurrentHashMap<>();
 
     public RubiconAnalyticsModule(String endpointUrl, Integer globalSamplingFactor, String pbsVersion,
                                   String pbsHostname, String dataCenterRegion, BidderCatalog bidderCatalog,
@@ -284,26 +285,42 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private void processNotificationEvent(NotificationEvent notificationEvent) {
+        final String bidId = notificationEvent.getBidId();
+        final Account account = notificationEvent.getAccount();
         final HttpContext context = notificationEvent.getHttpContext();
-        if (context == null) {
+        if (bidId == null || account == null || context == null) {
             return;
+        }
+
+        final Integer accountId = parseId(account.getId());
+        final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+
+        // only continue if counter matches sampling factor
+        // note: this event type doesn't use global event count because it is related to particular account
+        final Integer samplingFactor = samplingFactor(accountSamplingFactor);
+        if (samplingFactor != null && samplingFactor > 0) {
+            final long eventCount = accountToNotificationEventCount.compute(accountId,
+                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
+            if (eventCount % samplingFactor != 0) {
+                return;
+            }
         }
 
         final NotificationEvent.Type type = notificationEvent.getType();
         final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
         final Event event = type.equals(NotificationEvent.Type.win)
-                ? makeWinEvent(notificationEvent, uidsCookie)
-                : makeImpEvent(notificationEvent, uidsCookie);
+                ? makeWinEvent(bidId, accountId, context, uidsCookie)
+                : makeImpEvent(bidId, accountId, context, uidsCookie);
 
         postEvent(event);
     }
 
-    private Event makeWinEvent(NotificationEvent notificationEvent, UidsCookie uidsCookie) {
-        final HttpContext context = notificationEvent.getHttpContext();
+    private Event makeWinEvent(String bidId, Integer accountId, HttpContext context,
+                               UidsCookie uidsCookie) {
         return eventBuilderFromNotification(context)
                 .bidsWon(Collections.singletonList(BidWon.builder()
-                        .accountId(parseId(notificationEvent.getAccount().getId()))
-                        .bidId(notificationEvent.getBidId())
+                        .accountId(accountId)
+                        .bidId(bidId)
                         .status(SUCCESS_STATUS)
                         .source(SERVER_SOURCE)
                         .serverHasUserId(serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))
@@ -312,13 +329,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .build();
     }
 
-    private Event makeImpEvent(NotificationEvent notificationEvent, UidsCookie uidsCookie) {
-        final HttpContext context = notificationEvent.getHttpContext();
+    private Event makeImpEvent(String bidId, Integer accountId, HttpContext context,
+                               UidsCookie uidsCookie) {
         return eventBuilderFromNotification(context)
                 .impression(Impression.builder()
                         .bidder(RUBICON_BIDDER)
-                        .accountId(parseId(notificationEvent.getAccount().getId()))
-                        .bidId(notificationEvent.getBidId())
+                        .accountId(accountId)
+                        .bidId(bidId)
                         .status(SUCCESS_STATUS)
                         .source(SERVER_SOURCE)
                         .serverHasUserId(serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))
