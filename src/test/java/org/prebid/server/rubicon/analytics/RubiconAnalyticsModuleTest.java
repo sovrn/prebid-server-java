@@ -414,7 +414,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .build()))
                                         .build()),
-                        1234, 1000L, true)))
+                        123, 1000L, true)))
                 .build());
     }
 
@@ -673,7 +673,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .build()))
                                         .build()),
-                        1234, 1000L, true)))
+                        123, 1000L, true)))
                 .build());
     }
 
@@ -697,7 +697,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
                         .build(),
-                null);
+                Account.builder().id("123").build());
 
         // then
         then(bid1.getNurl()).isNull();
@@ -724,7 +724,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
                         .build(),
-                2);
+                Account.builder().id("123").analyticsSamplingFactor(2).build());
 
         // then
         then(bid1.getNurl()).isNull();
@@ -746,7 +746,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(singletonList(bid)).build()))
                         .build(),
-                2);
+                null);
 
         // then
         then(bid.getNurl()).isNull();
@@ -760,7 +760,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         final BidResponse returnedBidResponse = module.postProcess(routingContext, uidsCookie, bidRequest,
-                bidResponse, null).result();
+                bidResponse, Account.builder().id("1234").build()).result();
 
         // then
         then(returnedBidResponse.getSeatbid())
@@ -1087,7 +1087,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     private AuctionContext givenAuctionContext(BidRequest bidRequest, Integer samplingFactor) {
         return AuctionContext.builder()
                 .bidRequest(bidRequest)
-                .account(Account.builder().analyticsSamplingFactor(samplingFactor).build())
+                .account(Account.builder().id("123").analyticsSamplingFactor(samplingFactor).build())
                 .build();
     }
 

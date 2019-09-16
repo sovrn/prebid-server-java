@@ -10,7 +10,6 @@ import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
-import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.Video;
 import com.iab.openrtb.response.Bid;
@@ -177,12 +176,14 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     @Override
     public Future<BidResponse> postProcess(RoutingContext context, UidsCookie uidsCookie, BidRequest bidRequest,
-                                           BidResponse bidResponse, Integer accountSamplingFactor) {
+                                           BidResponse bidResponse, Account account) {
         if (bidRequest.getApp() != null) {
             final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
             final HttpContext httpContext = HttpContext.from(context);
             final boolean hasRubiconId = hasRubiconId(httpContext);
-            final Integer accountId = accountIdFromApp(bidRequest);
+
+            final Integer accountId = parseId(account.getId());
+            final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
 
             for (final SeatBid seatBid : bidResponse.getSeatbid()) {
                 final String bidder = seatBid.getSeat();
@@ -247,14 +248,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             return;
         }
 
-        final Integer accountId = accountIdFromApp(bidRequest);
-        final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
-
         final Account account = auctionContext.getAccount();
+        final Integer accountId = parseId(account.getId());
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
+            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
+
             postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, accountSamplingFactor,
                     this::eventBuilderBaseFromApp));
         }
@@ -271,14 +273,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             return;
         }
 
-        final Integer accountId = accountIdFromSite(bidRequest);
-        final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
-
         final Account account = auctionContext.getAccount();
+        final Integer accountId = parseId(account.getId());
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
+            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
+
             postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, accountSamplingFactor,
                     this::eventBuilderBaseFromSite));
         }
@@ -288,6 +291,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final String bidId = notificationEvent.getBidId();
         final Account account = notificationEvent.getAccount();
         final HttpContext context = notificationEvent.getHttpContext();
+
         if (bidId == null || account == null || context == null) {
             return;
         }
@@ -308,7 +312,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
         final NotificationEvent.Type type = notificationEvent.getType();
         final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
-        final Event event = type.equals(NotificationEvent.Type.win)
+        final Event event = type == NotificationEvent.Type.win
                 ? makeWinEvent(bidId, accountId, context, uidsCookie)
                 : makeImpEvent(bidId, accountId, context, uidsCookie);
 
@@ -707,16 +711,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                         .params(paramsFrom(foundImp, bidder))
                         .build()))
                 .build();
-    }
-
-    private static Integer accountIdFromApp(BidRequest bidRequest) {
-        final Publisher publisher = bidRequest.getApp().getPublisher();
-        return publisher != null ? parseId(publisher.getId()) : null;
-    }
-
-    private static Integer accountIdFromSite(BidRequest bidRequest) {
-        final Publisher publisher = bidRequest.getSite().getPublisher();
-        return publisher != null ? parseId(publisher.getId()) : null;
     }
 
     private static Integer parseId(String id) {
