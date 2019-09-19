@@ -21,7 +21,7 @@ public interface BidResponsePostProcessor {
      * @param uidsCookie  auction request {@link Uids} container
      * @param bidRequest  original auction request
      * @param bidResponse auction result
-     * @param account     {@link Account}, fetched from request
+     * @param account     {@link Account} fetched from request
      * @return a {@link Future} with (possibly modified) auction result
      */
     Future<BidResponse> postProcess(RoutingContext context, UidsCookie uidsCookie, BidRequest bidRequest,
