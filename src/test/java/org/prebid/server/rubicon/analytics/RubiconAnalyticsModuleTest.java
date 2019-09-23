@@ -534,6 +534,27 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
+    public void processNotificationEventShouldNotSendEventIfAccountSamplingFactorIsMissing() {
+        // given
+        final HttpContext httpContext = HttpContext.builder().headers(emptyMap()).cookies(emptyMap()).build();
+        final NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationEvent.Type.win)
+                .bidId("bidid")
+                .account(Account.builder().id("123123").analyticsSamplingFactor(null).build())
+                .httpContext(httpContext)
+                .build();
+
+        module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", "dataCenterRegion",
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+
+        // when
+        module.processEvent(event);
+
+        // then
+        verifyZeroInteractions(httpClient);
+    }
+
+    @Test
     public void processAmpEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
         // given
         givenHttpClientReturnsResponse(200, null);

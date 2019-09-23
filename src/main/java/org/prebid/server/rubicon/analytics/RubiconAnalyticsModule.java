@@ -308,6 +308,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             if (eventCount % samplingFactor != 0) {
                 return;
             }
+        } else {
+            return;
         }
 
         final NotificationEvent.Type type = notificationEvent.getType();
