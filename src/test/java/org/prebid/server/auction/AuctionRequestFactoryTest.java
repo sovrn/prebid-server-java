@@ -776,6 +776,24 @@ public class AuctionRequestFactoryTest extends VertxTest {
     }
 
     @Test
+    public void shouldTolerateInvalidRubiconImpExtWhileFetchingAccountId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubicon",
+                                singletonMap("sizes", TextNode.valueOf("invalid")))))
+                        .build()))
+                .build());
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        assertThat(account).isEqualTo(Account.builder().id("").build());
+    }
+
+    @Test
     public void shouldReturnAuctionContextWithEmptyAccountIfNotFound() {
         // given
         givenBidRequest(BidRequest.builder()

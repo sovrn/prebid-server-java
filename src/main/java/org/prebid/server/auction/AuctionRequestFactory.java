@@ -559,23 +559,6 @@ public class AuctionRequestFactory {
     }
 
     /**
-     * Checks request impression extensions whether they have a rubicon extension, picks first and
-     * takes account ID from it. If none is present - returns null.
-     */
-    private static String resolveRubiconAccountId(List<Imp> imps) {
-        return CollectionUtils.isEmpty(imps) ? null : imps.stream()
-                .map(Imp::getExt)
-                .filter(Objects::nonNull)
-                .map(objectNode -> objectNode.get("rubicon"))
-                .filter(Objects::nonNull)
-                .findFirst()
-                .map(jsonNode -> Json.mapper.convertValue(jsonNode, ExtImpRubicon.class))
-                .map(ExtImpRubicon::getAccountId)
-                .map(Objects::toString)
-                .orElse(null);
-    }
-
-    /**
      * Resolves what value should be used as a publisher id - either taken from publisher.ext.parentAccount
      * or publisher.id in this respective priority.
      */
@@ -596,6 +579,36 @@ public class AuctionRequestFactory {
     private static String getParentAccountFromExt(ObjectNode extPublisher) {
         try {
             return Json.mapper.convertValue(extPublisher, ExtPublisher.class).getParentAccount();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Checks request impression extensions whether they have a rubicon extension, picks first and
+     * takes account ID from it. If none is present - returns null.
+     */
+    private static String resolveRubiconAccountId(List<Imp> imps) {
+        return CollectionUtils.isEmpty(imps) ? null : imps.stream()
+                .map(Imp::getExt)
+                .filter(Objects::nonNull)
+                .map(ext -> ext.get("rubicon"))
+                .filter(Objects::nonNull)
+                .map(AuctionRequestFactory::extImpRubiconOrNull)
+                .filter(Objects::nonNull)
+                .map(ExtImpRubicon::getAccountId)
+                .filter(Objects::nonNull)
+                .map(Objects::toString)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Extracts {@link ExtImpRubicon} from the given {@link JsonNode}.
+     */
+    private static ExtImpRubicon extImpRubiconOrNull(JsonNode extRubicon) {
+        try {
+            return Json.mapper.convertValue(extRubicon, ExtImpRubicon.class);
         } catch (IllegalArgumentException e) {
             return null;
         }
