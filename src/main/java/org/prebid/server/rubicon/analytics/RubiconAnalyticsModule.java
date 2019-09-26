@@ -239,50 +239,60 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private void processAuctionEvent(AuctionEvent auctionEvent) {
         final AuctionContext auctionContext = auctionEvent.getAuctionContext();
-        final BidRequest bidRequest = auctionContext.getBidRequest();
-        final HttpContext context = auctionEvent.getHttpContext();
-        final BidResponse bidResponse = auctionEvent.getBidResponse();
-
-        // only send event for mobile requests
-        if (context == null || bidRequest == null || bidResponse == null || bidRequest.getApp() == null) {
+        if (auctionContext == null) { // this can happens when exception is thrown while processing
             return;
         }
 
+        final HttpContext httpContext = auctionEvent.getHttpContext();
+        final BidRequest bidRequest = auctionContext.getBidRequest();
         final Account account = auctionContext.getAccount();
+        final BidResponse bidResponse = auctionEvent.getBidResponse();
+
+        // only send event for mobile requests
+        if (httpContext == null || bidRequest == null || account == null || bidResponse == null
+                || bidRequest.getApp() == null) {
+            return;
+        }
+
         final Integer accountId = parseId(account.getId());
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
 
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
-            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
+            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
 
-            postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, accountSamplingFactor,
+            postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
                     this::eventBuilderBaseFromApp));
         }
     }
 
     private void processAmpEvent(AmpEvent ampEvent) {
         final AuctionContext auctionContext = ampEvent.getAuctionContext();
-        final BidRequest bidRequest = auctionContext.getBidRequest();
-        final HttpContext context = ampEvent.getHttpContext();
-        final BidResponse bidResponse = ampEvent.getBidResponse();
-
-        // only send event for web requests
-        if (context == null || bidRequest == null || bidResponse == null || bidRequest.getSite() == null) {
+        if (auctionContext == null) { // this can happens when exception is thrown while processing
             return;
         }
 
+        final HttpContext httpContext = ampEvent.getHttpContext();
+        final BidRequest bidRequest = auctionContext.getBidRequest();
         final Account account = auctionContext.getAccount();
+        final BidResponse bidResponse = ampEvent.getBidResponse();
+
+        // only send event for web requests
+        if (httpContext == null || bidRequest == null || account == null || bidResponse == null
+                || bidRequest.getSite() == null) {
+            return;
+        }
+
         final Integer accountId = parseId(account.getId());
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
 
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
-            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
+            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
 
-            postEvent(toAuctionEvent(context, bidRequest, adUnits, accountId, accountSamplingFactor,
+            postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
                     this::eventBuilderBaseFromSite));
         }
     }

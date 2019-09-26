@@ -115,7 +115,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     private HttpClient httpClient;
 
     private RubiconAnalyticsModule module;
-
     @Mock
     private RoutingContext routingContext;
     @Mock
@@ -165,7 +164,107 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void processEventShouldUseGlobalSamplingFactor() {
+    public void processAuctionEventShouldIgnoreProcessingIfAuctionContextIsMissing() {
+        // given
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(null)
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAuctionEventShouldIgnoreProcessingIfHttpContextIsMissing() {
+        // given
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder().build())
+                .httpContext(null)
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAuctionEventShouldIgnoreProcessingIfBidRequestIsMissing() {
+        // given
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(null)
+                        .build())
+                .httpContext(HttpContext.builder().build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAuctionEventShouldIgnoreProcessingIfAccountIsMissing() {
+        // given
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder().build())
+                        .account(null)
+                        .build())
+                .httpContext(HttpContext.builder().build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAuctionEventShouldIgnoreProcessingIfBidResponseIsMissing() {
+        // given
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder().build())
+                        .account(Account.builder().build())
+                        .build())
+                .httpContext(HttpContext.builder().build())
+                .bidResponse(null)
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processEventShouldIgnoreNonMobileRequests() {
+        // given
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(givenAuctionContext(
+                        BidRequest.builder()
+                                .site(Site.builder().build())
+                                .build()))
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAuctionEventShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname",
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -196,7 +295,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void processEventShouldUseAccountSamplingFactorOverGlobal() {
+    public void processAuctionEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname",
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -219,32 +318,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void processEventShouldIgnoreNonAuctionEvents() {
-        // when
-        module.processEvent(AmpEvent.builder().auctionContext(givenAuctionContext(null)).build());
-
-        // then
-        verifyZeroInteractions(httpClient);
-    }
-
-    @Test
-    public void processEventShouldIgnoreNonMobileRequests() {
-        // when
-        final AuctionContext auctionContext = givenAuctionContext(
-                BidRequest.builder()
-                        .site(Site.builder().build())
-                        .build());
-
-        module.processEvent(AuctionEvent.builder()
-                .auctionContext(auctionContext)
-                .build());
-
-        // then
-        verifyZeroInteractions(httpClient);
-    }
-
-    @Test
-    public void processEventShouldPostEventToEndpointWithExpectedHeaders() {
+    public void processAuctionEventShouldPostEventToEndpointWithExpectedHeaders() {
         // given
         givenHttpClientReturnsResponse(200, null);
 
@@ -552,6 +626,106 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         verifyZeroInteractions(httpClient);
+    }
+
+    @Test
+    public void processAmpEventShouldIgnoreProcessingIfAuctionContextIsMissing() {
+        // given
+        final AmpEvent ampEvent = AmpEvent.builder()
+                .auctionContext(null)
+                .build();
+
+        // when
+        module.processEvent(ampEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAmpEventShouldIgnoreProcessingIfHttpContextIsMissing() {
+        // given
+        final AmpEvent ampEvent = AmpEvent.builder()
+                .auctionContext(AuctionContext.builder().build())
+                .httpContext(null)
+                .build();
+
+        // when
+        module.processEvent(ampEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAmpEventShouldIgnoreProcessingIfBidRequestIsMissing() {
+        // given
+        final AmpEvent ampEvent = AmpEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(null)
+                        .build())
+                .httpContext(HttpContext.builder().build())
+                .build();
+
+        // when
+        module.processEvent(ampEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAmpEventShouldIgnoreProcessingIfAccountIsMissing() {
+        // given
+        final AmpEvent ampEvent = AmpEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder().build())
+                        .account(null)
+                        .build())
+                .httpContext(HttpContext.builder().build())
+                .build();
+
+        // when
+        module.processEvent(ampEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAmpEventShouldIgnoreProcessingIfBidResponseIsMissing() {
+        // given
+        final AmpEvent ampEvent = AmpEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder().build())
+                        .account(Account.builder().build())
+                        .build())
+                .httpContext(HttpContext.builder().build())
+                .bidResponse(null)
+                .build();
+
+        // when
+        module.processEvent(ampEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAmpEventShouldIgnoreNonWebRequests() {
+        // given
+        final AmpEvent ampEvent = AmpEvent.builder()
+                .auctionContext(givenAuctionContext(
+                        BidRequest.builder()
+                                .app(App.builder().build())
+                                .build()))
+                .build();
+
+        // when
+        module.processEvent(ampEvent);
+
+        // then
+        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -1116,4 +1290,3 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return givenAuctionContext(bidRequest, null);
     }
 }
-
