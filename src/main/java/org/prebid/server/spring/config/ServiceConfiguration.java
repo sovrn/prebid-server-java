@@ -31,7 +31,6 @@ import org.prebid.server.events.EventsService;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.gdpr.vendorlist.VendorListService;
-import org.prebid.server.geolocation.CircuitBreakerSecuredGeoLocationService;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.health.ApplicationChecker;
 import org.prebid.server.health.DatabaseHealthChecker;
@@ -39,7 +38,9 @@ import org.prebid.server.health.HealthChecker;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
+import org.prebid.server.rubicon.geolocation.CircuitBreakerSecuredNetAcuityGeoLocationService;
 import org.prebid.server.rubicon.geolocation.NetAcuityGeoLocationService;
+import org.prebid.server.rubicon.geolocation.NetAcuityServerAddressProvider;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.spring.config.model.CircuitBreakerProperties;
@@ -58,6 +59,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 
@@ -66,7 +68,11 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Configuration
 public class ServiceConfiguration {
@@ -425,42 +431,43 @@ public class ServiceConfiguration {
     static class GeoLocationConfiguration {
 
         @Bean
-        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "false",
-                matchIfMissing = true)
-        GeoLocationService basicGeoLocationService(
-                Vertx vertx,
-                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
+        NetAcuityServerAddressProvider netAcuityAddressProvider(
+                Vertx vertx, @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
+            return NetAcuityServerAddressProvider.create(vertx, parseServerNames(server));
+        }
 
-            return createGeoLocationService(vertx, server);
+        @Bean
+        NetAcuityGeoLocationService netAcuityGeoLocationService(Vertx vertx,
+                                                                NetAcuityServerAddressProvider addressProvider) {
+            return new NetAcuityGeoLocationService(vertx, addressProvider::getServerAddress);
         }
 
         @Bean
         @ConfigurationProperties(prefix = "gdpr.geolocation.circuit-breaker")
         @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
-        CircuitBreakerProperties geolocationCircuitBreakerProperties() {
+        CircuitBreakerProperties netacuityCircuitBreakerProperties() {
             return new CircuitBreakerProperties();
         }
 
         @Bean
+        @Primary
         @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
-        CircuitBreakerSecuredGeoLocationService circuitBreakerSecuredGeoLocationService(
+        CircuitBreakerSecuredNetAcuityGeoLocationService circuitBreakerSecuredNetAcuityGeoLocationService(
                 Vertx vertx,
-                Metrics metrics,
-                @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
-                @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server,
+                NetAcuityServerAddressProvider netAcuityServerAddressProvider,
+                NetAcuityGeoLocationService netAcuityGeoLocationService,
+                @Qualifier("netacuityCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
                 Clock clock) {
 
-            return new CircuitBreakerSecuredGeoLocationService(vertx, createGeoLocationService(vertx, server), metrics,
-                    circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
-                    circuitBreakerProperties.getClosingIntervalMs(), clock);
+            return new CircuitBreakerSecuredNetAcuityGeoLocationService(netAcuityGeoLocationService,
+                    netAcuityServerAddressProvider, vertx, circuitBreakerProperties.getOpeningThreshold(),
+                    circuitBreakerProperties.getOpeningIntervalMs(), circuitBreakerProperties.getClosingIntervalMs(),
+                    clock);
         }
 
-        /**
-         * Default geolocation service implementation.
-         */
-        private GeoLocationService createGeoLocationService(Vertx vertx, String server) {
-
-            return NetAcuityGeoLocationService.create(vertx, server);
+        private static Set<String> parseServerNames(String serversString) {
+            Objects.requireNonNull(serversString);
+            return Stream.of(serversString.split(",")).map(String::trim).collect(Collectors.toSet());
         }
     }
 
