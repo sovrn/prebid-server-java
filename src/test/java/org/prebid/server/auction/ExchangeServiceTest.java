@@ -105,6 +105,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.any;
@@ -174,8 +175,6 @@ public class ExchangeServiceTest extends VertxTest {
         given(privacyEnforcementService.mask(argThat(MapUtils::isEmpty), any(), any(), any(), any(), any(), any(),
                 any()))
                 .willReturn(Future.succeededFuture(emptyMap()));
-
-        given(bidderCatalog.bidderInfoByName(anyString())).willReturn(givenBidderInfo(15, true));
 
         given(responseBidValidator.validate(any())).willReturn(ValidationResult.success());
         given(usersyncer.getCookieFamilyName()).willReturn("cookieFamily");
@@ -421,8 +420,6 @@ public class ExchangeServiceTest extends VertxTest {
     @Test
     public void shouldReturnSeparateSeatBidsForTheSameBidderIfBiddersAliasAndBidderWereUsedWithingSingleImp() {
         // given
-        given(bidderCatalog.isValidName("bidder")).willReturn(true);
-
         given(httpBidderRequester.requestBids(any(), eq(givenBidRequest(givenSingleImp(singletonMap("bidder", 1)),
                 builder -> builder.ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("bidderAlias", "bidder")).build(), null))))), any(), anyBoolean()))
@@ -746,8 +743,9 @@ public class ExchangeServiceTest extends VertxTest {
         // given
         givenBidder(givenEmptySeatBid());
 
-        // this is not required but stated for clarity's sake
-        given(uidsCookie.uidFrom(anyString())).willReturn(null);
+        // this is not required but stated for clarity's sake. The case when bidder is disabled.
+        given(bidderCatalog.isActive(anyString())).willReturn(false);
+        given(uidsCookie.uidFrom(any())).willReturn(null);
 
         final User user = User.builder().id("userId").build();
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
@@ -757,6 +755,8 @@ public class ExchangeServiceTest extends VertxTest {
         exchangeService.holdAuction(givenRequestContext(bidRequest));
 
         // then
+        verify(uidsCookie).uidFrom(isNull());
+
         final BidRequest capturedBidRequest = captureBidRequest();
         assertThat(capturedBidRequest.getUser()).isSameAs(user);
     }
@@ -1280,8 +1280,6 @@ public class ExchangeServiceTest extends VertxTest {
     @Test
     public void shouldRespondWithErrorWhenBidsWithDifferentCurrencies() throws JsonProcessingException {
         // given
-        given(bidderCatalog.isValidName(anyString())).willReturn(true);
-
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(asList(
                         BidderBid.of(Bid.builder().price(TEN).build(), BidType.banner, "EUR"),
@@ -1354,8 +1352,6 @@ public class ExchangeServiceTest extends VertxTest {
     @Test
     public void shouldCallUpdateCookieMetricsWithExpectedValue() {
         // given
-        given(bidderCatalog.isActive(any())).willReturn(false);
-
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
                 builder -> builder.app(App.builder().build()));
 
@@ -1370,7 +1366,6 @@ public class ExchangeServiceTest extends VertxTest {
     @Test
     public void shouldUseEmptyStringIfPublisherIdIsEmpty() {
         // given
-        given(bidderCatalog.isValidName(anyString())).willReturn(true);
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().price(TEN).build())))));
@@ -1533,13 +1528,11 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     private void givenBidder(BidderSeatBid response) {
-        given(bidderCatalog.isValidName(anyString())).willReturn(true);
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(response));
     }
 
     private void givenBidder(String bidderName, Bidder<?> bidder, BidderSeatBid response) {
-        given(bidderCatalog.isValidName(eq(bidderName))).willReturn(true);
         doReturn(bidder).when(bidderCatalog).bidderByName(eq(bidderName));
         given(httpBidderRequester.requestBids(same(bidder), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(response));

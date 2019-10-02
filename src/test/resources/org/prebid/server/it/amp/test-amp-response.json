@@ -1,7 +1,7 @@
 {
   "targeting": {
     "hb_pb_appnexus": "5.50",
-    "hb_winurl": "http://localhost:8000/event?t=win&b=BIDID&a=5001&f=i",
+    "hb_winurl": "http%3A%2F%2Flocalhost%3A8000%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D5001%26f%3Di",
     "hb_deal_rubicon": "dealId1",
     "hb_cache_path_appnexus": "/cache",
     "hb_size_rubicon": "300x600",

@@ -90,7 +90,6 @@ public class CookieSyncHandlerTest extends VertxTest {
     private Metrics metrics;
 
     private CookieSyncHandler cookieSyncHandler;
-
     @Mock
     private RoutingContext routingContext;
     @Mock

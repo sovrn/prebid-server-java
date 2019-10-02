@@ -19,7 +19,7 @@
                 "hb_pb": "4.20",
                 "hb_pb_rubicon": "4.20",
                 "hb_deal_rubicon": "dealId2",
-                "hb_winurl": "http://localhost:8000/event?t=win&b=BIDID&a=5001&f=i",
+                "hb_winurl": "http%3A%2F%2Flocalhost%3A8000%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D5001%26f%3Di",
                 "hb_size": "120x600",
                 "hb_bidder": "rubicon",
                 "hb_size_rubicon": "120x600",
