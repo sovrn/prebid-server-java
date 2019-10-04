@@ -43,6 +43,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private static final String IMG_FORMAT_PARAM = "img";
     private static final String PIXEL_FILE_PATH = "static/tracking-pixel.png";
     private static final String ACCOUNT_PARAM = "account";
+    private static final String RUBICON_BIDDER = "rubicon";
 
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
@@ -57,8 +58,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     public SetuidHandler(long defaultTimeout, UidsCookieService uidsCookieService, GdprService gdprService,
                          Integer gdprHostVendorId, boolean useGeoLocation, AnalyticsReporter analyticsReporter,
-                         Metrics metrics, TimeoutFactory timeoutFactory, boolean enableCookie,
-                         UidsAuditCookieService uidsAuditCookieService) {
+                         Metrics metrics, TimeoutFactory timeoutFactory,
+                         boolean enableCookie, UidsAuditCookieService uidsAuditCookieService) {
         this.defaultTimeout = defaultTimeout;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.gdprService = Objects.requireNonNull(gdprService);
@@ -98,74 +99,34 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
         final String gdpr = context.request().getParam(GDPR_PARAM);
         final String gdprConsent = context.request().getParam(GDPR_CONSENT_PARAM);
-        final String account = context.request().getParam(ACCOUNT_PARAM);
         final String ip = useGeoLocation ? HttpUtil.ipFrom(context.request()) : null;
         gdprService.resultByVendor(GDPR_PURPOSES, gdprVendorIds, gdpr, gdprConsent, ip,
                 timeoutFactory.create(defaultTimeout), context)
-                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, account, bidder,
-                        gdprConsent, ip));
+                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, bidder, gdprConsent, ip));
     }
 
-    private void respondWithMissingParamMessage(String param, RoutingContext context) {
-        final int status = HttpResponseStatus.BAD_REQUEST.code();
-        context.response().setStatusCode(status).end(String.format("\"%s\" query param is required", param));
-        metrics.updateUserSyncBadRequestMetric();
-        analyticsReporter.processEvent(SetuidEvent.error(status));
-    }
+    private void handleResult(AsyncResult<GdprResponse> async, RoutingContext context, UidsCookie uidsCookie,
+                              String bidder, String gdprConsent, String ip) {
 
-    private void handleResult(AsyncResult<GdprResponse> asyncResult, RoutingContext context,
-                              UidsCookie uidsCookie, String account, String bidder, String gdprConsent, String ip) {
-
-        final boolean gdprProcessingFailed = asyncResult.failed();
-        final GdprResponse gdprResponse = !gdprProcessingFailed ? asyncResult.result() : null;
+        final boolean gdprProcessingFailed = async.failed();
+        final GdprResponse gdprResponse = !gdprProcessingFailed ? async.result() : null;
 
         // allow cookie only if user is not in GDPR scope or vendor passes GDPR check
         final boolean allowedCookie = gdprResponse != null
                 && (!gdprResponse.isUserInGdprScope() || gdprResponse.getVendorsToGdpr().values().iterator().next());
 
         if (allowedCookie) {
-            final UidAudit uidsAudit;
-            try {
-                uidsAudit = uidsAuditCookieService.getUidsAudit(context);
-            } catch (PreBidException e) {
-                final String errorMessage = String.format("Error retrieving of audit cookie: %s", e.getMessage());
-                logger.warn(errorMessage);
-                context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(errorMessage);
-                return;
+            if (bidder.equals(RUBICON_BIDDER)) {
+                respondForRubiconBidder(context, uidsCookie, gdprConsent, ip, gdprResponse.getCountry());
+            } else {
+                respondForOtherBidder(context, uidsCookie, gdprConsent, ip, gdprResponse.getCountry(), bidder);
             }
-
-            // check do we really need account parameter
-            if (uidsAudit == null && StringUtils.isBlank(account) && gdprResponse.isUserInGdprScope()) {
-                respondWithMissingParamMessage(ACCOUNT_PARAM, context);
-                return;
-            }
-
-            final Cookie uidsAuditCookie;
-            try {
-                if (uidsAudit != null) {
-                    uidsAuditCookie = uidsAuditCookieService.updateUidsAuditCookie(context, gdprConsent, uidsAudit);
-                } else if (StringUtils.isNotBlank(account)) {
-                    final String uid = context.request().getParam(UID_PARAM);
-                    uidsAuditCookie = uidsAuditCookieService
-                            .createUidsAuditCookie(context, uid, account, gdprConsent, gdprResponse.getCountry(), ip);
-                } else {
-                    uidsAuditCookie = null; // user is not in GDPR scope, so uids-audit cookie is not required
-                }
-            } catch (PreBidException e) {
-                final String errorMessage = String.format("Error occurred on audit cookie creation, "
-                        + "uid cookie will not be set without audit: %s", e.getMessage());
-                logger.warn(errorMessage);
-                context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(errorMessage);
-                return;
-            }
-
-            respondWithCookie(context, bidder, uidsCookie, uidsAuditCookie);
         } else {
             final int status;
             final String body;
 
             if (gdprProcessingFailed) {
-                final Throwable exception = asyncResult.cause();
+                final Throwable exception = async.cause();
                 if (exception instanceof InvalidRequestException) {
                     status = HttpResponseStatus.BAD_REQUEST.code();
                     body = String.format("GDPR processing failed with error: %s", exception.getMessage());
@@ -181,6 +142,82 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
             respondWithoutCookie(context, status, body, bidder);
         }
+    }
+
+    private void respondForRubiconBidder(RoutingContext context, UidsCookie uidsCookie, String gdprConsent, String ip,
+                                         String country) {
+        final String account = context.request().getParam(ACCOUNT_PARAM);
+        if (StringUtils.isBlank(account)) {
+            final int status = HttpResponseStatus.BAD_REQUEST.code();
+            respondWith(context, status, "\"account\" query param is required");
+            metrics.updateUserSyncBadRequestMetric();
+            analyticsReporter.processEvent(SetuidEvent.error(status));
+            return;
+        }
+
+        final Cookie uidsAuditCookie;
+        try {
+            final String uid = context.request().getParam(UID_PARAM);
+            uidsAuditCookie = uidsAuditCookieService
+                    .createUidsAuditCookie(context, uid, account, gdprConsent, country, ip);
+        } catch (PreBidException e) {
+            respondWithUidAuditCreationError(context, e);
+            return;
+        }
+
+        respondWithCookie(context, RUBICON_BIDDER, uidsCookie, uidsAuditCookie);
+    }
+
+    private void respondForOtherBidder(RoutingContext context, UidsCookie uidsCookie, String gdprConsent, String ip,
+                                       String country, String bidder) {
+        final UidAudit uidsAudit;
+        try {
+            uidsAudit = uidsAuditCookieService.getUidsAudit(context);
+        } catch (PreBidException e) {
+            final int status = HttpResponseStatus.BAD_REQUEST.code();
+            final String message = String.format("Error retrieving of uids-audit cookie: %s", e.getMessage());
+            respondWith(context, status, message);
+            metrics.updateUserSyncBadRequestMetric();
+            logger.info(message);
+            analyticsReporter.processEvent(SetuidEvent.error(status));
+            return;
+        }
+
+        if (uidsAudit == null) {
+            final int status = HttpResponseStatus.BAD_REQUEST.code();
+            respondWith(context, status, "\"uids-audit\" cookie is missing, sync Rubicon bidder first");
+            metrics.updateUserSyncBadRequestMetric();
+            analyticsReporter.processEvent(SetuidEvent.error(status));
+            return;
+        }
+
+        final Cookie uidsAuditCookie;
+        try {
+            final String uid = context.request().getParam(UID_PARAM);
+            uidsAuditCookie = uidsAuditCookieService
+                    .createUidsAuditCookie(context, uid, uidsAudit.getInitiatorId(), gdprConsent, country, ip);
+        } catch (PreBidException e) {
+            respondWithUidAuditCreationError(context, e);
+            return;
+        }
+
+        respondWithCookie(context, bidder, uidsCookie, uidsAuditCookie);
+    }
+
+    private void respondWithUidAuditCreationError(RoutingContext context, PreBidException e) {
+        final int status = HttpResponseStatus.BAD_REQUEST.code();
+        final String message = String.format("Error occurred on uids-audit cookie creation, "
+                + "uid cookie will not be set without it: %s", e.getMessage());
+        respondWith(context, status, message);
+        metrics.updateUserSyncBadRequestMetric();
+        logger.info(message);
+        analyticsReporter.processEvent(SetuidEvent.error(status));
+    }
+
+    private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
+        respondWith(context, status, body);
+        metrics.updateUserSyncGdprPreventMetric(bidder);
+        analyticsReporter.processEvent(SetuidEvent.error(status));
     }
 
     private void respondWithCookie(RoutingContext context, String bidder, UidsCookie uidsCookie,
@@ -226,16 +263,6 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 .build());
     }
 
-    private void addCookie(RoutingContext context, Cookie cookie) {
-        context.response().headers().add(HttpUtil.SET_COOKIE_HEADER, HttpUtil.toSetCookieHeaderValue(cookie));
-    }
-
-    private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
-        respondWith(context, status, body);
-        metrics.updateUserSyncGdprPreventMetric(bidder);
-        analyticsReporter.processEvent(SetuidEvent.error(status));
-    }
-
     private static void respondWith(RoutingContext context, int status, String body) {
         // don't send the response if client has gone
         if (context.response().closed()) {
@@ -249,5 +276,9 @@ public class SetuidHandler implements Handler<RoutingContext> {
         } else {
             context.response().end();
         }
+    }
+
+    private static void addCookie(RoutingContext context, Cookie cookie) {
+        context.response().headers().add(HttpUtil.SET_COOKIE_HEADER, HttpUtil.toSetCookieHeaderValue(cookie));
     }
 }

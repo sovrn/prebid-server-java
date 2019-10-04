@@ -90,8 +90,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
 
-//        given(httpResponse.headers()).willReturn(new CaseInsensitiveHeaders());
-
         given(uidsCookieService.toCookie(any()))
                 .willReturn(Cookie.cookie("test", "test"));
 
@@ -105,13 +103,12 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookiesDisables() {
+    public void shouldRespondWithEmptyBodyAndNoContentStatusIfCookieIsDisabled() {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
         setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, false, analyticsReporter, metrics,
-                timeoutFactory, false, uidsAuditCookieService
-        );
+                timeoutFactory, false, uidsAuditCookieService);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -139,7 +136,23 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldRespondWithErrorIfAccountParamIsMissingAndUserInGdprScope() {
+    public void shouldRespondWithErrorIfBidderParamIsMissing() {
+        // given
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(400));
+        verify(httpResponse).end(eq("\"bidder\" query param is required"));
+    }
+
+    @Test
+    public void shouldRespondWithErrorIfUserInGdprScopeAndAccountParamIsMissing() {
         // given
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
@@ -154,63 +167,6 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(400));
         verify(httpResponse).end(eq("\"account\" query param is required"));
-    }
-
-    @Test
-    public void shouldNotRespondWithErrorIfAccountParamIsMissingAndUserNotInGdprScope() {
-        // given
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(true, singletonMap(null, false), null)));
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
-        given(httpRequest.getParam("account")).willReturn(null);
-        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        verify(httpResponse).setStatusCode(eq(200));
-        verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
-    }
-
-    @Test
-    public void shouldNotRespondWithErrorIfAccountParamIsMissingButAuditCookieExistsAndUserInGdprScope() {
-        // given
-        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(true, singletonMap(null, false), null)));
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
-        given(httpRequest.getParam("account")).willReturn(null);
-        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(UidAudit.builder().build());
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        verify(httpResponse).setStatusCode(eq(200));
-        verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
-    }
-
-    @Test
-    public void shouldRespondWithErrorIfBidderParamIsMissing() {
-        // given
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end(eq("\"bidder\" query param is required"));
     }
 
     @Test
@@ -347,6 +303,10 @@ public class SetuidHandlerTest extends VertxTest {
         given(uidsCookieService.toCookie(any())).willReturn(Cookie
                 .cookie("uids", "eyJ0ZW1wVUlEcyI6eyJhdWRpZW5jZU5ldHdvcmsiOnsidWlkIjoiZmFjZWJvb2tVaWQifX19"));
 
+        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(UidAudit.builder().build());
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willReturn(Cookie.cookie("uids-audit", "value").setDomain("rubicon"));
+
         // when
         setuidHandler.handle(routingContext);
 
@@ -355,7 +315,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(httpResponse).end();
         verify(httpResponse, never()).sendFile(any());
 
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(0);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get("audienceNetwork").getUid()).isEqualTo("facebookUid");
@@ -374,8 +334,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("format")).willReturn("img");
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -452,7 +410,7 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldSendBadRequestIfAuditCookieWasNotCreated() {
+    public void shouldSendBadRequestIfUidsAuditCookieCannotBeCreated() {
         // given
         given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
@@ -461,16 +419,15 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
-                .willThrow(new PreBidException(
-                        "Uid was not defined. Should be present to set uid audit cookie."));
+                .willThrow(new PreBidException("error"));
 
         // when
         setuidHandler.handle(routingContext);
 
         // then
         verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end("Error occurred on audit cookie creation, uid cookie will not be set without audit:" +
-                " Uid was not defined. Should be present to set uid audit cookie.");
+        verify(httpResponse).end(
+                "Error occurred on uids-audit cookie creation, uid cookie will not be set without it: error");
     }
 
     @Test
@@ -501,13 +458,14 @@ public class SetuidHandlerTest extends VertxTest {
     @Test
     public void shouldTolerateSendingUidsAuditCookieIfUserIsNotInGdprScope() {
         // given
-        given(httpRequest.getParam("account")).willReturn(null);
-
         given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(GdprResponse.of(false, singletonMap(null, true), null)));
 
         given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
+
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willReturn(Cookie.cookie("uids-audit", "value").setDomain("rubicon"));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
 
@@ -519,8 +477,61 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(0);
         assertThat(uidsCookie).startsWith("uids=");
+    }
+
+    @Test
+    public void shouldSendBadRequestIfUidsAuditCookieCannotBeRetrievedForNonRubiconBidder() {
+        // given
+        given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(ADNXS, UidWithExpiry.live("12345"))).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(ADNXS);
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willThrow(new PreBidException("error"));
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(400));
+        verify(httpResponse).end("Error retrieving of uids-audit cookie: error");
+    }
+
+    @Test
+    public void shouldSendBadRequestIfUidsAuditCookieIsMissingForNonRubiconBidder() {
+        // given
+        given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(ADNXS, UidWithExpiry.live("12345"))).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(ADNXS);
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(null);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(400));
+        verify(httpResponse).end("\"uids-audit\" cookie is missing, sync Rubicon bidder first");
+    }
+
+    @Test
+    public void shouldNotRequireAccountForNonRubiconBidder() {
+        // given
+        given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(ADNXS, UidWithExpiry.live("12345"))).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(ADNXS);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpRequest, times(0)).getParam(eq("account"));
     }
 
     @Test
@@ -649,6 +660,9 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn("audienceNetwork");
         given(httpRequest.getParam("uid")).willReturn("0");
 
+        given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(UidAudit.builder().build());
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willReturn(Cookie.cookie("uids-audit", "value").setDomain("rubicon"));
 
         // when
         setuidHandler.handle(routingContext);
