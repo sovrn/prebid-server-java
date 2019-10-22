@@ -625,7 +625,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .targeting(ExtRequestTargeting.of(null, null,
                                 null, null, null))
                         .cache(ExtRequestPrebidCache.of(null, null, true))
-                        .build())))
+                        .build(), null)))
                 .build());
 
         // when
@@ -652,7 +652,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.of(null, null,
                                 null, null, null))
-                        .build())))
+                        .build(), null)))
                 .build());
 
         // when
