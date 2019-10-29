@@ -52,6 +52,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class SetuidHandlerTest extends VertxTest {
 
@@ -456,16 +457,13 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldTolerateSendingUidsAuditCookieIfUserIsNotInGdprScope() {
+    public void shouldNotSendUidsAuditCookieButUidsCookieIfUserIsNotInGdprScope() {
         // given
         given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(GdprResponse.of(false, singletonMap(null, true), null)));
+                .willReturn(Future.succeededFuture(GdprResponse.of(false, emptyMap(), null)));
 
         given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
                 Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("J5VLCWQP-26-CWFT"))).build()));
-
-        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
-                .willReturn(Cookie.cookie("uids-audit", "value").setDomain("rubicon"));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
 
@@ -477,8 +475,40 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        final String uidsCookie = captureAllCookies().get(0);
-        assertThat(uidsCookie).startsWith("uids=");
+        verifyZeroInteractions(uidsAuditCookieService);
+
+        final String uidsCookie = captureCookie();
+        final Uids decodedUids = decodeUids(uidsCookie);
+        assertThat(decodedUids.getUids()).hasSize(1);
+        assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
+    }
+
+    @Test
+    public void shouldNotSendUidsAuditCookieButUidsCookieIfUserIsNotInGdprScopeForNonRubiconBidder() {
+        // given
+        given(gdprService.resultByVendor(anySet(), anySet(), any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(GdprResponse.of(false, emptyMap(), null)));
+
+
+        given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(ADNXS, UidWithExpiry.live("12345"))).build()));
+
+        given(httpRequest.getParam("bidder")).willReturn(ADNXS);
+
+        // this uids cookie stands for {"tempUIDs":{"adnxs":{"uid":"12345"}}}
+        given(uidsCookieService.toCookie(any())).willReturn(Cookie
+                .cookie("uids", "eyJ0ZW1wVUlEcyI6eyJhZG54cyI6eyJ1aWQiOiIxMjM0NSJ9fX0="));
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verifyZeroInteractions(uidsAuditCookieService);
+
+        final String uidsCookie = captureCookie();
+        final Uids decodedUids = decodeUids(uidsCookie);
+        assertThat(decodedUids.getUids()).hasSize(1);
+        assertThat(decodedUids.getUids().get(ADNXS).getUid()).isEqualTo("12345");
     }
 
     @Test

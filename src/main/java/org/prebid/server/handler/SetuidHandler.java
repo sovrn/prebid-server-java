@@ -117,9 +117,11 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
         if (allowedCookie) {
             if (bidder.equals(RUBICON_BIDDER)) {
-                respondForRubiconBidder(context, uidsCookie, gdprConsent, ip, gdprResponse.getCountry());
+                respondForRubiconBidder(context, uidsCookie, gdprConsent, ip, gdprResponse.getCountry(),
+                        gdprResponse.isUserInGdprScope());
             } else {
-                respondForOtherBidder(context, uidsCookie, gdprConsent, ip, gdprResponse.getCountry(), bidder);
+                respondForOtherBidder(context, uidsCookie, gdprConsent, ip, gdprResponse.getCountry(), bidder,
+                        gdprResponse.isUserInGdprScope());
             }
         } else {
             final int status;
@@ -145,60 +147,68 @@ public class SetuidHandler implements Handler<RoutingContext> {
     }
 
     private void respondForRubiconBidder(RoutingContext context, UidsCookie uidsCookie, String gdprConsent, String ip,
-                                         String country) {
-        final String account = context.request().getParam(ACCOUNT_PARAM);
-        if (StringUtils.isBlank(account)) {
-            final int status = HttpResponseStatus.BAD_REQUEST.code();
-            respondWith(context, status, "\"account\" query param is required");
-            metrics.updateUserSyncBadRequestMetric();
-            analyticsReporter.processEvent(SetuidEvent.error(status));
-            return;
-        }
-
+                                         String country, boolean userInGdprScope) {
         final Cookie uidsAuditCookie;
-        try {
-            final String uid = context.request().getParam(UID_PARAM);
-            uidsAuditCookie = uidsAuditCookieService
-                    .createUidsAuditCookie(context, uid, account, gdprConsent, country, ip);
-        } catch (PreBidException e) {
-            respondWithUidAuditCreationError(context, e);
-            return;
+        if (userInGdprScope) {
+            final String account = context.request().getParam(ACCOUNT_PARAM);
+            if (StringUtils.isBlank(account)) {
+                final int status = HttpResponseStatus.BAD_REQUEST.code();
+                respondWith(context, status, "\"account\" query param is required");
+                metrics.updateUserSyncBadRequestMetric();
+                analyticsReporter.processEvent(SetuidEvent.error(status));
+                return;
+            }
+
+            try {
+                final String uid = context.request().getParam(UID_PARAM);
+                uidsAuditCookie = uidsAuditCookieService
+                        .createUidsAuditCookie(context, uid, account, gdprConsent, country, ip);
+            } catch (PreBidException e) {
+                respondWithUidAuditCreationError(context, e);
+                return;
+            }
+        } else {
+            uidsAuditCookie = null;
         }
 
         respondWithCookie(context, RUBICON_BIDDER, uidsCookie, uidsAuditCookie);
     }
 
     private void respondForOtherBidder(RoutingContext context, UidsCookie uidsCookie, String gdprConsent, String ip,
-                                       String country, String bidder) {
-        final UidAudit uidsAudit;
-        try {
-            uidsAudit = uidsAuditCookieService.getUidsAudit(context);
-        } catch (PreBidException e) {
-            final int status = HttpResponseStatus.BAD_REQUEST.code();
-            final String message = String.format("Error retrieving of uids-audit cookie: %s", e.getMessage());
-            respondWith(context, status, message);
-            metrics.updateUserSyncBadRequestMetric();
-            logger.info(message);
-            analyticsReporter.processEvent(SetuidEvent.error(status));
-            return;
-        }
-
-        if (uidsAudit == null) {
-            final int status = HttpResponseStatus.BAD_REQUEST.code();
-            respondWith(context, status, "\"uids-audit\" cookie is missing, sync Rubicon bidder first");
-            metrics.updateUserSyncBadRequestMetric();
-            analyticsReporter.processEvent(SetuidEvent.error(status));
-            return;
-        }
-
+                                       String country, String bidder, boolean userInGdprScope) {
         final Cookie uidsAuditCookie;
-        try {
-            final String uid = context.request().getParam(UID_PARAM);
-            uidsAuditCookie = uidsAuditCookieService
-                    .createUidsAuditCookie(context, uid, uidsAudit.getInitiatorId(), gdprConsent, country, ip);
-        } catch (PreBidException e) {
-            respondWithUidAuditCreationError(context, e);
-            return;
+        if (userInGdprScope) {
+            final UidAudit uidsAudit;
+            try {
+                uidsAudit = uidsAuditCookieService.getUidsAudit(context);
+            } catch (PreBidException e) {
+                final int status = HttpResponseStatus.BAD_REQUEST.code();
+                final String message = String.format("Error retrieving of uids-audit cookie: %s", e.getMessage());
+                respondWith(context, status, message);
+                metrics.updateUserSyncBadRequestMetric();
+                logger.info(message);
+                analyticsReporter.processEvent(SetuidEvent.error(status));
+                return;
+            }
+
+            if (uidsAudit == null) {
+                final int status = HttpResponseStatus.BAD_REQUEST.code();
+                respondWith(context, status, "\"uids-audit\" cookie is missing, sync Rubicon bidder first");
+                metrics.updateUserSyncBadRequestMetric();
+                analyticsReporter.processEvent(SetuidEvent.error(status));
+                return;
+            }
+
+            try {
+                final String uid = context.request().getParam(UID_PARAM);
+                uidsAuditCookie = uidsAuditCookieService
+                        .createUidsAuditCookie(context, uid, uidsAudit.getInitiatorId(), gdprConsent, country, ip);
+            } catch (PreBidException e) {
+                respondWithUidAuditCreationError(context, e);
+                return;
+            }
+        } else {
+            uidsAuditCookie = null;
         }
 
         respondWithCookie(context, bidder, uidsCookie, uidsAuditCookie);
