@@ -19,6 +19,7 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.SetuidEvent;
+import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
@@ -67,6 +68,8 @@ public class SetuidHandlerTest extends VertxTest {
     @Mock
     private UidsAuditCookieService uidsAuditCookieService;
     @Mock
+    private BidderCatalog bidderCatalog;
+    @Mock
     private GdprService gdprService;
     @Mock
     private AnalyticsReporter analyticsReporter;
@@ -94,13 +97,15 @@ public class SetuidHandlerTest extends VertxTest {
         given(uidsCookieService.toCookie(any()))
                 .willReturn(Cookie.cookie("test", "test"));
 
+        given(bidderCatalog.isActive(any())).willReturn(true);
+
         given(httpRequest.getParam("account")).willReturn("account");
         given(httpResponse.headers()).willReturn(responseHeaders);
 
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
-        setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, false, analyticsReporter, metrics,
-                timeoutFactory, true, uidsAuditCookieService);
+        setuidHandler = new SetuidHandler(2000, uidsCookieService, bidderCatalog, gdprService, null, false,
+                analyticsReporter, metrics, timeoutFactory, true, uidsAuditCookieService);
     }
 
     @Test
@@ -108,8 +113,8 @@ public class SetuidHandlerTest extends VertxTest {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
-        setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, false, analyticsReporter, metrics,
-                timeoutFactory, false, uidsAuditCookieService);
+        setuidHandler = new SetuidHandler(2000, uidsCookieService, bidderCatalog, gdprService, null, false,
+                analyticsReporter, metrics, timeoutFactory, false, uidsAuditCookieService);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -168,6 +173,24 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(httpResponse).setStatusCode(eq(400));
         verify(httpResponse).end(eq("\"account\" query param is required"));
+    }
+
+    @Test
+    public void shouldRespondWithErrorIfBidderParamIsInvalid() {
+        // given
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));
+        given(bidderCatalog.isActive(any())).willReturn(false);
+        given(httpRequest.getParam(any())).willReturn("invalid_or_disabled");
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse).setStatusCode(eq(400));
+        verify(httpResponse).end(eq("\"bidder\" query param is invalid"));
     }
 
     @Test
@@ -242,8 +265,8 @@ public class SetuidHandlerTest extends VertxTest {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);
-        setuidHandler = new SetuidHandler(2000, uidsCookieService, gdprService, null, true, analyticsReporter, metrics,
-                timeoutFactory, true, uidsAuditCookieService);
+        setuidHandler = new SetuidHandler(2000, uidsCookieService, bidderCatalog, gdprService, null, true,
+                analyticsReporter, metrics, timeoutFactory, true, uidsAuditCookieService);
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build()));

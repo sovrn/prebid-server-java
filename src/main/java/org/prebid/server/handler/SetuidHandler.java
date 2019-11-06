@@ -10,6 +10,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.SetuidEvent;
+import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.InvalidRequestException;
@@ -47,6 +48,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
+    private final BidderCatalog bidderCatalog;
     private final GdprService gdprService;
     private final Set<Integer> gdprVendorIds;
     private final boolean useGeoLocation;
@@ -56,12 +58,13 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private final boolean enableCookie;
     private final UidsAuditCookieService uidsAuditCookieService;
 
-    public SetuidHandler(long defaultTimeout, UidsCookieService uidsCookieService, GdprService gdprService,
-                         Integer gdprHostVendorId, boolean useGeoLocation, AnalyticsReporter analyticsReporter,
-                         Metrics metrics, TimeoutFactory timeoutFactory,
+    public SetuidHandler(long defaultTimeout, UidsCookieService uidsCookieService, BidderCatalog bidderCatalog,
+                         GdprService gdprService, Integer gdprHostVendorId, boolean useGeoLocation,
+                         AnalyticsReporter analyticsReporter, Metrics metrics, TimeoutFactory timeoutFactory,
                          boolean enableCookie, UidsAuditCookieService uidsAuditCookieService) {
         this.defaultTimeout = defaultTimeout;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
+        this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.gdprService = Objects.requireNonNull(gdprService);
         this.gdprVendorIds = Collections.singleton(gdprHostVendorId);
         this.useGeoLocation = useGeoLocation;
@@ -89,9 +92,11 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
 
         final String bidder = context.request().getParam(BIDDER_PARAM);
-        if (StringUtils.isBlank(bidder)) {
+        final boolean isBidderBlank = StringUtils.isBlank(bidder);
+        if (isBidderBlank || !bidderCatalog.isActive(bidder)) {
             final int status = HttpResponseStatus.BAD_REQUEST.code();
-            respondWith(context, status, "\"bidder\" query param is required");
+            final String body = "\"bidder\" query param is ";
+            respondWith(context, status, body + (isBidderBlank ? "required" : "invalid"));
             metrics.updateUserSyncBadRequestMetric();
             analyticsReporter.processEvent(SetuidEvent.error(status));
             return;
@@ -224,12 +229,6 @@ public class SetuidHandler implements Handler<RoutingContext> {
         analyticsReporter.processEvent(SetuidEvent.error(status));
     }
 
-    private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
-        respondWith(context, status, body);
-        metrics.updateUserSyncGdprPreventMetric(bidder);
-        analyticsReporter.processEvent(SetuidEvent.error(status));
-    }
-
     private void respondWithCookie(RoutingContext context, String bidder, UidsCookie uidsCookie,
                                    Cookie uidsAuditCookie) {
         final String uid = context.request().getParam(UID_PARAM);
@@ -273,6 +272,16 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 .build());
     }
 
+    private void addCookie(RoutingContext context, Cookie cookie) {
+        context.response().headers().add(HttpUtil.SET_COOKIE_HEADER, HttpUtil.toSetCookieHeaderValue(cookie));
+    }
+
+    private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
+        respondWith(context, status, body);
+        metrics.updateUserSyncGdprPreventMetric(bidder);
+        analyticsReporter.processEvent(SetuidEvent.error(status));
+    }
+
     private static void respondWith(RoutingContext context, int status, String body) {
         // don't send the response if client has gone
         if (context.response().closed()) {
@@ -286,9 +295,5 @@ public class SetuidHandler implements Handler<RoutingContext> {
         } else {
             context.response().end();
         }
-    }
-
-    private static void addCookie(RoutingContext context, Cookie cookie) {
-        context.response().headers().add(HttpUtil.SET_COOKIE_HEADER, HttpUtil.toSetCookieHeaderValue(cookie));
     }
 }

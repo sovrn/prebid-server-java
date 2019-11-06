@@ -149,7 +149,7 @@ public class HttpBidderRequester {
 
         final List<Result<List<BidderBid>>> createdBids = calls.stream()
                 .filter(httpCall -> httpCall.getError() == null)
-                .filter(httpCall -> httpCall.getResponse().getStatusCode() == HttpResponseStatus.OK.code())
+                .filter(HttpBidderRequester::isOkOrNoContent)
                 .map(httpCall -> bidder.makeBids(httpCall, bidRequest))
                 .collect(Collectors.toList());
 
@@ -178,6 +178,11 @@ public class HttpBidderRequester {
         }
 
         return builder.build();
+    }
+
+    private static boolean isOkOrNoContent(HttpCall httpCall) {
+        final int statusCode = httpCall.getResponse().getStatusCode();
+        return statusCode == HttpResponseStatus.OK.code() || statusCode == HttpResponseStatus.NO_CONTENT.code();
     }
 
     /**

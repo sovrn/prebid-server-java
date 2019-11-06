@@ -18,6 +18,7 @@ import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.metric.Metrics;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.rubicon.rsid.model.Rsid;
 
@@ -44,15 +45,17 @@ public class GdprService {
 
     private final RsidCookieService rsidCookieService;
     private final GeoLocationService geoLocationService;
+    private final Metrics metrics;
     private final List<String> eeaCountries;
     private final VendorListService vendorListService;
     private final String gdprDefaultValue;
 
     public GdprService(RsidCookieService rsidCookieService,
-                       GeoLocationService geoLocationService, VendorListService vendorListService,
+                       GeoLocationService geoLocationService, Metrics metrics, VendorListService vendorListService,
                        List<String> eeaCountries, String gdprDefaultValue) {
         this.rsidCookieService = Objects.requireNonNull(rsidCookieService);
         this.geoLocationService = geoLocationService;
+        this.metrics = Objects.requireNonNull(metrics);
         this.eeaCountries = Objects.requireNonNull(eeaCountries);
         this.vendorListService = Objects.requireNonNull(vendorListService);
         this.gdprDefaultValue = Objects.requireNonNull(gdprDefaultValue);
@@ -245,14 +248,11 @@ public class GdprService {
             return geoLocationService.lookup(ipAddress, timeout)
                     .map(GeoInfo::getCountry)
                     .map(resolvedCountry -> createGdprInfoWithCountry(gdprConsent, resolvedCountry))
-                    .otherwise(
-                            GdprInfoWithCountry.of(gdprDefaultValue, vendorConsentFrom(gdprDefaultValue, gdprConsent),
-                                    null));
+                    .otherwise(updateMetricsAndReturnDefault(gdprConsent));
         }
 
         // use default
-        return Future.succeededFuture(
-                GdprInfoWithCountry.of(gdprDefaultValue, vendorConsentFrom(gdprDefaultValue, gdprConsent), null));
+        return Future.succeededFuture(defaultGdprInfoWithCountry(gdprConsent));
     }
 
     /**
@@ -284,11 +284,28 @@ public class GdprService {
     }
 
     /**
-     * Creates {@link GdprInfoWithCountry} which GDPR value depends on if country is in eea list.
+     * Updates Geo {@link Metrics} and creates {@link GdprInfoWithCountry} which GDPR value depends on if country is
+     * in eea list.
      */
     private GdprInfoWithCountry createGdprInfoWithCountry(String gdprConsent, String country) {
+        metrics.updateGeoLocationMetric(true);
         final String gdpr = country == null ? gdprDefaultValue : eeaCountries.contains(country) ? GDPR_ONE : GDPR_ZERO;
         return GdprInfoWithCountry.of(gdpr, vendorConsentFrom(gdpr, gdprConsent), country);
+    }
+
+    /**
+     * Updates Geo {@link Metrics} and returns default {@link GdprInfoWithCountry}.
+     */
+    private GdprInfoWithCountry updateMetricsAndReturnDefault(String gdprConsent) {
+        metrics.updateGeoLocationMetric(false);
+        return defaultGdprInfoWithCountry(gdprConsent);
+    }
+
+    /**
+     * Creates default {@link GdprInfoWithCountry} with null country, default GDPR value and GDPR consent from request.
+     */
+    private GdprInfoWithCountry defaultGdprInfoWithCountry(String gdprConsent) {
+        return GdprInfoWithCountry.of(gdprDefaultValue, vendorConsentFrom(gdprDefaultValue, gdprConsent), null);
     }
 
     /**
