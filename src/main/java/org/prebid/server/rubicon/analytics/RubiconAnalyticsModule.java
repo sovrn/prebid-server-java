@@ -57,6 +57,10 @@ import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.ExtApp;
 import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
+import org.prebid.server.rubicon.analytics.proto.ExtRequest;
+import org.prebid.server.rubicon.analytics.proto.ExtRequestPrebid;
+import org.prebid.server.rubicon.analytics.proto.ExtRequestPrebidBidders;
+import org.prebid.server.rubicon.analytics.proto.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
@@ -789,9 +793,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                                                 org.prebid.server.rubicon.analytics.proto.App clientApp) {
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
+        final ExtRequestPrebidBiddersRubicon extParameter = parseExtParameters(bidRequest);
+        final String extIntegration = extParameter.getIntegration();
+        final String extWrappername = extParameter.getWrappername();
 
         return Event.builder()
-                .integration(PBS_INTEGRATION)
+                .integration(StringUtils.isBlank(extIntegration) ? PBS_INTEGRATION : extIntegration)
+                .wrappername(extWrappername)
                 .version(pbsVersion)
                 .client(Client.builder()
                         .deviceClass(MOBILE_DEVICE_CLASS)
@@ -811,6 +819,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
         return target != null ? getter.apply(target) : null;
+    }
+
+    private static ExtRequestPrebidBiddersRubicon parseExtParameters(BidRequest bidRequest) {
+        try {
+            final ExtRequest extRequest = Json.mapper.convertValue(bidRequest.getExt(), ExtRequest.class);
+            final ExtRequestPrebid prebid = extRequest == null ? null : extRequest.getPrebid();
+            final ExtRequestPrebidBidders bidders = prebid == null ? null : prebid.getBidders();
+            return bidders == null ? ExtRequestPrebidBiddersRubicon.EMPTY : bidders.getRubicon();
+        } catch (IllegalArgumentException e) {
+            return ExtRequestPrebidBiddersRubicon.EMPTY;
+        }
     }
 
     private String countryFrom(Device device) {

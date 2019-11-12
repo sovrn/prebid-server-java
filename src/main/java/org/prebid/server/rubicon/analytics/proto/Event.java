@@ -15,6 +15,8 @@ public class Event {
 
     String integration;
 
+    String wrappername;
+
     String version;
 
     Client client;
