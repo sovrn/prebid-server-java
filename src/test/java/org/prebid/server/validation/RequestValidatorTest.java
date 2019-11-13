@@ -1658,7 +1658,7 @@ public class RequestValidatorTest extends VertxTest {
         final BidRequest bidRequest = validBidRequestBuilder()
                 .user(User.builder()
                         .ext(mapper.valueToTree(ExtUser.builder()
-                                .eids(singletonList(ExtUserEid.of(null, null, null))).build()))
+                                .eids(singletonList(ExtUserEid.of(null, null, null, null))).build()))
                         .build())
                 .build();
 
@@ -1676,7 +1676,7 @@ public class RequestValidatorTest extends VertxTest {
         final BidRequest bidRequest = validBidRequestBuilder()
                 .user(User.builder()
                         .ext(mapper.valueToTree(ExtUser.builder()
-                                .eids(singletonList(ExtUserEid.of("source", null, null))).build()))
+                                .eids(singletonList(ExtUserEid.of("source", null, null, null))).build()))
                         .build())
                 .build();
 
@@ -1694,7 +1694,7 @@ public class RequestValidatorTest extends VertxTest {
         final BidRequest bidRequest = validBidRequestBuilder()
                 .user(User.builder()
                         .ext(mapper.valueToTree(ExtUser.builder()
-                                .eids(singletonList(ExtUserEid.of("source", null, emptyList()))).build()))
+                                .eids(singletonList(ExtUserEid.of("source", null, emptyList(), null))).build()))
                         .build())
                 .build();
 
@@ -1713,7 +1713,7 @@ public class RequestValidatorTest extends VertxTest {
                 .user(User.builder()
                         .ext(mapper.valueToTree(ExtUser.builder()
                                 .eids(singletonList(ExtUserEid.of("source", null,
-                                        singletonList(ExtUserEidUid.of(null, null))))).build()))
+                                        singletonList(ExtUserEidUid.of(null, null)), null))).build()))
                         .build())
                 .build();
 
@@ -1733,9 +1733,9 @@ public class RequestValidatorTest extends VertxTest {
                         .ext(mapper.valueToTree(ExtUser.builder()
                                 .eids(asList(
                                         ExtUserEid.of("source", null,
-                                                singletonList(ExtUserEidUid.of("id1", null))),
+                                                singletonList(ExtUserEidUid.of("id1", null)), null),
                                         ExtUserEid.of("source", null,
-                                                singletonList(ExtUserEidUid.of("id2", null)))))
+                                                singletonList(ExtUserEidUid.of("id2", null)), null)))
                                 .build()))
                         .build())
                 .build();
