@@ -87,3 +87,6 @@ gdpr:
         http-client:
           connect-timeout-ms: 2500
           max-redirects: 3
+adapters:
+  adform:
+    enabled: true
