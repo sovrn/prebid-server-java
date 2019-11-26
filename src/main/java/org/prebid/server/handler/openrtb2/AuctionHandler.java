@@ -22,9 +22,12 @@ import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.cookie.UidsCookie;
+import org.prebid.server.exception.BlacklistedAccountException;
+import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
+import org.prebid.server.execution.LogModifier;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
@@ -51,14 +54,16 @@ public class AuctionHandler implements Handler<RoutingContext> {
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
     private final Clock clock;
+    private final LogModifier logModifier;
 
     public AuctionHandler(AuctionRequestFactory auctionRequestFactory, ExchangeService exchangeService,
-                          AnalyticsReporter analyticsReporter, Metrics metrics, Clock clock) {
+                          AnalyticsReporter analyticsReporter, Metrics metrics, Clock clock, LogModifier logModifier) {
         this.auctionRequestFactory = Objects.requireNonNull(auctionRequestFactory);
         this.exchangeService = Objects.requireNonNull(exchangeService);
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
+        this.logModifier = Objects.requireNonNull(logModifier);
     }
 
     @Override
@@ -143,10 +148,22 @@ public class AuctionHandler implements Handler<RoutingContext> {
             extBidResponse = null;
 
             final Throwable exception = responseResult.cause();
-            if (exception instanceof InvalidRequestException) {
+            if (exception instanceof BlacklistedAppException || exception instanceof BlacklistedAccountException) {
+                metricRequestStatus = exception instanceof BlacklistedAccountException
+                        ? MetricName.blacklisted_account : MetricName.blacklisted_app;
+                final String errorMessage = exception.getMessage();
+                logger.debug("Blacklisted: {0}", errorMessage);
+
+                errorMessages = Collections.singletonList(errorMessage);
+                status = HttpResponseStatus.FORBIDDEN.code();
+                body = String.format("Blacklisted: %s", errorMessage);
+
+            } else if (exception instanceof InvalidRequestException) {
                 metricRequestStatus = MetricName.badinput;
+
                 errorMessages = ((InvalidRequestException) exception).getMessages();
-                logger.info("Invalid request format: {0}", errorMessages);
+                final String logMessage = String.format("Invalid request format: %s", errorMessages);
+                logModifier.get().accept(logger, logMessage);
 
                 status = HttpResponseStatus.BAD_REQUEST.code();
                 body = errorMessages.stream()
