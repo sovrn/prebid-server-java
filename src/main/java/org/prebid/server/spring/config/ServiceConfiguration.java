@@ -6,7 +6,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.ext.jdbc.JDBCClient;
+import io.vertx.core.net.JksOptions;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
@@ -22,6 +22,7 @@ import org.prebid.server.auction.StoredResponseProcessor;
 import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.BidderDeps;
+import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
 import org.prebid.server.bidder.HttpAdapterConnector;
 import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.cache.CacheService;
@@ -31,19 +32,12 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.events.EventsService;
 import org.prebid.server.execution.LogModifier;
 import org.prebid.server.execution.TimeoutFactory;
-import org.prebid.server.gdpr.GdprService;
-import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.geolocation.GeoLocationService;
-import org.prebid.server.health.ApplicationChecker;
-import org.prebid.server.health.DatabaseHealthChecker;
-import org.prebid.server.health.GeoLocationHealthChecker;
-import org.prebid.server.health.HealthChecker;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
+import org.prebid.server.privacy.gdpr.GdprService;
+import org.prebid.server.privacy.gdpr.vendorlist.VendorListService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
-import org.prebid.server.rubicon.geolocation.CircuitBreakerSecuredNetAcuityGeoLocationService;
-import org.prebid.server.rubicon.geolocation.NetAcuityGeoLocationService;
-import org.prebid.server.rubicon.geolocation.NetAcuityServerAddressProvider;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.spring.config.model.CircuitBreakerProperties;
@@ -57,12 +51,10 @@ import org.prebid.server.vertx.http.HttpClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 
@@ -71,9 +63,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Properties;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -211,7 +201,8 @@ public class ServiceConfiguration {
 
         return createBasicHttpClient(vertx, httpClientProperties.getMaxPoolSize(),
                 httpClientProperties.getConnectTimeoutMs(), httpClientProperties.getUseCompression(),
-                httpClientProperties.getMaxRedirects());
+                httpClientProperties.getMaxRedirects(), httpClientProperties.getSsl(),
+                httpClientProperties.getJksPath(), httpClientProperties.getJksPassword());
     }
 
     @Bean
@@ -233,14 +224,17 @@ public class ServiceConfiguration {
 
         final HttpClient httpClient = createBasicHttpClient(vertx, httpClientProperties.getMaxPoolSize(),
                 httpClientProperties.getConnectTimeoutMs(), httpClientProperties.getUseCompression(),
-                httpClientProperties.getMaxRedirects());
+                httpClientProperties.getMaxRedirects(), httpClientProperties.getSsl(),
+                httpClientProperties.getJksPath(), httpClientProperties.getJksPassword());
         return new CircuitBreakerSecuredHttpClient(vertx, httpClient, metrics,
                 circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
                 circuitBreakerProperties.getClosingIntervalMs(), clock);
     }
 
     private static BasicHttpClient createBasicHttpClient(Vertx vertx, int maxPoolSize, int connectTimeoutMs,
-                                                         boolean useCompression, int maxRedirects) {
+                                                         boolean useCompression, int maxRedirects, boolean ssl,
+                                                         String jksPath, String jksPassword) {
+
         final HttpClientOptions options = new HttpClientOptions()
                 .setMaxPoolSize(maxPoolSize)
                 .setTryUseCompression(useCompression)
@@ -248,6 +242,16 @@ public class ServiceConfiguration {
                 // Vert.x's HttpClientRequest needs this value to be 2 for redirections to be followed once,
                 // 3 for twice, and so on
                 .setMaxRedirects(maxRedirects + 1);
+
+        if (ssl) {
+            final JksOptions jksOptions = new JksOptions()
+                    .setPath(jksPath)
+                    .setPassword(jksPassword);
+
+            options
+                    .setSsl(true)
+                    .setKeyStoreOptions(jksOptions);
+        }
         return new BasicHttpClient(vertx, vertx.createHttpClient(options));
     }
 
@@ -319,8 +323,11 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    HttpBidderRequester httpBidderRequester(HttpClient httpClient) {
-        return new HttpBidderRequester(httpClient);
+    HttpBidderRequester httpBidderRequester(
+            HttpClient httpClient,
+            @Autowired(required = false) BidderRequestCompletionTrackerFactory bidderRequestCompletionTrackerFactory) {
+
+        return new HttpBidderRequester(httpClient, bidderRequestCompletionTrackerFactory);
     }
 
     @Bean
@@ -362,9 +369,8 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    StoredResponseProcessor storedResponseProcessor(
-            ApplicationSettings applicationSettings,
-            BidderCatalog bidderCatalog) {
+    StoredResponseProcessor storedResponseProcessor(ApplicationSettings applicationSettings,
+                                                    BidderCatalog bidderCatalog) {
 
         return new StoredResponseProcessor(applicationSettings, bidderCatalog);
     }
@@ -374,7 +380,7 @@ public class ServiceConfiguration {
             GdprService gdprService,
             BidderCatalog bidderCatalog,
             Metrics metrics,
-            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation) {
+            @Value("${geolocation.enabled}") boolean useGeoLocation) {
         return new PrivacyEnforcementService(gdprService, bidderCatalog, metrics, useGeoLocation);
     }
 
@@ -413,7 +419,7 @@ public class ServiceConfiguration {
 
     @Bean
     Clock clock() {
-        return Clock.systemDefaultZone();
+        return Clock.systemUTC();
     }
 
     @Bean
@@ -446,81 +452,5 @@ public class ServiceConfiguration {
             HttpClient httpClient) {
 
         return new CurrencyConversionService(currencyServerUrl, defaultTimeout, refreshPeriod, vertx, httpClient);
-    }
-
-    @Configuration
-    @ConditionalOnProperty(prefix = "gdpr.geolocation", name = "enabled", havingValue = "true")
-    static class GeoLocationConfiguration {
-
-        @Bean
-        NetAcuityServerAddressProvider netAcuityAddressProvider(
-                Vertx vertx, @Value("${gdpr.rubicon.geolocation-netacuity-server}") String server) {
-            return NetAcuityServerAddressProvider.create(vertx, parseServerNames(server));
-        }
-
-        @Bean
-        NetAcuityGeoLocationService netAcuityGeoLocationService(Vertx vertx,
-                                                                NetAcuityServerAddressProvider addressProvider) {
-            return new NetAcuityGeoLocationService(vertx, addressProvider::getServerAddress);
-        }
-
-        @Bean
-        @ConfigurationProperties(prefix = "gdpr.geolocation.circuit-breaker")
-        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
-        CircuitBreakerProperties netacuityCircuitBreakerProperties() {
-            return new CircuitBreakerProperties();
-        }
-
-        @Bean
-        @Primary
-        @ConditionalOnProperty(prefix = "gdpr.geolocation.circuit-breaker", name = "enabled", havingValue = "true")
-        CircuitBreakerSecuredNetAcuityGeoLocationService circuitBreakerSecuredNetAcuityGeoLocationService(
-                Vertx vertx,
-                NetAcuityServerAddressProvider netAcuityServerAddressProvider,
-                NetAcuityGeoLocationService netAcuityGeoLocationService,
-                @Qualifier("netacuityCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
-                Clock clock) {
-
-            return new CircuitBreakerSecuredNetAcuityGeoLocationService(netAcuityGeoLocationService,
-                    netAcuityServerAddressProvider, vertx, circuitBreakerProperties.getOpeningThreshold(),
-                    circuitBreakerProperties.getOpeningIntervalMs(), circuitBreakerProperties.getClosingIntervalMs(),
-                    clock);
-        }
-
-        private static Set<String> parseServerNames(String serversString) {
-            Objects.requireNonNull(serversString);
-            return Stream.of(serversString.split(",")).map(String::trim).collect(Collectors.toSet());
-        }
-    }
-
-    @Configuration
-    @ConditionalOnProperty("status-response")
-    @ConditionalOnExpression("'${status-response}' != ''")
-    static class HealthCheckerConfiguration {
-
-        @Bean
-        @ConditionalOnProperty(prefix = "health-check.database", name = "enabled", havingValue = "true")
-        HealthChecker databaseChecker(
-                Vertx vertx,
-                JDBCClient jdbcClient,
-                @Value("${health-check.database.refresh-period-ms}") long refreshPeriod) {
-
-            return new DatabaseHealthChecker(vertx, jdbcClient, refreshPeriod);
-        }
-
-        @Bean
-        @ConditionalOnExpression("${health-check.geolocation.enabled} == true and ${gdpr.geolocation.enabled} == true")
-        HealthChecker geoLocationChecker(
-                Vertx vertx,
-                @Value("${health-check.geolocation.refresh-period-ms}") long refreshPeriod,
-                GeoLocationService geoLocationService,
-                TimeoutFactory timeoutFactory) {
-            return new GeoLocationHealthChecker(vertx, refreshPeriod, geoLocationService, timeoutFactory);
-        }
-
-        @Bean
-        HealthChecker applicationChecker(@Value("${status-response}") String statusResponse) {
-            return new ApplicationChecker(statusResponse);
-        }
     }
 }

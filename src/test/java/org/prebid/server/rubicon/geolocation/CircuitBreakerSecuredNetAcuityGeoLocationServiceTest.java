@@ -67,7 +67,8 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
     @Test
     public void lookupShouldSucceedsIfCircuitIsClosedAndWrappedGeoLocationSucceeds(TestContext context) {
         // given
-        givenWrappedGeoLocationReturning(Future.succeededFuture(GeoInfo.of("country")));
+        givenWrappedGeoLocationReturning(Future.succeededFuture(
+                GeoInfo.builder().country("country").vendor("vendor").build()));
 
         // when
         final Future<GeoInfo> future = doLookup(context);
@@ -133,7 +134,7 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
         // given
         givenWrappedGeoLocationReturning(
                 Future.failedFuture(new RuntimeException("exception")),
-                Future.succeededFuture(GeoInfo.of("country")));
+                Future.succeededFuture(GeoInfo.builder().country("country").vendor("vendor").build()));
 
         // when
         doLookup(context); // 1 call

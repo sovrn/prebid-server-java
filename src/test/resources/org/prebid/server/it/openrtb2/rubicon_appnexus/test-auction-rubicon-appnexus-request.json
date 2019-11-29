@@ -282,6 +282,7 @@
   },
   "regs": {
     "ext": {
+      "us_privacy": "1YN",
       "gdpr": 0
     }
   }

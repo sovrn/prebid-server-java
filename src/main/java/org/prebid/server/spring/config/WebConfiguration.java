@@ -27,7 +27,6 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.execution.LogModifier;
 import org.prebid.server.execution.TimeoutFactory;
-import org.prebid.server.gdpr.GdprService;
 import org.prebid.server.handler.AdminHandler;
 import org.prebid.server.handler.AuctionHandler;
 import org.prebid.server.handler.BidderParamHandler;
@@ -50,6 +49,7 @@ import org.prebid.server.health.HealthChecker;
 import org.prebid.server.health.PeriodicHealthChecker;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
+import org.prebid.server.privacy.gdpr.GdprService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.SettingsCache;
@@ -221,7 +221,7 @@ public class WebConfiguration {
             Clock clock,
             GdprService gdprService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation) {
+            @Value("${geolocation.enabled}") boolean useGeoLocation) {
 
         return new AuctionHandler(applicationSettings, bidderCatalog, preBidRequestContextFactory, cacheService,
                 metrics, httpAdapterConnector, clock, gdprService, hostVendorId, useGeoLocation);
@@ -276,7 +276,7 @@ public class WebConfiguration {
             CoopSyncPriorities coopSyncPriorities,
             GdprService gdprService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation,
+            @Value("${geolocation.enabled}") boolean useGeoLocation,
             @Value("${cookie-sync.coop-sync.default}") boolean defaultCoopSync,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
@@ -294,7 +294,7 @@ public class WebConfiguration {
             BidderCatalog bidderCatalog,
             GdprService gdprService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            @Value("${gdpr.geolocation.enabled}") boolean useGeoLocation,
+            @Value("${geolocation.enabled}") boolean useGeoLocation,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
             TimeoutFactory timeoutFactory,

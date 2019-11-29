@@ -28,9 +28,9 @@ import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.TimeoutFactory;
-import org.prebid.server.gdpr.GdprService;
-import org.prebid.server.gdpr.model.GdprResponse;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.privacy.gdpr.GdprService;
+import org.prebid.server.privacy.gdpr.model.GdprResponse;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
 
@@ -371,6 +371,8 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("format")).willReturn("img");
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
+
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);

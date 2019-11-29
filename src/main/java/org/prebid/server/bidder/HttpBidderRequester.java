@@ -1,8 +1,6 @@
 package org.prebid.server.bidder;
 
 import com.iab.openrtb.request.BidRequest;
-import com.iab.openrtb.request.Imp;
-import com.iab.openrtb.response.Bid;
 import io.netty.channel.ConnectTimeoutException;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.CompositeFuture;
@@ -25,12 +23,13 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Implements HTTP communication functionality common for {@link Bidder}'s.
@@ -46,28 +45,46 @@ public class HttpBidderRequester {
     private static final Logger logger = LoggerFactory.getLogger(HttpBidderRequester.class);
 
     private final HttpClient httpClient;
+    private final BidderRequestCompletionTrackerFactory completionTrackerFactory;
 
-    public HttpBidderRequester(HttpClient httpClient) {
+    public HttpBidderRequester(HttpClient httpClient,
+                               BidderRequestCompletionTrackerFactory completionTrackerFactory) {
+
         this.httpClient = Objects.requireNonNull(httpClient);
+        this.completionTrackerFactory = completionTrackerFactoryOrFallback(completionTrackerFactory);
     }
 
     /**
      * Executes given request to a given bidder.
      */
-    public <T> Future<BidderSeatBid> requestBids(Bidder<T> bidder, BidRequest bidRequest, Timeout timeout,
-                                                 boolean debugEnabled) {
+    public <T> Future<BidderSeatBid> requestBids(
+            Bidder<T> bidder, BidRequest bidRequest, Timeout timeout, boolean debugEnabled) {
+
         final Result<List<HttpRequest<T>>> httpRequestsWithErrors = bidder.makeHttpRequests(bidRequest);
 
         final List<BidderError> bidderErrors = httpRequestsWithErrors.getErrors();
         final List<HttpRequest<T>> httpRequests = httpRequestsWithErrors.getValue();
 
-        return CollectionUtils.isEmpty(httpRequests)
-                ? emptyBidderSeatBidWithErrors(bidderErrors)
-                : CompositeFuture.join(httpRequests.stream()
+        if (CollectionUtils.isEmpty(httpRequests)) {
+            return emptyBidderSeatBidWithErrors(bidderErrors);
+        }
+
+        final BidderRequestCompletionTracker completionTracker = completionTrackerFactory.create(bidRequest);
+
+        final ResultBuilder<T> resultBuilder = new ResultBuilder<>(httpRequests, bidderErrors, completionTracker);
+
+        final List<Future<Void>> httpRequestFutures = httpRequests.stream()
                 .map(httpRequest -> doRequest(httpRequest, timeout))
-                .collect(Collectors.toList()))
-                .map(httpRequestsResult ->
-                        toBidderSeatBid(bidder, bidRequest, httpRequestsResult.list(), debugEnabled, bidderErrors));
+                .map(httpCallFuture -> httpCallFuture
+                        .map(httpCall -> processHttpCall(bidder, bidRequest, resultBuilder, httpCall)))
+                .collect(Collectors.toList());
+
+        final CompositeFuture completionFuture = CompositeFuture.any(
+                CompositeFuture.join(new ArrayList<>(httpRequestFutures)),
+                completionTracker.future());
+
+        return completionFuture
+                .map(ignored -> resultBuilder.toBidderSeatBid(debugEnabled));
     }
 
     /**
@@ -136,49 +153,20 @@ public class HttpBidderRequester {
         return null;
     }
 
-    /**
-     * Transforms HTTP call results into single {@link BidderSeatBid} filled with debug information, bids and errors
-     * happened along the way.
-     */
-    private <T> BidderSeatBid toBidderSeatBid(Bidder<T> bidder, BidRequest bidRequest, List<HttpCall<T>> calls,
-                                              boolean debugEnabled, List<BidderError> previousErrors) {
-        // Capture debugging info from the requests
-        final List<ExtHttpCall> httpCalls = debugEnabled
-                ? calls.stream().map(HttpBidderRequester::toExt).collect(Collectors.toList())
-                : Collections.emptyList();
+    private <T> Void processHttpCall(Bidder<T> bidder,
+                                     BidRequest bidRequest,
+                                     ResultBuilder<T> seatBidBuilder,
+                                     HttpCall<T> httpCall) {
 
-        final List<Result<List<BidderBid>>> createdBids = calls.stream()
-                .filter(httpCall -> httpCall.getError() == null)
-                .filter(HttpBidderRequester::isOkOrNoContent)
-                .map(HttpBidderRequester::toHttpCallWithSafeResponseBody)
-                .map(httpCall -> bidder.makeBids(httpCall, bidRequest))
-                .collect(Collectors.toList());
-
-        final List<BidderBid> bids = createdBids.stream()
-                .flatMap(bidderBid -> bidderBid.getValue().stream())
-                .collect(Collectors.toList());
-
-        final List<BidderError> bidderErrors = errors(previousErrors, calls, createdBids, bidRequest);
-
-        return BidderSeatBid.of(bids, httpCalls, bidderErrors);
+        seatBidBuilder.addHttpCall(httpCall, makeBids(bidder, httpCall, bidRequest));
+        return null;
     }
 
-    /**
-     * Constructs {@link ExtHttpCall} filled with HTTP call information.
-     */
-    private static <T> ExtHttpCall toExt(HttpCall<T> httpCall) {
-        final HttpRequest<T> request = httpCall.getRequest();
-        final ExtHttpCall.ExtHttpCallBuilder builder = ExtHttpCall.builder()
-                .uri(request.getUri())
-                .requestbody(request.getBody());
-
-        final HttpResponse response = httpCall.getResponse();
-        if (response != null) {
-            builder.responsebody(response.getBody());
-            builder.status(response.getStatusCode());
+    private static <T> Result<List<BidderBid>> makeBids(Bidder<T> bidder, HttpCall<T> httpCall, BidRequest bidRequest) {
+        if (httpCall.getError() != null || !isOkOrNoContent(httpCall)) {
+            return null;
         }
-
-        return builder.build();
+        return bidder.makeBids(toHttpCallWithSafeResponseBody(httpCall), bidRequest);
     }
 
     /**
@@ -205,93 +193,108 @@ public class HttpBidderRequester {
         return httpCall;
     }
 
-    /**
-     * Assembles all errors for {@link BidderSeatBid} into the list of {@link BidderError}s.
-     */
-    private static <R> List<BidderError> errors(List<BidderError> requestErrors, List<HttpCall<R>> calls,
-                                                List<Result<List<BidderBid>>> createdBids,
-                                                BidRequest bidRequest) {
+    private static class ResultBuilder<T> {
 
-        final Set<String> impIdsFromPrebidRequest = impIdsFromPrebidRequest(bidRequest);
-        final Set<String> impIdsFromExchangeRequests = impIdsFromExchangeRequests(calls);
-        final Set<String> requestErrorImpIds = subtract(impIdsFromPrebidRequest, impIdsFromExchangeRequests);
-        final List<BidderError> requestErrorsWithImpIds = populateImpIds(requestErrorImpIds, requestErrors);
+        final List<HttpRequest<T>> httpRequests;
+        final List<BidderError> previousErrors;
+        final BidderRequestCompletionTracker completionTracker;
 
-        final Set<String> httpErrorImpIds = httpErrorImpIds(calls);
-        final List<BidderError> httpErrors = httpErrors(calls);
-        final List<BidderError> httpErrorsWithImpIds = populateImpIds(httpErrorImpIds, httpErrors);
+        final Map<HttpRequest<T>, HttpCall<T>> httpCallsRecorded = new HashMap<>();
+        final List<BidderBid> bidsRecorded = new ArrayList<>();
+        final List<BidderError> errorsRecorded = new ArrayList<>();
 
-        final Set<String> impIdsWithoutHttpErrors = subtract(impIdsFromExchangeRequests, httpErrorImpIds);
-        final Set<String> impIdsFromResponse = impIdsFromResponse(createdBids);
-        final Set<String> responseErrorImpIds = subtract(impIdsWithoutHttpErrors, impIdsFromResponse);
-        final List<BidderError> responseErrors = responseErrors(createdBids);
-        final List<BidderError> responseErrorsWithImpIds = populateImpIds(responseErrorImpIds, responseErrors);
+        ResultBuilder(List<HttpRequest<T>> httpRequests,
+                      List<BidderError> previousErrors,
+                      BidderRequestCompletionTracker completionTracker) {
+            this.httpRequests = httpRequests;
+            this.previousErrors = previousErrors;
+            this.completionTracker = completionTracker;
+        }
 
-        final List<BidderError> bidderErrors = new ArrayList<>(requestErrorsWithImpIds);
-        bidderErrors.addAll(httpErrorsWithImpIds);
-        bidderErrors.addAll(responseErrorsWithImpIds);
-        return bidderErrors;
+        void addHttpCall(HttpCall<T> httpCall, Result<List<BidderBid>> bidsResult) {
+            httpCallsRecorded.put(httpCall.getRequest(), httpCall);
+
+            final List<BidderBid> bids = bidsResult != null ? bidsResult.getValue() : null;
+            if (bids != null) {
+                bidsRecorded.addAll(bids);
+                completionTracker.processBids(bids);
+            }
+
+            final List<BidderError> bidderErrors = bidsResult != null ? bidsResult.getErrors() : null;
+            if (bidderErrors != null) {
+                errorsRecorded.addAll(bidderErrors);
+            }
+        }
+
+        BidderSeatBid toBidderSeatBid(boolean debugEnabled) {
+            final List<HttpCall<T>> httpCalls = new ArrayList<>(httpCallsRecorded.values());
+            httpRequests.stream()
+                    .filter(httpRequest -> !httpCallsRecorded.containsKey(httpRequest))
+                    .map(httpRequest -> HttpCall.success(httpRequest, null, null))
+                    .forEach(httpCalls::add);
+
+            // Capture debugging info from the requests
+            final List<ExtHttpCall> extHttpCalls = debugEnabled
+                    ? httpCalls.stream().map(ResultBuilder::toExt).collect(Collectors.toList())
+                    : Collections.emptyList();
+
+            final List<BidderError> errors = errors(previousErrors, httpCalls, errorsRecorded);
+
+            return BidderSeatBid.of(bidsRecorded, extHttpCalls, errors);
+        }
+
+        /**
+         * Constructs {@link ExtHttpCall} filled with HTTP call information.
+         */
+        private static <T> ExtHttpCall toExt(HttpCall<T> httpCall) {
+            final HttpRequest<T> request = httpCall.getRequest();
+            final ExtHttpCall.ExtHttpCallBuilder builder = ExtHttpCall.builder()
+                    .uri(request.getUri())
+                    .requestbody(request.getBody());
+
+            final HttpResponse response = httpCall.getResponse();
+            if (response != null) {
+                builder.responsebody(response.getBody());
+                builder.status(response.getStatusCode());
+            }
+
+            return builder.build();
+        }
+
+        /**
+         * Assembles all errors for {@link BidderSeatBid} into the list of {@link BidderError}s.
+         */
+        private static <R> List<BidderError> errors(List<BidderError> requestErrors, List<HttpCall<R>> calls,
+                                                    List<BidderError> responseErrors) {
+
+            final List<BidderError> bidderErrors = new ArrayList<>(requestErrors);
+            bidderErrors.addAll(
+                    Stream.concat(
+                            responseErrors.stream(),
+                            calls.stream().map(HttpCall::getError).filter(Objects::nonNull))
+                            .collect(Collectors.toList()));
+            return bidderErrors;
+        }
     }
 
-    private static Set<String> impIdsFromPrebidRequest(BidRequest bidRequest) {
-        return bidRequest.getImp().stream()
-                .map(Imp::getId)
-                .collect(Collectors.toSet());
+    private static BidderRequestCompletionTrackerFactory completionTrackerFactoryOrFallback(
+            BidderRequestCompletionTrackerFactory completionTrackerFactory) {
+
+        return completionTrackerFactory != null
+                ? completionTrackerFactory
+                : bidRequest -> new NoOpCompletionTracker();
     }
 
-    private static <R> Set<String> impIdsFromExchangeRequests(List<HttpCall<R>> calls) {
-        return calls.stream()
-                .map(call -> call.getRequest().getPayload())
-                .filter(BidRequest.class::isInstance)
-                .map(BidRequest.class::cast)
-                .flatMap(request -> request.getImp().stream())
-                .map(Imp::getId)
-                .collect(Collectors.toSet());
-    }
+    private static class NoOpCompletionTracker implements BidderRequestCompletionTracker {
 
-    private static Set<String> impIdsFromResponse(List<Result<List<BidderBid>>> createdBids) {
-        return createdBids.stream()
-                .flatMap(listResult -> listResult.getValue().stream())
-                .map(BidderBid::getBid)
-                .filter(Objects::nonNull)
-                .map(Bid::getImpid)
-                .collect(Collectors.toSet());
-    }
+        @Override
+        public Future<Void> future() {
+            return Future.failedFuture("No-op");
+        }
 
-    private static <R> Set<String> httpErrorImpIds(List<HttpCall<R>> calls) {
-        return calls.stream()
-                .filter(call -> call.getError() != null)
-                .map(call -> call.getRequest().getPayload())
-                .filter(BidRequest.class::isInstance)
-                .map(BidRequest.class::cast)
-                .flatMap(request -> request.getImp().stream())
-                .map(Imp::getId)
-                .collect(Collectors.toSet());
-    }
+        @Override
+        public void processBids(List<BidderBid> bids) {
 
-    private static <R> List<BidderError> httpErrors(List<HttpCall<R>> calls) {
-        return calls.stream()
-                .map(HttpCall::getError)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
-    private static List<BidderError> responseErrors(List<Result<List<BidderBid>>> createdBids) {
-        return createdBids.stream()
-                .flatMap(bidResult -> bidResult.getErrors().stream())
-                .collect(Collectors.toList());
-    }
-
-    private static List<BidderError> populateImpIds(Set<String> impIds, List<BidderError> errors) {
-        return errors.stream()
-                .map(error -> BidderError.of(error.getMessage(), error.getType(),
-                        CollectionUtils.isNotEmpty(impIds) ? impIds : null))
-                .collect(Collectors.toList());
-    }
-
-    private static Set<String> subtract(Set<String> first, Set<String> second) {
-        final Set<String> result = new HashSet<>(first);
-        result.removeAll(second);
-        return result;
+        }
     }
 }

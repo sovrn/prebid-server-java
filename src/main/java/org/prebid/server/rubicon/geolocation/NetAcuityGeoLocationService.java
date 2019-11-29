@@ -75,7 +75,7 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
                 Math.toIntExact(remainingTimeout));
         try {
             final PulseQuery query = dbAccessor.query(PulseQuery.class, lookupAddress);
-            executeFuture.complete(GeoInfo.of(query.getTwoLetterCountry()));
+            executeFuture.complete(GeoInfo.builder().country(query.getTwoLetterCountry()).build());
         } catch (IllegalArgumentException | IOException e) {
             failWith(new PreBidException("Geo location lookup failed", e)).setHandler(executeFuture);
         }

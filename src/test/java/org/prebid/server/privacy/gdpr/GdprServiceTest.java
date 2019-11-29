@@ -1,4 +1,4 @@
-package org.prebid.server.gdpr;
+package org.prebid.server.privacy.gdpr;
 
 import io.vertx.core.Future;
 import org.junit.Before;
@@ -7,12 +7,12 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
-import org.prebid.server.gdpr.model.GdprPurpose;
-import org.prebid.server.gdpr.model.GdprResponse;
-import org.prebid.server.gdpr.vendorlist.VendorListService;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.privacy.gdpr.model.GdprPurpose;
+import org.prebid.server.privacy.gdpr.model.GdprResponse;
+import org.prebid.server.privacy.gdpr.vendorlist.VendorListService;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.rubicon.rsid.model.Rsid;
 
@@ -53,6 +53,8 @@ public class GdprServiceTest {
     public void setUp() {
         given(vendorListService.forVersion(anyInt())).willReturn(Future.succeededFuture(
                 singletonMap(1, singleton(GdprPurpose.informationStorageAndAccess.getId()))));
+        given(geoLocationService.lookup(anyString(), any()))
+                .willReturn(Future.succeededFuture(GeoInfo.builder().vendor("vendor").country("country1").build()));
 
         gdprService = new GdprService(rsidCookieService, null, metrics, vendorListService, emptyList(), "1");
     }
@@ -87,7 +89,6 @@ public class GdprServiceTest {
     @Test
     public void shouldReturnGdprFromGeoLocationServiceIfGdprFromRequestIsNotValidAndUpdateMetrics() {
         // given
-        given(geoLocationService.lookup(anyString(), any())).willReturn(Future.succeededFuture(GeoInfo.of("country1")));
         gdprService = new GdprService(rsidCookieService, geoLocationService, metrics, vendorListService,
                 singletonList("country1"), "1");
 
@@ -235,7 +236,6 @@ public class GdprServiceTest {
     @Test
     public void shouldReturnAllowedResultIfNoGdprParamAndCountryIsNotInEEA() {
         // given
-        given(geoLocationService.lookup(anyString(), any())).willReturn(Future.succeededFuture(GeoInfo.of("country1")));
         gdprService = new GdprService(rsidCookieService, geoLocationService, metrics, vendorListService, emptyList(),
                 "1");
 
@@ -269,7 +269,6 @@ public class GdprServiceTest {
     @Test
     public void shouldReturnAllowedResultIfNoGdprParamAndConsentParamIsValidAndCountryIsInEEA() {
         // given
-        given(geoLocationService.lookup(anyString(), any())).willReturn(Future.succeededFuture(GeoInfo.of("country1")));
         gdprService = new GdprService(rsidCookieService, geoLocationService, metrics, vendorListService,
                 singletonList("country1"), "1");
 

@@ -753,7 +753,7 @@ public class RubiconBidderTest extends VertxTest {
     public void makeHttpRequestsShouldFillRegsIfRegsAndGdprArePresent() {
         // given
         final BidRequest bidRequest = givenBidRequest(
-                builder -> builder.regs(Regs.of(null, mapper.valueToTree(ExtRegs.of(50)))),
+                builder -> builder.regs(Regs.of(null, mapper.valueToTree(ExtRegs.of(50, null)))),
                 builder -> builder.video(Video.builder().build()),
                 identity());
 
@@ -765,7 +765,7 @@ public class RubiconBidderTest extends VertxTest {
         assertThat(result.getValue()).hasSize(1).doesNotContainNull()
                 .extracting(httpRequest -> mapper.readValue(httpRequest.getBody(), BidRequest.class))
                 .extracting(BidRequest::getRegs).doesNotContainNull()
-                .containsOnly(Regs.of(null, mapper.valueToTree(ExtRegs.of(50))));
+                .containsOnly(Regs.of(null, mapper.valueToTree(ExtRegs.of(50, null))));
     }
 
     @Test
