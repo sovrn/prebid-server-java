@@ -24,6 +24,7 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
     private static final Logger logger = LoggerFactory.getLogger(NetAcuityGeoLocationService.class);
 
     private static final int API_ID = 1;
+    private static final String VENDOR = "netacuity";
 
     private final Vertx vertx;
     private final Supplier<InetAddress> serverAddress;
@@ -75,7 +76,7 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
                 Math.toIntExact(remainingTimeout));
         try {
             final PulseQuery query = dbAccessor.query(PulseQuery.class, lookupAddress);
-            executeFuture.complete(GeoInfo.builder().country(query.getTwoLetterCountry()).build());
+            executeFuture.complete(GeoInfo.builder().vendor(VENDOR).country(query.getTwoLetterCountry()).build());
         } catch (IllegalArgumentException | IOException e) {
             failWith(new PreBidException("Geo location lookup failed", e)).setHandler(executeFuture);
         }

@@ -72,12 +72,12 @@ gdpr:
   host-vendor-id: 52
   vendorlist:
     filesystem-cache-dir: /app/prebid-server/data/vendorlist-cache
-  geolocation:
-    enabled: true
-    circuit-breaker:
-      enabled: true
-      opening-threshold: 100
-      opening-interval-ms: 2000
-      closing-interval-ms: 20000
   rubicon:
     enable-cookie: true
+geolocation:
+  type: netacuity
+  circuit-breaker:
+    enabled: true
+    opening-threshold: 100
+    opening-interval-ms: 2000
+    closing-interval-ms: 20000
