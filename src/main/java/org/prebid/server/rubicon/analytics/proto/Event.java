@@ -32,7 +32,7 @@ public class Event {
     @JsonProperty("eventCreator")
     EventCreator eventCreator;
 
-    List<Impression> impressions;
+    Impression impression;
 
     @JsonProperty("userAgent")
     String userAgent;
