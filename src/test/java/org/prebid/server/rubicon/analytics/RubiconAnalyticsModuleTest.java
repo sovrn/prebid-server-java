@@ -577,7 +577,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .referrerUri("http://referer")
                 .limitAdTracking(true)
                 .userAgent("ua")
-                .impression(Impression.builder()
+                .impressions(singletonList(Impression.builder()
                         .bidder("rubicon")
                         .accountId(222)
                         .bidId("bidid")
@@ -585,7 +585,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .source("server")
                         .serverHasUserId(true)
                         .hasRubiconId(true)
-                        .build())
+                        .build()))
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .build();
 
@@ -970,9 +970,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .mediaTypes(emptyList())
                 .source("server")
                 .hasRubiconId(true)
-                .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(null, null, null, Dimensions.of(null, null)))
+                .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(null, null, null,
+                        Dimensions.of(null, null)))
                 .build();
-        final org.prebid.server.rubicon.analytics.proto.App app = org.prebid.server.rubicon.analytics.proto.App.of(null, null, null, null);
+        final org.prebid.server.rubicon.analytics.proto.App app = org.prebid.server.rubicon.analytics.proto.App.of(null,
+                null, null, null);
         final Event expectedEvent = Event.builder()
                 .integration("updated")
                 .wrappername("wrappername")
@@ -1114,7 +1116,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 Format.builder().w(300).h(400).build()))
                                         .build())
                                 .video(Video.builder().build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
+                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
                                         ExtImpRubicon.builder()
                                                 .video(RubiconVideoParams.builder().sizeId(202).build())
                                                 .accountId(123)
@@ -1130,7 +1132,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(400).h(500).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
+                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
                                         ExtImpRubicon.builder()
                                                 .video(RubiconVideoParams.builder().sizeId(202).build())
                                                 .accountId(321)
@@ -1142,19 +1144,19 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(500).h(600).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build(),
                         Imp.builder().id("impId5")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(600).h(700).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
                                 .build(),
                         Imp.builder().id("impId6")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(800).h(900).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
                 .ext(mapper.valueToTree(ExtPrebid.of(ExtRequestPrebid.of(ExtRequestPrebidBidders.of(
                         ExtRequestPrebidBiddersRubicon.of(integration, wrappername))), null)))
@@ -1192,7 +1194,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 Format.builder().w(300).h(400).build()))
                                         .build())
                                 .video(Video.builder().build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
+                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
                                         ExtImpRubicon.builder()
                                                 .video(RubiconVideoParams.builder().sizeId(202).build())
                                                 .accountId(123)
@@ -1208,7 +1210,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(400).h(500).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("rubicon", mapper.valueToTree(
+                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
                                         ExtImpRubicon.builder()
                                                 .video(RubiconVideoParams.builder().sizeId(202).build())
                                                 .accountId(321)
@@ -1220,19 +1222,19 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(500).h(600).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build(),
                         Imp.builder().id("impId5")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(600).h(700).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
                                 .build(),
                         Imp.builder().id("impId6")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(800).h(900).build()))
                                         .build())
-                                .ext((ObjectNode) mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
                 .tmax(1000L)
                 .build();

@@ -352,7 +352,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private Event makeImpEvent(String bidId, Integer accountId, HttpContext context,
                                UidsCookie uidsCookie) {
         return eventBuilderFromNotification(context)
-                .impression(Impression.builder()
+                .impressions(Collections.singletonList(Impression.builder()
                         .bidder(RUBICON_BIDDER)
                         .accountId(accountId)
                         .bidId(bidId)
@@ -360,7 +360,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                         .source(SERVER_SOURCE)
                         .serverHasUserId(serverHasUserIdFrom(uidsCookie, RUBICON_BIDDER))
                         .hasRubiconId(hasRubiconId(context))
-                        .build())
+                        .build()))
                 .build();
     }
 
