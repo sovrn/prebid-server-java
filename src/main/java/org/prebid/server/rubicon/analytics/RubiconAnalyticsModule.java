@@ -379,7 +379,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse);
 
         return bidRequest.getImp().stream()
-                .map(imp -> toAdUnit(imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList())))
+                .map(imp -> toAdUnit(bidRequest, imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList())))
                 .collect(Collectors.toList());
     }
 
@@ -508,6 +508,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                        .bidId(getIfNotNull(bid, Bid::getId))
                         .bidder(bidder)
                         .status(status)
                         .error(bidError)
@@ -583,7 +584,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 : null;
     }
 
-    private static AdUnit toAdUnit(Imp imp, List<TwinBids> bids) {
+    private static AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids) {
         final boolean openrtbBidsFound = bids.stream().map(TwinBids::getOpenrtbBid).anyMatch(Objects::nonNull);
 
         final boolean errorsFound = bids.stream().map(TwinBids::getAnalyticsBid)
@@ -591,7 +592,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .anyMatch(Objects::nonNull);
 
         return AdUnit.builder()
-                .transactionId(imp.getId())
+                .transactionId(transactionIdFrom(bidRequest.getId(), imp.getId()))
                 .status(openrtbBidsFound ? SUCCESS_STATUS : errorsFound ? ERROR_STATUS : NO_BID_STATUS)
                 .error(null) // multiple errors may exist, we do not have insight what to choose
                 .mediaTypes(mediaTypesFromImp(imp))
@@ -601,6 +602,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .adserverTargeting(targetingForImp(bids))
                 .bids(bids.stream().map(TwinBids::getAnalyticsBid).collect(Collectors.toList()))
                 .build();
+    }
+
+    private static String transactionIdFrom(String bidRequestId, String impId) {
+        return String.format("%s-%s", bidRequestId, impId);
     }
 
     private static List<String> mediaTypesFromImp(Imp imp) {
@@ -708,7 +713,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
         return eventBuilderBaseFromApp(context, bidRequest)
                 .bidsWon(Collections.singletonList(BidWon.builder()
-                        .transactionId(bid.getImpid())
+                        .transactionId(transactionIdFrom(bidRequest.getId(), bid.getImpid()))
                         .accountId(accountId)
                         .bidder(bidder)
                         .samplingFactor(samplingFactor(accountSamplingFactor))

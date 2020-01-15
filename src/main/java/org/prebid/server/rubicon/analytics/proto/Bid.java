@@ -8,6 +8,9 @@ import lombok.Value;
 @Value
 public class Bid {
 
+    @JsonProperty("bidId")
+    String bidId;
+
     String bidder;
 
     String status;
