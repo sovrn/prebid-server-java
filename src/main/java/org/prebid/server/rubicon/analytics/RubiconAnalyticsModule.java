@@ -288,7 +288,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             return;
         }
 
-        final Integer accountId = parseId(account.getId());
+        final String requestAccountId = account.getId();
+        final Integer accountId = NumberUtils.isDigits(requestAccountId) ? parseId(requestAccountId) : null;
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
 
         // only continue if counter matches sampling factor
