@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 public class CircuitBreakerSecuredNetAcuityGeoLocationService implements GeoLocationService {
@@ -41,31 +42,38 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationService implements GeoLoca
                 openingThreshold, openingIntervalMs, closingIntervalMs, Objects.requireNonNull(clock))
                 .openHandler(ignored -> circuitOpened(server))
                 .halfOpenHandler(ignored -> circuitHalfOpened(server))
-                .closeHandler(ignored -> circuitClosed());
+                .closeHandler(ignored -> circuitClosed(server));
     }
 
     private void circuitOpened(InetAddress server) {
         netAcuityServerAddressProvider.removeServerAddress(server);
-        logger.warn("NetAcuity service is unavailable, circuit opened.");
+        logger.error("NetAcuity service is unavailable, circuit opened. Server: {0}", server);
     }
 
     private void circuitHalfOpened(InetAddress server) {
         netAcuityServerAddressProvider.addServerAddress(server);
-        logger.warn("NetAcuity service is ready to try again, circuit half-opened.");
+        logger.error("NetAcuity service is ready to try again, circuit half-opened. Server: {0}", server);
     }
 
-    private void circuitClosed() {
-        logger.warn("NetAcuity service becomes working, circuit closed.");
+    private void circuitClosed(InetAddress server) {
+        logger.error("NetAcuity service becomes working, circuit closed. Server: {0}", server);
     }
 
     @Override
     public Future<GeoInfo> lookup(String ip, Timeout timeout) {
+        // This will prevent removing of potentially working server
+        final long remainingTimeout = timeout.remaining();
+        if (remainingTimeout <= 0) {
+            return Future.failedFuture(new TimeoutException("Timeout has been exceeded"));
+        }
+
         final InetAddress serverAddress;
         try {
             serverAddress = netAcuityServerAddressProvider.getServerAddress();
         } catch (PreBidException e) {
             return Future.failedFuture(e);
         }
+
         return circuitBreakerByAddress.computeIfAbsent(serverAddress, circuitBreakerCreator)
                 .execute(future -> netAcuityGeoLocationService.lookup(ip, timeout, serverAddress).setHandler(future));
     }

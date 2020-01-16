@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.execution.Timeout;
+import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.geolocation.model.GeoInfo;
 
 import java.net.InetAddress;
@@ -40,6 +42,8 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
 
     private Clock clock;
 
+    private Timeout timeout;
+
     @Mock
     private NetAcuityGeoLocationService netAcuityGeoLocationService;
 
@@ -54,6 +58,7 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
 
         vertx = Vertx.vertx();
         clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+        timeout = new TimeoutFactory(clock).create(1000L);
 
         circuitBreakerSecuredNetAcuityGeoLocationService = new CircuitBreakerSecuredNetAcuityGeoLocationService(
                 netAcuityGeoLocationService, netAcuityServerAddressProvider, vertx, 1, 100L, 200L, clock);
@@ -62,6 +67,22 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
     @After
     public void tearDown(TestContext context) {
         vertx.close(context.asyncAssertSuccess());
+    }
+
+    @Test
+    public void lookupShouldNotCallAddressProviderAndWrappedGeoLocationIfTimeoutExceeds(TestContext context) {
+        // given
+        timeout = new TimeoutFactory(clock).create(clock.instant().minusMillis(1500L).toEpochMilli(), 1000L);
+
+        // when
+        final Future<GeoInfo> future = doLookup(context, timeout);
+
+        // then
+        assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isNotNull().hasMessage("Timeout has been exceeded");
+
+        verifyZeroInteractions(netAcuityServerAddressProvider);
+        verifyZeroInteractions(netAcuityGeoLocationService);
     }
 
     @Test
@@ -211,9 +232,13 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
     }
 
     private Future<GeoInfo> doLookup(TestContext context) {
+        return doLookup(context, timeout);
+    }
+
+    private Future<GeoInfo> doLookup(TestContext context, Timeout timeout) {
         final Async async = context.async();
 
-        final Future<GeoInfo> future = circuitBreakerSecuredNetAcuityGeoLocationService.lookup(null, null);
+        final Future<GeoInfo> future = circuitBreakerSecuredNetAcuityGeoLocationService.lookup(null, timeout);
         future.setHandler(ar -> async.complete());
 
         async.await();
