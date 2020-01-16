@@ -1134,6 +1134,33 @@ public class AuctionRequestFactoryTest extends VertxTest {
     }
 
     @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromAliasOfRubiconImpExt() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubiconAlias",
+                                ExtImpRubicon.builder().accountId(123).build())))
+                        .build()))
+                .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
+                        .aliases(singletonMap("rubiconAlias", "rubicon"))
+                        .build(), null)))
+                .build());
+
+        final Account givenAccount = Account.builder().id("accountId").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
     public void shouldTolerateInvalidRubiconImpExtWhileFetchingAccountId() {
         // given
         givenBidRequest(BidRequest.builder()

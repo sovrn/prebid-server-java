@@ -70,6 +70,8 @@ public class AuctionRequestFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(AuctionRequestFactory.class);
 
+    private static final String RUBICON_BIDDER = "rubicon";
+
     private final long maxRequestSize;
     private final boolean enforceValidAccount;
     private final String adServerCurrency;
@@ -670,7 +672,7 @@ public class AuctionRequestFactory {
         final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
         final String publisherId = publisher != null ? resolvePublisherId(publisher) : null;
         final String publisherOrRubiconAccountId = publisherId != null
-                ? publisherId : resolveRubiconAccountId(bidRequest.getImp());
+                ? publisherId : resolveRubiconAccountId(bidRequest);
         return ObjectUtils.defaultIfNull(publisherOrRubiconAccountId, StringUtils.EMPTY);
     }
 
@@ -706,11 +708,16 @@ public class AuctionRequestFactory {
      * Checks request impression extensions whether they have a rubicon extension, picks first and
      * takes account ID from it. If none is present - returns null.
      */
-    private static String resolveRubiconAccountId(List<Imp> imps) {
+    private static String resolveRubiconAccountId(BidRequest bidRequest) {
+        final Set<String> nameAndAliases = new HashSet<>();
+        nameAndAliases.add(RUBICON_BIDDER);
+        nameAndAliases.addAll(rubiconAliases(bidRequest.getExt()));
+
+        final List<Imp> imps = bidRequest.getImp();
         return CollectionUtils.isEmpty(imps) ? null : imps.stream()
                 .map(Imp::getExt)
                 .filter(Objects::nonNull)
-                .map(ext -> ext.get("rubicon"))
+                .map(ext -> extImpRubiconNodeOrNull(ext, nameAndAliases))
                 .filter(Objects::nonNull)
                 .map(AuctionRequestFactory::extImpRubiconOrNull)
                 .filter(Objects::nonNull)
@@ -719,6 +726,34 @@ public class AuctionRequestFactory {
                 .map(Objects::toString)
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Returns list of aliases for Rubicon bidder or empty if not defined.
+     */
+    private static Set<String> rubiconAliases(ObjectNode extNode) {
+        final ExtBidRequest ext = getIfNotNull(extNode, AuctionRequestFactory::extBidRequest);
+        final ExtRequestPrebid prebid = getIfNotNull(ext, ExtBidRequest::getPrebid);
+        final Map<String, String> aliases = getIfNotNullOrDefault(prebid, ExtRequestPrebid::getAliases,
+                Collections.emptyMap());
+
+        return aliases.entrySet().stream()
+                .filter(entry -> Objects.equals(entry.getValue(), RUBICON_BIDDER))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Returns raw {@link JsonNode} of imp.ext.{rubicon|alias} or null.
+     */
+    private static JsonNode extImpRubiconNodeOrNull(ObjectNode ext, Set<String> nameAndAliases) {
+        for (String value : nameAndAliases) {
+            final JsonNode node = ext.get(value);
+            if (node != null) {
+                return node;
+            }
+        }
+        return null;
     }
 
     /**
