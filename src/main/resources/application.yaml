@@ -102,6 +102,3 @@ health-check:
     enabled: false
   geolocation:
     enabled: false
-adapters:
-  adform:
-    enabled: true
