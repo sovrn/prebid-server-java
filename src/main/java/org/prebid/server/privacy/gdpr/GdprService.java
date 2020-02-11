@@ -44,15 +44,18 @@ public class GdprService {
     private static final String GDPR_ONE = "1";
 
     private final RsidCookieService rsidCookieService;
+    private final List<String> eeaCountries;
+    private final String gdprDefaultValue;
     private final GeoLocationService geoLocationService;
     private final Metrics metrics;
-    private final List<String> eeaCountries;
     private final VendorListService vendorListService;
-    private final String gdprDefaultValue;
 
     public GdprService(RsidCookieService rsidCookieService,
-                       GeoLocationService geoLocationService, Metrics metrics, VendorListService vendorListService,
-                       List<String> eeaCountries, String gdprDefaultValue) {
+                       List<String> eeaCountries,
+                       String gdprDefaultValue,
+                       GeoLocationService geoLocationService,
+                       Metrics metrics,
+                       VendorListService vendorListService) {
         this.rsidCookieService = Objects.requireNonNull(rsidCookieService);
         this.geoLocationService = geoLocationService;
         this.metrics = Objects.requireNonNull(metrics);

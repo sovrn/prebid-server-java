@@ -15,7 +15,6 @@ import com.iab.openrtb.request.User;
 import com.iab.openrtb.request.Video;
 import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
-import io.vertx.core.json.Json;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
@@ -117,9 +116,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
         given(timeoutResolver.resolve(any())).willReturn(2000L);
         given(timeoutResolver.adjustTimeout(anyLong())).willReturn(1900L);
 
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, false, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                false,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
     }
 
     @Test
@@ -140,9 +153,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnFailedFutureIfAccountIsEnforcedAndIdIsNotProvided() {
         // given
-        factory = new AuctionRequestFactory(1000, true, false, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                1000,
+                true,
+                false,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         givenValidBidRequest();
 
@@ -162,9 +189,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     public void shouldReturnFailedFutureIfAccountIsEnforcedAndFailedGetAccountById() {
         // given
 
-        factory = new AuctionRequestFactory(1000, true, false, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                1000,
+                true,
+                false,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.failedFuture(new PreBidException("Not found")));
@@ -192,9 +233,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnFailedFutureIfRequestBodyExceedsMaxRequestSize() {
         // given
-        factory = new AuctionRequestFactory(1, false, false, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                1,
+                false,
+                false,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         given(routingContext.getBody()).willReturn(Buffer.buffer("body"));
 
@@ -220,7 +275,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class);
         assertThat(((InvalidRequestException) future.cause()).getMessages()).hasSize(1)
-                .element(0).asString().startsWith("Failed to decode:");
+                .element(0).asString().startsWith("Error decoding bidRequest: Failed to decode:");
     }
 
     @Test
@@ -492,7 +547,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(new TextNode("low"), null, null, null, null))
+                        .targeting(ExtRequestTargeting.builder().pricegranularity(new TextNode("low")).build())
                         .build(), null)))
                 .build());
 
@@ -518,8 +573,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(new TextNode("invalid"),
-                                null, null, null, null))
+                        .targeting(ExtRequestTargeting.builder().pricegranularity(new TextNode("invalid")).build())
                         .build(), null)))
                 .build());
 
@@ -539,8 +593,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().video(Video.builder().build()).ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(null, null,
-                                null, null, null))
+                        .targeting(ExtRequestTargeting.builder().build())
                         .build(), null)))
                 .build());
 
@@ -561,14 +614,16 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldNotSetDefaultPriceGranularityIfThereIsAMediaTypePriceGranularityForImpType() {
         // given
+        final ExtMediaTypePriceGranularity mediaTypePriceGranularity = ExtMediaTypePriceGranularity.of(
+                mapper.valueToTree(ExtPriceGranularity.of(2, singletonList(ExtGranularityRange.of(
+                        BigDecimal.valueOf(20), BigDecimal.valueOf(0.1))))), null, null);
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().banner(Banner.builder().build())
                         .ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(null, ExtMediaTypePriceGranularity.of(
-                                mapper.valueToTree(ExtPriceGranularity.of(2, singletonList(ExtGranularityRange.of(
-                                        BigDecimal.valueOf(20), BigDecimal.valueOf(0.1))))), null, null),
-                                null, null, null))
+                        .targeting(ExtRequestTargeting.builder()
+                                .mediatypepricegranularity(mediaTypePriceGranularity)
+                                .build())
                         .build(), null)))
                 .build());
 
@@ -591,8 +646,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(null, null,
-                                null, null, null))
+                        .targeting(ExtRequestTargeting.builder().build())
                         .build(), null)))
                 .build());
 
@@ -615,8 +669,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(null, null,
-                                null, null, null))
+                        .targeting(ExtRequestTargeting.builder().build())
                         .build(), null)))
                 .build());
 
@@ -639,8 +692,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(null, null,
-                                null, null, null))
+                        .targeting(ExtRequestTargeting.builder().build())
                         .cache(ExtRequestPrebidCache.of(null, null, true))
                         .build(), null)))
                 .build());
@@ -661,14 +713,27 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldSetDefaultIncludeBidderKeysToFalseIfIncludeBidderKeysIsMissedAndWinningonlyIsTrueInConfig() {
         // given
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, true, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                true,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.of(null, null,
-                                null, null, null))
+                        .targeting(ExtRequestTargeting.builder().build())
                         .build(), null)))
                 .build());
 
@@ -688,9 +753,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldSetCacheWinningonlyFromConfigWhenExtRequestPrebidIsNull() {
         // given
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, true, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                true,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -713,9 +792,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldSetCacheWinningonlyFromConfigWhenExtRequestPrebidCacheIsNull() {
         // given
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, true, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                true,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -738,9 +831,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldSetCacheWinningonlyFromConfigWhenCacheWinningonlyIsNull() {
         // given
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, true, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                true,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -790,9 +897,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldSetCacheWinningonlyFromRequestWhenCacheWinningonlyIsPresent() {
         // given
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, true, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                true,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -817,9 +938,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Test
     public void shouldNotSetCacheWinningonlyFromConfigWhenCacheWinningonlyIsNullAndConfigValueIsFalse() {
         // given
-        factory = new AuctionRequestFactory(Integer.MAX_VALUE, false, false, "USD", BLACKLISTED_APPS,
-                BLACKLISTED_ACCOUNTS, storedRequestProcessor, paramsExtractor, uidsCookieService, bidderCatalog,
-                requestValidator, interstitialProcessor, timeoutResolver, timeoutFactory, applicationSettings);
+        factory = new AuctionRequestFactory(
+                Integer.MAX_VALUE,
+                false,
+                false,
+                "USD",
+                BLACKLISTED_APPS,
+                BLACKLISTED_ACCOUNTS,
+                storedRequestProcessor,
+                paramsExtractor,
+                uidsCookieService,
+                bidderCatalog,
+                requestValidator,
+                interstitialProcessor,
+                timeoutResolver,
+                timeoutFactory,
+                applicationSettings,
+                jacksonMapper);
 
         final ObjectNode extBidRequest = mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
                 .cache(ExtRequestPrebidCache.of(null, null, null))
@@ -841,20 +976,19 @@ public class AuctionRequestFactoryTest extends VertxTest {
     public void shouldAddMissingAliases() {
         // given
         final Imp imp1 = Imp.builder()
-                .ext((ObjectNode) Json.mapper.createObjectNode()
-                        .set("requestScopedBidderAlias", Json.mapper.createObjectNode()))
+                .ext(mapper.createObjectNode()
+                        .set("requestScopedBidderAlias", mapper.createObjectNode()))
                 .build();
         final Imp imp2 = Imp.builder()
-                .ext((ObjectNode) Json.mapper.createObjectNode()
-                        .set("configScopedBidderAlias", Json.mapper.createObjectNode()))
+                .ext(mapper.createObjectNode()
+                        .set("configScopedBidderAlias", mapper.createObjectNode()))
                 .build();
 
         givenBidRequest(BidRequest.builder()
                 .imp(asList(imp1, imp2))
                 .ext(mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("requestScopedBidderAlias", "bidder1"))
-                        .targeting(ExtRequestTargeting.of(null, null, null,
-                                null, null))
+                        .targeting(ExtRequestTargeting.builder().build())
                         .build(), null)))
                 .build());
 
@@ -954,7 +1088,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
         final UidsCookie givenUidsCookie = new UidsCookie(Uids.builder()
                 .uids(singletonMap("bidder", UidWithExpiry.live("uid")))
-                .build());
+                .build(), jacksonMapper);
         given(uidsCookieService.parseFromRequest(any())).willReturn(givenUidsCookie);
 
         // when
@@ -1244,7 +1378,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
     private void givenBidRequest(BidRequest bidRequest) {
         try {
-            given(routingContext.getBody()).willReturn(Buffer.buffer(Json.mapper.writeValueAsString(bidRequest)));
+            given(routingContext.getBody()).willReturn(Buffer.buffer(mapper.writeValueAsString(bidRequest)));
 
             given(storedRequestProcessor.processStoredRequests(any())).willReturn(Future.succeededFuture(bidRequest));
 

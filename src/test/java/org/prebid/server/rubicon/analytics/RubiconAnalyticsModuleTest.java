@@ -144,7 +144,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(uidsCookieService.parseFromCookies(any()))
                 .willReturn(new UidsCookie(Uids.builder()
                         .uids(singletonMap("rubicon", UidWithExpiry.live("uid")))
-                        .build()));
+                        .build(), jacksonMapper));
 
         given(uidsAuditCookieService.getUidsAudit(anyMap()))
                 .willReturn(UidAudit.builder().country("countryFromAuditCookie").build());
@@ -157,14 +157,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         httpContext = HttpContext.builder().cookies(emptyMap()).build();
 
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, null, null,
-                        null, null, null))
+                        null, null, null, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -272,7 +272,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processAuctionEventShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
+                jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -303,7 +304,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processAuctionEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
+                jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -630,7 +632,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, jacksonMapper);
 
         // when
         module.processEvent(event);
@@ -889,7 +891,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 2, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, jacksonMapper);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -916,7 +918,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldUseAccountSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
+                jacksonMapper);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -943,7 +946,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldSetIntegrationAndWrappernameForRubicon() throws JsonProcessingException {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
+                jacksonMapper);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().impid("impId").build();
@@ -1264,7 +1268,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .h(600)
                                         .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                 BidType.video,
-                                                singletonMap("key1", "value1"), null, null), null)))
+                                                singletonMap("key1", "value1"), null, null, null, null), null)))
                                         .build()))
                                 .build(),
                         SeatBid.builder()
@@ -1279,7 +1283,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .h(700)
                                                 .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                         BidType.video,
-                                                        singletonMap("key21", "value21"), null, null), null)))
+                                                        singletonMap("key21", "value21"), null, null, null, null),
+                                                        null)))
                                                 .build(),
                                         Bid.builder()
                                                 .id(null) // mark as optional
@@ -1290,7 +1295,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .h(700)
                                                 .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
                                                         BidType.video,
-                                                        singletonMap("key22", "value22"), null, null), null)))
+                                                        singletonMap("key22", "value22"), null, null, null, null),
+                                                        null)))
                                                 .build()))
                                 .build()))
                 .ext(mapper.valueToTree(

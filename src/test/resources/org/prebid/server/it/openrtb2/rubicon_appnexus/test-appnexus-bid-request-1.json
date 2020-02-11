@@ -108,7 +108,6 @@
       ]
     }
   },
-  "test": 1,
   "at": 1,
   "tmax": 3000,
   "cur": [
@@ -116,16 +115,22 @@
   ],
   "source": {
     "fd": 1,
-    "tid": "tid"
+    "tid": "tid",
+    "ext": {
+      "schain": {
+        "ver": "1.0"
+      }
+    }
   },
   "regs": {
     "ext": {
-      "us_privacy": "1YN",
+      "us_privacy": "1YNN",
       "gdpr": 0
     }
   },
   "ext": {
     "prebid": {
+      "debug": 1,
       "aliases": {
         "appnexusAlias": "appnexus"
       },
