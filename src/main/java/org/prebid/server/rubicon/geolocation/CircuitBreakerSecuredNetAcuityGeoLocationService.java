@@ -8,6 +8,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.vertx.CircuitBreaker;
 
 import java.net.InetAddress;
@@ -15,6 +16,7 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -22,6 +24,8 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationService implements GeoLoca
 
     private static final Logger logger = LoggerFactory.getLogger(
             CircuitBreakerSecuredNetAcuityGeoLocationService.class);
+    private static final ConditionalLogger conditionalLogger = new ConditionalLogger(logger);
+    private static final int LOG_PERIOD_SECONDS = 5;
 
     private final Function<InetAddress, CircuitBreaker> circuitBreakerCreator;
     private final Map<InetAddress, CircuitBreaker> circuitBreakerByAddress = new ConcurrentHashMap<>();
@@ -47,7 +51,8 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationService implements GeoLoca
 
     private void circuitOpened(InetAddress server) {
         netAcuityServerAddressProvider.removeServerAddress(server);
-        logger.error("NetAcuity service is unavailable, circuit opened. Server: {0}", server);
+        conditionalLogger.error(String.format("NetAcuity service is unavailable, circuit opened. Server: %s", server),
+                LOG_PERIOD_SECONDS, TimeUnit.SECONDS);
     }
 
     private void circuitHalfOpened(InetAddress server) {
