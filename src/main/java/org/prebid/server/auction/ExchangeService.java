@@ -660,11 +660,16 @@ public class ExchangeService {
         final List<ExtRequestPrebidSchain> extPrebidSchains = extPrebid != null ? extPrebid.getSchains() : null;
         final boolean suppressSchains = extPrebidSchains != null;
 
-        if (firstPartyDataBidders.isEmpty() && bidderToPrebidBidders.isEmpty() && !suppressSchains) {
+        // FIXME: remove firstPartyDataBidders.isEmpty() && bidder.equals("rubicon") after FPD will be reworked
+        //  https://github.com/prebid/prebid-server/issues/879
+        final boolean useFirstPartyData = (firstPartyDataBidders.isEmpty() && bidder.equals("rubicon"))
+                || firstPartyDataBidders.contains(bidder);
+
+        if (!useFirstPartyData && bidderToPrebidBidders.isEmpty() && !suppressSchains) {
             return requestExtNode;
         }
 
-        final ExtRequestPrebidData prebidData = firstPartyDataBidders.contains(bidder)
+        final ExtRequestPrebidData prebidData = useFirstPartyData
                 ? ExtRequestPrebidData.of(Collections.singletonList(bidder))
                 : null;
 
