@@ -529,12 +529,36 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithSitePublisherIdOverriddenWithAccountParamValue() {
         // given
-        given(httpRequest.getParam("account")).willReturn("accountId");
+        given(httpRequest.getParam("account")).willReturn("888");
 
         givenBidRequest(
                 builder -> builder
                         .ext(mapper.valueToTree(ExtBidRequest.of(null, null)))
                         .site(Site.builder().publisher(Publisher.builder().id("will-be-overridden").build()).build()),
+                Imp.builder().build());
+
+        // when
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        assertThat(singletonList(request))
+                .extracting(BidRequest::getSite)
+                .extracting(Site::getPublisher, Site::getExt)
+                .containsOnly(tuple(
+                        Publisher.builder().id("888").build(),
+                        mapper.valueToTree(ExtSite.of(1, null))));
+    }
+
+
+    @Test
+    public void shouldReturnBidRequestWithSitePublisherIdIfAccountParamValueIsInvalidInteger() {
+        // given
+        given(httpRequest.getParam("account")).willReturn("invalid-integer");
+
+        givenBidRequest(
+                builder -> builder
+                        .ext(mapper.valueToTree(ExtBidRequest.of(null, null)))
+                        .site(Site.builder().publisher(Publisher.builder().id("accountId").build()).build()),
                 Imp.builder().build());
 
         // when
@@ -552,7 +576,7 @@ public class AmpRequestFactoryTest extends VertxTest {
     @Test
     public void shouldReturnBidRequestWithSitePublisherIdFromAccountParamWhenSiteDoesNotExist() {
         // given
-        given(httpRequest.getParam("account")).willReturn("accountId");
+        given(httpRequest.getParam("account")).willReturn("888");
 
         givenBidRequest(
                 builder -> builder
@@ -568,14 +592,14 @@ public class AmpRequestFactoryTest extends VertxTest {
                 .extracting(BidRequest::getSite)
                 .extracting(Site::getPublisher, Site::getExt)
                 .containsOnly(tuple(
-                        Publisher.builder().id("accountId").build(),
+                        Publisher.builder().id("888").build(),
                         mapper.valueToTree(ExtSite.of(1, null))));
     }
 
     @Test
     public void shouldReturnBidRequestWithSitePublisherIdFromAccountParamWhenSitePublisherDoesNotExist() {
         // given
-        given(httpRequest.getParam("account")).willReturn("accountId");
+        given(httpRequest.getParam("account")).willReturn("888");
 
         givenBidRequest(
                 builder -> builder
@@ -591,7 +615,7 @@ public class AmpRequestFactoryTest extends VertxTest {
                 .extracting(BidRequest::getSite)
                 .extracting(Site::getPublisher, Site::getExt)
                 .containsOnly(tuple(
-                        Publisher.builder().id("accountId").build(),
+                        Publisher.builder().id("888").build(),
                         mapper.valueToTree(ExtSite.of(1, null))));
     }
 

@@ -275,7 +275,7 @@ public class ApplicationTest extends IntegrationTest {
                         "&timeout=10000000" +
                         "&slot=overwrite-tagId" +
                         "&curl=https%3A%2F%2Fgoogle.com" +
-                        "&account=accountId" +
+                        "&account=888" +
                         "&us_privacy=1YNN");
 
         // then

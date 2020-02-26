@@ -235,17 +235,18 @@ public class AmpRequestFactory {
     private Site overrideSite(Site site, HttpServerRequest request) {
         final String canonicalUrl = canonicalUrl(request);
         final String accountId = request.getParam(ACCOUNT_REQUEST_PARAM);
+        final int accountIdAsInt = parseIntOrZero(accountId);
 
         final boolean hasSite = site != null;
         final ObjectNode siteExt = hasSite ? site.getExt() : null;
         final boolean shouldSetExtAmp = siteExt == null || siteExt.get("amp") == null;
 
-        if (StringUtils.isNotBlank(canonicalUrl) || StringUtils.isNotBlank(accountId) || shouldSetExtAmp) {
+        if (StringUtils.isNotBlank(canonicalUrl) || accountIdAsInt != 0 || shouldSetExtAmp) {
             final Site.SiteBuilder siteBuilder = hasSite ? site.toBuilder() : Site.builder();
             if (StringUtils.isNotBlank(canonicalUrl)) {
                 siteBuilder.page(canonicalUrl);
             }
-            if (StringUtils.isNotBlank(accountId)) {
+            if (accountIdAsInt != 0) {
                 final Publisher publisher = hasSite ? site.getPublisher() : null;
                 final Publisher.PublisherBuilder publisherBuilder = publisher != null
                         ? publisher.toBuilder() : Publisher.builder();

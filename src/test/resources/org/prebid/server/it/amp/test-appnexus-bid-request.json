@@ -29,7 +29,7 @@
     "domain": "example.com",
     "page": "https://google.com",
     "publisher": {
-      "id": "accountId"
+      "id": "888"
     },
     "ext": {
       "amp": 1
