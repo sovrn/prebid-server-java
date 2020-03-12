@@ -1,9 +1,9 @@
 package org.prebid.server.rubicon.audit;
 
+import io.vertx.core.http.Cookie;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.exception.PreBidException;
@@ -116,7 +116,7 @@ public class UidsAuditCookieService {
      * Returns {@link UidAudit} from {@link RoutingContext} or null if no audit cookie exists.
      */
     public UidAudit getUidsAudit(RoutingContext context) {
-        final Cookie uidAuditCookie = context.getCookie(COOKIE_NAME);
+        final Cookie uidAuditCookie = context.cookieMap().get(COOKIE_NAME);
         return uidAuditCookie != null ? getUidAudit(uidAuditCookie.getValue()) : null;
     }
 
@@ -169,7 +169,7 @@ public class UidsAuditCookieService {
     /**
      * Updates existing uid audit {@link Cookie}.
      */
-    public Cookie updateUidsAuditCookie(RoutingContext context, String consent, UidAudit previousUidAudit) {
+    Cookie updateUidsAuditCookie(RoutingContext context, String consent, UidAudit previousUidAudit) {
         final String referrer = context.request().getHeader(HttpHeaders.REFERER);
         final long renewedSeconds = ZonedDateTime.now(Clock.systemUTC()).toEpochSecond();
 

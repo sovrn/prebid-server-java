@@ -1,8 +1,8 @@
 package org.prebid.server.rubicon.rsid;
 
+import io.vertx.core.http.Cookie;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.rubicon.rsid.model.Rsid;
@@ -29,7 +29,7 @@ public class RsidCookieService {
      * Returns {@link Rsid} from Http cookie in request or null if absent.
      */
     public Rsid parseFromRequest(RoutingContext context) {
-        final Cookie rsidCookie = context.getCookie(COOKIE_NAME);
+        final Cookie rsidCookie = context.cookieMap().get(COOKIE_NAME);
         final String rsidRawValue = rsidCookie != null ? rsidCookie.getValue() : null;
 
         return rsidRawValue != null ? toRsid(rsidRawValue) : null;

@@ -1,6 +1,7 @@
 package org.prebid.server.rubicon.geolocation;
 
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -50,16 +51,15 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
      * The idea is to use the same serverAddress variable while getting these addresses randomly.
      */
     public Future<GeoInfo> lookup(String ip, Timeout timeout, InetAddress serverAddress) {
-        final Future<GeoInfo> future = Future.future();
-        vertx.executeBlocking(executeFuture -> doLookup(executeFuture, serverAddress, ip, timeout),
-                false, future);
-        return future;
+        final Promise<GeoInfo> promise = Promise.promise();
+        vertx.executeBlocking(executeFuture -> doLookup(executeFuture, serverAddress, ip, timeout), false, promise);
+        return promise.future();
     }
 
-    private void doLookup(Future<GeoInfo> executeFuture, InetAddress serverAddress, String ip, Timeout timeout) {
+    private void doLookup(Promise<GeoInfo> promise, InetAddress serverAddress, String ip, Timeout timeout) {
         final long remainingTimeout = timeout.remaining();
         if (remainingTimeout <= 0) {
-            failWith(new TimeoutException("Timeout has been exceeded")).setHandler(executeFuture);
+            failWith(new TimeoutException("Timeout has been exceeded")).setHandler(promise);
             return;
         }
 
@@ -68,7 +68,7 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
             lookupAddress = InetAddress.getByName(ip);
         } catch (UnknownHostException e) {
             failWith(new PreBidException(String.format("Invalid IP address to lookup: %s", ip), e))
-                    .setHandler(executeFuture);
+                    .setHandler(promise);
             return;
         }
 
@@ -76,9 +76,9 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
                 Math.toIntExact(remainingTimeout));
         try {
             final PulseQuery query = dbAccessor.query(PulseQuery.class, lookupAddress);
-            executeFuture.complete(GeoInfo.builder().vendor(VENDOR).country(query.getTwoLetterCountry()).build());
+            promise.complete(GeoInfo.builder().vendor(VENDOR).country(query.getTwoLetterCountry()).build());
         } catch (IllegalArgumentException | IOException e) {
-            failWith(new PreBidException("Geo location lookup failed", e)).setHandler(executeFuture);
+            failWith(new PreBidException("Geo location lookup failed", e)).setHandler(promise);
         }
     }
 

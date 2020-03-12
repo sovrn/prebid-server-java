@@ -1,8 +1,8 @@
 package org.prebid.server.rubicon.audit;
 
+import io.vertx.core.http.Cookie;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
@@ -27,6 +27,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
@@ -70,8 +71,9 @@ public class UidsAuditCookieServiceTest {
     public void getUidsAuditShouldReturnExpectedResultIfCookieExists() {
         // given
         // Base64 encoded Blowfish encrypted string - 1|uid^^^^1527684614^referrer|^|1^consent
-        given(routingContext.getCookie("uids-audit")).willReturn(Cookie.cookie("uids-audit",
-                "pMmn7z8bUD5mOWCasu0nA42E99uwy-gx6uIWeNPO2UpXs5Lhsj8uS9g992oiVBPB"));
+        given(routingContext.cookieMap())
+                .willReturn(singletonMap("uids-audit", Cookie.cookie("uids-audit",
+                        "pMmn7z8bUD5mOWCasu0nA42E99uwy-gx6uIWeNPO2UpXs5Lhsj8uS9g992oiVBPB")));
 
         // when
         final UidAudit uidAudit = uidsAuditCookieService.getUidsAudit(routingContext);
@@ -90,7 +92,8 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void getUidsAuditShouldFailIfCookieCannotBeParsed() {
         // given
-        given(routingContext.getCookie("uids-audit")).willReturn(Cookie.cookie("uids-audit", "invalid"));
+        given(routingContext.cookieMap())
+                .willReturn(singletonMap("uids-audit", Cookie.cookie("uids-audit", "invalid")));
 
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
@@ -100,8 +103,8 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void getUidsAuditShouldFailIfCookieCannotBeParsedBecauseOfIllegalBase64Character() {
         // given
-        given(routingContext.getCookie("uids-audit")).willReturn(
-                Cookie.cookie("uids-audit", "/contains-illegal-chars/"));
+        given(routingContext.cookieMap())
+                .willReturn(singletonMap("uids-audit", Cookie.cookie("uids-audit", "/contains-illegal-chars/")));
 
         // when and then
         assertThatThrownBy(() -> uidsAuditCookieService.getUidsAudit(routingContext))
