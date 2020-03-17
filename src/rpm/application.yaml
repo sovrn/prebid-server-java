@@ -11,6 +11,8 @@ adapters:
     enabled: true
   appnexus:
     enabled: true
+  brightroll:
+    enabled: true
   conversant:
     enabled: true
   ix:
