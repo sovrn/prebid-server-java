@@ -15,10 +15,6 @@ adapters:
     enabled: true
   conversant:
     enabled: true
-  facebook:
-    enabled: true
-    platform-id: platform
-    app-secret: secret
   ix:
     enabled: true
   openx:
