@@ -236,6 +236,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
     private Future<Map<Integer, Boolean>> resolveVendorsToGdpr(PreBidRequestContext preBidRequestContext,
                                                                List<AdapterResponse> adapterResponses,
                                                                RoutingContext context) {
+        // todo Process also but bidders name (not every bidder have GVL id)
         final Set<Integer> vendorIds = adapterResponses.stream()
                 .map(adapterResponse -> adapterResponse.getBidderStatus().getBidder())
                 .filter(this::isValidAdapterName)
