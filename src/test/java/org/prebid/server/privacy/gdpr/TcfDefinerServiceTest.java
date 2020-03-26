@@ -34,6 +34,7 @@ import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -116,8 +117,7 @@ public class TcfDefinerServiceTest {
     @Test
     public void resultForShouldReturnGdprFromGeoLocationServiceWhenGdprFromRequestIsNotValid() {
         // when
-        final Future<TcfResponse> result = target.resultFor(singleton(1), emptySet(), null, "consent", "ip", null,
-                null);
+        target.resultFor(singleton(1), emptySet(), null, "consent", "ip", null, null);
 
         // then
         verify(geoLocationService).lookup(eq("ip"), any());
@@ -125,15 +125,13 @@ public class TcfDefinerServiceTest {
     }
 
     @Test
-    public void resultForShouldFailWhenConsentIsNotValid() {
+    public void resultForShouldReturnRestrictAllWhenConsentIsNotValid() {
         // when
-        final Future<TcfResponse> result = target.resultFor(singleton(1), emptySet(), null, "consent", "ip", null,
-                null);
+        target.resultFor(singleton(1), emptySet(), "1", "consent", "ip", null, null);
 
         // then
-        assertThat(result.failed()).isTrue();
-
-        verifyZeroInteractions(tcf2Service);
+        verify(tcf2Service).permissionsFor(
+                argThat(arg -> arg.getClass() == TcfDefinerService.TCStringEmpty.class), any(), any(), any());
         verifyZeroInteractions(gdprService);
     }
 
@@ -176,8 +174,7 @@ public class TcfDefinerServiceTest {
         // given
         final GdprConfig gdprConfig = GdprConfig.builder().enabled(true).defaultValue("0").build();
         target = new TcfDefinerService(rsidCookieService, gdprConfig, singletonList(EEA_COUNTRY), gdprService,
-                tcf2Service,
-                geoLocationService, metrics);
+                tcf2Service, geoLocationService, metrics);
 
         given(geoLocationService.lookup(anyString(), any())).willReturn(Future.failedFuture("Bad ip"));
 
@@ -199,8 +196,7 @@ public class TcfDefinerServiceTest {
         // given
         final GdprConfig gdprConfig = GdprConfig.builder().enabled(true).defaultValue("0").build();
         target = new TcfDefinerService(rsidCookieService, gdprConfig, singletonList(EEA_COUNTRY), gdprService,
-                tcf2Service,
-                geoLocationService, metrics);
+                tcf2Service, geoLocationService, metrics);
 
         // when
         final Future<TcfResponse> result = target.resultFor(singleton(1), emptySet(), null, "consent", null, null,
