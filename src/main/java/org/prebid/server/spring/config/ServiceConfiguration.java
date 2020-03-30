@@ -47,6 +47,7 @@ import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.privacy.gdpr.tcf2stratgies.PurposeOneStrategy;
 import org.prebid.server.privacy.gdpr.tcf2stratgies.PurposeStrategy;
 import org.prebid.server.privacy.gdpr.tcf2stratgies.typeStrategies.BasicTypeStrategy;
+import org.prebid.server.privacy.gdpr.tcf2stratgies.typeStrategies.NoTypeStrategy;
 import org.prebid.server.privacy.gdpr.vendorlist.VendorListService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
@@ -423,13 +424,18 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    PurposeOneStrategy purposeOneStrategy(BasicTypeStrategy basicTypeStrategy) {
-        return new PurposeOneStrategy(basicTypeStrategy);
+    PurposeOneStrategy purposeOneStrategy(BasicTypeStrategy basicTypeStrategy, NoTypeStrategy noTypeStrategy) {
+        return new PurposeOneStrategy(basicTypeStrategy, noTypeStrategy);
     }
 
     @Bean
     BasicTypeStrategy basicTypeStrategy() {
         return new BasicTypeStrategy();
+    }
+
+    @Bean
+    NoTypeStrategy noTypeStrategy() {
+        return new NoTypeStrategy();
     }
 
     @Bean
