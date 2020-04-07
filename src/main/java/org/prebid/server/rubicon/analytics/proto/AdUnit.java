@@ -33,4 +33,10 @@ public class AdUnit {
     Map<String, String> adserverTargeting;
 
     List<Bid> bids;
+
+    @JsonProperty("siteId")
+    Integer siteId;
+
+    @JsonProperty("zoneId")
+    Integer zoneId;
 }

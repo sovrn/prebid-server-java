@@ -15,7 +15,8 @@ public class Event {
 
     String integration;
 
-    String wrappername;
+    @JsonProperty("wrapperName")
+    String wrapperName;
 
     String version;
 

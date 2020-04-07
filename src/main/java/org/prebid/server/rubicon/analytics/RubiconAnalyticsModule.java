@@ -41,6 +41,8 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -120,6 +122,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
             };
 
+    private static final TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>> RUBICON_IMP_EXT_TYPE_REFERENCE =
+            new TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>>() {
+            };
+    private static final String APPLICATION_JSON =
+            HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
+
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
         VIDEO_SIZE_AD_FORMATS.put(201, VideoAdFormat.PREROLL);
@@ -129,9 +137,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         VIDEO_SIZE_AD_FORMATS.put(205, VideoAdFormat.POSTROLL);
         VIDEO_SIZE_AD_FORMATS.put(207, "vertical");
     }
-
-    private static final String APPLICATION_JSON =
-            HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
 
     private final String endpointUrl;
     private final String pbsVersion;
@@ -526,16 +531,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private Params paramsFrom(Imp imp, String bidder) {
-        final Params result;
         if (imp != null && Objects.equals(bidder, RUBICON_BIDDER)) {
             // it should be safe to cast since there wouldn't be rubicon bids if this imp had no "rubicon" field in ext
             final ExtImpRubicon impExt = readExt((ObjectNode) imp.getExt().get(RUBICON_BIDDER), ExtImpRubicon.class);
 
-            result = impExt != null ? Params.of(impExt.getAccountId(), impExt.getSiteId(), impExt.getZoneId()) : null;
-        } else {
-            result = null;
+            return impExt != null ? Params.of(impExt.getAccountId(), impExt.getSiteId(), impExt.getZoneId()) : null;
         }
-        return result;
+        return null;
     }
 
     private BidType mediaTypeFromBid(Bid bid) {
@@ -594,6 +596,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .map(org.prebid.server.rubicon.analytics.proto.Bid::getError)
                 .anyMatch(Objects::nonNull);
 
+        final ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebid = extPrebidFromImp(imp);
+        final Params params = paramsFromPrebid(extPrebid.getBidder());
+        final String storedRequestId = storedRequestId(extPrebid.getPrebid());
         return AdUnit.builder()
                 .transactionId(transactionIdFrom(bidRequest.getId(), imp.getId()))
                 .status(openrtbBidsFound ? SUCCESS_STATUS : errorsFound ? ERROR_STATUS : NO_BID_STATUS)
@@ -601,10 +606,40 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .mediaTypes(mediaTypesFromImp(imp))
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
                 .dimensions(dimensions(imp))
-                .adUnitCode(null) // does not apply to mobile ads
+                .adUnitCode(storedRequestId)
+                .siteId(params.getSiteId())
+                .zoneId(params.getZoneId())
                 .adserverTargeting(targetingForImp(bids))
                 .bids(bids.stream().map(TwinBids::getAnalyticsBid).collect(Collectors.toList()))
                 .build();
+    }
+
+    private ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebidFromImp(Imp imp) {
+        final ObjectNode impExt = imp != null ? imp.getExt() : null;
+        if (impExt == null) {
+            return ExtPrebid.of(null, null);
+        }
+        try {
+            final ExtImpPrebid prebid =
+                    mapper.mapper().convertValue(impExt, RUBICON_IMP_EXT_TYPE_REFERENCE).getPrebid();
+
+            final ExtImpRubicon impRubicon = readExt((ObjectNode) impExt.get(RUBICON_BIDDER), ExtImpRubicon.class);
+            return ExtPrebid.of(prebid, impRubicon);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Error unmarshalling ext by type reference {0}", e, RUBICON_IMP_EXT_TYPE_REFERENCE);
+            return ExtPrebid.of(null, null);
+        }
+    }
+
+    private Params paramsFromPrebid(ExtImpRubicon impExt) {
+        return impExt != null
+                ? Params.of(impExt.getAccountId(), impExt.getSiteId(), impExt.getZoneId())
+                : Params.empty();
+    }
+
+    private String storedRequestId(ExtImpPrebid impPrebid) {
+        final ExtStoredRequest storedRequest = impPrebid != null ? impPrebid.getStoredrequest() : null;
+        return storedRequest != null ? storedRequest.getId() : null;
     }
 
     private static String transactionIdFrom(String bidRequestId, String impId) {
@@ -807,7 +842,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
         return Event.builder()
                 .integration(StringUtils.isBlank(extIntegration) ? PBS_INTEGRATION : extIntegration)
-                .wrappername(extWrappername)
+                .wrapperName(extWrappername)
                 .version(pbsVersion)
                 .client(Client.builder()
                         .deviceClass(MOBILE_DEVICE_CLASS)

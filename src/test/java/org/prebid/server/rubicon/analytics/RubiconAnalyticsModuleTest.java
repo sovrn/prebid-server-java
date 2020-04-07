@@ -41,6 +41,8 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -384,6 +386,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .videoAdFormat("interstitial")
                                                 .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
                                                 .adserverTargeting(singletonMap("key1", "value1"))
+                                                .siteId(456)
+                                                .zoneId(789)
                                                 .bids(singletonList(
                                                         org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                                 .bidId("bidId1")
@@ -450,6 +454,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .status("no-bid")
                                                 .mediaTypes(singletonList("banner"))
                                                 .dimensions(singletonList(Dimensions.of(400, 500)))
+                                                .siteId(654)
+                                                .zoneId(987)
+                                                .adUnitCode("storedId1")
                                                 .bids(singletonList(
                                                         org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                                 .bidder("rubicon")
@@ -772,6 +779,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .videoAdFormat("interstitial")
                                         .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
                                         .adserverTargeting(singletonMap("key1", "value1"))
+                                        .siteId(456)
+                                        .zoneId(789)
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidId("bidId1")
@@ -832,6 +841,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .status("no-bid")
                                         .mediaTypes(singletonList("banner"))
                                         .dimensions(singletonList(Dimensions.of(400, 500)))
+                                        .siteId(654)
+                                        .zoneId(987)
+                                        .adUnitCode("storedId1")
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
@@ -987,7 +999,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 null, null, null);
         final Event expectedEvent = Event.builder()
                 .integration("updated")
-                .wrappername("wrappername")
+                .wrapperName("wrappername")
                 .version("pbs-version-1")
                 .client(Client.builder().deviceClass("mobile").app(app).build())
                 .bidsWon(singletonList(expectedBidWod))
@@ -1099,6 +1111,17 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         multiBidderImpExt.set("pubmatic", mapper.createObjectNode());
         multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
 
+        final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode();
+        rubiconExtWithStoredId.set("rubicon", mapper.valueToTree(
+                ExtImpRubicon.builder()
+                        .video(RubiconVideoParams.builder().sizeId(202).build())
+                        .accountId(321)
+                        .siteId(654)
+                        .zoneId(987)
+                        .build()));
+        rubiconExtWithStoredId.set("prebid", mapper.valueToTree(ExtImpPrebid.builder()
+                .storedrequest(ExtStoredRequest.of("storedId1"))
+                .build()));
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
@@ -1142,13 +1165,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(400).h(500).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
-                                        ExtImpRubicon.builder()
-                                                .video(RubiconVideoParams.builder().sizeId(202).build())
-                                                .accountId(321)
-                                                .siteId(654)
-                                                .zoneId(987)
-                                                .build())))
+                                .ext(rubiconExtWithStoredId)
                                 .build(),
                         Imp.builder().id("impId4")
                                 .banner(Banner.builder()
@@ -1180,6 +1197,17 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         multiBidderImpExt.set("rubicon", mapper.createObjectNode());
         multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
 
+        final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode();
+        rubiconExtWithStoredId.set("rubicon", mapper.valueToTree(
+                ExtImpRubicon.builder()
+                        .video(RubiconVideoParams.builder().sizeId(202).build())
+                        .accountId(321)
+                        .siteId(654)
+                        .zoneId(987)
+                        .build()));
+        rubiconExtWithStoredId.set("prebid", mapper.valueToTree(ExtImpPrebid.builder()
+                .storedrequest(ExtStoredRequest.of("storedId1"))
+                .build()));
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
@@ -1220,13 +1248,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(400).h(500).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
-                                        ExtImpRubicon.builder()
-                                                .video(RubiconVideoParams.builder().sizeId(202).build())
-                                                .accountId(321)
-                                                .siteId(654)
-                                                .zoneId(987)
-                                                .build())))
+                                .ext(rubiconExtWithStoredId)
                                 .build(),
                         Imp.builder().id("impId4")
                                 .banner(Banner.builder()
@@ -1315,7 +1337,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     private static Event.EventBuilder expectedEventBuilderBaseFromApp(String integration, String wrappername) {
         return Event.builder()
                 .integration(integration)
-                .wrappername(wrappername)
+                .wrapperName(wrappername)
                 .version("pbs-version-1")
                 .client(Client.builder()
                         .deviceClass("mobile")

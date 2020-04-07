@@ -8,6 +8,8 @@ import lombok.Value;
 @Value
 public class Params {
 
+    private static final Params EMPTY_PARAM = Params.of(null, null, null);
+
     @JsonProperty("accountId")
     Integer accountId;
 
@@ -16,4 +18,8 @@ public class Params {
 
     @JsonProperty("zoneId")
     Integer zoneId;
+
+    public static Params empty() {
+        return EMPTY_PARAM;
+    }
 }
