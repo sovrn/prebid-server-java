@@ -41,6 +41,7 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
@@ -274,7 +275,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
 
             postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
-                    this::eventBuilderBaseFromApp));
+                    this::eventBuilderBaseFromApp), isDebugEnabled(bidRequest));
         }
     }
 
@@ -305,7 +306,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
 
             postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
-                    this::eventBuilderBaseFromSite));
+                    this::eventBuilderBaseFromSite), isDebugEnabled(bidRequest));
         }
     }
 
@@ -340,7 +341,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 ? makeWinEvent(bidId, accountId, context, uidsCookie)
                 : makeImpEvent(bidId, accountId, context, uidsCookie);
 
-        postEvent(event);
+        postEvent(event, false);
     }
 
     private Event makeWinEvent(String bidId, Integer accountId, HttpContext context,
@@ -381,6 +382,16 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .limitAdTracking(StringUtils.equals(context.getHeaders().get(DNT_HEADER), "1"))
                 .userAgent(context.getHeaders().get(USER_AGENT_HEADER))
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion));
+    }
+
+    private boolean isDebugEnabled(BidRequest bidRequest) {
+        final ObjectNode ext = bidRequest.getExt();
+        final ExtBidRequest extBidRequest = ext != null ? readExt(ext, ExtBidRequest.class) : null;
+        final org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid extRequestPrebid = extBidRequest != null
+                ? extBidRequest.getPrebid()
+                : null;
+        final Integer prebidDebug = extRequestPrebid != null ? extRequestPrebid.getDebug() : null;
+        return Objects.equals(prebidDebug, 1);
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
@@ -888,8 +899,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     /**
      * Sends event to analytics service.
      */
-    private void postEvent(Event event) {
-        httpClient.post(endpointUrl, headers(event), mapper.encode(event), 2000L)
+    private void postEvent(Event event, boolean isDebugEnabled) {
+        final String eventBody = mapper.encode(event);
+        if (isDebugEnabled) {
+            logger.warn(String.format("Sending analytic event: %s", eventBody));
+        }
+        httpClient.post(endpointUrl, headers(event), eventBody, 2000L)
                 .compose(RubiconAnalyticsModule::processResponse)
                 .recover(RubiconAnalyticsModule::failResponse);
     }
