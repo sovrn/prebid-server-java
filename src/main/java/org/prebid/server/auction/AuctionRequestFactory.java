@@ -33,6 +33,7 @@ import org.prebid.server.json.DecodeException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPublisher;
@@ -41,6 +42,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
+import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
@@ -75,6 +77,7 @@ public class AuctionRequestFactory {
     private static final ConditionalLogger UNKNOWN_ACCOUNT_LOGGER = new ConditionalLogger("unknown_account", logger);
 
     private static final String RUBICON_BIDDER = "rubicon";
+    private static final String PREBID = "prebid";
 
     private final long maxRequestSize;
     private final boolean enforceValidAccount;
@@ -681,9 +684,22 @@ public class AuctionRequestFactory {
 
         final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
         final String publisherId = publisher != null ? resolvePublisherId(publisher) : null;
-        final String publisherOrRubiconAccountId = publisherId != null
-                ? publisherId : resolveRubiconAccountId(bidRequest);
-        return ObjectUtils.defaultIfNull(publisherOrRubiconAccountId, StringUtils.EMPTY);
+        if (StringUtils.isNotEmpty(publisherId)) {
+            return publisherId;
+        }
+
+        final String storedRequestAccountId = resolveExtStoredRequestAccountId(bidRequest);
+        if (StringUtils.isNotEmpty(storedRequestAccountId)) {
+            return storedRequestAccountId;
+        }
+
+        final String rubiconAccountId = resolveRubiconAccountId(bidRequest);
+        if (StringUtils.isNotEmpty(rubiconAccountId)) {
+            return rubiconAccountId;
+        }
+
+        final String impStoredRequestAccountId = resolveImpStoredRequestAccountId(bidRequest);
+        return ObjectUtils.defaultIfNull(impStoredRequestAccountId, StringUtils.EMPTY);
     }
 
     /**
@@ -712,6 +728,134 @@ public class AuctionRequestFactory {
 
         final ExtPublisherPrebid extPublisherPrebid = extPublisher != null ? extPublisher.getPrebid() : null;
         return extPublisherPrebid != null ? StringUtils.stripToNull(extPublisherPrebid.getParentAccount()) : null;
+    }
+
+    private String resolveExtStoredRequestAccountId(BidRequest bidRequest) {
+        if (bidRequest.getExt() == null) {
+            return null;
+        }
+        final JsonNode prebidJsonNode = extNodeOrNull(bidRequest.getExt(), Collections.singleton(PREBID));
+        final ExtRequestPrebid extRequestPrebid = extRequestPrebidOrNull(prebidJsonNode);
+        final ExtStoredRequest extStoredRequest = extRequestPrebid != null ? extRequestPrebid.getStoredrequest() : null;
+        return extStoredRequest != null ? parseAccountFromStoredRequest(extStoredRequest) : null;
+    }
+
+    /**
+     * Returns raw {@link JsonNode} of imp.ext.{rubicon|alias} or null.
+     */
+    private static JsonNode extNodeOrNull(ObjectNode ext, Set<String> nameAndAliases) {
+        for (String value : nameAndAliases) {
+            final JsonNode node = ext.get(value);
+            if (node != null) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extracts {@link ExtRequestPrebid} from the given {@link JsonNode}.
+     */
+    private ExtRequestPrebid extRequestPrebidOrNull(JsonNode extPrebid) {
+        try {
+            return mapper.mapper().convertValue(extPrebid, ExtRequestPrebid.class);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Checks request impression extensions whether they have a rubicon extension, picks first and
+     * takes account ID from it. If none is present - returns null.
+     */
+    private String resolveRubiconAccountId(BidRequest bidRequest) {
+        final Set<String> nameAndAliases = new HashSet<>();
+        nameAndAliases.add(RUBICON_BIDDER);
+        nameAndAliases.addAll(rubiconAliases(bidRequest.getExt()));
+
+        final List<Imp> imps = bidRequest.getImp();
+        return CollectionUtils.isEmpty(imps) ? null : imps.stream()
+                .map(Imp::getExt)
+                .filter(Objects::nonNull)
+                .map(ext -> extNodeOrNull(ext, nameAndAliases))
+                .filter(Objects::nonNull)
+                .map(this::extImpRubiconOrNull)
+                .filter(Objects::nonNull)
+                .map(ExtImpRubicon::getAccountId)
+                .filter(Objects::nonNull)
+                .map(Objects::toString)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Returns list of aliases for Rubicon bidder or empty if not defined.
+     */
+    private Set<String> rubiconAliases(ObjectNode extNode) {
+        final ExtBidRequest ext = getIfNotNull(extNode, this::extBidRequest);
+        final ExtRequestPrebid prebid = getIfNotNull(ext, ExtBidRequest::getPrebid);
+        final Map<String, String> aliases = getIfNotNullOrDefault(prebid, ExtRequestPrebid::getAliases,
+                Collections.emptyMap());
+
+        return aliases.entrySet().stream()
+                .filter(entry -> Objects.equals(entry.getValue(), RUBICON_BIDDER))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Extracts {@link ExtImpRubicon} from the given {@link JsonNode}.
+     */
+    private ExtImpRubicon extImpRubiconOrNull(JsonNode extRubicon) {
+        try {
+            return mapper.mapper().convertValue(extRubicon, ExtImpRubicon.class);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String resolveImpStoredRequestAccountId(BidRequest bidRequest) {
+        final List<Imp> imps = bidRequest.getImp();
+        return CollectionUtils.isEmpty(imps) ? null : imps.stream()
+                .map(Imp::getExt)
+                .filter(Objects::nonNull)
+                .map(ext -> extNodeOrNull(ext, Collections.singleton(PREBID)))
+                .filter(Objects::nonNull)
+                .map(this::extImpPrebidOrNull)
+                .filter(Objects::nonNull)
+                .map(ExtImpPrebid::getStoredrequest)
+                .filter(Objects::nonNull)
+                .map(AuctionRequestFactory::parseAccountFromStoredRequest)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Extracts {@link ExtImpPrebid} from the given {@link JsonNode}.
+     */
+    private ExtImpPrebid extImpPrebidOrNull(JsonNode extPrebid) {
+        try {
+            return mapper.mapper().convertValue(extPrebid, ExtImpPrebid.class);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static String parseAccountFromStoredRequest(ExtStoredRequest storedRequest) {
+        final String storedRequestId = storedRequest.getId();
+        if (StringUtils.isEmpty(storedRequestId)) {
+            return null;
+        }
+        final String accountIdCandidate = storedRequestId.split("-")[0];
+        if (StringUtils.isNumeric(accountIdCandidate)) {
+            try {
+                return String.valueOf(Integer.parseInt(accountIdCandidate));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private Future<Account> responseForEmptyAccount(RoutingContext routingContext) {
@@ -750,68 +894,5 @@ public class AuctionRequestFactory {
      */
     private static Account emptyAccount(String accountId) {
         return Account.builder().id(accountId).build();
-    }
-
-    /**
-     * Checks request impression extensions whether they have a rubicon extension, picks first and
-     * takes account ID from it. If none is present - returns null.
-     */
-    private String resolveRubiconAccountId(BidRequest bidRequest) {
-        final Set<String> nameAndAliases = new HashSet<>();
-        nameAndAliases.add(RUBICON_BIDDER);
-        nameAndAliases.addAll(rubiconAliases(bidRequest.getExt()));
-
-        final List<Imp> imps = bidRequest.getImp();
-        return CollectionUtils.isEmpty(imps) ? null : imps.stream()
-                .map(Imp::getExt)
-                .filter(Objects::nonNull)
-                .map(ext -> extImpRubiconNodeOrNull(ext, nameAndAliases))
-                .filter(Objects::nonNull)
-                .map(this::extImpRubiconOrNull)
-                .filter(Objects::nonNull)
-                .map(ExtImpRubicon::getAccountId)
-                .filter(Objects::nonNull)
-                .map(Objects::toString)
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * Returns list of aliases for Rubicon bidder or empty if not defined.
-     */
-    private Set<String> rubiconAliases(ObjectNode extNode) {
-        final ExtBidRequest ext = getIfNotNull(extNode, this::extBidRequest);
-        final ExtRequestPrebid prebid = getIfNotNull(ext, ExtBidRequest::getPrebid);
-        final Map<String, String> aliases = getIfNotNullOrDefault(prebid, ExtRequestPrebid::getAliases,
-                Collections.emptyMap());
-
-        return aliases.entrySet().stream()
-                .filter(entry -> Objects.equals(entry.getValue(), RUBICON_BIDDER))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * Returns raw {@link JsonNode} of imp.ext.{rubicon|alias} or null.
-     */
-    private static JsonNode extImpRubiconNodeOrNull(ObjectNode ext, Set<String> nameAndAliases) {
-        for (String value : nameAndAliases) {
-            final JsonNode node = ext.get(value);
-            if (node != null) {
-                return node;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Extracts {@link ExtImpRubicon} from the given {@link JsonNode}.
-     */
-    private ExtImpRubicon extImpRubiconOrNull(JsonNode extRubicon) {
-        try {
-            return mapper.mapper().convertValue(extRubicon, ExtImpRubicon.class);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 }

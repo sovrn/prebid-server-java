@@ -40,6 +40,7 @@ import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPublisher;
@@ -50,6 +51,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheBids;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheVastxml;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
+import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
@@ -1374,6 +1376,65 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // then
         assertThat(account).isEqualTo(Account.builder().id("").build());
         verifyZeroInteractions(applicationSettings);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromImpStoredRequestId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(asList(Imp.builder()
+                                .ext(mapper.valueToTree(singletonMap("prebid",
+                                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("")).build())))
+                                .build(),
+                        Imp.builder()
+                                .ext(mapper.valueToTree(singletonMap("prebid",
+                                        ExtImpPrebid.builder().build())))
+                                .build(),
+                        Imp.builder()
+                                .ext(mapper.valueToTree(singletonMap("prebid",
+                                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("123-test")).build())))
+                                .build()
+                ))
+                .build());
+
+        final Account givenAccount = Account.builder().id("accountId").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromStoredRequestId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .ext(mapper.valueToTree(singletonMap("prebid",
+                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("123-test-test")).build())))
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("prebid",
+                                ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("321-test-test")).build())))
+                        .build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("accountId").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
     }
 
     private void givenImplicitParams(String referer, String domain, String ip, String ua) {
