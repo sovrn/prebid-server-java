@@ -27,7 +27,6 @@ import org.prebid.server.bidder.HttpAdapterConnector;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
-import org.prebid.server.execution.LogModifier;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.handler.AdminHandler;
 import org.prebid.server.handler.AuctionHandler;
@@ -51,6 +50,7 @@ import org.prebid.server.handler.openrtb2.VideoHandler;
 import org.prebid.server.health.HealthChecker;
 import org.prebid.server.health.PeriodicHealthChecker;
 import org.prebid.server.json.JacksonMapper;
+import org.prebid.server.manager.AdminManager;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.privacy.PrivacyExtractor;
@@ -248,11 +248,11 @@ public class WebConfiguration {
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
             Clock clock,
-            LogModifier logModifier,
+            AdminManager adminManager,
             JacksonMapper mapper) {
 
         return new org.prebid.server.handler.openrtb2.AuctionHandler(
-                auctionRequestFactory, exchangeService, analyticsReporter, metrics, clock, logModifier, mapper);
+                auctionRequestFactory, exchangeService, analyticsReporter, metrics, clock, adminManager, mapper);
     }
 
     @Bean
@@ -265,7 +265,7 @@ public class WebConfiguration {
             BidderCatalog bidderCatalog,
             AmpProperties ampProperties,
             AmpResponsePostProcessor ampResponsePostProcessor,
-            LogModifier logModifier,
+            AdminManager adminManager,
             JacksonMapper mapper) {
 
         return new AmpHandler(
@@ -277,7 +277,7 @@ public class WebConfiguration {
                 bidderCatalog,
                 ampProperties.getCustomTargetingSet(),
                 ampResponsePostProcessor,
-                logModifier,
+                adminManager,
                 mapper);
     }
 
@@ -446,7 +446,7 @@ public class WebConfiguration {
         @Autowired
         private VersionHandler versionHandler;
 
-        @Autowired(required = false)
+        @Autowired
         private AdminHandler adminHandler;
 
         @Autowired
@@ -483,9 +483,8 @@ public class WebConfiguration {
         }
 
         @Bean
-        @ConditionalOnProperty(prefix = "logger-level-modifier", name = "enabled", havingValue = "true")
-        AdminHandler adminHandler(LogModifier logModifier) {
-            return new AdminHandler(logModifier);
+        AdminHandler adminHandler(AdminManager adminManager) {
+            return new AdminHandler(adminManager);
         }
 
         @Bean

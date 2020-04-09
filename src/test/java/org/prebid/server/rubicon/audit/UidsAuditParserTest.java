@@ -254,7 +254,6 @@ public class UidsAuditParserTest {
                 .country("ua").renewedSeconds(123456L).referringDomain("referrer").initiatorType("initiatorType")
                 .initiatorId("initiatorId").consentUsed("0").consent("sfasdfasdfd").build();
 
-
         // when
         final String auditRow = UidsAuditParser.uidAuditToRow(uidAudit);
 

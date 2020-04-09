@@ -97,7 +97,7 @@
     }
   },
   "at": 1,
-  "tmax": 3000,
+  "tmax": 5000,
   "cur": [
     "USD"
   ],
@@ -119,6 +119,16 @@
   "ext": {
     "prebid": {
       "debug": 1,
+      "currency": {
+        "rates": {
+          "EUR": {
+            "USD": 1.2406
+          },
+          "USD": {
+            "EUR": 0.8110
+          }
+        }
+      },
       "aliases": {
         "appnexusAlias": "appnexus"
       },
@@ -132,16 +142,6 @@
             }
           ]
         },
-        "currency": {
-          "rates": {
-            "EUR": {
-              "USD": 1.2406
-            },
-            "USD": {
-              "EUR": 0.811
-            }
-          }
-        },
         "includewinners": true,
         "includebidderkeys": true
       },
@@ -150,7 +150,8 @@
         "vastxml": {
           "ttlseconds": 120
         }
-      }
+      },
+      "auctiontimestamp": 1000
     }
   }
 }

@@ -5,7 +5,7 @@
 
     <groupId>org.prebid</groupId>
     <artifactId>prebid-server</artifactId>
-    <version>1.32.0-SNAPSHOT</version>
+    <version>1.33.0-SNAPSHOT</version>
 
     <name>prebid-server</name>
     <description>Prebid Server (Server-side Header Bidding)</description>
@@ -390,6 +390,7 @@
                         <!-- true if project build should fails on any style violation. -->
                         <failsOnError>true</failsOnError>
                         <linkXRef>false</linkXRef>
+                        <includeTestSourceDirectory>true</includeTestSourceDirectory>
                     </configuration>
                     <dependencies>
                         <dependency>

@@ -356,7 +356,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
-
         final String integration = "dbpg";
         final String wrappername = "12314wp";
 
@@ -375,141 +374,133 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(
                 expectedEventBuilderBaseFromApp(integration, wrappername)
-                        .auctions(singletonList(Auction.of(
-                                "bidRequestId",
-                                1,
-                                asList(
-                                        AdUnit.builder()
-                                                .transactionId("bidRequestId-impId1")
-                                                .status("success")
-                                                .mediaTypes(asList("banner", "video"))
-                                                .videoAdFormat("interstitial")
-                                                .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
-                                                .adserverTargeting(singletonMap("key1", "value1"))
-                                                .siteId(456)
-                                                .zoneId(789)
-                                                .bids(singletonList(
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidId("bidId1")
-                                                                .bidder("rubicon")
-                                                                .status("success")
-                                                                .source("server")
-                                                                .serverLatencyMillis(101)
-                                                                .serverHasUserId(true)
-                                                                .params(Params.of(123, 456, 789))
-                                                                .bidResponse(
-                                                                        org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                                345, BigDecimal.valueOf(4.56), "video",
-                                                                                Dimensions.of(500, 600)))
-                                                                .build()))
-                                                .build(),
-                                        AdUnit.builder()
-                                                .transactionId("bidRequestId-impId2")
-                                                .status("success")
-                                                .mediaTypes(singletonList("video"))
-                                                .videoAdFormat("mid-roll")
-                                                .dimensions(singletonList(Dimensions.of(100, 200)))
-                                                .adserverTargeting(singletonMap("key22", "value22"))
-                                                .bids(asList(
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidId("bidId2")
-                                                                .bidder("appnexus")
-                                                                .status("success")
-                                                                .source("server")
-                                                                .serverLatencyMillis(202)
-                                                                .serverHasUserId(false)
-                                                                .bidResponse(
-                                                                        org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                                456, BigDecimal.valueOf(5.67), "video",
-                                                                                Dimensions.of(600, 700)))
-                                                                .build(),
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("appnexus")
-                                                                .status("success")
-                                                                .source("server")
-                                                                .serverLatencyMillis(202)
-                                                                .serverHasUserId(false)
-                                                                .bidResponse(
-                                                                        org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                                567, BigDecimal.valueOf(6.78), "video",
-                                                                                Dimensions.of(600, 700)))
-                                                                .build(),
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("rubicon")
-                                                                .status("no-bid")
-                                                                .source("server")
-                                                                .serverLatencyMillis(101)
-                                                                .serverHasUserId(true)
-                                                                .params(Params.of(null, null, null))
-                                                                .build(),
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("pubmatic")
-                                                                .status("error")
-                                                                .error(BidError.timeoutError("Timeout error"))
-                                                                .source("server")
-                                                                .build()))
-                                                .build(),
-                                        AdUnit.builder()
-                                                .transactionId("bidRequestId-impId3")
-                                                .status("no-bid")
-                                                .mediaTypes(singletonList("banner"))
-                                                .dimensions(singletonList(Dimensions.of(400, 500)))
-                                                .siteId(654)
-                                                .zoneId(987)
-                                                .adUnitCode("storedId1")
-                                                .bids(singletonList(
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("rubicon")
-                                                                .status("no-bid")
-                                                                .source("server")
-                                                                .serverLatencyMillis(101)
-                                                                .serverHasUserId(true)
-                                                                .params(Params.of(321, 654, 987))
-                                                                .build()))
-                                                .build(),
-                                        AdUnit.builder()
-                                                .transactionId("bidRequestId-impId4")
-                                                .status("no-bid")
-                                                .mediaTypes(singletonList("banner"))
-                                                .dimensions(singletonList(Dimensions.of(500, 600)))
-                                                .bids(singletonList(
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("appnexus")
-                                                                .status("no-bid")
-                                                                .source("server")
-                                                                .serverLatencyMillis(202)
-                                                                .serverHasUserId(false)
-                                                                .build()))
-                                                .build(),
-                                        AdUnit.builder()
-                                                .transactionId("bidRequestId-impId5")
-                                                .status("no-bid")
-                                                .mediaTypes(singletonList("banner"))
-                                                .dimensions(singletonList(Dimensions.of(600, 700)))
-                                                .bids(singletonList(
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("unknown")
-                                                                .status("no-bid")
-                                                                .source("server")
-                                                                .build()))
-                                                .build(),
-                                        AdUnit.builder()
-                                                .transactionId("bidRequestId-impId6")
-                                                .status("error")
-                                                .mediaTypes(singletonList("banner"))
-                                                .dimensions(singletonList(Dimensions.of(800, 900)))
-                                                .bids(singletonList(
-                                                        org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                                .bidder("appnexus")
-                                                                .status("error")
-                                                                .error(BidError.timeoutError("Timeout error"))
-                                                                .source("server")
-                                                                .serverLatencyMillis(202)
-                                                                .serverHasUserId(false)
-                                                                .build()))
-                                                .build()),
-                                123, 1000L, true)))
-                        .build());
+                        .auctions(singletonList(Auction.of("bidRequestId", 1, asList(
+                                AdUnit.builder()
+                                        .transactionId("bidRequestId-impId1")
+                                        .status("success")
+                                        .mediaTypes(asList("banner", "video"))
+                                        .videoAdFormat("interstitial")
+                                        .dimensions(asList(Dimensions.of(200, 300), Dimensions.of(300, 400)))
+                                        .adserverTargeting(singletonMap("key1", "value1"))
+                                        .siteId(456)
+                                        .zoneId(789)
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidId("bidId1")
+                                                        .bidder("rubicon")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(123, 456, 789))
+                                                        .bidResponse(org.prebid.server.rubicon.analytics.proto
+                                                                .BidResponse.of(345, BigDecimal.valueOf(4.56),
+                                                                        "video", Dimensions.of(500, 600)))
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("bidRequestId-impId2")
+                                        .status("success")
+                                        .mediaTypes(singletonList("video"))
+                                        .videoAdFormat("mid-roll")
+                                        .dimensions(singletonList(Dimensions.of(100, 200)))
+                                        .adserverTargeting(singletonMap("key22", "value22"))
+                                        .bids(asList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidId("bidId2")
+                                                        .bidder("appnexus")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .bidResponse(org.prebid.server.rubicon.analytics.proto
+                                                                .BidResponse.of(456, BigDecimal.valueOf(5.67),
+                                                                        "video", Dimensions.of(600, 700)))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("success")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .bidResponse(org.prebid.server.rubicon.analytics.proto
+                                                                .BidResponse.of(567, BigDecimal.valueOf(6.78),
+                                                                        "video", Dimensions.of(600, 700)))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("rubicon")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(null, null, null))
+                                                        .build(),
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("pubmatic")
+                                                        .status("error")
+                                                        .error(BidError.timeoutError("Timeout error"))
+                                                        .source("server")
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("bidRequestId-impId3")
+                                        .status("no-bid")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(400, 500)))
+                                        .siteId(654)
+                                        .zoneId(987)
+                                        .adUnitCode("storedId1")
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("rubicon")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .serverLatencyMillis(101)
+                                                        .serverHasUserId(true)
+                                                        .params(Params.of(321, 654, 987))
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("bidRequestId-impId4")
+                                        .status("no-bid")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(500, 600)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("bidRequestId-impId5")
+                                        .status("no-bid")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(600, 700)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("unknown")
+                                                        .status("no-bid")
+                                                        .source("server")
+                                                        .build()))
+                                        .build(),
+                                AdUnit.builder()
+                                        .transactionId("bidRequestId-impId6")
+                                        .status("error")
+                                        .mediaTypes(singletonList("banner"))
+                                        .dimensions(singletonList(Dimensions.of(800, 900)))
+                                        .bids(singletonList(
+                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                        .bidder("appnexus")
+                                                        .status("error")
+                                                        .error(BidError.timeoutError("Timeout error"))
+                                                        .source("server")
+                                                        .serverLatencyMillis(202)
+                                                        .serverHasUserId(false)
+                                                        .build()))
+                                        .build()), 123, 1000L, true))).build());
     }
 
     @Test
@@ -791,9 +782,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverHasUserId(true)
                                                         .params(Params.of(123, 456, 789))
                                                         .bidResponse(
-                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                        345, BigDecimal.valueOf(4.56), "video",
-                                                                        Dimensions.of(500, 600)))
+                                                                org.prebid.server.rubicon.analytics.proto
+                                                                        .BidResponse.of(345, BigDecimal.valueOf(4.56),
+                                                                        "video", Dimensions.of(500, 600)))
                                                         .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -812,9 +803,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .bidResponse(
-                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                        456, BigDecimal.valueOf(5.67), "video",
-                                                                        Dimensions.of(600, 700)))
+                                                                org.prebid.server.rubicon.analytics.proto
+                                                                        .BidResponse.of(456, BigDecimal.valueOf(5.67),
+                                                                        "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
@@ -823,9 +814,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .bidResponse(
-                                                                org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                                        567, BigDecimal.valueOf(6.78), "video",
-                                                                        Dimensions.of(600, 700)))
+                                                                org.prebid.server.rubicon.analytics.proto
+                                                                        .BidResponse.of(567, BigDecimal.valueOf(6.78),
+                                                                        "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
@@ -1322,7 +1313,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .build()))
                                 .build()))
                 .ext(mapper.valueToTree(
-                        ExtBidResponse.of(null, errors, doubleMap("rubicon", 101, "appnexus", 202), null, null)))
+                        ExtBidResponse.of(null, errors, doubleMap("rubicon", 101, "appnexus", 202), null, null, null)))
                 .build();
     }
 

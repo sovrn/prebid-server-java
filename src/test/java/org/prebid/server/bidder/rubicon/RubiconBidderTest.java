@@ -441,7 +441,6 @@ public class RubiconBidderTest extends VertxTest {
                 .containsOnly(RubiconVideoExt.of(5, 10, RubiconVideoExtRp.of(14), null));
     }
 
-
     @Test
     public void makeHttpRequestsShouldFillUserExtIfUserAndVisitorPresent() {
         // given
@@ -1721,12 +1720,12 @@ public class RubiconBidderTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(identity());
         final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest,
-                mapper.writeValueAsString((BidResponse.builder()
+                mapper.writeValueAsString(BidResponse.builder()
                         .bidid("bidid1") // returned bidid from XAPI
                         .seatbid(singletonList(SeatBid.builder()
                                 .bid(singletonList(Bid.builder().id("0").price(ONE).build()))
                                 .build()))
-                        .build())));
+                        .build()));
 
         // when
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, bidRequest);
@@ -1742,12 +1741,12 @@ public class RubiconBidderTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(identity());
         final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest,
-                mapper.writeValueAsString((BidResponse.builder()
+                mapper.writeValueAsString(BidResponse.builder()
                         .bidid("bidid1") // returned bidid from XAPI
                         .seatbid(singletonList(SeatBid.builder()
                                 .bid(singletonList(Bid.builder().id("non-zero").price(ONE).build()))
                                 .build()))
-                        .build())));
+                        .build()));
 
         // when
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, bidRequest);
@@ -1766,11 +1765,11 @@ public class RubiconBidderTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(identity());
         final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest,
-                mapper.writeValueAsString((BidResponse.builder()
+                mapper.writeValueAsString(BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder()
                                 .bid(singletonList(Bid.builder().id("bidid1").price(ONE).build()))
                                 .build()))
-                        .build())));
+                        .build()));
 
         // when
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, bidRequest);

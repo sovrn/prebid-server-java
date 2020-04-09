@@ -235,7 +235,7 @@ public class UidsAuditCookieServiceTest {
     }
 
     private static String getHostIpFromJvm() throws UnknownHostException, SocketException {
-        try (final DatagramSocket socket = new DatagramSocket()) {
+        try (DatagramSocket socket = new DatagramSocket()) {
             socket.connect(InetAddress.getByName("8.8.8.8"), 10002);
             return socket.getLocalAddress().getHostAddress();
         }

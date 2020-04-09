@@ -290,7 +290,7 @@ public class AmpRequestFactoryTest extends VertxTest {
     }
 
     @Test
-    public void shouldReturnBidRequestWithDefaultIncludeBidderKeysIfStoredBidRequestExtTargetingHasNoIncludeBidderKeys() {
+    public void shouldReturnBidRequestWithDefaultIncludeBidderKeysIfStoredRequestExtTargetingHasNoIncludeBidderKeys() {
         // given
         givenBidRequest(
                 builder -> builder
@@ -525,7 +525,6 @@ public class AmpRequestFactoryTest extends VertxTest {
                 .containsOnly(tuple("overridden-site-page", mapper.valueToTree(ExtSite.of(1, null))));
     }
 
-
     @Test
     public void shouldReturnBidRequestWithSitePublisherIdOverriddenWithAccountParamValue() {
         // given
@@ -548,7 +547,6 @@ public class AmpRequestFactoryTest extends VertxTest {
                         Publisher.builder().id("888").build(),
                         mapper.valueToTree(ExtSite.of(1, null))));
     }
-
 
     @Test
     public void shouldReturnBidRequestWithSitePublisherIdIfAccountParamValueIsInvalidInteger() {

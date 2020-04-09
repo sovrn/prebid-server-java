@@ -26,9 +26,9 @@ import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
-import org.prebid.server.execution.LogModifier;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
+import org.prebid.server.manager.AdminManager;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
@@ -56,7 +56,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
     private final Clock clock;
-    private final LogModifier logModifier;
+    private final AdminManager adminManager;
     private final JacksonMapper mapper;
 
     public AuctionHandler(AuctionRequestFactory auctionRequestFactory,
@@ -64,7 +64,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
                           AnalyticsReporter analyticsReporter,
                           Metrics metrics,
                           Clock clock,
-                          LogModifier logModifier,
+                          AdminManager adminManager,
                           JacksonMapper mapper) {
 
         this.auctionRequestFactory = Objects.requireNonNull(auctionRequestFactory);
@@ -72,7 +72,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
-        this.logModifier = Objects.requireNonNull(logModifier);
+        this.adminManager = Objects.requireNonNull(adminManager);
         this.mapper = Objects.requireNonNull(mapper);
     }
 
@@ -166,7 +166,8 @@ public class AuctionHandler implements Handler<RoutingContext> {
                         .map(msg -> String.format("Invalid request format: %s", msg))
                         .collect(Collectors.toList());
                 final String message = String.join("\n", errorMessages);
-                logModifier.get().accept(logger, logMessageFrom(invalidRequestException, message, context));
+                adminManager.accept(AdminManager.COUNTER_KEY, logger,
+                        logMessageFrom(invalidRequestException, message, context));
 
                 status = HttpResponseStatus.BAD_REQUEST.code();
                 body = message;

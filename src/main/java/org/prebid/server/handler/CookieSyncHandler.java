@@ -166,9 +166,9 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
         final Integer limit = cookieSyncRequest.getLimit();
         final Boolean coopSync = cookieSyncRequest.getCoopSync();
+        final Set<String> biddersToSync = biddersToSync(cookieSyncRequest.getBidders(), coopSync, limit);
         final List<String> bidders = cookieSyncRequest.getBidders();
         final boolean requestHasBidders = CollectionUtils.isNotEmpty(bidders);
-        final Set<String> biddersToSync = biddersToSync(cookieSyncRequest.getBidders(), coopSync, limit);
 
         final String gdprAsString = gdpr != null ? gdpr.toString() : null;
         final Ccpa ccpa = Ccpa.of(cookieSyncRequest.getUsPrivacy());
@@ -273,8 +273,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                     : null;
             if (hostActions == null || hostActions.isBlockPixelSync()) {
                 // host vendor should be allowed by TCF verification
-                respondWith(context, uidsCookie, privacy, biddersToSync, biddersToSync, limit, REJECTED_BY_TCF, account,
-                        requestHasBidders);
+                respondWith(context, uidsCookie, privacy, biddersToSync, biddersToSync, limit, REJECTED_BY_TCF,
+                        account, requestHasBidders);
             } else {
                 final Map<String, PrivacyEnforcementAction> bidderNameToAction = tcfResponse.getBidderNameToActionMap();
 

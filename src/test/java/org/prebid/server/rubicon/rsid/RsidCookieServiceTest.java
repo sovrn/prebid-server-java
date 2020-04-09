@@ -63,8 +63,8 @@ public class RsidCookieServiceTest {
         // given
         given(context.cookieMap())
                 .willReturn(singletonMap("rsid", Cookie.cookie("rsid",
-                        "chars_before_pipe|B9qWECXyvoJUFeX6MlUI0rdsb6KO+1hVre/oD1mN/CN4VoLIUnj4T/IHduc/n6k03b" +
-                                "YgvBh7oB3JHIxCI7JZAa8E5oMBeRSWa9qr15frXLoJaNEy0hbrXDlIwC9iqGWqIrmhaA==")));
+                        "chars_before_pipe|B9qWECXyvoJUFeX6MlUI0rdsb6KO+1hVre/oD1mN/CN4VoLIUnj4T/IHduc/n6k03b"
+                                + "YgvBh7oB3JHIxCI7JZAa8E5oMBeRSWa9qr15frXLoJaNEy0hbrXDlIwC9iqGWqIrmhaA==")));
 
         // when
         final Rsid rsid = rsidCookieService.parseFromRequest(context);
@@ -72,7 +72,6 @@ public class RsidCookieServiceTest {
         // then
         assertThat(rsid).isEqualTo(Rsid.of("us"));
     }
-
 
     @Test
     public void shouldReturnExpectedResultsForVarianceOfInputs() {
