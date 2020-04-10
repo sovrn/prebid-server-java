@@ -13,6 +13,8 @@ adapters:
     enabled: true
   brightroll:
     enabled: true
+  consumable:
+    enabled: true
   conversant:
     enabled: true
   ix:
@@ -26,6 +28,10 @@ adapters:
   rubicon:
     enabled: true
   sovrn:
+    enabled: true
+  triplelift:
+    enabled: true
+  yieldmo:
     enabled: true
 auction:
   ad-server-currency: USD
