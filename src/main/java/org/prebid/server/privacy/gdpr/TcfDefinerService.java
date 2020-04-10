@@ -20,6 +20,8 @@ import org.prebid.server.privacy.gdpr.model.TcfResponse;
 import org.prebid.server.privacy.gdpr.model.VendorPermission;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.rubicon.rsid.model.Rsid;
+import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountGdprConfig;
 import org.prebid.server.settings.model.GdprConfig;
 
 import java.time.Instant;
@@ -59,23 +61,11 @@ public class TcfDefinerService {
         this.rsidCookieService = Objects.requireNonNull(rsidCookieService);
         this.gdprEnabled = gdprConfig != null && BooleanUtils.isNotFalse(gdprConfig.getEnabled());
         this.gdprDefaultValue = gdprConfig != null ? gdprConfig.getDefaultValue() : null;
-        this.gdprService = gdprService;
-        this.tcf2Service = tcf2Service;
-        this.eeaCountries = eeaCountries;
+        this.gdprService = Objects.requireNonNull(gdprService);
+        this.tcf2Service = Objects.requireNonNull(tcf2Service);
+        this.eeaCountries = Objects.requireNonNull(eeaCountries);
         this.geoLocationService = geoLocationService;
-        this.metrics = metrics;
-
-        checkForRequiredServices();
-    }
-
-    private void checkForRequiredServices() {
-        if (gdprEnabled) {
-            Objects.requireNonNull(gdprDefaultValue);
-            Objects.requireNonNull(gdprService);
-            Objects.requireNonNull(tcf2Service);
-            Objects.requireNonNull(eeaCountries);
-            Objects.requireNonNull(metrics);
-        }
+        this.metrics = Objects.requireNonNull(metrics);
     }
 
     // vendorIds and BidderNames can't contain null elements
@@ -84,9 +74,10 @@ public class TcfDefinerService {
                                          String gdpr,
                                          String gdprConsent,
                                          String ipAddress,
+                                         Account account,
                                          Timeout timeout,
                                          RoutingContext context) {
-        if (BooleanUtils.isFalse(gdprEnabled)) {
+        if (isGdprDisabled(gdprEnabled, account)) {
             return allowAll(vendorIds, bidderNames, null);
         }
 
@@ -94,6 +85,18 @@ public class TcfDefinerService {
         final Set<GdprPurpose> gdprPurposes = Collections.singleton(GdprPurpose.informationStorageAndAccess);
         return tcfPurposeForEachVendor(gdprPurposes, vendorIds, bidderNames, gdpr, gdprConsent, ipAddress, timeout,
                 context);
+    }
+
+    private boolean isGdprDisabled(Boolean gdprEnabled, Account account) {
+        final Boolean legacyEnforcement = account == null ? null : account.getEnforceGdpr();
+        final AccountGdprConfig gdpr = account == null ? null : account.getGdpr();
+        final Boolean tcf2Enforcement = gdpr == null ? null : BooleanUtils.isNotFalse(gdpr.getEnabled());
+
+        if (legacyEnforcement == null && tcf2Enforcement == null) {
+            return BooleanUtils.isFalse(gdprEnabled);
+        }
+
+        return BooleanUtils.isFalse(tcf2Enforcement) || BooleanUtils.isFalse(legacyEnforcement);
     }
 
     // vendorIds and BidderNames can't contain null elements

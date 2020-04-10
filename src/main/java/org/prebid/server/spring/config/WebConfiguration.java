@@ -310,9 +310,10 @@ public class WebConfiguration {
     CookieSyncHandler cookieSyncHandler(
             @Value("${external-url}") String externalUrl,
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
+            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
             @Value("${cookie-sync.default-timeout-ms}") int defaultTimeoutMs,
             UidsCookieService uidsCookieService,
-            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
+            ApplicationSettings applicationSettings,
             BidderCatalog bidderCatalog,
             CoopSyncPriorities coopSyncPriorities,
             TcfDefinerService tcfDefinerService,
@@ -324,16 +325,17 @@ public class WebConfiguration {
             Metrics metrics,
             TimeoutFactory timeoutFactory,
             JacksonMapper mapper) {
-        return new CookieSyncHandler(enableCookie, externalUrl, defaultTimeoutMs, uidsCookieService,
-                uidsAuditCookieService, bidderCatalog,
-                tcfDefinerService, privacyEnforcementService, hostVendorId, useGeoLocation, defaultCoopSync,
-                coopSyncPriorities.getPri(), analyticsReporter, metrics, timeoutFactory, mapper);
+        return new CookieSyncHandler(enableCookie, uidsAuditCookieService, externalUrl, defaultTimeoutMs,
+                uidsCookieService, applicationSettings, bidderCatalog, tcfDefinerService, privacyEnforcementService,
+                hostVendorId, useGeoLocation, defaultCoopSync, coopSyncPriorities.getPri(), analyticsReporter, metrics,
+                timeoutFactory, mapper);
     }
 
     @Bean
     SetuidHandler setuidHandler(
             @Value("${setuid.default-timeout-ms}") int defaultTimeoutMs,
             UidsCookieService uidsCookieService,
+            ApplicationSettings applicationSettings,
             BidderCatalog bidderCatalog,
             TcfDefinerService tcfDefinerService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
@@ -344,8 +346,9 @@ public class WebConfiguration {
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService) {
 
-        return new SetuidHandler(defaultTimeoutMs, uidsCookieService, bidderCatalog, tcfDefinerService, hostVendorId,
-                useGeoLocation, analyticsReporter, metrics, timeoutFactory, enableCookie, uidsAuditCookieService);
+        return new SetuidHandler(defaultTimeoutMs, uidsCookieService, applicationSettings, bidderCatalog,
+                tcfDefinerService, hostVendorId, useGeoLocation, analyticsReporter, metrics, timeoutFactory,
+                enableCookie, uidsAuditCookieService);
     }
 
     @Bean
