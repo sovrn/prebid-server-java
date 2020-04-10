@@ -24,10 +24,6 @@
                 "hb_bidder_rubicon": "rubicon",
                 "hb_bidid_rubicon": "466223845",
                 "hb_bidid": "466223845"
-              },
-              "events": {
-                "win": "http://localhost:8000/event?t=win&b=466223845&a=5001&ts=1000&bidder=rubicon&f=i",
-                "imp": "http://localhost:8000/event?t=imp&b=466223845&a=5001&ts=1000&bidder=rubicon&f=i"
               }
             }
           }
@@ -70,10 +66,6 @@
                 "playbackmethod": [
                   1
                 ]
-              },
-              "events": {
-                "win": "http://localhost:8000/event?t=win&b=31124&a=5001&ts=1000&bidder=rubicon&f=i",
-                "imp": "http://localhost:8000/event?t=imp&b=31124&a=5001&ts=1000&bidder=rubicon&f=i"
               }
             }
           }
@@ -88,7 +80,9 @@
     "responsetimemillis": {
       "rubicon": "{{ rubicon.response_time_ms }}"
     },
-    "auctiontimestamp": 1000,
+    "prebid": {
+      "auctiontimestamp": 1000
+    },
     "tmaxrequest": 5000
   }
 }

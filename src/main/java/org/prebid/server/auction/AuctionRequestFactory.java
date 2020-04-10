@@ -682,7 +682,7 @@ public class AuctionRequestFactory {
         final Site site = bidRequest.getSite();
         final Publisher sitePublisher = site != null ? site.getPublisher() : null;
 
-        final Publisher publisher = ObjectUtils.firstNonNull(appPublisher, sitePublisher);
+        final Publisher publisher = ObjectUtils.defaultIfNull(appPublisher, sitePublisher);
         final String publisherId = publisher != null ? resolvePublisherId(publisher) : null;
         if (StringUtils.isNotEmpty(publisherId)) {
             return publisherId;
