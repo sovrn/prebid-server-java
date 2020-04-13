@@ -314,7 +314,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final String bidId = notificationEvent.getBidId();
         final Account account = notificationEvent.getAccount();
         final HttpContext context = notificationEvent.getHttpContext();
-
+        final Long timestamp = notificationEvent.getTimestamp();
         if (bidId == null || account == null || context == null) {
             return;
         }
@@ -338,15 +338,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final NotificationEvent.Type type = notificationEvent.getType();
         final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(context.getCookies());
         final Event event = type == NotificationEvent.Type.win
-                ? makeWinEvent(bidId, accountId, context, uidsCookie)
-                : makeImpEvent(bidId, accountId, context, uidsCookie);
+                ? makeWinEvent(bidId, accountId, context, timestamp, uidsCookie)
+                : makeImpEvent(bidId, accountId, context, timestamp, uidsCookie);
 
         postEvent(event, false);
     }
 
-    private Event makeWinEvent(String bidId, Integer accountId, HttpContext context,
+    private Event makeWinEvent(String bidId, Integer accountId, HttpContext context, Long timestamp,
                                UidsCookie uidsCookie) {
-        return eventBuilderFromNotification(context)
+        return eventBuilderFromNotification(context, timestamp)
                 .bidsWon(Collections.singletonList(BidWon.builder()
                         .accountId(accountId)
                         .bidId(bidId)
@@ -358,9 +358,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .build();
     }
 
-    private Event makeImpEvent(String bidId, Integer accountId, HttpContext context,
+    private Event makeImpEvent(String bidId, Integer accountId, HttpContext context, Long timestamp,
                                UidsCookie uidsCookie) {
-        return eventBuilderFromNotification(context)
+        return eventBuilderFromNotification(context, timestamp)
                 .impressions(Collections.singletonList(Impression.builder()
                         .bidder(RUBICON_BIDDER)
                         .accountId(accountId)
@@ -373,9 +373,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .build();
     }
 
-    private Event.EventBuilder eventBuilderFromNotification(HttpContext context) {
+    private Event.EventBuilder eventBuilderFromNotification(HttpContext context, Long timestamp) {
         return Event.builder()
-                .eventTimeMillis(Instant.now().toEpochMilli())
+                .eventTimeMillis(timestamp != null ? timestamp : Instant.now().toEpochMilli())
                 .integration(PBS_INTEGRATION)
                 .version(pbsVersion)
                 .referrerUri(context.getHeaders().get(REFERER_HEADER))

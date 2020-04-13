@@ -517,6 +517,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .type(NotificationEvent.Type.win)
                 .bidId("bidid")
                 .account(Account.builder().id("123123").build())
+                .timestamp(1000L)
                 .httpContext(httpContext)
                 .build();
 
@@ -546,7 +547,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         final Event actual = mapper.readValue(eventCaptor.getValue(), Event.class);
         then(actual).isEqualToIgnoringGivenFields(expectedWinEvent, "eventTimeMillis");
-        assertThat(actual.getEventTimeMillis()).isCloseTo(Instant.now().toEpochMilli(), within(400L));
+        assertThat(actual.getEventTimeMillis()).isEqualTo(1000L);
     }
 
     @Test
