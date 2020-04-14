@@ -30,10 +30,6 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
-import org.prebid.server.bidder.rubicon.proto.RubiconExt;
-import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebid;
-import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBidders;
-import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBiddersBidder;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheContext;
 import org.prebid.server.cache.model.CacheHttpCall;
@@ -62,6 +58,10 @@ import org.prebid.server.proto.openrtb.ext.response.ExtBidResponsePrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
+import org.prebid.server.rubicon.proto.request.ExtRequest;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.VideoStoredDataResult;
 
@@ -1218,14 +1218,15 @@ public class BidResponseCreatorTest extends VertxTest {
     }
 
     @Test
-    public void shouldPassIntegrationToCacheService() {
+    public void shouldPassIntegrationToCacheServiceAndBidEvents() {
         // given
         final BidRequest bidRequest = BidRequest.builder()
+                .cur(singletonList("USD"))
                 .imp(emptyList())
-                .ext(mapper.valueToTree(RubiconExt.of(
-                        RubiconExtPrebid.of(
-                                RubiconExtPrebidBidders.of(
-                                        RubiconExtPrebidBiddersBidder.of("integration"))))))
+                .ext(mapper.valueToTree(ExtRequest.of(
+                        ExtRequestPrebid.of(
+                                ExtRequestPrebidBidders.of(
+                                        ExtRequestPrebidBiddersRubicon.of("integration", null))))))
                 .build();
 
         final Bid bid = Bid.builder().id("bidId1").impid("impId1").price(BigDecimal.valueOf(5.67)).build();
@@ -1236,12 +1237,23 @@ public class BidResponseCreatorTest extends VertxTest {
 
         givenCacheServiceResult(singletonMap(bid, CacheIdInfo.of(null, null)));
 
+        given(eventsService.winUrlTargeting(anyString(), anyString(), anyLong())).willReturn("http://win-url");
+        given(eventsService.createEvent(anyString(), anyString(), anyString(), anyLong()))
+                .willReturn(Events.of("http://win-url?param=value", "http://imp-url?param=value"));
+
         // when
-        bidResponseCreator.create(bidderResponses, bidRequest, null, cacheInfo, ACCOUNT, false, 1000L, false, timeout);
+        final Future<BidResponse> result = bidResponseCreator.create(bidderResponses, bidRequest, givenTargeting(),
+                cacheInfo, Account.builder().id("accountId").eventsEnabled(true).build(), true, 1000L, false, timeout);
 
         // then
         verify(cacheService).cacheBidsOpenrtb(anyList(), anyList(), any(), any(),
                 argThat(eventsContext -> eventsContext.getIntegration().equals("integration")), any());
+
+        assertThat(result.result().getSeatbid())
+                .flatExtracting(SeatBid::getBid).hasSize(1)
+                .extracting(extractedBid -> toExtPrebid(extractedBid.getExt()).getPrebid().getEvents())
+                .containsOnly(Events.of("http://win-url?param=value&int=integration",
+                        "http://imp-url?param=value&int=integration"));
     }
 
     private void givenCacheServiceResult(Map<Bid, CacheIdInfo> cacheBids) {

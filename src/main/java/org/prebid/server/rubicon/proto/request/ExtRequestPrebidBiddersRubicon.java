@@ -1,4 +1,4 @@
-package org.prebid.server.rubicon.analytics.proto;
+package org.prebid.server.rubicon.proto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Value;
@@ -13,4 +13,3 @@ public class ExtRequestPrebidBiddersRubicon {
 
     String wrappername;
 }
-

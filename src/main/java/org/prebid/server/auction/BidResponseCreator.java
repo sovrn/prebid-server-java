@@ -27,10 +27,6 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
-import org.prebid.server.bidder.rubicon.proto.RubiconExt;
-import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebid;
-import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBidders;
-import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBiddersBidder;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheContext;
 import org.prebid.server.cache.model.CacheHttpCall;
@@ -62,6 +58,10 @@ import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseDebug;
+import org.prebid.server.rubicon.proto.request.ExtRequest;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.VideoStoredDataResult;
 import org.prebid.server.util.HttpUtil;
@@ -805,16 +805,16 @@ public class BidResponseCreator {
     }
 
     private String integrationFrom(BidRequest bidRequest) {
-        final RubiconExt rubiconExt;
+        final ExtRequest extRequest;
         try {
-            rubiconExt = mapper.mapper().convertValue(bidRequest.getExt(), RubiconExt.class);
+            extRequest = mapper.mapper().convertValue(bidRequest.getExt(), ExtRequest.class);
         } catch (IllegalArgumentException e) {
             return null;
         }
-        final RubiconExtPrebid prebid = rubiconExt == null ? null : rubiconExt.getPrebid();
-        final RubiconExtPrebidBidders bidders = prebid == null ? null : prebid.getBidders();
-        final RubiconExtPrebidBiddersBidder rubiconBidder = bidders == null ? null : bidders.getBidder();
-        final String integration = rubiconBidder == null ? null : rubiconBidder.getIntegration();
+        final ExtRequestPrebid prebid = extRequest == null ? null : extRequest.getPrebid();
+        final ExtRequestPrebidBidders bidders = prebid == null ? null : prebid.getBidders();
+        final ExtRequestPrebidBiddersRubicon rubicon = bidders != null ? bidders.getRubicon() : null;
+        final String integration = rubicon != null ? rubicon.getIntegration() : null;
         return StringUtils.stripToNull(integration);
     }
 
