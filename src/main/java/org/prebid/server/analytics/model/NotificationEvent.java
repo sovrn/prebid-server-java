@@ -21,6 +21,8 @@ public class NotificationEvent {
 
     Long timestamp;
 
+    String integration; // Rubicon-fork only
+
     HttpContext httpContext;
 
     public enum Type {

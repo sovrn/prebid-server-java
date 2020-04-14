@@ -30,6 +30,10 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
+import org.prebid.server.bidder.rubicon.proto.RubiconExt;
+import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebid;
+import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBidders;
+import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBiddersBidder;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheContext;
 import org.prebid.server.cache.model.CacheHttpCall;
@@ -1211,6 +1215,33 @@ public class BidResponseCreatorTest extends VertxTest {
         assertThat(responseExt.getDebug().getResolvedrequest()).isEqualTo(bidRequest);
 
         verify(cacheService).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void shouldPassIntegrationToCacheService() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(emptyList())
+                .ext(mapper.valueToTree(RubiconExt.of(
+                        RubiconExtPrebid.of(
+                                RubiconExtPrebidBidders.of(
+                                        RubiconExtPrebidBiddersBidder.of("integration"))))))
+                .build();
+
+        final Bid bid = Bid.builder().id("bidId1").impid("impId1").price(BigDecimal.valueOf(5.67)).build();
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
+                givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
+
+        final BidRequestCacheInfo cacheInfo = BidRequestCacheInfo.builder().doCaching(true).build();
+
+        givenCacheServiceResult(singletonMap(bid, CacheIdInfo.of(null, null)));
+
+        // when
+        bidResponseCreator.create(bidderResponses, bidRequest, null, cacheInfo, ACCOUNT, false, 1000L, false, timeout);
+
+        // then
+        verify(cacheService).cacheBidsOpenrtb(anyList(), anyList(), any(), any(),
+                argThat(eventsContext -> eventsContext.getIntegration().equals("integration")), any());
     }
 
     private void givenCacheServiceResult(Map<Bid, CacheIdInfo> cacheBids) {

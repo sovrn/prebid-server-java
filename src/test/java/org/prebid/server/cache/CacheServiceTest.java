@@ -976,6 +976,36 @@ public class CacheServiceTest extends VertxTest {
     }
 
     @Test
+    public void cacheBidsOpenrtbShouldAddIntegrationToVastUrlTracking() throws IOException {
+        // given
+        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder.id("bid1").impid("impId1")
+                .adm("<Impression>http:/test.com</Impression>"));
+        final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
+
+        given(eventsService.vastUrlTracking(any(), any(), any(), any()))
+                .willReturn("http://vast-url?param=value");
+
+        // when
+        cacheService.cacheBidsOpenrtb(singletonList(bid), singletonList(imp1),
+                CacheContext.builder()
+                        .shouldCacheVideoBids(true)
+                        .bidderToVideoBidIdsToModify(singletonMap("bidder", singletonList("bid1")))
+                        .bidderToBidIds(singletonMap("bidder", singletonList("bid1")))
+                        .build(), account, EventsContext.builder().integration("integration").build(), timeout);
+
+        // then
+        final BidCacheRequest bidCacheRequest = captureBidCacheRequest();
+        assertThat(bidCacheRequest.getPuts())
+                .containsOnly(
+                        PutObject.builder()
+                                .type("xml")
+                                .value(new TextNode("<Impression>http:/test.com</Impression><Impression>"
+                                        + "<![CDATA[http://vast-url?param=value&int=integration]]>"
+                                        + "</Impression>"))
+                                .build());
+    }
+
+    @Test
     public void cachePutObjectsShouldTolerateGlobalTimeoutAlreadyExpired() {
         // when
         final Future<BidCacheResponse> future = cacheService.cachePutObjects(singletonList(PutObject.builder().build()),

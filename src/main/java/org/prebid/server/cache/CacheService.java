@@ -195,7 +195,7 @@ public class CacheService {
             final JsonNode value = putObject.getValue();
             if (biddersAllowingVastUpdate.contains(putObject.getBidder()) && value != null) {
                 final String updatedVastXml = modifyVastXml(value.asText(), putObject.getBidid(),
-                        putObject.getBidder(), accountId, putObject.getTimestamp());
+                        putObject.getBidder(), accountId, putObject.getTimestamp(), null);
                 builder.value(new TextNode(updatedVastXml)).build();
             }
 
@@ -235,7 +235,8 @@ public class CacheService {
                     impIdToTtl, videoImpIds, impWithNoExpExists, cacheContext.getCacheVideoBidsTtl(), account);
 
             result = doCacheOpenrtb(cacheBids, videoCacheBids, cacheContext.getBidderToVideoBidIdsToModify(),
-                    cacheContext.getBidderToBidIds(), account, eventsContext.getAuctionTimestamp(), timeout);
+                    cacheContext.getBidderToBidIds(), account, eventsContext.getAuctionTimestamp(),
+                    timeout, eventsContext.getIntegration());
         }
 
         return result;
@@ -311,12 +312,13 @@ public class CacheService {
     private Future<CacheServiceResult> doCacheOpenrtb(List<CacheBid> bids, List<CacheBid> videoBids,
                                                       Map<String, List<String>> bidderToVideoBidIdsToModify,
                                                       Map<String, List<String>> biddersToCacheBidIds,
-                                                      Account account, Long auctionTimestamp, Timeout timeout) {
+                                                      Account account, Long auctionTimestamp,
+                                                      Timeout timeout, String integration) {
         final List<PutObject> putObjects = Stream.concat(
                 bids.stream().map(cacheBid -> createJsonPutObjectOpenrtb(cacheBid, biddersToCacheBidIds, account,
                         auctionTimestamp)),
                 videoBids.stream().map(cacheBid -> createXmlPutObjectOpenrtb(cacheBid, bidderToVideoBidIdsToModify,
-                        account.getId(), auctionTimestamp)))
+                        account.getId(), auctionTimestamp, integration)))
                 .collect(Collectors.toList());
 
         if (putObjects.isEmpty()) {
@@ -423,7 +425,7 @@ public class CacheService {
      */
     private PutObject createXmlPutObjectOpenrtb(CacheBid cacheBid,
                                                 Map<String, List<String>> bidderToVideoBidIdsToModify,
-                                                String accountId, Long auctionTimestamp) {
+                                                String accountId, Long auctionTimestamp, String integration) {
         final com.iab.openrtb.response.Bid bid = cacheBid.getBid();
         String vastXml;
         if (bid.getAdm() == null) {
@@ -441,7 +443,7 @@ public class CacheService {
                 .filter(biddersAndBidIds -> biddersAndBidIds.getValue().contains(bidId))
                 .findFirst()
                 .map(Map.Entry::getKey)
-                .map(bidder -> modifyVastXml(vastXml, bidId, bidder, accountId, auctionTimestamp))
+                .map(bidder -> modifyVastXml(vastXml, bidId, bidder, accountId, auctionTimestamp, integration))
                 .orElse(vastXml);
 
         return PutObject.builder()
@@ -451,7 +453,8 @@ public class CacheService {
                 .build();
     }
 
-    private String modifyVastXml(String stringValue, String bidId, String bidder, String accountId, Long timestamp) {
+    private String modifyVastXml(String stringValue, String bidId, String bidder, String accountId, Long timestamp,
+                                 String integration) {
         final String closeTag = "</Impression>";
         final int closeTagIndex = stringValue.indexOf(closeTag);
 
@@ -461,7 +464,10 @@ public class CacheService {
         }
 
         final String vastUrlTracking = eventsService.vastUrlTracking(bidId, bidder, accountId, timestamp);
-        final String impressionUrl = "<![CDATA[" + vastUrlTracking + "]]>";
+        final String vastUrlTrackingWithIntegration = integration != null
+                ? vastUrlTracking + "&int=" + integration
+                : vastUrlTracking;
+        final String impressionUrl = "<![CDATA[" + vastUrlTrackingWithIntegration + "]]>";
         final String openTag = "<Impression>";
 
         // empty impression tag - just insert the link

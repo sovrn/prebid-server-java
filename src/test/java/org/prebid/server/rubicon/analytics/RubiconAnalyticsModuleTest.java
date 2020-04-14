@@ -518,6 +518,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .bidId("bidid")
                 .account(Account.builder().id("123123").build())
                 .timestamp(1000L)
+                .integration("integration")
                 .httpContext(httpContext)
                 .build();
 
@@ -529,7 +530,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
 
         final Event expectedWinEvent = Event.builder()
-                .integration("pbs")
+                .integration("integration")
                 .version("pbs-version-1")
                 .referrerUri("http://referer")
                 .limitAdTracking(true)
@@ -563,6 +564,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.imp)
                 .bidId("bidid")
+                .bidder("bidder")
                 .account(Account.builder().id("222").build())
                 .httpContext(httpContext)
                 .build();
@@ -581,9 +583,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .limitAdTracking(true)
                 .userAgent("ua")
                 .impressions(singletonList(Impression.builder()
-                        .bidder("rubicon")
-                        .accountId(222)
                         .bidId("bidid")
+                        .bidder("bidder")
+                        .accountId(222)
                         .status("success")
                         .source("server")
                         .serverHasUserId(true)

@@ -165,6 +165,51 @@ public class EventUtilTest {
     }
 
     @Test
+    public void validateIntegrationShouldFailWhenIntegrationHasInvalidSymbol() {
+        // given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("int", "invalid-_123*"));
+
+        // when and then
+        assertThatIllegalArgumentException().isThrownBy(() -> EventUtil.validateIntegration(routingContext))
+                .withMessage("Integration 'int' query parameter is not valid: invalid-_123*");
+    }
+
+    @Test
+    public void validateIntegrationShouldFailWhenIntegrationIsTooLong() {
+        // given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("int", "11111111112222222222333333333344444444445555555555666666666677777"));
+
+        // when and then
+        assertThatIllegalArgumentException().isThrownBy(() -> EventUtil.validateIntegration(routingContext))
+                .withMessage("Integration 'int' query parameter is longer 64 symbols: "
+                        + "11111111112222222222333333333344444444445555555555666666666677777");
+    }
+
+    @Test
+    public void validateIntegrationShouldSucceedForEmptyValue() {
+        // given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("int", ""));
+
+        // when and then
+        assertThatCode(() -> EventUtil.validateIntegration(routingContext))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void validateIntegrationShouldSucceedForAlphaNumericUnderscoreAndDash() {
+        // given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("int", "int_-123"));
+
+        // when and then
+        assertThatCode(() -> EventUtil.validateIntegration(routingContext))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     public void fromShouldReturnExpectedEventRequest() {
         // given
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()

@@ -71,6 +71,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
             EventUtil.validateTimestamp(context);
             EventUtil.validateFormat(context);
             EventUtil.validateAnalytics(context);
+            EventUtil.validateIntegration(context);
         } catch (IllegalArgumentException e) {
             respondWithBadStatus(context, e.getMessage());
             return;
@@ -87,6 +88,8 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
         if (eventRequest.getAnalytics() == EventRequest.Analytics.enabled) {
             getAccountById(eventRequest.getAccountId())
                     .setHandler(async -> handleEvent(async, eventRequest, context));
+        } else {
+            respondWithOkStatus(context, eventRequest.getFormat() == EventRequest.Format.image);
         }
     }
 
@@ -123,6 +126,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
                         .account(account)
                         .bidder(eventRequest.getBidder())
                         .timestamp(eventRequest.getTimestamp())
+                        .integration(eventRequest.getIntegration())
                         .httpContext(HttpContext.from(context))
                         .build();
                 analyticsReporter.processEvent(notificationEvent);

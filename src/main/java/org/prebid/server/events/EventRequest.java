@@ -24,6 +24,8 @@ public class EventRequest {
 
     Analytics analytics;
 
+    String integration; // Rubicon-fork only
+
     public enum Type {
 
         win, imp

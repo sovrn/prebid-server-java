@@ -20,12 +20,17 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.auction.model.BidRequestCacheInfo;
 import org.prebid.server.auction.model.BidderResponse;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
+import org.prebid.server.bidder.rubicon.proto.RubiconExt;
+import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebid;
+import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBidders;
+import org.prebid.server.bidder.rubicon.proto.RubiconExtPrebidBiddersBidder;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheContext;
 import org.prebid.server.cache.model.CacheHttpCall;
@@ -139,12 +144,14 @@ public class BidResponseCreator {
                     ? winningBids
                     : bidderResponses.stream().flatMap(BidResponseCreator::getBids).collect(Collectors.toSet());
 
+            final String integration = integrationFrom(bidRequest);
+
             result = toBidsWithCacheIds(bidderResponses, bidsToCache, bidRequest.getImp(), cacheInfo, account, timeout,
-                    auctionTimestamp)
+                    auctionTimestamp, integration)
                     .compose(cacheResult -> videoStoredDataResult(bidRequest.getImp(), timeout)
                             .map(videoStoredDataResult -> toBidResponse(bidderResponses, bidRequest, targeting,
                                     winningBids, winningBidsByBidder, cacheInfo, cacheResult, videoStoredDataResult,
-                                    account, eventsAllowedByRequest, auctionTimestamp, debugEnabled)));
+                                    account, eventsAllowedByRequest, auctionTimestamp, debugEnabled, integration)));
         }
 
         return result;
@@ -267,7 +274,8 @@ public class BidResponseCreator {
      */
     private Future<CacheServiceResult> toBidsWithCacheIds(List<BidderResponse> bidderResponses, Set<Bid> bidsToCache,
                                                           List<Imp> imps, BidRequestCacheInfo cacheInfo,
-                                                          Account account, Timeout timeout, Long auctionTimestamp) {
+                                                          Account account, Timeout timeout, Long auctionTimestamp,
+                                                          String integration) {
         final Future<CacheServiceResult> result;
 
         if (!cacheInfo.isDoCaching()) {
@@ -300,6 +308,7 @@ public class BidResponseCreator {
 
             final EventsContext eventsContext = EventsContext.builder()
                     .auctionTimestamp(auctionTimestamp)
+                    .integration(integration)
                     .build();
 
             result = cacheService.cacheBidsOpenrtb(bidsWithNonZeroPrice, imps, cacheContext, account, eventsContext,
@@ -517,14 +526,14 @@ public class BidResponseCreator {
             List<BidderResponse> bidderResponses, BidRequest bidRequest, ExtRequestTargeting targeting,
             Set<Bid> winningBids, Set<Bid> winningBidsByBidder, BidRequestCacheInfo cacheInfo,
             CacheServiceResult cacheResult, VideoStoredDataResult videoStoredDataResult, Account account,
-            boolean eventsAllowedByRequest, long auctionTimestamp, boolean debugEnabled) {
+            boolean eventsAllowedByRequest, long auctionTimestamp, boolean debugEnabled, String integration) {
 
         final Map<String, List<ExtBidderError>> bidErrors = new HashMap<>();
         final List<SeatBid> seatBids = bidderResponses.stream()
                 .filter(bidderResponse -> !bidderResponse.getSeatBid().getBids().isEmpty())
                 .map(bidderResponse -> toSeatBid(bidderResponse, targeting, bidRequest, winningBids,
                         winningBidsByBidder, cacheInfo, cacheResult.getCacheBids(), videoStoredDataResult, account,
-                        eventsAllowedByRequest, bidErrors, auctionTimestamp))
+                        eventsAllowedByRequest, bidErrors, auctionTimestamp, integration))
                 .collect(Collectors.toList());
 
         final ExtBidResponse extBidResponse = toExtBidResponse(bidderResponses, bidRequest, cacheResult,
@@ -583,14 +592,14 @@ public class BidResponseCreator {
                               Set<Bid> winningBids, Set<Bid> winningBidsByBidder, BidRequestCacheInfo cacheInfo,
                               Map<Bid, CacheIdInfo> cachedBids, VideoStoredDataResult videoStoredDataResult,
                               Account account, boolean eventsAllowedByRequest,
-                              Map<String, List<ExtBidderError>> bidErrors, long auctionTimestamp) {
+                              Map<String, List<ExtBidderError>> bidErrors, long auctionTimestamp, String integration) {
 
         final String bidder = bidderResponse.getBidder();
 
         final List<Bid> bids = bidderResponse.getSeatBid().getBids().stream()
                 .map(bidderBid -> toBid(bidderBid, bidder, targeting, bidRequest, winningBids, winningBidsByBidder,
                         cacheInfo, cachedBids, videoStoredDataResult.getImpIdToStoredVideo(), account,
-                        eventsAllowedByRequest, auctionTimestamp, bidErrors))
+                        eventsAllowedByRequest, auctionTimestamp, bidErrors, integration))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
@@ -608,7 +617,7 @@ public class BidResponseCreator {
                       Set<Bid> winningBids, Set<Bid> winningBidsByBidder, BidRequestCacheInfo cacheInfo,
                       Map<Bid, CacheIdInfo> bidsWithCacheIds, Map<String, Video> impIdToStoredVideo, Account account,
                       boolean eventsAllowedByRequest, long auctionTimestamp,
-                      Map<String, List<ExtBidderError>> bidErrors) {
+                      Map<String, List<ExtBidderError>> bidErrors, String integration) {
 
         final Bid bid = bidderBid.getBid();
         final BidType bidType = bidderBid.getType();
@@ -663,7 +672,8 @@ public class BidResponseCreator {
                 ? eventsService.createEvent(bid.getId(), bidder, account.getId(), auctionTimestamp)
                 : null;
 
-        final ExtBidPrebid prebidExt = ExtBidPrebid.of(bidType, targetingKeywords, cache, storedVideo, events, null);
+        final ExtBidPrebid prebidExt = ExtBidPrebid.of(bidType, targetingKeywords, cache, storedVideo,
+                addIntegration(events, integration), null);
         final ExtPrebid<ExtBidPrebid, ObjectNode> bidExt = ExtPrebid.of(prebidExt, bid.getExt());
         bid.setExt(mapper.mapper().valueToTree(bidExt));
 
@@ -792,5 +802,34 @@ public class BidResponseCreator {
      */
     private CacheAsset toCacheAsset(String cacheId) {
         return CacheAsset.of(cacheAssetUrlTemplate.concat(cacheId), cacheId);
+    }
+
+    private String integrationFrom(BidRequest bidRequest) {
+        final RubiconExt rubiconExt;
+        try {
+            rubiconExt = mapper.mapper().convertValue(bidRequest.getExt(), RubiconExt.class);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        final RubiconExtPrebid prebid = rubiconExt == null ? null : rubiconExt.getPrebid();
+        final RubiconExtPrebidBidders bidders = prebid == null ? null : prebid.getBidders();
+        final RubiconExtPrebidBiddersBidder rubiconBidder = bidders == null ? null : bidders.getBidder();
+        final String integration = rubiconBidder == null ? null : rubiconBidder.getIntegration();
+        return StringUtils.stripToNull(integration);
+    }
+
+    private static Events addIntegration(Events events, String integration) {
+        if (events != null && integration != null) {
+            return Events.of(addIntegration(events.getWin(), integration),
+                    addIntegration(events.getImp(), integration));
+        }
+        return events;
+    }
+
+    private static String addIntegration(String url, String integration) {
+        if (url != null && integration != null) {
+            return url + "&int=" + integration;
+        }
+        return url;
     }
 }

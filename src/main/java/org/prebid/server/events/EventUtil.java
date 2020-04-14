@@ -33,6 +33,9 @@ public class EventUtil {
     private static final String ENABLED_ANALYTICS = "1"; // default
     private static final String DISABLED_ANALYTICS = "0";
 
+    private static final String INT_PARAMETER = "int";
+    private static final int INT_PARAMETER_MAX_LENGTH = 64;
+
     private EventUtil() {
     }
 
@@ -92,6 +95,23 @@ public class EventUtil {
         }
     }
 
+    public static void validateIntegration(RoutingContext context) {
+        final String value = context.request().params().get(INT_PARAMETER);
+        if (StringUtils.isNotEmpty(value)) {
+            if (value.length() > INT_PARAMETER_MAX_LENGTH) {
+                throw new IllegalArgumentException(String.format(
+                        "Integration '%s' query parameter is longer %s symbols: %s",
+                        INT_PARAMETER, INT_PARAMETER_MAX_LENGTH, value));
+            }
+            for (int i = 0; i < value.length(); i++) {
+                if (!Character.isLetterOrDigit(value.charAt(i)) && value.charAt(i) != '-' && value.charAt(i) != '_') {
+                    throw new IllegalArgumentException(String.format(
+                            "Integration '%s' query parameter is not valid: %s", INT_PARAMETER, value));
+                }
+            }
+        }
+    }
+
     public static EventRequest from(RoutingContext context) {
         final MultiMap queryParams = context.request().params();
 
@@ -116,6 +136,7 @@ public class EventUtil {
                 .timestamp(timestamp)
                 .format(format)
                 .analytics(analytics)
+                .integration(queryParams.get(INT_PARAMETER))
                 .build();
     }
 
