@@ -316,7 +316,7 @@ public class CacheService {
                                                       Timeout timeout, String integration) {
         final List<PutObject> putObjects = Stream.concat(
                 bids.stream().map(cacheBid -> createJsonPutObjectOpenrtb(cacheBid, biddersToCacheBidIds, account,
-                        auctionTimestamp)),
+                        auctionTimestamp, integration)),
                 videoBids.stream().map(cacheBid -> createXmlPutObjectOpenrtb(cacheBid, bidderToVideoBidIdsToModify,
                         account.getId(), auctionTimestamp, integration)))
                 .collect(Collectors.toList());
@@ -399,7 +399,7 @@ public class CacheService {
      * Used for OpenRTB auction request. Also, adds win url to result object if events are enabled.
      */
     private PutObject createJsonPutObjectOpenrtb(CacheBid cacheBid, Map<String, List<String>> biddersToCacheBidIds,
-                                                 Account account, Long auctionTimestamp) {
+                                                 Account account, Long auctionTimestamp, String integration) {
         final com.iab.openrtb.response.Bid bid = cacheBid.getBid();
         final ObjectNode bidObjectNode = mapper.mapper().valueToTree(bid);
 
@@ -409,8 +409,8 @@ public class CacheService {
                     .filter(biddersAndBidIds -> biddersAndBidIds.getValue().contains(bidId))
                     .findFirst()
                     .map(Map.Entry::getKey)
-                    .ifPresent(bidder -> bidObjectNode.put("wurl", eventsService.winUrl(bidId, bidder, account.getId(),
-                            auctionTimestamp)));
+                    .ifPresent(bidder -> bidObjectNode.put("wurl", addIntegration(
+                            eventsService.winUrl(bidId, bidder, account.getId(), auctionTimestamp), integration)));
         }
 
         return PutObject.builder()
@@ -464,9 +464,7 @@ public class CacheService {
         }
 
         final String vastUrlTracking = eventsService.vastUrlTracking(bidId, bidder, accountId, timestamp);
-        final String vastUrlTrackingWithIntegration = integration != null
-                ? vastUrlTracking + "&int=" + integration
-                : vastUrlTracking;
+        final String vastUrlTrackingWithIntegration = addIntegration(vastUrlTracking, integration);
         final String impressionUrl = "<![CDATA[" + vastUrlTrackingWithIntegration + "]]>";
         final String openTag = "<Impression>";
 
@@ -617,5 +615,12 @@ public class CacheService {
                 .value(mapper.mapper().valueToTree(BannerValue.of(bid.getAdm(), bid.getNurl(), bid.getWidth(),
                         bid.getHeight())))
                 .build();
+    }
+
+    private static String addIntegration(String url, String integration) {
+        if (url != null && integration != null) {
+            return url + "&int=" + integration;
+        }
+        return url;
     }
 }
