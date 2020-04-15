@@ -115,6 +115,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private static final String MOBILE_DEVICE_CLASS = "mobile";
 
+    private static final String STORED_REQUEST_ID_AMP_URL_PARAM = "tag_id=";
+    private static final String URL_PARAM_SEPARATOR = "&";
+
     private static final Base64.Encoder BASE64_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
     private static final Map<Integer, String> VIDEO_SIZE_AD_FORMATS;
@@ -123,7 +126,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
             new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
             };
 
-    private static final TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>> RUBICON_IMP_EXT_TYPE_REFERENCE =
+    private static final TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>> IMP_EXT_TYPE_REFERENCE =
             new TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>>() {
             };
     private static final String APPLICATION_JSON =
@@ -299,15 +302,22 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         final String requestAccountId = account.getId();
         final Integer accountId = NumberUtils.isDigits(requestAccountId) ? parseId(requestAccountId) : null;
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+        final String storedId = parseStoredId(httpContext.getUri());
 
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
-            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
+            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, storedId);
 
             postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
                     this::eventBuilderBaseFromSite), isDebugEnabled(bidRequest));
         }
+    }
+
+    private String parseStoredId(String uri) {
+        // substringBetween can't handle "amp?tag_id=1001"
+        final String tagIdValueAndOthers = StringUtils.substringAfter(uri, STORED_REQUEST_ID_AMP_URL_PARAM);
+        return StringUtils.substringBefore(tagIdValueAndOthers, URL_PARAM_SEPARATOR);
     }
 
     private void processNotificationEvent(NotificationEvent notificationEvent) {
@@ -398,6 +408,19 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 : null;
         final Integer prebidDebug = extRequestPrebid != null ? extRequestPrebid.getDebug() : null;
         return Objects.equals(prebidDebug, 1);
+    }
+
+    private List<AdUnit> toAdUnits(BidRequest bidRequest,
+                                   UidsCookie uidsCookie,
+                                   BidResponse bidResponse,
+                                   String storedId) {
+
+        final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse);
+
+        return bidRequest.getImp().stream()
+                .map(imp -> toAdUnit(bidRequest, imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList()),
+                        storedId))
+                .collect(Collectors.toList());
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
@@ -607,15 +630,28 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     }
 
     private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids) {
+        final ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebid = extPrebidFromImp(imp);
+        final Params params = paramsFromPrebid(extPrebid.getBidder());
+        final String storedImpId = storedRequestId(extPrebid.getPrebid());
+
+        return toAdUnit(bidRequest, imp, bids, params, storedImpId);
+
+    }
+
+    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids, String storedImpId) {
+        final ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebid = extPrebidFromImp(imp);
+        final Params params = paramsFromPrebid(extPrebid.getBidder());
+
+        return toAdUnit(bidRequest, imp, bids, params, storedImpId);
+    }
+
+    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids, Params params, String storedId) {
         final boolean openrtbBidsFound = bids.stream().map(TwinBids::getOpenrtbBid).anyMatch(Objects::nonNull);
 
         final boolean errorsFound = bids.stream().map(TwinBids::getAnalyticsBid)
                 .map(org.prebid.server.rubicon.analytics.proto.Bid::getError)
                 .anyMatch(Objects::nonNull);
 
-        final ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebid = extPrebidFromImp(imp);
-        final Params params = paramsFromPrebid(extPrebid.getBidder());
-        final String storedRequestId = storedRequestId(extPrebid.getPrebid());
         return AdUnit.builder()
                 .transactionId(transactionIdFrom(bidRequest.getId(), imp.getId()))
                 .status(openrtbBidsFound ? SUCCESS_STATUS : errorsFound ? ERROR_STATUS : NO_BID_STATUS)
@@ -623,7 +659,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .mediaTypes(mediaTypesFromImp(imp))
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
                 .dimensions(dimensions(imp))
-                .adUnitCode(storedRequestId)
+                .adUnitCode(storedId)
                 .siteId(params.getSiteId())
                 .zoneId(params.getZoneId())
                 .adserverTargeting(targetingForImp(bids))
@@ -638,12 +674,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         }
         try {
             final ExtImpPrebid prebid =
-                    mapper.mapper().convertValue(impExt, RUBICON_IMP_EXT_TYPE_REFERENCE).getPrebid();
+                    mapper.mapper().convertValue(impExt, IMP_EXT_TYPE_REFERENCE).getPrebid();
 
-            final ExtImpRubicon impRubicon = readExt((ObjectNode) impExt.get(RUBICON_BIDDER), ExtImpRubicon.class);
+            final ObjectNode impExtRubicon = (ObjectNode) impExt.get(RUBICON_BIDDER);
+            final ExtImpRubicon impRubicon = impExtRubicon == null ? null : readExt(impExtRubicon, ExtImpRubicon.class);
             return ExtPrebid.of(prebid, impRubicon);
         } catch (IllegalArgumentException e) {
-            logger.warn("Error unmarshalling ext by type reference {0}", e, RUBICON_IMP_EXT_TYPE_REFERENCE);
+            logger.warn("Error unmarshalling ext by type reference {0}", e, IMP_EXT_TYPE_REFERENCE);
             return ExtPrebid.of(null, null);
         }
     }

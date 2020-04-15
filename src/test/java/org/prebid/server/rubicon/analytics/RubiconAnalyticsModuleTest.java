@@ -748,6 +748,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
 
+        httpContext = HttpContext.builder().uri("http://host-url/event/tag_id=storedId1").cookies(emptyMap()).build();
         final AmpEvent event = AmpEvent.builder()
                 .httpContext(httpContext)
                 .auctionContext(givenAuctionContext(sampleAmpBidRequest()))
@@ -762,9 +763,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
 
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBaseFromSite()
-                .auctions(singletonList(Auction.of(
-                        "bidRequestId",
-                        1,
+                .auctions(singletonList(Auction.of("bidRequestId", 1,
                         asList(
                                 AdUnit.builder()
                                         .transactionId("bidRequestId-impId1")
@@ -775,20 +774,20 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .adserverTargeting(singletonMap("key1", "value1"))
                                         .siteId(456)
                                         .zoneId(789)
-                                        .bids(singletonList(
-                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                        .bidId("bidId1")
-                                                        .bidder("rubicon")
-                                                        .status("success")
-                                                        .source("server")
-                                                        .serverLatencyMillis(101)
-                                                        .serverHasUserId(true)
-                                                        .params(Params.of(123, 456, 789))
-                                                        .bidResponse(
-                                                                org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of(345, BigDecimal.valueOf(4.56),
-                                                                        "video", Dimensions.of(500, 600)))
-                                                        .build()))
+                                        .adUnitCode("storedId1")
+                                        .bids(singletonList(org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                .bidId("bidId1")
+                                                .bidder("rubicon")
+                                                .status("success")
+                                                .source("server")
+                                                .serverLatencyMillis(101)
+                                                .serverHasUserId(true)
+                                                .params(Params.of(123, 456, 789))
+                                                .bidResponse(
+                                                        org.prebid.server.rubicon.analytics.proto
+                                                                .BidResponse.of(345, BigDecimal.valueOf(4.56),
+                                                                "video", Dimensions.of(500, 600)))
+                                                .build()))
                                         .build(),
                                 AdUnit.builder()
                                         .transactionId("bidRequestId-impId2")
@@ -797,6 +796,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .videoAdFormat("mid-roll")
                                         .dimensions(singletonList(Dimensions.of(100, 200)))
                                         .adserverTargeting(singletonMap("key22", "value22"))
+                                        .adUnitCode("storedId1")
                                         .bids(asList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidId("bidId2")
@@ -838,35 +838,35 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .siteId(654)
                                         .zoneId(987)
                                         .adUnitCode("storedId1")
-                                        .bids(singletonList(
-                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                        .bidder("rubicon")
-                                                        .status("no-bid")
-                                                        .source("server")
-                                                        .serverLatencyMillis(101)
-                                                        .serverHasUserId(true)
-                                                        .params(Params.of(321, 654, 987))
-                                                        .build()))
+                                        .bids(singletonList(org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                .bidder("rubicon")
+                                                .status("no-bid")
+                                                .source("server")
+                                                .serverLatencyMillis(101)
+                                                .serverHasUserId(true)
+                                                .params(Params.of(321, 654, 987))
+                                                .build()))
                                         .build(),
                                 AdUnit.builder()
                                         .transactionId("bidRequestId-impId4")
                                         .status("no-bid")
                                         .mediaTypes(singletonList("banner"))
                                         .dimensions(singletonList(Dimensions.of(500, 600)))
-                                        .bids(singletonList(
-                                                org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                                                        .bidder("appnexus")
-                                                        .status("no-bid")
-                                                        .source("server")
-                                                        .serverLatencyMillis(202)
-                                                        .serverHasUserId(false)
-                                                        .build()))
+                                        .adUnitCode("storedId1")
+                                        .bids(singletonList(org.prebid.server.rubicon.analytics.proto.Bid.builder()
+                                                .bidder("appnexus")
+                                                .status("no-bid")
+                                                .source("server")
+                                                .serverLatencyMillis(202)
+                                                .serverHasUserId(false)
+                                                .build()))
                                         .build(),
                                 AdUnit.builder()
                                         .transactionId("bidRequestId-impId5")
                                         .status("no-bid")
                                         .mediaTypes(singletonList("banner"))
                                         .dimensions(singletonList(Dimensions.of(600, 700)))
+                                        .adUnitCode("storedId1")
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("unknown")
@@ -879,6 +879,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .status("error")
                                         .mediaTypes(singletonList("banner"))
                                         .dimensions(singletonList(Dimensions.of(800, 900)))
+                                        .adUnitCode("storedId1")
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
