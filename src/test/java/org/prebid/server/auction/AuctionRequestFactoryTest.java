@@ -85,7 +85,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 public class AuctionRequestFactoryTest extends VertxTest {
 
     private static final List<String> BLACKLISTED_APPS = singletonList("bad_app");
-    private static final List<String> BLACKLISTED_ACCOUNTS = singletonList("bad_acc");
+    private static final List<String> BLACKLISTED_ACCOUNTS = singletonList("321");
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -220,7 +220,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
         final BidRequest bidRequest = BidRequest.builder()
                 .app(App.builder()
-                        .publisher(Publisher.builder().id("absentId").build())
+                        .publisher(Publisher.builder().id("1001").build())
                         .build())
                 .build();
 
@@ -230,12 +230,12 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Future<?> future = factory.fromRequest(routingContext, 0L);
 
         // then
-        verify(applicationSettings).getAccountById(eq("absentId"), any());
+        verify(applicationSettings).getAccountById(eq("1001"), any());
 
         assertThat(future.failed()).isTrue();
         assertThat(future.cause())
                 .isInstanceOf(UnauthorizedAccountException.class)
-                .hasMessage("Unauthorised account id absentId");
+                .hasMessage("Unauthorised account id 1001");
     }
 
     @Test
@@ -1129,7 +1129,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("bad_acc").build()).build())
+                        .publisher(Publisher.builder().id("321").build()).build())
                 .build());
 
         // when
@@ -1139,7 +1139,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         assertThat(result.failed()).isTrue();
         assertThat(result.cause())
                 .isInstanceOf(BlacklistedAccountException.class)
-                .hasMessage("Prebid-server has blacklisted Account ID: bad_acc, please reach out to the prebid "
+                .hasMessage("Prebid-server has blacklisted Account ID: 321, please reach out to the prebid "
                         + "server host.");
     }
 
@@ -1165,13 +1165,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("accountId")
-                                .ext(mapper.valueToTree(ExtPublisher.of(ExtPublisherPrebid.of("parentAccount"))))
+                        .publisher(Publisher.builder().id("1001")
+                                .ext(mapper.valueToTree(ExtPublisher.of(ExtPublisherPrebid.of("1002"))))
                                 .build())
                         .build())
                 .build());
 
-        final Account givenAccount = Account.builder().id("parentAccount").build();
+        final Account givenAccount = Account.builder().id("1002").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1179,7 +1179,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
 
         // then
-        verify(applicationSettings).getAccountById(eq("parentAccount"), any());
+        verify(applicationSettings).getAccountById(eq("1002"), any());
 
         assertThat(account).isSameAs(givenAccount);
     }
@@ -1189,11 +1189,11 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("accountId").ext(null).build())
+                        .publisher(Publisher.builder().id("1001").ext(null).build())
                         .build())
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("1001").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1201,7 +1201,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
 
         // then
-        verify(applicationSettings).getAccountById(eq("accountId"), any());
+        verify(applicationSettings).getAccountById(eq("1001"), any());
 
         assertThat(account).isSameAs(givenAccount);
     }
@@ -1211,12 +1211,12 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("accountId")
+                        .publisher(Publisher.builder().id("1001")
                                 .ext(mapper.valueToTree(ExtPublisher.of(null))).build())
                         .build())
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("1001").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1224,7 +1224,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
 
         // then
-        verify(applicationSettings).getAccountById(eq("accountId"), any());
+        verify(applicationSettings).getAccountById(eq("1001"), any());
 
         assertThat(account).isSameAs(givenAccount);
     }
@@ -1234,12 +1234,12 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("accountId")
+                        .publisher(Publisher.builder().id("1001")
                                 .ext(mapper.valueToTree(ExtPublisher.of(ExtPublisherPrebid.of("")))).build())
                         .build())
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("1001").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1247,7 +1247,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
 
         // then
-        verify(applicationSettings).getAccountById(eq("accountId"), any());
+        verify(applicationSettings).getAccountById(eq("1001"), any());
 
         assertThat(account).isSameAs(givenAccount);
     }
@@ -1263,7 +1263,55 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .build()))
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("123").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromRubiconImpExtIfAppPublisherIdIsNotValidNumber() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .app(App.builder().publisher(Publisher.builder().id("not-number").build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubicon",
+                                ExtImpRubicon.builder().accountId(123).build())))
+                        .build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("123").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromRubiconImpExtIfSitePublisherIdIsNotValidNumber() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().id("not-number").build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubicon",
+                                ExtImpRubicon.builder().accountId(123).build())))
+                        .build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("123").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1290,7 +1338,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .build(), null)))
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("123").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1326,8 +1374,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("accountId")
-                                .ext(mapper.valueToTree(ExtPublisher.of(ExtPublisherPrebid.of("parentAccount"))))
+                        .publisher(Publisher.builder().id("1001")
+                                .ext(mapper.valueToTree(ExtPublisher.of(ExtPublisherPrebid.of("1002"))))
                                 .build())
                         .build())
                 .build());
@@ -1339,9 +1387,9 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
 
         // then
-        verify(applicationSettings).getAccountById(eq("parentAccount"), any());
+        verify(applicationSettings).getAccountById(eq("1002"), any());
 
-        assertThat(account).isEqualTo(Account.builder().id("parentAccount").build());
+        assertThat(account).isEqualTo(Account.builder().id("1002").build());
     }
 
     @Test
@@ -1349,7 +1397,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .site(Site.builder()
-                        .publisher(Publisher.builder().id("accountId").build())
+                        .publisher(Publisher.builder().id("1001").build())
                         .build())
                 .build());
 
@@ -1360,9 +1408,9 @@ public class AuctionRequestFactoryTest extends VertxTest {
         final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
 
         // then
-        verify(applicationSettings).getAccountById(eq("accountId"), any());
+        verify(applicationSettings).getAccountById(eq("1001"), any());
 
-        assertThat(account).isEqualTo(Account.builder().id("accountId").build());
+        assertThat(account).isEqualTo(Account.builder().id("1001").build());
     }
 
     @Test
@@ -1398,7 +1446,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 ))
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("123").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 
@@ -1424,7 +1472,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .build()))
                 .build());
 
-        final Account givenAccount = Account.builder().id("accountId").build();
+        final Account givenAccount = Account.builder().id("123").build();
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(givenAccount));
 

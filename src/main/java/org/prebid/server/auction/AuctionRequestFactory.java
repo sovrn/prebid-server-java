@@ -684,22 +684,26 @@ public class AuctionRequestFactory {
 
         final Publisher publisher = ObjectUtils.defaultIfNull(appPublisher, sitePublisher);
         final String publisherId = publisher != null ? resolvePublisherId(publisher) : null;
-        if (StringUtils.isNotEmpty(publisherId)) {
+        if (accountIsValidNumber(publisherId)) {
             return publisherId;
         }
 
-        final String storedRequestAccountId = resolveExtStoredRequestAccountId(bidRequest);
-        if (StringUtils.isNotEmpty(storedRequestAccountId)) {
+        final String storedRequestAccountId = accountFromExtPrebidStoredRequestId(bidRequest);
+        if (accountIsValidNumber(storedRequestAccountId)) {
             return storedRequestAccountId;
         }
 
-        final String rubiconAccountId = resolveRubiconAccountId(bidRequest);
+        final String rubiconAccountId = accountFromImpExtRubiconAccountId(bidRequest);
         if (StringUtils.isNotEmpty(rubiconAccountId)) {
             return rubiconAccountId;
         }
 
-        final String impStoredRequestAccountId = resolveImpStoredRequestAccountId(bidRequest);
-        return ObjectUtils.defaultIfNull(impStoredRequestAccountId, StringUtils.EMPTY);
+        final String impStoredRequestAccountId = accountFromImpExtPrebidStoredRequestId(bidRequest);
+        if (accountIsValidNumber(impStoredRequestAccountId)) {
+            return impStoredRequestAccountId;
+        }
+
+        return StringUtils.EMPTY;
     }
 
     /**
@@ -730,7 +734,7 @@ public class AuctionRequestFactory {
         return extPublisherPrebid != null ? StringUtils.stripToNull(extPublisherPrebid.getParentAccount()) : null;
     }
 
-    private String resolveExtStoredRequestAccountId(BidRequest bidRequest) {
+    private String accountFromExtPrebidStoredRequestId(BidRequest bidRequest) {
         if (bidRequest.getExt() == null) {
             return null;
         }
@@ -768,7 +772,7 @@ public class AuctionRequestFactory {
      * Checks request impression extensions whether they have a rubicon extension, picks first and
      * takes account ID from it. If none is present - returns null.
      */
-    private String resolveRubiconAccountId(BidRequest bidRequest) {
+    private String accountFromImpExtRubiconAccountId(BidRequest bidRequest) {
         final Set<String> nameAndAliases = new HashSet<>();
         nameAndAliases.add(RUBICON_BIDDER);
         nameAndAliases.addAll(rubiconAliases(bidRequest.getExt()));
@@ -814,7 +818,7 @@ public class AuctionRequestFactory {
         }
     }
 
-    private String resolveImpStoredRequestAccountId(BidRequest bidRequest) {
+    private String accountFromImpExtPrebidStoredRequestId(BidRequest bidRequest) {
         final List<Imp> imps = bidRequest.getImp();
         return CollectionUtils.isEmpty(imps) ? null : imps.stream()
                 .map(Imp::getExt)
@@ -844,18 +848,21 @@ public class AuctionRequestFactory {
 
     private static String parseAccountFromStoredRequest(ExtStoredRequest storedRequest) {
         final String storedRequestId = storedRequest.getId();
-        if (StringUtils.isEmpty(storedRequestId)) {
-            return null;
-        }
-        final String accountIdCandidate = storedRequestId.split("-")[0];
-        if (StringUtils.isNumeric(accountIdCandidate)) {
+        return StringUtils.isNotEmpty(storedRequestId)
+                ? storedRequestId.split("-")[0]
+                : null;
+    }
+
+    private static boolean accountIsValidNumber(String accountId) {
+        if (StringUtils.isNumeric(accountId)) {
             try {
-                return String.valueOf(Integer.parseInt(accountIdCandidate));
+                Integer.parseInt(accountId);
+                return true;
             } catch (NumberFormatException e) {
-                return null;
+                return false;
             }
         }
-        return null;
+        return false;
     }
 
     private Future<Account> responseForEmptyAccount(RoutingContext routingContext) {
