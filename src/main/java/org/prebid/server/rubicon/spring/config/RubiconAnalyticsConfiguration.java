@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.rubicon.analytics.RubiconAnalyticsModule;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -33,12 +34,14 @@ public class RubiconAnalyticsConfiguration {
             BidderCatalog bidderCatalog,
             UidsCookieService uidsCookieService,
             UidsAuditCookieService uidsAuditCookieService,
+            CurrencyConversionService currencyConversionService,
             HttpClient httpClient,
             JacksonMapper mapper) {
 
         return new RubiconAnalyticsModule(properties.getHostUrl(), properties.getSamplingFactor(),
                 properties.getPbsVersion(), HttpUtil.getDomainFromUrl(externalUrl), dataCenterRegion,
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, mapper);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyConversionService,
+                httpClient, mapper);
     }
 
     @Component

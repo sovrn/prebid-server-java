@@ -38,11 +38,13 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestCurrency;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
@@ -75,6 +77,7 @@ import org.prebid.server.util.HttpUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -122,6 +125,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private static final Map<Integer, String> VIDEO_SIZE_AD_FORMATS;
 
+    private static final String USD_CURRENCY = "USD";
+
     private static final TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>> EXT_PREBID_TYPE_REFERENCE =
             new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
             };
@@ -150,6 +155,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private final BidderCatalog bidderCatalog;
     private final UidsCookieService uidsCookieService;
     private final UidsAuditCookieService uidsAuditCookieService;
+    private final CurrencyConversionService currencyService;
     private final HttpClient httpClient;
     private final JacksonMapper mapper;
 
@@ -165,7 +171,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     public RubiconAnalyticsModule(String endpointUrl, Integer globalSamplingFactor, String pbsVersion,
                                   String pbsHostname, String dataCenterRegion, BidderCatalog bidderCatalog,
                                   UidsCookieService uidsCookieService, UidsAuditCookieService uidsAuditCookieService,
-                                  HttpClient httpClient, JacksonMapper mapper) {
+                                  CurrencyConversionService currencyService, HttpClient httpClient,
+                                  JacksonMapper mapper) {
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl) + EVENT_PATH);
         this.globalSamplingFactor = globalSamplingFactor;
         this.pbsVersion = pbsVersion;
@@ -174,6 +181,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
+        this.currencyService = Objects.requireNonNull(currencyService);
         this.httpClient = Objects.requireNonNull(httpClient);
         this.mapper = Objects.requireNonNull(mapper);
     }
@@ -444,6 +452,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private void populateSuccessfulBids(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse,
                                         ExtBidResponse extBidResponse, Map<String, List<TwinBids>> impIdToBids) {
+
+        final String currency = bidRequest.getCur().get(0);
+        final Map<String, Map<String, BigDecimal>> requestCurrencyRates = requestCurrencyRates(bidRequest.getExt());
+
         for (final SeatBid seatBid : bidResponse.getSeatbid()) {
             final String bidder = seatBid.getSeat();
             final Integer responseTime = serverLatencyMillisFrom(extBidResponse, bidder);
@@ -454,7 +466,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 final Imp imp = findImpById(bidRequest.getImp(), impId);
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
-                        .add(toTwinBids(bidder, imp, bid, SUCCESS_STATUS, null, responseTime, serverHasUserId));
+                        .add(toTwinBids(bidder, imp, bid, SUCCESS_STATUS, null, responseTime, serverHasUserId,
+                                currency, requestCurrencyRates));
             }
         }
     }
@@ -482,7 +495,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
-                        .add(toTwinBids(bidder, imp, null, status, bidError, responseTime, serverHasUserId));
+                        .add(toTwinBids(bidder, imp, null, status, bidError, responseTime, serverHasUserId, null,
+                                null));
             }
         }
     }
@@ -549,10 +563,25 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .orElse(null);
     }
 
+    private Map<String, Map<String, BigDecimal>> requestCurrencyRates(ObjectNode extBidRequestNode) {
+        final ExtBidRequest extBidRequest = extBidRequestNode != null
+                ? readExt(extBidRequestNode, ExtBidRequest.class)
+                : null;
+
+        final org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid prebid = extBidRequest != null
+                ? extBidRequest.getPrebid()
+                : null;
+
+        final ExtRequestCurrency currency = prebid != null ? prebid.getCurrency() : null;
+        return currency != null ? currency.getRates() : null;
+    }
+
     private TwinBids toTwinBids(String bidder, Imp imp, Bid bid, String status,
                                 BidError bidError,
                                 Integer serverLatencyMillis,
-                                Boolean serverHasUserId) {
+                                Boolean serverHasUserId,
+                                String currency,
+                                Map<String, Map<String, BigDecimal>> requestCurrencyRates) {
 
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -564,7 +593,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                         .serverLatencyMillis(serverLatencyMillis)
                         .serverHasUserId(serverHasUserId)
                         .params(paramsFrom(imp, bidder))
-                        .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(bid))))
+                        .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(bid)), currency,
+                                requestCurrencyRates))
                         .build();
 
         return new TwinBids(bid, analyticsBid);
@@ -616,17 +646,28 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         }
     }
 
-    private static org.prebid.server.rubicon.analytics.proto.BidResponse analyticsBidResponse(
-            Bid bid, String mediaType) {
+    private org.prebid.server.rubicon.analytics.proto.BidResponse analyticsBidResponse(
+            Bid bid, String mediaType, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates) {
 
         return bid != null
                 ? org.prebid.server.rubicon.analytics.proto.BidResponse.of(
                 parseId(bid.getDealid()),
-                // TODO will need to convert currencies to USD once currency support has been added
-                bid.getPrice(),
+                convertToUSD(bid.getPrice(), currency, requestCurrencyRates),
                 mediaType,
                 Dimensions.of(bid.getW(), bid.getH()))
                 : null;
+    }
+
+    private BigDecimal convertToUSD(
+            BigDecimal price, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates) {
+
+        try {
+            return currencyService.convertCurrency(price, requestCurrencyRates, USD_CURRENCY, currency);
+        } catch (PreBidException e) {
+            logger.info("Unable to covert bid currency {0} to desired ad server currency {1}. {2}",
+                    currency, USD_CURRENCY, e.getMessage());
+            return null;
+        }
     }
 
     private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids) {
@@ -818,7 +859,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                         .error(null)
                         .adUnitCode(null) // does not apply to mobile ads
                         .source(SERVER_SOURCE)
-                        .bidResponse(analyticsBidResponse(bid, bidTypeString))
+                        .bidResponse(analyticsBidResponse(bid, bidTypeString, bidRequest.getCur().get(0),
+                                requestCurrencyRates(bidRequest.getExt())))
                         .serverLatencyMillis(serverLatencyMillis)
                         .serverHasUserId(serverHasUserId)
                         .hasRubiconId(hasRubiconId)

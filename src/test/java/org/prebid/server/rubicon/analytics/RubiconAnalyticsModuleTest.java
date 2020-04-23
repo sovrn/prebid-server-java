@@ -40,6 +40,7 @@ import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
+import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
@@ -73,6 +74,7 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
@@ -117,6 +119,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Mock
     private UidsAuditCookieService uidsAuditCookieService;
     @Mock
+    private CurrencyConversionService currencyService;
+    @Mock
     private UidsCookie uidsCookie;
     @Mock
     private HttpClient httpClient;
@@ -151,6 +155,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(uidsAuditCookieService.getUidsAudit(anyMap()))
                 .willReturn(UidAudit.builder().country("countryFromAuditCookie").build());
 
+        given(currencyService.convertCurrency(any(), any(), any(), any()))
+                .willAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
+
         given(routingContext.request()).willReturn(httpRequest);
         given(httpRequest.uri()).willReturn("");
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap());
@@ -159,14 +166,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         httpContext = HttpContext.builder().cookies(emptyMap()).build();
 
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, jacksonMapper);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, null, null,
-                        null, null, null, null))
+                        null, null, null, null, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -274,8 +281,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processAuctionEventShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
-                jacksonMapper);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
+                httpClient, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -283,6 +290,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
+                        .cur(singletonList("USD"))
                         .build());
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
@@ -306,8 +314,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void processAuctionEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
-                jacksonMapper);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
+                httpClient, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -633,7 +641,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, jacksonMapper);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, jacksonMapper);
 
         // when
         module.processEvent(event);
@@ -747,7 +755,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
-
+        givenCurrencyConversion(BigDecimal.TEN);
         httpContext = HttpContext.builder().uri("http://host-url/event/tag_id=storedId1").cookies(emptyMap()).build();
         final AmpEvent event = AmpEvent.builder()
                 .httpContext(httpContext)
@@ -785,7 +793,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .params(Params.of(123, 456, 789))
                                                 .bidResponse(
                                                         org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of(345, BigDecimal.valueOf(4.56),
+                                                                .BidResponse.of(345, BigDecimal.valueOf(0.46),
                                                                 "video", Dimensions.of(500, 600)))
                                                 .build()))
                                         .build(),
@@ -807,7 +815,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of(456, BigDecimal.valueOf(5.67),
+                                                                        .BidResponse.of(456, BigDecimal.valueOf(0.57),
                                                                         "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -818,7 +826,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of(567, BigDecimal.valueOf(6.78),
+                                                                        .BidResponse.of(567, BigDecimal.valueOf(0.68),
                                                                         "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -898,7 +906,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 2, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient, jacksonMapper);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, jacksonMapper);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -910,6 +918,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().build())
+                        .cur(singletonList("USD"))
                         .build(),
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
@@ -925,8 +934,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldUseAccountSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
-                jacksonMapper);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
+                httpClient, jacksonMapper);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().build();
@@ -938,6 +947,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 BidRequest.builder()
                         .imp(emptyList())
                         .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
+                        .cur(singletonList("USD"))
                         .build(),
                 BidResponse.builder()
                         .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
@@ -953,8 +963,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void postProcessShouldSetIntegrationAndWrappernameForRubicon() throws JsonProcessingException {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient,
-                jacksonMapper);
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
+                httpClient, jacksonMapper);
 
         final Bid bid1 = Bid.builder().build();
         final Bid bid2 = Bid.builder().impid("impId").build();
@@ -971,6 +981,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .id("bidRequestId")
                         .imp(emptyList())
                         .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
+                        .cur(singletonList("USD"))
                         .ext(mapper.valueToTree(updatedExt))
                         .build(),
                 BidResponse.builder()
@@ -1180,6 +1191,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .build())
                                 .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
+                .cur(singletonList("USD"))
                 .ext(mapper.valueToTree(ExtPrebid.of(ExtRequestPrebid.of(ExtRequestPrebidBidders.of(
                         ExtRequestPrebidBiddersRubicon.of(integration, wrappername))), null)))
                 .tmax(1000L)
@@ -1263,6 +1275,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .build())
                                 .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
+                .cur(singletonList("JPY"))
                 .tmax(1000L)
                 .build();
     }
@@ -1387,5 +1400,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
     private AuctionContext givenAuctionContext(BidRequest bidRequest) {
         return givenAuctionContext(bidRequest, null);
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private void givenCurrencyConversion(BigDecimal value) {
+        given(currencyService.convertCurrency(any(), any(), any(), any()))
+                .willAnswer(invocationOnMock ->
+                        invocationOnMock.getArgument(0) != null
+                                ? new BigDecimal(invocationOnMock.getArgument(0).toString())
+                                .divide(value, RoundingMode.HALF_DOWN) : null);
     }
 }
