@@ -87,7 +87,7 @@ gdpr:
       cache-dir: /app/prebid-server/data/vendorlist2-cache
   purposes:
     p7:
-      enforce-purpose: no
+      enforce-purpose: "no"
   rubicon:
     enable-cookie: true
 geolocation:
