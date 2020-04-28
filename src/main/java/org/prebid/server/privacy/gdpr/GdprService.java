@@ -9,7 +9,6 @@ import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.privacy.gdpr.model.PrivacyEnforcementAction;
-import org.prebid.server.privacy.gdpr.model.TcfPurpose;
 import org.prebid.server.privacy.gdpr.model.VendorPermission;
 import org.prebid.server.privacy.gdpr.vendorlist.VendorListService;
 import org.prebid.server.privacy.gdpr.vendorlist.proto.VendorListV1;
@@ -29,6 +28,7 @@ import java.util.stream.Collectors;
 public class GdprService {
 
     private static final Logger logger = LoggerFactory.getLogger(GdprService.class);
+    private static final int PURPOSE_ONE_ID = 1;
 
     private final VendorListService<VendorListV1, VendorV1> vendorListService;
 
@@ -137,8 +137,7 @@ public class GdprService {
     }
 
     private static boolean isPurposeOneClaimedAndAllowed(Set<Integer> claimedPurposes, Set<Integer> allowedPurposeIds) {
-        final int purposeOneId = TcfPurpose.informationStorageAndAccess.getId();
-        return claimedPurposes.contains(purposeOneId) && allowedPurposeIds.contains(purposeOneId);
+        return claimedPurposes.contains(PURPOSE_ONE_ID) && allowedPurposeIds.contains(PURPOSE_ONE_ID);
     }
 
     private static PrivacyEnforcementAction allDenied() {
@@ -147,7 +146,7 @@ public class GdprService {
 
     private static PrivacyEnforcementAction toAction(boolean allowPrivateInfo, boolean allowUserSync) {
         return PrivacyEnforcementAction.builder()
-                .removeUserBuyerUid(!allowPrivateInfo)
+                .removeUserIds(!allowPrivateInfo)
                 .maskGeo(!allowPrivateInfo)
                 .maskDeviceIp(!allowPrivateInfo)
                 .maskDeviceInfo(!allowPrivateInfo)

@@ -43,14 +43,6 @@ import org.prebid.server.privacy.PrivacyExtractor;
 import org.prebid.server.privacy.gdpr.GdprService;
 import org.prebid.server.privacy.gdpr.Tcf2Service;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
-import org.prebid.server.privacy.gdpr.tcfstrategies.PurposeFourStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.PurposeOneStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.PurposeSevenStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.PurposeStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.PurposeTwoStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies.BasicEnforcePurposeStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies.FullEnforcePurposeStrategy;
-import org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies.NoEnforcePurposeStrategy;
 import org.prebid.server.privacy.gdpr.vendorlist.VendorListServiceV1;
 import org.prebid.server.privacy.gdpr.vendorlist.VendorListServiceV2;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -85,8 +77,10 @@ import javax.validation.constraints.Min;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -382,16 +376,10 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    RsidCookieService rsidCookieService(@Value("${gdpr.rubicon.rsid-cookie-encryption-key}") String encryptionKey) {
-        return new RsidCookieService(encryptionKey);
-    }
-
-    @Bean
     VendorListServiceV2 vendorListServiceV2(
             @Value("${gdpr.vendorlist.v2.cache-dir}") String cacheDir,
             @Value("${gdpr.vendorlist.v2.http-endpoint-template}") String endpointTemplate,
             @Value("${gdpr.vendorlist.v2.http-default-timeout-ms}") int defaultTimeoutMs,
-            RsidCookieService rsidCookieService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
             BidderCatalog bidderCatalog,
             FileSystem fileSystem,
@@ -407,76 +395,12 @@ public class ServiceConfiguration {
         return new GdprService(vendorListServiceV1);
     }
 
-    @ConditionalOnProperty(name = "gdpr.rubicon.enable-cookie", matchIfMissing = true)
     @Bean
-    UidsAuditCookieService uidsAuditCookieService(
-            @Value("${gdpr.rubicon.audit-cookie-encryption-key:#{null}}") String encryptionKey,
-            @Value("${host-cookie.ttl-days}") Integer ttlDays,
-            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp) {
+    Tcf2Service tcf2Service(GdprConfig gdprConfig,
+                            VendorListServiceV2 vendorListServiceV2,
+                            BidderCatalog bidderCatalog) {
 
-        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
-    }
-
-    @Bean
-    Tcf2Service tcf2Service(
-            GdprConfig gdprConfig,
-            VendorListServiceV2 vendorListServiceV2,
-            BidderCatalog bidderCatalog,
-            List<PurposeStrategy> purposeStrategies) {
-
-        return new Tcf2Service(gdprConfig, vendorListServiceV2, bidderCatalog, purposeStrategies);
-    }
-
-    @Bean
-    PurposeOneStrategy purposeOneStrategy(
-            FullEnforcePurposeStrategy fullEnforcePurposeStrategy,
-            BasicEnforcePurposeStrategy basicEnforcePurposeStrategy,
-            NoEnforcePurposeStrategy noEnforcePurposeStrategy) {
-
-        return new PurposeOneStrategy(fullEnforcePurposeStrategy, basicEnforcePurposeStrategy,
-                noEnforcePurposeStrategy);
-    }
-
-    @Bean
-    PurposeTwoStrategy purposeTwoStrategy(
-            FullEnforcePurposeStrategy fullEnforcePurposeStrategy,
-            BasicEnforcePurposeStrategy basicEnforcePurposeStrategy,
-            NoEnforcePurposeStrategy noEnforcePurposeStrategy) {
-        return new PurposeTwoStrategy(fullEnforcePurposeStrategy, basicEnforcePurposeStrategy,
-                noEnforcePurposeStrategy);
-    }
-
-    @Bean
-    PurposeFourStrategy purposeFourStrategy(
-            FullEnforcePurposeStrategy fullEnforcePurposeStrategy,
-            BasicEnforcePurposeStrategy basicEnforcePurposeStrategy,
-            NoEnforcePurposeStrategy noEnforcePurposeStrategy) {
-        return new PurposeFourStrategy(fullEnforcePurposeStrategy, basicEnforcePurposeStrategy,
-                noEnforcePurposeStrategy);
-    }
-
-    @Bean
-    PurposeSevenStrategy purposeSevenStrategy(
-            FullEnforcePurposeStrategy fullEnforcePurposeStrategy,
-            BasicEnforcePurposeStrategy basicEnforcePurposeStrategy,
-            NoEnforcePurposeStrategy noEnforcePurposeStrategy) {
-        return new PurposeSevenStrategy(fullEnforcePurposeStrategy, basicEnforcePurposeStrategy,
-                noEnforcePurposeStrategy);
-    }
-
-    @Bean
-    FullEnforcePurposeStrategy fullEnforcePurposeStrategy() {
-        return new FullEnforcePurposeStrategy();
-    }
-
-    @Bean
-    BasicEnforcePurposeStrategy basicEnforcePurposeStrategy() {
-        return new BasicEnforcePurposeStrategy();
-    }
-
-    @Bean
-    NoEnforcePurposeStrategy noEnforcePurposeStrategy() {
-        return new NoEnforcePurposeStrategy();
+        return new Tcf2Service(gdprConfig, vendorListServiceV2, bidderCatalog);
     }
 
     @Bean
@@ -490,11 +414,26 @@ public class ServiceConfiguration {
             BidderCatalog bidderCatalog,
             Metrics metrics) {
 
-        final List<String> eeaCountries = Arrays.asList(eeaCountriesAsString.trim().split(","));
+        final Set<String> eeaCountries = new HashSet<>(Arrays.asList(eeaCountriesAsString.trim().split(",")));
 
         return new TcfDefinerService(
                 rsidCookieService, gdprConfig, eeaCountries, gdprService, tcf2Service,
                 geoLocationService, bidderCatalog, metrics);
+    }
+
+    @Bean
+    RsidCookieService rsidCookieService(@Value("${gdpr.rubicon.rsid-cookie-encryption-key}") String encryptionKey) {
+        return new RsidCookieService(encryptionKey);
+    }
+
+    @ConditionalOnProperty(name = "gdpr.rubicon.enable-cookie", matchIfMissing = true)
+    @Bean
+    UidsAuditCookieService uidsAuditCookieService(
+            @Value("${gdpr.rubicon.audit-cookie-encryption-key:#{null}}") String encryptionKey,
+            @Value("${host-cookie.ttl-days}") Integer ttlDays,
+            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp) {
+
+        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
     }
 
     @Bean

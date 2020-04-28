@@ -78,7 +78,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         this.metrics = Objects.requireNonNull(metrics);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.enableCookie = enableCookie;
-        this.uidsAuditCookieService = uidsAuditCookieService;
+        this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
 
         activeCookieFamilyNames = bidderCatalog.names().stream()
                 .filter(bidderCatalog::isActive)
