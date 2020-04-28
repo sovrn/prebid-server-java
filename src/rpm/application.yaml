@@ -33,6 +33,8 @@ adapters:
     enabled: true
   yieldmo:
     enabled: true
+  yieldone:
+    enabled: true
 auction:
   ad-server-currency: USD
 metrics:
@@ -79,7 +81,13 @@ status-response: ready
 gdpr:
   host-vendor-id: 52
   vendorlist:
-    filesystem-cache-dir: /app/prebid-server/data/vendorlist-cache
+    v1:
+      cache-dir: /app/prebid-server/data/vendorlist-cache
+    v2:
+      cache-dir: /app/prebid-server/data/vendorlist2-cache
+  purposes:
+    p7:
+      enforce-purpose: no
   rubicon:
     enable-cookie: true
 geolocation:
