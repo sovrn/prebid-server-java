@@ -55,7 +55,6 @@ import org.prebid.server.manager.AdminManager;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.privacy.PrivacyExtractor;
-import org.prebid.server.privacy.gdpr.GdprService;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.settings.ApplicationSettings;
@@ -222,7 +221,7 @@ public class WebConfiguration {
             Metrics metrics,
             HttpAdapterConnector httpAdapterConnector,
             Clock clock,
-            GdprService gdprService,
+            TcfDefinerService tcfDefinerService,
             PrivacyExtractor privacyExtractor,
             JacksonMapper mapper,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
@@ -236,7 +235,7 @@ public class WebConfiguration {
                 metrics,
                 httpAdapterConnector,
                 clock,
-                gdprService,
+                tcfDefinerService,
                 privacyExtractor,
                 mapper,
                 hostVendorId,

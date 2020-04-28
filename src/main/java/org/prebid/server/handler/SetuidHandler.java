@@ -123,7 +123,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
         accountById(requestAccount, timeout)
                 .compose(account -> tcfDefinerService
-                        .resultFor(vendorIds, Collections.emptySet(), gdpr, gdprConsent, ip, account, timeout, context))
+                        .resultForVendorIds(vendorIds, gdpr, gdprConsent, ip, timeout, context))
                 .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, cookieName, gdprConsent, ip));
     }
 
@@ -134,17 +134,17 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 .otherwise((Account) null);
     }
 
-    private void handleResult(AsyncResult<TcfResponse> asyncResult, RoutingContext context,
+    private void handleResult(AsyncResult<TcfResponse<Integer>> asyncResult, RoutingContext context,
                               UidsCookie uidsCookie, String bidder, String gdprConsent, String ip) {
         if (asyncResult.failed()) {
             respondWithError(context, bidder, asyncResult.cause());
         } else {
             // allow cookie only if user is not in GDPR scope or vendor passed GDPR check
-            final TcfResponse tcfResponse = asyncResult.result();
+            final TcfResponse<Integer> tcfResponse = asyncResult.result();
 
             final boolean notInGdprScope = BooleanUtils.isFalse(tcfResponse.getUserInGdprScope());
 
-            final Map<Integer, PrivacyEnforcementAction> vendorIdToAction = tcfResponse.getVendorIdToActionMap();
+            final Map<Integer, PrivacyEnforcementAction> vendorIdToAction = tcfResponse.getActions();
             final PrivacyEnforcementAction privacyEnforcementAction = vendorIdToAction != null
                     ? vendorIdToAction.get(gdprHostVendorId)
                     : null;
@@ -186,7 +186,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
     private void respondWithoutCookie(RoutingContext context, int status, String body, String bidder) {
         respondWith(context, status, body);
-        metrics.updateUserSyncGdprPreventMetric(bidder);
+        metrics.updateUserSyncTcfBlockedMetric(bidder);
         analyticsReporter.processEvent(SetuidEvent.error(status));
     }
 
