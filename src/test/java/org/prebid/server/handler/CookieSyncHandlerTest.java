@@ -36,6 +36,8 @@ import org.prebid.server.proto.response.UsersyncInfo;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.settings.ApplicationSettings;
+import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountGdprConfig;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -61,6 +63,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anySet;
@@ -251,6 +254,50 @@ public class CookieSyncHandlerTest extends VertxTest {
         // then
         verify(httpResponse)
                 .putHeader(eq(new AsciiString("Content-Type")), eq(new AsciiString("application/json")));
+    }
+
+    @Test
+    public void shouldPassAccountToTcfWhenAccountIsFound() {
+        // given
+        given(routingContext.getBody()).willReturn(
+                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null, null, "account")));
+
+        final AccountGdprConfig accountGdprConfig = AccountGdprConfig.builder().enabled(true).build();
+        final Account account = Account.builder().gdpr(accountGdprConfig).build();
+        given(applicationSettings.getAccountById(any(), any())).willReturn(Future.succeededFuture(account));
+
+        givenTcfServiceReturningVendorIdResult(singleton(1));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        verify(applicationSettings).getAccountById(eq("account"), any());
+
+        verify(tcfDefinerService).resultForVendorIds(anySet(), any(), any(), any(), eq(accountGdprConfig), any(),
+                any());
+        verify(tcfDefinerService).resultForBidderNames(anySet(), any(), any(), any(), eq(accountGdprConfig), any(),
+                any());
+    }
+
+    @Test
+    public void shouldPassAccountToTcfWhenAccountIsNotFound() {
+        // given
+        given(routingContext.getBody()).willReturn(
+                givenRequestBody(CookieSyncRequest.of(emptyList(), null, null, null, null, null, "account")));
+
+        given(applicationSettings.getAccountById(any(), any())).willReturn(Future.failedFuture("bad"));
+
+        givenTcfServiceReturningVendorIdResult(singleton(1));
+
+        // when
+        cookieSyncHandler.handle(routingContext);
+
+        // then
+        verify(applicationSettings).getAccountById(eq("account"), any());
+
+        verify(tcfDefinerService).resultForVendorIds(anySet(), any(), any(), any(), isNull(), any(), any());
+        verify(tcfDefinerService).resultForBidderNames(anySet(), any(), any(), any(), isNull(), any(), any());
     }
 
     @Test
@@ -1251,12 +1298,12 @@ public class CookieSyncHandlerTest extends VertxTest {
     }
 
     private void givenTcfServiceReturningVendorIdResult(Set<Integer> vendorIds) {
-        given(tcfDefinerService.resultForVendorIds(anySet(), any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resultForVendorIds(anySet(), any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, actions(vendorIds), null)));
     }
 
     private void givenTcfServiceReturningBidderNamesResult(Set<String> bidderNames) {
-        given(tcfDefinerService.resultForBidderNames(anySet(), any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resultForBidderNames(anySet(), any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, actions(bidderNames), null)));
     }
 
