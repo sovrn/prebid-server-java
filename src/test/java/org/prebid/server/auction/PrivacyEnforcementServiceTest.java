@@ -180,8 +180,8 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // then
         verify(tcfDefinerService)
-                .resultForBidderNames(eq(singleton(BIDDER_NAME)), isNull(), any(), any(), any(), any(),
-                        eq(timeout), any());
+                .resultForBidderNames(eq(singleton(BIDDER_NAME)), any(), isNull(), any(), any(), any(), eq(timeout),
+                        any());
         verifyNoMoreInteractions(tcfDefinerService);
 
         assertThat(result).isEqualTo(emptyList());
