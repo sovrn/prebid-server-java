@@ -192,15 +192,11 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         final Timeout timeout = timeoutFactory.create(defaultTimeout);
 
         accountById(requestAccount, timeout)
-                .compose(account -> tcfDefinerService.resultForVendorIds(vendorIds, gdprAsString, gdprConsent, ip,
-                        timeout, context)
-                        .compose(this::handleVendorIdResult)
-                        .compose(ignored ->
-                                tcfDefinerService.resultForBidderNames(biddersToSync, gdprAsString, gdprConsent, ip,
-                                        timeout, context))
-                        .setHandler(asyncResult ->
-                                handleBidderNamesResult(asyncResult, context, uidsCookie, biddersToSync, privacy,
-                                        limit, cookieSyncRequest.getAccount(), requestHasBidders)));
+                .compose(account -> prepareTcfResponse(gdprConsent, biddersToSync, gdprAsString, vendorIds, ip,
+                        timeout, context))
+                .setHandler(asyncResult ->
+                        handleBidderNamesResult(asyncResult, context, uidsCookie, biddersToSync, privacy, limit,
+                                requestAccount, requestHasBidders));
     }
 
     /**
@@ -266,6 +262,19 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
      */
     private String bidderNameFor(String bidder) {
         return bidderCatalog.isAlias(bidder) ? bidderCatalog.nameByAlias(bidder) : bidder;
+    }
+
+    private Future<TcfResponse<String>> prepareTcfResponse(String gdprConsent,
+                                                           Set<String> biddersToSync,
+                                                           String gdprAsString,
+                                                           Set<Integer> vendorIds,
+                                                           String ip,
+                                                           Timeout timeout,
+                                                           RoutingContext context) {
+        return tcfDefinerService.resultForVendorIds(vendorIds, gdprAsString, gdprConsent, ip, timeout, context)
+                .compose(this::handleVendorIdResult)
+                .compose(ignored -> tcfDefinerService.resultForBidderNames(biddersToSync, gdprAsString, gdprConsent,
+                        ip, timeout, context));
     }
 
     private Future<Void> handleVendorIdResult(TcfResponse<Integer> tcfResponse) {

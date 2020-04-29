@@ -1,4 +1,4 @@
-package org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies;
+package org.prebid.server.privacy.gdpr.tcfstrategies.purpose.typestrategies;
 
 import com.iabtcf.decoder.TCString;
 import com.iabtcf.utils.IntIterable;
@@ -11,7 +11,6 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.privacy.gdpr.model.PrivacyEnforcementAction;
 import org.prebid.server.privacy.gdpr.model.VendorPermission;
 import org.prebid.server.privacy.gdpr.model.VendorPermissionWithGvl;
-import org.prebid.server.privacy.gdpr.tcfstrategies.purpose.typestrategies.BasicEnforcePurposeStrategy;
 import org.prebid.server.privacy.gdpr.vendorlist.proto.VendorV2;
 
 import java.util.Arrays;
@@ -31,7 +30,7 @@ public class BasicEnforcePurposeStrategyTest {
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
-    private org.prebid.server.privacy.gdpr.tcfstrategies.purpose.typestrategies.BasicEnforcePurposeStrategy target;
+    private BasicEnforcePurposeStrategy target;
 
     @Mock
     private TCString tcString;
@@ -265,3 +264,4 @@ public class BasicEnforcePurposeStrategyTest {
         assertThat(result).usingFieldByFieldElementComparator().containsOnly(vendorPermission2);
     }
 }
+

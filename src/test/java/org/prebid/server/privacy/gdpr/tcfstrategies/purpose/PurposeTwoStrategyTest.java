@@ -1,4 +1,8 @@
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+package org.prebid.server.privacy.gdpr.tcfstrategies;
+=======
 package org.prebid.server.privacy.gdpr.tcfstrategies.purpose;
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
 
 import com.iabtcf.decoder.TCString;
 import org.junit.Before;
@@ -10,9 +14,15 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.privacy.gdpr.model.PrivacyEnforcementAction;
 import org.prebid.server.privacy.gdpr.model.VendorPermission;
 import org.prebid.server.privacy.gdpr.model.VendorPermissionWithGvl;
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+import org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies.BasicEnforcePurposeStrategy;
+import org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies.FullEnforcePurposeStrategy;
+import org.prebid.server.privacy.gdpr.tcfstrategies.typestrategies.NoEnforcePurposeStrategy;
+=======
 import org.prebid.server.privacy.gdpr.tcfstrategies.purpose.typestrategies.BasicEnforcePurposeStrategy;
 import org.prebid.server.privacy.gdpr.tcfstrategies.purpose.typestrategies.FullEnforcePurposeStrategy;
 import org.prebid.server.privacy.gdpr.tcfstrategies.purpose.typestrategies.NoEnforcePurposeStrategy;
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
 import org.prebid.server.privacy.gdpr.vendorlist.proto.VendorV2;
 import org.prebid.server.settings.model.EnforcePurpose;
 import org.prebid.server.settings.model.Purpose;
@@ -34,6 +44,8 @@ public class PurposeTwoStrategyTest {
 
     private static final int PURPOSE_ID = 2;
 
+    private static final int PURPOSE_ID = 1;
+
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
@@ -41,6 +53,15 @@ public class PurposeTwoStrategyTest {
     private FullEnforcePurposeStrategy fullEnforcePurposeStrategy;
 
     @Mock
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+    private BasicEnforcePurposeStrategy basicEnforcePurposeStrategy;
+
+    @Mock
+    private NoEnforcePurposeStrategy noEnforcePurposeStrategy;
+
+    private PurposeOneStrategy target;
+
+=======
     private BasicEnforcePurposeStrategy basicTypeStrategy;
 
     @Mock
@@ -48,12 +69,18 @@ public class PurposeTwoStrategyTest {
 
     private PurposeTwoStrategy target;
 
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
     @Mock
     private TCString tcString;
 
     @Before
     public void setUp() {
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+        target = new PurposeOneStrategy(fullEnforcePurposeStrategy, basicEnforcePurposeStrategy,
+                noEnforcePurposeStrategy);
+=======
         target = new PurposeTwoStrategy(fullEnforcePurposeStrategy, basicTypeStrategy, noEnforcePurposeStrategy);
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
     }
 
     @Test
@@ -127,7 +154,12 @@ public class PurposeTwoStrategyTest {
                 VendorV2.empty(3));
         final List<VendorPermissionWithGvl> vendorPermissionsWithGvl = Arrays.asList(vendorPermissionWitGvl1,
                 vendorPermissionWitGvl2, vendorPermissionWitGvl3);
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+
+        given(basicEnforcePurposeStrategy.allowedByTypeStrategy(anyInt(), any(), any(), any(), anyBoolean()))
+=======
         given(basicTypeStrategy.allowedByTypeStrategy(anyInt(), any(), any(), any(), anyBoolean()))
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
                 .willReturn(Arrays.asList(vendorPermission1, vendorPermission2));
 
         // when
@@ -142,7 +174,11 @@ public class PurposeTwoStrategyTest {
         assertThat(result).usingFieldByFieldElementComparator().isEqualTo(
                 Arrays.asList(vendorPermission1Changed, vendorPermission2Changed, vendorPermission3Changed));
 
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+        verify(basicEnforcePurposeStrategy).allowedByTypeStrategy(PURPOSE_ID, tcString,
+=======
         verify(basicTypeStrategy).allowedByTypeStrategy(PURPOSE_ID, tcString,
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
                 Arrays.asList(vendorPermissionWitGvl1, vendorPermissionWitGvl3), singletonList(vendorPermissionWitGvl2),
                 false);
     }
@@ -150,7 +186,12 @@ public class PurposeTwoStrategyTest {
     @Test
     public void processTypePurposeStrategyShouldPassEmptyListWithEnforcementsWhenAllBiddersAreExcluded() {
         // given
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+        final List<String> vendorExceptions = Arrays.asList("b1", "b2", "b3", "b5", "b7");
+        final Purpose purpose = Purpose.of(EnforcePurpose.basic, null, vendorExceptions);
+=======
         final Purpose purpose = Purpose.of(EnforcePurpose.basic, null, Arrays.asList("b1", "b2", "b3", "b5", "b7"));
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
         final VendorPermission vendorPermission1 = VendorPermission.of(1, "b1", PrivacyEnforcementAction.restrictAll());
         final VendorPermission vendorPermission2 = VendorPermission.of(2, "b2", PrivacyEnforcementAction.restrictAll());
         final VendorPermission vendorPermission3 = VendorPermission.of(3, "b3", PrivacyEnforcementAction.restrictAll());
@@ -165,7 +206,11 @@ public class PurposeTwoStrategyTest {
         final List<VendorPermissionWithGvl> vendorPermissionsWithGvl = Arrays.asList(vendorPermissionWitGvl1,
                 vendorPermissionWitGvl2, vendorPermissionWitGvl3);
 
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+        given(basicEnforcePurposeStrategy.allowedByTypeStrategy(anyInt(), any(), any(), any(), anyBoolean()))
+=======
         given(basicTypeStrategy.allowedByTypeStrategy(anyInt(), any(), any(), any(), anyBoolean()))
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
                 .willReturn(vendorPermissions);
 
         // when
@@ -179,8 +224,13 @@ public class PurposeTwoStrategyTest {
         assertThat(result).usingFieldByFieldElementComparator().isEqualTo(
                 Arrays.asList(vendorPermission1Changed, vendorPermission2Changed, vendorPermission3Changed));
 
+<<<<<<< HEAD:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/PurposeOneStrategyTest.java
+        verify(basicEnforcePurposeStrategy).allowedByTypeStrategy(PURPOSE_ID, tcString, emptyList(),
+                vendorPermissionsWithGvl, true);
+=======
         verify(basicTypeStrategy).allowedByTypeStrategy(PURPOSE_ID, tcString, emptyList(), vendorPermissionsWithGvl,
                 true);
+>>>>>>> master:src/test/java/org/prebid/server/privacy/gdpr/tcfstrategies/purpose/PurposeTwoStrategyTest.java
     }
 
     private static PrivacyEnforcementAction allowPurpose() {

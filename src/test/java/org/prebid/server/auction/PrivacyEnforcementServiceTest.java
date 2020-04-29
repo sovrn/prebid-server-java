@@ -180,8 +180,8 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         // then
         verify(tcfDefinerService)
-                .resultForBidderNames(eq(singleton(BIDDER_NAME)), any(), isNull(), any(), any(), any(), eq(timeout),
-                        any());
+                .resultForBidderNames(eq(singleton(BIDDER_NAME)), isNull(), any(), any(), any(), any(),
+                        eq(timeout), any());
         verifyNoMoreInteractions(tcfDefinerService);
 
         assertThat(result).isEqualTo(emptyList());
@@ -865,7 +865,8 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         final HashSet<String> bidderNames = new HashSet<>(asList(bidder1Name, bidder2Name, bidder3Name));
         verify(tcfDefinerService).resultForBidderNames(eq(bidderNames), any(), eq("1"), isNull(), isNull(),
                 any(),
-                eq(timeout), any());
+                eq(timeout),
+                any());
     }
 
     private AuctionContext auctionContext(BidRequest bidRequest) {

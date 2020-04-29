@@ -16,7 +16,6 @@ import org.prebid.server.privacy.gdpr.model.TCStringEmpty;
 import org.prebid.server.privacy.gdpr.model.TcfResponse;
 import org.prebid.server.privacy.gdpr.model.VendorPermission;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
-import org.prebid.server.rubicon.rsid.model.Rsid;
 import org.prebid.server.settings.model.AccountGdprConfig;
 import org.prebid.server.settings.model.EnforcePurpose;
 import org.prebid.server.settings.model.GdprConfig;
@@ -353,21 +352,5 @@ public class TcfDefinerServiceTest {
 
         verifyZeroInteractions(gdprService);
         verify(metrics).updatePrivacyTcfGeoMetric(2, null);
-    }
-
-    @Test
-    public void resultForVendorIdsShouldUseCountryFromRsidCookie() {
-        //given
-        given(rsidCookieService.parseFromRequest(any())).willReturn(Rsid.of("country1"));
-
-        // when
-        final Future<TcfResponse<Integer>> result =
-                target.resultForVendorIds(singleton(1), null,
-                        "COwayg7OwaybYN6AAAENAPCgAIAAAAAAAAAAASkAAAAAAAAAAA", null, null, null);
-
-        // then
-        assertThat(result).succeededWith(
-                TcfResponse.of(false, singletonMap(1, PrivacyEnforcementAction.allowAll()), "country1"));
-        verifyZeroInteractions(geoLocationService);
     }
 }

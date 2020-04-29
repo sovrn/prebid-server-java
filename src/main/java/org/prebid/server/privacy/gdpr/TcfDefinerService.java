@@ -158,7 +158,8 @@ public class TcfDefinerService {
     }
 
     private Future<GdprInfoWithCountry<String>> toGdprInfo(
-            String gdpr, String gdprConsent, String ipAddress, Timeout timeout, RoutingContext context) {
+            String gdpr, String gdprConsent, String ipAddress, Timeout timeout,
+            RoutingContext context) {
 
         // from request param
         final boolean isValidGdpr = gdpr != null && (gdpr.equals(GDPR_ZERO) || gdpr.equals(GDPR_ONE));

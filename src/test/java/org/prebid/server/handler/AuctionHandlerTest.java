@@ -790,7 +790,7 @@ public class AuctionHandlerTest extends VertxTest {
         vendorToAction.put(1, actionWithUserSync(false)); // host vendor id from app config
         vendorToAction.put(15, actionWithUserSync(false)); // Rubicon bidder
         vendorToAction.put(20, actionWithUserSync(true)); // Appnexus bidder
-        given(tcfDefinerService.resultForVendorIds(anySet(), any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resultForVendorIds(anySet(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, vendorToAction, null)));
 
         given(httpAdapterConnector.call(any(), any(), any(), any()))
@@ -819,7 +819,7 @@ public class AuctionHandlerTest extends VertxTest {
         final Map<Integer, PrivacyEnforcementAction> vendorToAction = new HashMap<>();
         vendorToAction.put(1, actionWithUserSync(false)); // host vendor id from app config
         vendorToAction.put(15, actionWithUserSync(false)); // Rubicon bidder
-        given(tcfDefinerService.resultForVendorIds(anySet(), any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resultForVendorIds(anySet(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, vendorToAction, null)));
 
         given(httpAdapterConnector.call(any(), any(), any(), any()))
