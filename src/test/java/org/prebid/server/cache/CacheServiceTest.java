@@ -1009,7 +1009,7 @@ public class CacheServiceTest extends VertxTest {
     public void cachePutObjectsShouldTolerateGlobalTimeoutAlreadyExpired() {
         // when
         final Future<BidCacheResponse> future = cacheService.cachePutObjects(singletonList(PutObject.builder().build()),
-                emptySet(), "", expiredTimeout);
+                emptySet(), "", "", expiredTimeout);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -1019,7 +1019,8 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cachePutObjectsShouldReturnResultWithEmptyListWhenPutObjectsIsEmpty() {
         // when
-        final Future<BidCacheResponse> result = cacheService.cachePutObjects(emptyList(), emptySet(), null, null);
+        final Future<BidCacheResponse> result = cacheService.cachePutObjects(emptyList(), emptySet(), null, null,
+                null);
 
         // then
         verifyZeroInteractions(httpClient);
@@ -1051,7 +1052,7 @@ public class CacheServiceTest extends VertxTest {
 
         // when
         cacheService.cachePutObjects(asList(firstPutObject, secondPutObject), singleton("bidder1"), "account",
-                timeout);
+                "integration", timeout);
 
         // then
         final PutObject modifiedFirstPutObject = firstPutObject.toBuilder()
@@ -1061,7 +1062,7 @@ public class CacheServiceTest extends VertxTest {
                 .value(new TextNode("<VAST version=\"3.0\"><Ad><Wrapper><AdSystem>"
                         + "prebid.org wrapper</AdSystem><VASTAdTagURI><![CDATA[adm2]]></VASTAdTagURI>"
                         + "<Impression><!"
-                        + "[CDATA[http://external-url/event]]>"
+                        + "[CDATA[http://external-url/event&int=integration]]>"
                         + "</Impression><Creatives></Creatives></Wrapper></Ad></VAST>"))
                 .build();
         final PutObject modifiedSecondPutObject = secondPutObject.toBuilder()
@@ -1086,7 +1087,8 @@ public class CacheServiceTest extends VertxTest {
                 .build();
 
         // when
-        cacheService.cachePutObjects(singletonList(firstPutObject), singleton("bidder1"), "account", timeout);
+        cacheService.cachePutObjects(singletonList(firstPutObject), singleton("bidder1"), "account",
+                null, timeout);
 
         // then
         verify(eventsService).vastUrlTracking(eq("bidId1"), eq("bidder1"), eq("account"), eq(1000L));

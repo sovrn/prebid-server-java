@@ -15,6 +15,7 @@ import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.proto.request.BidCacheRequest;
 import org.prebid.server.cache.proto.request.PutObject;
 import org.prebid.server.cache.proto.response.BidCacheResponse;
+import org.prebid.server.events.EventUtil;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
@@ -35,6 +36,7 @@ public class VtrackHandler implements Handler<RoutingContext> {
     private static final Logger logger = LoggerFactory.getLogger(VtrackHandler.class);
 
     private static final String ACCOUNT_PARAMETER = "a";
+    private static final String INT_PARAMETER = "int";
 
     private final long defaultTimeout;
     private final boolean allowUnknownBidder;
@@ -65,8 +67,10 @@ public class VtrackHandler implements Handler<RoutingContext> {
     public void handle(RoutingContext context) {
         final String accountId;
         final List<PutObject> vtrackPuts;
+        final String integration;
         try {
             accountId = accountId(context);
+            integration = integration(context);
             vtrackPuts = vtrackPuts(context);
         } catch (IllegalArgumentException e) {
             respondWithBadRequest(context, e.getMessage());
@@ -76,7 +80,7 @@ public class VtrackHandler implements Handler<RoutingContext> {
 
         applicationSettings.getAccountById(accountId, timeout)
                 .recover(exception -> handleAccountExceptionOrFallback(exception, accountId))
-                .setHandler(async -> handleAccountResult(async, context, vtrackPuts, accountId, timeout));
+                .setHandler(async -> handleAccountResult(async, context, vtrackPuts, accountId, integration, timeout));
     }
 
     private static String accountId(RoutingContext context) {
@@ -86,6 +90,11 @@ public class VtrackHandler implements Handler<RoutingContext> {
                     String.format("Account '%s' is required query parameter and can't be empty", ACCOUNT_PARAMETER));
         }
         return accountId;
+    }
+
+    public static String integration(RoutingContext context) {
+        EventUtil.validateIntegration(context);
+        return context.request().getParam(INT_PARAMETER);
     }
 
     private List<PutObject> vtrackPuts(RoutingContext context) {
@@ -124,7 +133,8 @@ public class VtrackHandler implements Handler<RoutingContext> {
     }
 
     private void handleAccountResult(AsyncResult<Account> asyncAccount, RoutingContext context,
-                                     List<PutObject> vtrackPuts, String accountId, Timeout timeout) {
+                                     List<PutObject> vtrackPuts, String accountId, String integration,
+                                     Timeout timeout) {
         if (asyncAccount.failed()) {
             respondWithServerError(context, "Error occurred while fetching account", asyncAccount.cause());
         } else {
@@ -132,7 +142,7 @@ public class VtrackHandler implements Handler<RoutingContext> {
             final Set<String> biddersAllowingVastUpdate = Objects.equals(asyncAccount.result().getEventsEnabled(), true)
                     ? biddersAllowingVastUpdate(vtrackPuts)
                     : Collections.emptySet();
-            cacheService.cachePutObjects(vtrackPuts, biddersAllowingVastUpdate, accountId, timeout)
+            cacheService.cachePutObjects(vtrackPuts, biddersAllowingVastUpdate, accountId, integration, timeout)
                     .setHandler(asyncCache -> handleCacheResult(asyncCache, context));
         }
     }

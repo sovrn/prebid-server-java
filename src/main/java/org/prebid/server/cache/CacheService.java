@@ -170,8 +170,9 @@ public class CacheService {
      * The returned result will always have the number of elements equals putObjects list size.
      */
     public Future<BidCacheResponse> cachePutObjects(List<PutObject> putObjects, Set<String> biddersAllowingVastUpdate,
-                                                    String accountId, Timeout timeout) {
-        final List<PutObject> updatedPutObjects = updatePutObjects(putObjects, biddersAllowingVastUpdate, accountId);
+                                                    String accountId, String integration, Timeout timeout) {
+        final List<PutObject> updatedPutObjects = updatePutObjects(putObjects, biddersAllowingVastUpdate, accountId,
+                integration);
         return makeRequest(BidCacheRequest.of(updatedPutObjects), updatedPutObjects.size(), timeout);
     }
 
@@ -179,7 +180,7 @@ public class CacheService {
      * Modify VAST value in putObjects.
      */
     private List<PutObject> updatePutObjects(List<PutObject> putObjects, Set<String> biddersAllowingVastUpdate,
-                                             String accountId) {
+                                             String accountId, String integration) {
         if (CollectionUtils.isEmpty(biddersAllowingVastUpdate)) {
             return putObjects;
         }
@@ -195,7 +196,7 @@ public class CacheService {
             final JsonNode value = putObject.getValue();
             if (biddersAllowingVastUpdate.contains(putObject.getBidder()) && value != null) {
                 final String updatedVastXml = modifyVastXml(value.asText(), putObject.getBidid(),
-                        putObject.getBidder(), accountId, putObject.getTimestamp(), null);
+                        putObject.getBidder(), accountId, putObject.getTimestamp(), integration);
                 builder.value(new TextNode(updatedVastXml)).build();
             }
 
