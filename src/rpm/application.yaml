@@ -88,7 +88,7 @@ gdpr:
   purposes:
     p7:
       enforce-purpose: "no"
-  consent-string-means-in-scope: true
+  consent-string-means-in-scope: false
   rubicon:
     enable-cookie: true
 geolocation:
