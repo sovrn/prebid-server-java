@@ -1297,6 +1297,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .w(500)
                                         .h(600)
                                         .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
+                                                "bidId1",
                                                 BidType.video,
                                                 singletonMap("key1", "value1"), null, null, null, null), null)))
                                         .build()))
@@ -1312,6 +1313,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .w(600)
                                                 .h(700)
                                                 .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
+                                                        "bidId2",
                                                         BidType.video,
                                                         singletonMap("key21", "value21"), null, null, null, null),
                                                         null)))
@@ -1324,6 +1326,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .w(600)
                                                 .h(700)
                                                 .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
+                                                        null,
                                                         BidType.video,
                                                         singletonMap("key22", "value22"), null, null, null, null),
                                                         null)))

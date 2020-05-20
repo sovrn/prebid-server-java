@@ -75,6 +75,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
@@ -129,7 +130,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 .willReturn(Future.succeededFuture(VideoStoredDataResult.empty()));
 
         bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
-                jacksonMapper);
+                false, jacksonMapper);
 
         timeout = new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())).create(500);
     }
@@ -225,7 +226,7 @@ public class BidResponseCreatorTest extends VertxTest {
         // just a stub to get through method call chain
         givenCacheServiceResult(singletonMap(bid1, CacheIdInfo.of(null, null)));
 
-        // when\
+        // when
         bidResponseCreator.create(bidderResponses, bidRequest, targeting, cacheInfo, ACCOUNT, false, 1000L, false,
                 timeout);
 
@@ -419,6 +420,41 @@ public class BidResponseCreatorTest extends VertxTest {
     }
 
     @Test
+    public void shouldOverrideBidIdWhenGenerateBidIdIsTurnedOn() {
+        // given
+        final BidRequest bidRequest = givenBidRequest();
+
+        final ExtPrebid<ExtBidPrebid, ?> prebid = ExtPrebid.of(ExtBidPrebid.of(null, banner, null,
+                null, null, null, null), null);
+        final Bid bid = Bid.builder()
+                .id("123")
+                .impid("imp123")
+                .ext(mapper.valueToTree(prebid))
+                .build();
+        final List<BidderResponse> bidderResponses = singletonList(
+                BidderResponse.of("bidder2", givenSeatBid(BidderBid.of(bid, banner, "USD")), 0));
+
+        final BidResponseCreator bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService,
+                storedRequestProcessor, true, jacksonMapper);
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, bidRequest,
+                null, CACHE_INFO, ACCOUNT, false, 1000L, false, timeout).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid())
+                .flatExtracting(SeatBid::getBid)
+                .extracting(Bid::getExt)
+                .extracting(ext -> ext.get("prebid"))
+                .extracting(extPrebid -> mapper.treeToValue(extPrebid, ExtBidPrebid.class))
+                .extracting(ExtBidPrebid::getBidid)
+                .hasSize(1)
+                .first()
+                .satisfies(bidId -> assertThat(UUID.fromString(bidId)).isInstanceOf(UUID.class));
+
+        verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
+    }
+
+    @Test
     public void shouldSetExpectedResponseSeatBidAndBidFields() {
         // given
         final BidRequest bidRequest = givenBidRequest();
@@ -441,7 +477,8 @@ public class BidResponseCreatorTest extends VertxTest {
                         .price(BigDecimal.ONE)
                         .adm("adm")
                         .ext(mapper.valueToTree(ExtPrebid.of(
-                                ExtBidPrebid.of(banner, null, null, null, null, null), singletonMap("bidExt", 1))))
+                                ExtBidPrebid.of(null, banner, null, null, null, null, null),
+                                singletonMap("bidExt", 1))))
                         .build()))
                 .build());
 
@@ -576,7 +613,7 @@ public class BidResponseCreatorTest extends VertxTest {
                         .id("bidId")
                         .price(BigDecimal.ONE)
                         .ext(mapper.valueToTree(
-                                ExtPrebid.of(ExtBidPrebid.of(banner, null, null, null, null, null), null)))
+                                ExtPrebid.of(ExtBidPrebid.of(null, banner, null, null, null, null, null), null)))
                         .build());
 
         verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());

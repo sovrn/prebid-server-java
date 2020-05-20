@@ -1,6 +1,7 @@
 package org.prebid.server.privacy.gdpr;
 
 import io.vertx.core.Future;
+import org.assertj.core.api.Assertions;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -151,6 +152,46 @@ public class TcfDefinerServiceTest {
         verifyZeroInteractions(tcf2Service);
         verifyZeroInteractions(geoLocationService);
         verifyZeroInteractions(metrics);
+    }
+
+    @Test
+    public void resultForVendorIdsShouldConsiderPresenceOfConsentStringAsInScope() {
+        // given
+        gdprConfig.setConsentStringMeansInScope(true);
+
+        target = new TcfDefinerService(rsidCookieService, gdprConfig, singleton(EEA_COUNTRY), gdprService, tcf2Service,
+                geoLocationService, bidderCatalog, metrics);
+
+        // when
+        final String vendorConsent = "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA";
+        target.resultForVendorIds(singleton(1), null, vendorConsent, "ip", null, null, null);
+
+        // then
+        verify(gdprService).resultFor(any(), eq(vendorConsent));
+
+        verifyZeroInteractions(gdprService);
+        verifyZeroInteractions(tcf2Service);
+        verifyZeroInteractions(geoLocationService);
+    }
+
+    @Test
+    public void resultForBidderNamesShouldConsiderPresenceOfConsentStringAsInScope() {
+        // given
+        gdprConfig.setConsentStringMeansInScope(true);
+
+        target = new TcfDefinerService(rsidCookieService, gdprConfig, singleton(EEA_COUNTRY), gdprService, tcf2Service,
+                geoLocationService, bidderCatalog, metrics);
+
+        // when
+        final String vendorConsent = "BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA";
+        target.resultForBidderNames(singleton("b"), null, vendorConsent, "ip", null, null, null);
+
+        // then
+        verify(gdprService).resultFor(any(), eq(vendorConsent));
+
+        verifyZeroInteractions(gdprService);
+        verifyZeroInteractions(tcf2Service);
+        verifyZeroInteractions(geoLocationService);
     }
 
     @Test
@@ -373,5 +414,32 @@ public class TcfDefinerServiceTest {
 
         verifyZeroInteractions(gdprService);
         verify(metrics).updatePrivacyTcfGeoMetric(2, null);
+    }
+
+    @Test
+    public void isGdprConsentIsValidShouldReturnTrueWhenStringIsValid() {
+        // when
+        final boolean result = TcfDefinerService.isGdprConsentIsValid("BOEFEAyOEFEAyAHABDENAI4AAAB9vABAASA");
+
+        // then
+        Assertions.assertThat(result).isTrue();
+    }
+
+    @Test
+    public void isGdprConsentIsValidShouldReturnFalseWhenStringIsNull() {
+        // when
+        final boolean result = TcfDefinerService.isGdprConsentIsValid(null);
+
+        // then
+        Assertions.assertThat(result).isFalse();
+    }
+
+    @Test
+    public void isGdprConsentIsValidShouldReturnFalseWhenStringNotValid() {
+        // when
+        final boolean result = TcfDefinerService.isGdprConsentIsValid("invalid");
+
+        // then
+        Assertions.assertThat(result).isFalse();
     }
 }
