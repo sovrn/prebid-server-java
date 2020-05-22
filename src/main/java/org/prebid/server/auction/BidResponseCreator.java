@@ -94,6 +94,7 @@ public class BidResponseCreator {
     private final EventsService eventsService;
     private final StoredRequestProcessor storedRequestProcessor;
     private final boolean generateBidId;
+    private final boolean enforceRandomBidId;
     private final JacksonMapper mapper;
 
     private final String cacheHost;
@@ -102,12 +103,13 @@ public class BidResponseCreator {
 
     public BidResponseCreator(CacheService cacheService, BidderCatalog bidderCatalog, EventsService eventsService,
                               StoredRequestProcessor storedRequestProcessor,
-                              boolean generateBidId, JacksonMapper mapper) {
+                              boolean generateBidId, boolean enforceRandomBidId, JacksonMapper mapper) {
         this.cacheService = Objects.requireNonNull(cacheService);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.eventsService = Objects.requireNonNull(eventsService);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.generateBidId = generateBidId;
+        this.enforceRandomBidId = enforceRandomBidId;
         this.mapper = Objects.requireNonNull(mapper);
 
         cacheHost = Objects.requireNonNull(cacheService.getEndpointHost());
@@ -672,7 +674,11 @@ public class BidResponseCreator {
             cache = null;
         }
 
-        final String generatedBidId = generateBidId ? UUID.randomUUID().toString() : null;
+        // If enforceRandomBidId is set, then bid adapters that return seatbid[].bid[].id less than 17 characters
+        // will have the bid.id overwritten with a decent ~40-char UUID.
+        final boolean needToEnforceRandomBidId = enforceRandomBidId && StringUtils.length(bid.getId()) < 17;
+
+        final String generatedBidId = generateBidId || needToEnforceRandomBidId ? UUID.randomUUID().toString() : null;
         final String eventBidId = ObjectUtils.defaultIfNull(generatedBidId, bid.getId());
         final Video storedVideo = impIdToStoredVideo.get(bid.getImpid());
         final Events events = eventsEnabled && eventsAllowedByRequest
@@ -684,6 +690,10 @@ public class BidResponseCreator {
                 addIntegration(events, integration), null);
         final ExtPrebid<ExtBidPrebid, ObjectNode> bidExt = ExtPrebid.of(prebidExt, bid.getExt());
         bid.setExt(mapper.mapper().valueToTree(bidExt));
+
+        if (needToEnforceRandomBidId) {
+            bid.setId(generatedBidId);
+        }
 
         return bid;
     }
