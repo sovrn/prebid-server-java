@@ -94,7 +94,6 @@ public class BidResponseCreator {
     private final EventsService eventsService;
     private final StoredRequestProcessor storedRequestProcessor;
     private final boolean generateBidId;
-    private final boolean enforceRandomBidId;
     private final JacksonMapper mapper;
 
     private final String cacheHost;
@@ -103,13 +102,12 @@ public class BidResponseCreator {
 
     public BidResponseCreator(CacheService cacheService, BidderCatalog bidderCatalog, EventsService eventsService,
                               StoredRequestProcessor storedRequestProcessor,
-                              boolean generateBidId, boolean enforceRandomBidId, JacksonMapper mapper) {
+                              boolean generateBidId, JacksonMapper mapper) {
         this.cacheService = Objects.requireNonNull(cacheService);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.eventsService = Objects.requireNonNull(eventsService);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.generateBidId = generateBidId;
-        this.enforceRandomBidId = enforceRandomBidId;
         this.mapper = Objects.requireNonNull(mapper);
 
         cacheHost = Objects.requireNonNull(cacheService.getEndpointHost());
@@ -626,15 +624,7 @@ public class BidResponseCreator {
                       boolean eventsAllowedByRequest, long auctionTimestamp,
                       Map<String, List<ExtBidderError>> bidErrors, String integration) {
 
-        final Bid initialBid = bidderBid.getBid();
-
-        // If enforceRandomBidId is set, then bid adapters that return seatbid[].bid[].id less than 17 characters
-        // will have the bid.id overwritten with a decent ~40-char UUID.
-        final boolean needToEnforceRandomBidId = enforceRandomBidId && StringUtils.length(initialBid.getId()) < 17;
-        final String generatedBidId = generateBidId || needToEnforceRandomBidId ? UUID.randomUUID().toString() : null;
-
-        final Bid bid = generatedBidId != null ? initialBid.toBuilder().id(generatedBidId).build() : initialBid;
-
+        final Bid bid = bidderBid.getBid();
         final BidType bidType = bidderBid.getType();
 
         final boolean isApp = bidRequest.getApp() != null;
@@ -654,8 +644,8 @@ public class BidResponseCreator {
         final Map<String, String> targetingKeywords;
         final ExtResponseCache cache;
 
-        if (targeting != null && winningBidsByBidder.contains(initialBid)) {
-            final CacheIdInfo cacheIdInfo = bidsWithCacheIds.get(initialBid);
+        if (targeting != null && winningBidsByBidder.contains(bid)) {
+            final CacheIdInfo cacheIdInfo = bidsWithCacheIds.get(bid);
             final String cacheId = cacheIdInfo != null ? cacheIdInfo.getCacheId() : null;
             final String videoCacheId = cacheIdInfo != null ? cacheIdInfo.getVideoCacheId() : null;
 
@@ -667,7 +657,7 @@ public class BidResponseCreator {
             final TargetingKeywordsCreator keywordsCreator = keywordsCreator(targeting, isApp);
             final Map<BidType, TargetingKeywordsCreator> keywordsCreatorByBidType =
                     keywordsCreatorByBidType(targeting, isApp);
-            final boolean isWinningBid = winningBids.contains(initialBid);
+            final boolean isWinningBid = winningBids.contains(bid);
             final String winUrl = eventsEnabled && bidType != BidType.video
                     ? HttpUtil.encodeUrl(eventsService.winUrlTargeting(bidder, account.getId(), auctionTimestamp))
                     : null;
@@ -683,6 +673,7 @@ public class BidResponseCreator {
             cache = null;
         }
 
+        final String generatedBidId = generateBidId ? UUID.randomUUID().toString() : null;
         final String eventBidId = ObjectUtils.defaultIfNull(generatedBidId, bid.getId());
         final Video storedVideo = impIdToStoredVideo.get(bid.getImpid());
         final Events events = eventsEnabled && eventsAllowedByRequest

@@ -130,7 +130,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 .willReturn(Future.succeededFuture(VideoStoredDataResult.empty()));
 
         bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
-                false, false, jacksonMapper);
+                false, jacksonMapper);
 
         timeout = new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())).create(500);
     }
@@ -435,7 +435,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 BidderResponse.of("bidder2", givenSeatBid(BidderBid.of(bid, banner, "USD")), 0));
 
         final BidResponseCreator bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService,
-                storedRequestProcessor, true, false, jacksonMapper);
+                storedRequestProcessor, true, jacksonMapper);
         // when
         final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, bidRequest,
                 null, CACHE_INFO, ACCOUNT, false, 1000L, false, timeout).result();
@@ -452,30 +452,6 @@ public class BidResponseCreatorTest extends VertxTest {
                 .satisfies(bidId -> assertThat(UUID.fromString(bidId)).isInstanceOf(UUID.class));
 
         verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
-    }
-
-    @Test
-    public void shouldOverrideBidIdWhenEnforceRandomBidIdIsTurnedOn() {
-        // given
-        final BidRequest bidRequest = givenBidRequest();
-
-        final Bid bid = Bid.builder().id("less-then-17").build();
-        final List<BidderResponse> bidderResponses = singletonList(
-                BidderResponse.of("bidder", givenSeatBid(BidderBid.of(bid, banner, "USD")), 0));
-
-        final BidResponseCreator bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService,
-                storedRequestProcessor, true, true, jacksonMapper);
-        // when
-        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, bidRequest,
-                null, CACHE_INFO, ACCOUNT, false, 1000L, false, timeout).result();
-
-        // then
-        assertThat(bidResponse.getSeatbid())
-                .flatExtracting(SeatBid::getBid)
-                .extracting(Bid::getId)
-                .hasSize(1)
-                .first()
-                .satisfies(bidId -> assertThat(UUID.fromString(bidId)).isInstanceOf(UUID.class));
     }
 
     @Test
@@ -824,43 +800,6 @@ public class BidResponseCreatorTest extends VertxTest {
                         tuple("hb_bidid_bidder1", "bidId1"));
 
         verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
-    }
-
-    @Test
-    public void shouldPopulateTargetingKeywordsWithRandomBidId() {
-        // given
-        bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
-                false, true, jacksonMapper);
-
-        final BidRequest bidRequest = givenBidRequest();
-        final ExtRequestTargeting targeting = givenTargeting();
-
-        final Bid bid = Bid.builder().id("bidId1").price(BigDecimal.valueOf(5.67)).build();
-        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
-                givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
-
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
-
-        given(eventsService.winUrlTargeting(anyString(), anyString(), anyLong())).willReturn("http://win-url");
-
-        // when
-        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, bidRequest, targeting, CACHE_INFO,
-                account, true, 0L, false, timeout).result();
-
-        // then
-        assertThat(bidResponse.getSeatbid()).hasSize(1);
-        final List<Bid> expectedBids = bidResponse.getSeatbid().get(0).getBid();
-        assertThat(expectedBids).hasSize(1);
-
-        final ExtBidPrebid expectedExtPrebid = toExtPrebid(expectedBids.get(0).getExt()).getPrebid();
-        assertThat(UUID.fromString(expectedExtPrebid.getBidid())).isInstanceOf(UUID.class);
-
-        final Map<String, String> expectedTargeting = expectedExtPrebid.getTargeting();
-        assertThat(UUID.fromString(expectedTargeting.get("hb_bidid"))).isInstanceOf(UUID.class);
-        assertThat(UUID.fromString(expectedTargeting.get("hb_bidid_bidder1"))).isInstanceOf(UUID.class);
-
-        assertThat(expectedExtPrebid.getBidid()).isEqualTo(expectedTargeting.get("hb_bidid"));
-        assertThat(expectedExtPrebid.getBidid()).isEqualTo(expectedTargeting.get("hb_bidid_bidder1"));
     }
 
     @Test
