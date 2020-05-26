@@ -827,6 +827,43 @@ public class BidResponseCreatorTest extends VertxTest {
     }
 
     @Test
+    public void shouldPopulateTargetingKeywordsWithRandomBidId() {
+        // given
+        bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
+                false, true, jacksonMapper);
+
+        final BidRequest bidRequest = givenBidRequest();
+        final ExtRequestTargeting targeting = givenTargeting();
+
+        final Bid bid = Bid.builder().id("bidId1").price(BigDecimal.valueOf(5.67)).build();
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
+                givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
+
+        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+
+        given(eventsService.winUrlTargeting(anyString(), anyString(), anyLong())).willReturn("http://win-url");
+
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, bidRequest, targeting, CACHE_INFO,
+                account, true, 0L, false, timeout).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid()).hasSize(1);
+        final List<Bid> expectedBids = bidResponse.getSeatbid().get(0).getBid();
+        assertThat(expectedBids).hasSize(1);
+
+        final ExtBidPrebid expectedExtPrebid = toExtPrebid(expectedBids.get(0).getExt()).getPrebid();
+        assertThat(UUID.fromString(expectedExtPrebid.getBidid())).isInstanceOf(UUID.class);
+
+        final Map<String, String> expectedTargeting = expectedExtPrebid.getTargeting();
+        assertThat(UUID.fromString(expectedTargeting.get("hb_bidid"))).isInstanceOf(UUID.class);
+        assertThat(UUID.fromString(expectedTargeting.get("hb_bidid_bidder1"))).isInstanceOf(UUID.class);
+
+        assertThat(expectedExtPrebid.getBidid()).isEqualTo(expectedTargeting.get("hb_bidid"));
+        assertThat(expectedExtPrebid.getBidid()).isEqualTo(expectedTargeting.get("hb_bidid_bidder1"));
+    }
+
+    @Test
     public void shouldAddExtPrebidEvents() {
         // given
         final BidRequest bidRequest = givenBidRequest();

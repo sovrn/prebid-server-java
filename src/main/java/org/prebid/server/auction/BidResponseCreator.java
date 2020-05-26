@@ -626,7 +626,15 @@ public class BidResponseCreator {
                       boolean eventsAllowedByRequest, long auctionTimestamp,
                       Map<String, List<ExtBidderError>> bidErrors, String integration) {
 
-        final Bid bid = bidderBid.getBid();
+        final Bid initialBid = bidderBid.getBid();
+
+        // If enforceRandomBidId is set, then bid adapters that return seatbid[].bid[].id less than 17 characters
+        // will have the bid.id overwritten with a decent ~40-char UUID.
+        final boolean needToEnforceRandomBidId = enforceRandomBidId && StringUtils.length(initialBid.getId()) < 17;
+        final String generatedBidId = generateBidId || needToEnforceRandomBidId ? UUID.randomUUID().toString() : null;
+
+        final Bid bid = generatedBidId != null ? initialBid.toBuilder().id(generatedBidId).build() : initialBid;
+
         final BidType bidType = bidderBid.getType();
 
         final boolean isApp = bidRequest.getApp() != null;
@@ -646,8 +654,8 @@ public class BidResponseCreator {
         final Map<String, String> targetingKeywords;
         final ExtResponseCache cache;
 
-        if (targeting != null && winningBidsByBidder.contains(bid)) {
-            final CacheIdInfo cacheIdInfo = bidsWithCacheIds.get(bid);
+        if (targeting != null && winningBidsByBidder.contains(initialBid)) {
+            final CacheIdInfo cacheIdInfo = bidsWithCacheIds.get(initialBid);
             final String cacheId = cacheIdInfo != null ? cacheIdInfo.getCacheId() : null;
             final String videoCacheId = cacheIdInfo != null ? cacheIdInfo.getVideoCacheId() : null;
 
@@ -659,10 +667,11 @@ public class BidResponseCreator {
             final TargetingKeywordsCreator keywordsCreator = keywordsCreator(targeting, isApp);
             final Map<BidType, TargetingKeywordsCreator> keywordsCreatorByBidType =
                     keywordsCreatorByBidType(targeting, isApp);
-            final boolean isWinningBid = winningBids.contains(bid);
+            final boolean isWinningBid = winningBids.contains(initialBid);
             final String winUrl = eventsEnabled && bidType != BidType.video
                     ? HttpUtil.encodeUrl(eventsService.winUrlTargeting(bidder, account.getId(), auctionTimestamp))
                     : null;
+
             targetingKeywords = keywordsCreatorByBidType.getOrDefault(bidType, keywordsCreator)
                     .makeFor(bid, bidder, isWinningBid, cacheId, videoCacheId, cacheHost, cachePath, winUrl);
 
@@ -674,11 +683,6 @@ public class BidResponseCreator {
             cache = null;
         }
 
-        // If enforceRandomBidId is set, then bid adapters that return seatbid[].bid[].id less than 17 characters
-        // will have the bid.id overwritten with a decent ~40-char UUID.
-        final boolean needToEnforceRandomBidId = enforceRandomBidId && StringUtils.length(bid.getId()) < 17;
-
-        final String generatedBidId = generateBidId || needToEnforceRandomBidId ? UUID.randomUUID().toString() : null;
         final String eventBidId = ObjectUtils.defaultIfNull(generatedBidId, bid.getId());
         final Video storedVideo = impIdToStoredVideo.get(bid.getImpid());
         final Events events = eventsEnabled && eventsAllowedByRequest
@@ -690,10 +694,6 @@ public class BidResponseCreator {
                 addIntegration(events, integration), null);
         final ExtPrebid<ExtBidPrebid, ObjectNode> bidExt = ExtPrebid.of(prebidExt, bid.getExt());
         bid.setExt(mapper.mapper().valueToTree(bidExt));
-
-        if (needToEnforceRandomBidId) {
-            bid.setId(generatedBidId);
-        }
 
         return bid;
     }
