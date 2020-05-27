@@ -94,6 +94,7 @@ public class BidResponseCreator {
     private final EventsService eventsService;
     private final StoredRequestProcessor storedRequestProcessor;
     private final boolean generateBidId;
+    private final boolean enforceRandomBidId;
     private final JacksonMapper mapper;
 
     private final String cacheHost;
@@ -102,12 +103,13 @@ public class BidResponseCreator {
 
     public BidResponseCreator(CacheService cacheService, BidderCatalog bidderCatalog, EventsService eventsService,
                               StoredRequestProcessor storedRequestProcessor,
-                              boolean generateBidId, JacksonMapper mapper) {
+                              boolean generateBidId, boolean enforceRandomBidId, JacksonMapper mapper) {
         this.cacheService = Objects.requireNonNull(cacheService);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.eventsService = Objects.requireNonNull(eventsService);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.generateBidId = generateBidId;
+        this.enforceRandomBidId = enforceRandomBidId;
         this.mapper = Objects.requireNonNull(mapper);
 
         cacheHost = Objects.requireNonNull(cacheService.getEndpointHost());
@@ -137,24 +139,26 @@ public class BidResponseCreator {
                             null)))
                     .build());
         } else {
+            final List<BidderResponse> updatedBidderResponses = checkAndGenerateBidIds(bidderResponses);
+
             final Set<Bid> winningBids = newOrEmptySet(targeting);
             final Set<Bid> winningBidsByBidder = newOrEmptySet(targeting);
 
             // determine winning bids only if targeting is present
             if (targeting != null) {
-                populateWinningBids(bidderResponses, winningBids, winningBidsByBidder);
+                populateWinningBids(updatedBidderResponses, winningBids, winningBidsByBidder);
             }
 
             final Set<Bid> bidsToCache = cacheInfo.isShouldCacheWinningBidsOnly()
                     ? winningBids
-                    : bidderResponses.stream().flatMap(BidResponseCreator::getBids).collect(Collectors.toSet());
+                    : updatedBidderResponses.stream().flatMap(BidResponseCreator::getBids).collect(Collectors.toSet());
 
             final String integration = integrationFrom(bidRequest);
 
-            result = toBidsWithCacheIds(bidderResponses, bidsToCache, bidRequest.getImp(), cacheInfo, account, timeout,
-                    auctionTimestamp, integration)
+            result = toBidsWithCacheIds(updatedBidderResponses, bidsToCache, bidRequest.getImp(), cacheInfo, account,
+                    timeout, auctionTimestamp, integration)
                     .compose(cacheResult -> videoStoredDataResult(bidRequest.getImp(), timeout)
-                            .map(videoStoredDataResult -> toBidResponse(bidderResponses, bidRequest, targeting,
+                            .map(videoStoredDataResult -> toBidResponse(updatedBidderResponses, bidRequest, targeting,
                                     winningBids, winningBidsByBidder, cacheInfo, cacheResult, videoStoredDataResult,
                                     account, eventsAllowedByRequest, auctionTimestamp, debugEnabled, integration)));
         }
@@ -189,6 +193,28 @@ public class BidResponseCreator {
 
         return ExtBidResponse.of(extResponseDebug, errors, responseTimeMillis, bidRequest.getTmax(), null,
                 ExtBidResponsePrebid.of(auctionTimestamp));
+    }
+
+    /**
+     * If enforceRandomBidId is set, then bid adapters that return seatbid[].bid[].id less than 17 characters
+     * will have the bid.id overwritten with a decent ~40-char UUID.
+     */
+    private List<BidderResponse> checkAndGenerateBidIds(List<BidderResponse> bidderResponses) {
+        if (enforceRandomBidId) {
+            bidderResponses.forEach(BidResponseCreator::checkAndGenerateBidIds);
+        }
+        return bidderResponses;
+    }
+
+    private static void checkAndGenerateBidIds(BidderResponse bidderResponse) {
+        bidderResponse.getSeatBid().getBids().forEach(BidResponseCreator::checkAndGenerateBidId);
+    }
+
+    private static void checkAndGenerateBidId(BidderBid bidderBid) {
+        final Bid bid = bidderBid.getBid();
+        if (StringUtils.length(bid.getId()) < 17) {
+            bid.setId(UUID.randomUUID().toString());
+        }
     }
 
     /**

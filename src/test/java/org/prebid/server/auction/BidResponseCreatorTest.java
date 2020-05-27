@@ -130,7 +130,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 .willReturn(Future.succeededFuture(VideoStoredDataResult.empty()));
 
         bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
-                false, jacksonMapper);
+                false, false, jacksonMapper);
 
         timeout = new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())).create(500);
     }
@@ -435,7 +435,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 BidderResponse.of("bidder2", givenSeatBid(BidderBid.of(bid, banner, "USD")), 0));
 
         final BidResponseCreator bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService,
-                storedRequestProcessor, true, jacksonMapper);
+                storedRequestProcessor, true, false, jacksonMapper);
         // when
         final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, bidRequest,
                 null, CACHE_INFO, ACCOUNT, false, 1000L, false, timeout).result();
@@ -1291,6 +1291,29 @@ public class BidResponseCreatorTest extends VertxTest {
                 .extracting(extractedBid -> toExtPrebid(extractedBid.getExt()).getPrebid().getEvents())
                 .containsOnly(Events.of("http://win-url?param=value&int=integration",
                         "http://imp-url?param=value&int=integration"));
+    }
+
+    @Test
+    public void shouldOverrideBidIdWhenEnforceRandomBidIdIsTurnedOn() {
+        // given
+        bidResponseCreator = new BidResponseCreator(cacheService, bidderCatalog, eventsService,
+                storedRequestProcessor, true, true, jacksonMapper);
+
+        final Bid bid = Bid.builder().id("less-then-17").build();
+        final List<BidderResponse> bidderResponses = singletonList(
+                BidderResponse.of("bidder", givenSeatBid(BidderBid.of(bid, banner, "USD")), 0));
+
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, givenBidRequest(),
+                null, CACHE_INFO, ACCOUNT, false, 1000L, false, timeout).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid())
+                .flatExtracting(SeatBid::getBid)
+                .extracting(Bid::getId)
+                .hasSize(1)
+                .first()
+                .satisfies(bidId -> assertThat(UUID.fromString(bidId)).isInstanceOf(UUID.class));
     }
 
     private void givenCacheServiceResult(Map<Bid, CacheIdInfo> cacheBids) {
