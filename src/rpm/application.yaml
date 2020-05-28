@@ -57,6 +57,7 @@ cache:
   banner-ttl-seconds: 300
   video-ttl-seconds: 900
 settings:
+  enforce-valid-account: true
   database:
     type: mysql
     stored-requests-query: SELECT uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%) UNION ALL SELECT uuid, config, 'imp' as dataType FROM stored_requests WHERE uuid IN (%IMP_ID_LIST%)
@@ -87,9 +88,11 @@ gdpr:
     v2:
       cache-dir: /app/prebid-server/data/vendorlist2-cache
   purposes:
+    p2:
+      enforce-purpose: full
     p7:
       enforce-purpose: "no"
-  consent-string-means-in-scope: false
+  consent-string-means-in-scope: true
   rubicon:
     enable-cookie: true
 geolocation:
