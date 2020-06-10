@@ -597,7 +597,7 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         given(bidderCatalog.bidderInfoByName(APPNEXUS))
                 .willReturn(BidderInfo.create(true, null, null,
-                        null, null, 2, true, false));
+                        null, null, 2, true, true, false));
 
         givenTcfServiceReturningVendorIdResult(singleton(1));
         givenTcfServiceReturningBidderNamesResult(singleton(RUBICON));
@@ -629,7 +629,7 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         given(bidderCatalog.bidderInfoByName(APPNEXUS))
                 .willReturn(BidderInfo.create(true, null, null,
-                        null, null, 2, true, false));
+                        null, null, 2, true, true, false));
 
         givenTcfServiceReturningVendorIdResult(singleton(1));
         givenTcfServiceReturningBidderNamesResult(singleton(RUBICON));
@@ -1120,7 +1120,7 @@ public class CookieSyncHandlerTest extends VertxTest {
     }
 
     @Test
-    public void handleShouldRespondWithNoCookieWhenCcpaIsEnforced() throws IOException {
+    public void handleShouldRespondWithNoCookieWhenBothCcpaAndGdprRejectBidders() throws IOException {
         // given
         given(uidsCookieService.parseFromRequest(any())).willReturn(new UidsCookie(
                 Uids.builder().uids(emptyMap()).build(), jacksonMapper));
@@ -1137,11 +1137,14 @@ public class CookieSyncHandlerTest extends VertxTest {
         given(bidderCatalog.isActive(APPNEXUS)).willReturn(true);
 
         given(bidderCatalog.bidderInfoByName(RUBICON)).willReturn(BidderInfo.create(true, null, null,
-                null, null, 2, true, false));
+                null, null, 2, true, true, false));
         given(bidderCatalog.bidderInfoByName(APPNEXUS)).willReturn(BidderInfo.create(true, null, null,
-                null, null, 2, true, false));
+                null, null, 2, true, false, false));
 
-        given(privacyEnforcementService.isCcpaEnforced(any())).willReturn(true);
+        given(privacyEnforcementService.isCcpaEnforced(any(), any())).willReturn(true);
+
+        givenTcfServiceReturningVendorIdResult(singleton(1));
+        givenTcfServiceReturningBidderNamesResult(emptySet());
 
         // when
         cookieSyncHandler.handle(routingContext);
@@ -1151,7 +1154,7 @@ public class CookieSyncHandlerTest extends VertxTest {
         assertThat(cookieSyncResponse.getStatus()).isEqualTo("no_cookie");
         assertThat(cookieSyncResponse.getBidderStatus()).hasSize(2)
                 .extracting(BidderUsersyncStatus::getBidder, BidderUsersyncStatus::getError)
-                .containsOnly(tuple(APPNEXUS, "Rejected by CCPA"), tuple(RUBICON, "Rejected by CCPA"));
+                .containsOnly(tuple(APPNEXUS, "Rejected by TCF"), tuple(RUBICON, "Rejected by CCPA"));
     }
 
     @Test
@@ -1192,9 +1195,9 @@ public class CookieSyncHandlerTest extends VertxTest {
         given(bidderCatalog.names()).willReturn(new HashSet<>(asList("conversant", APPNEXUS, PUBMATIC)));
         given(bidderCatalog.isActive(anyString())).willReturn(true);
         given(bidderCatalog.bidderInfoByName(anyString())).willReturn(
-                BidderInfo.create(true, null, null, null, null, 1, false, false),
-                BidderInfo.create(true, null, null, null, null, 2, false, false),
-                BidderInfo.create(true, null, null, null, null, 3, false, false));
+                BidderInfo.create(true, null, null, null, null, 1, false, false, false),
+                BidderInfo.create(true, null, null, null, null, 2, false, false, false),
+                BidderInfo.create(true, null, null, null, null, 3, false, false, false));
 
         given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(null);
 

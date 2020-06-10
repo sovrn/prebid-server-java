@@ -489,11 +489,15 @@ public class ServiceConfiguration {
             EventsService eventsService,
             StoredRequestProcessor storedRequestProcessor,
             @Value("${auction.generate-bid-id}") boolean generateBidId,
+            @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
             @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
             JacksonMapper mapper) {
 
-        return new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
-                generateBidId, enforceRandomBidId, mapper);
+        if (truncateAttrChars < 0 || truncateAttrChars > 255) {
+            throw new IllegalArgumentException("settings.targeting.truncate-attr-chars must be between 0 and 255");
+        }
+        return new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor, generateBidId,
+                truncateAttrChars, enforceRandomBidId, mapper);
     }
 
     @Bean
