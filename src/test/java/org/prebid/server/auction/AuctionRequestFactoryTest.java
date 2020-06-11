@@ -70,6 +70,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1533,6 +1534,77 @@ public class AuctionRequestFactoryTest extends VertxTest {
         verify(applicationSettings).getAccountById(eq("123"), any());
 
         assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithPopulatedSitePublisherId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().id("ignored").build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubicon",
+                                ExtImpRubicon.builder().accountId(123).build())))
+                        .build()))
+                .build());
+
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(Account.builder().id("123").build()));
+
+        // when
+        final BidRequest bidRequest = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        assertThat(singleton(bidRequest))
+                .extracting(BidRequest::getSite)
+                .extracting(Site::getPublisher)
+                .extracting(Publisher::getId)
+                .containsOnly("123");
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithPopulatedAppPublisherId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .app(App.builder().build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("rubicon",
+                                ExtImpRubicon.builder().accountId(123).build())))
+                        .build()))
+                .build());
+
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(Account.builder().id("123").build()));
+
+        // when
+        final BidRequest bidRequest = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        assertThat(singleton(bidRequest))
+                .extracting(BidRequest::getApp)
+                .extracting(App::getPublisher)
+                .extracting(Publisher::getId)
+                .containsOnly("123");
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithOriginalAppPublisherIdIfFetchingAccountFailed() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .app(App.builder().publisher(Publisher.builder().id("123").build()).build())
+                .build());
+
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.failedFuture("error"));
+
+        // when
+        final BidRequest bidRequest = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        assertThat(singleton(bidRequest))
+                .extracting(BidRequest::getApp)
+                .extracting(App::getPublisher)
+                .extracting(Publisher::getId)
+                .containsOnly("123");
     }
 
     private void givenImplicitParams(String referer, String domain, String ip, String ua) {

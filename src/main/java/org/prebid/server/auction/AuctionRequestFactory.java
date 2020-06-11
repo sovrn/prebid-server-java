@@ -184,7 +184,7 @@ public class AuctionRequestFactory {
                 .map(account -> AuctionContext.builder()
                         .routingContext(routingContext)
                         .uidsCookie(uidsCookieService.parseFromRequest(routingContext))
-                        .bidRequest(bidRequest)
+                        .bidRequest(updateBidRequestWithAccountId(bidRequest, account.getId()))
                         .timeout(timeout)
                         .account(account)
                         .build());
@@ -968,5 +968,43 @@ public class AuctionRequestFactory {
                 ? Future.failedFuture(new UnauthorizedAccountException(
                 String.format("Unauthorized account id: %s", accountId), accountId))
                 : Future.succeededFuture(Account.empty(accountId));
+    }
+
+    /**
+     * Rubicon-fork can fetch account id not only from {@link Site} or {@link App},
+     * so need to make sure it is updated in {@link BidRequest}.
+     */
+    private static BidRequest updateBidRequestWithAccountId(BidRequest bidRequest, String accountId) {
+        if (StringUtils.isNotEmpty(accountId)) { // ignore fallback or empty account
+            final Site site = bidRequest.getSite();
+            final App app = bidRequest.getApp();
+
+            if (site != null) {
+                final Publisher publisher = site.getPublisher();
+                final String publisherId = publisher != null ? publisher.getId() : null;
+                if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
+                    final Site updatedSite = site.toBuilder()
+                            .publisher(updatePublisherId(publisher, accountId))
+                            .build();
+                    return bidRequest.toBuilder().site(updatedSite).build();
+                }
+            } else if (app != null) {
+                final Publisher publisher = app.getPublisher();
+                final String publisherId = publisher != null ? publisher.getId() : null;
+                if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
+                    final App updatedApp = app.toBuilder()
+                            .publisher(updatePublisherId(publisher, accountId))
+                            .build();
+                    return bidRequest.toBuilder().app(updatedApp).build();
+                }
+            }
+        }
+        return bidRequest;
+    }
+
+    private static Publisher updatePublisherId(Publisher publisher, String accountId) {
+        return (publisher != null ? publisher.toBuilder() : Publisher.builder())
+                .id(accountId)
+                .build();
     }
 }
