@@ -11,6 +11,7 @@ import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
+import com.iab.openrtb.request.Source;
 import com.iab.openrtb.request.User;
 import com.iab.openrtb.request.Video;
 import io.vertx.core.Future;
@@ -38,6 +39,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.identity.IdGenerator;
 import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
@@ -104,6 +106,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
     private InterstitialProcessor interstitialProcessor;
     @Mock
     private ApplicationSettings applicationSettings;
+    @Mock
+    private IdGenerator idGenerator;
 
     private AuctionRequestFactory factory;
     @Mock
@@ -118,6 +122,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Before
     public void setUp() {
         given(interstitialProcessor.process(any())).will(invocationOnMock -> invocationOnMock.getArgument(0));
+        given(idGenerator.generateId()).willReturn(null);
 
         given(routingContext.request()).willReturn(httpRequest);
         given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
@@ -141,6 +146,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
     }
 
@@ -178,6 +184,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         givenValidBidRequest();
@@ -213,6 +220,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         given(applicationSettings.getAccountById(any(), any()))
@@ -257,6 +265,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         given(routingContext.getBody()).willReturn(Buffer.buffer("body"));
@@ -523,6 +532,21 @@ public class AuctionRequestFactoryTest extends VertxTest {
     }
 
     @Test
+    public void shouldSetSourceTidIfNotDefined() {
+        // given
+        given(idGenerator.generateId()).willReturn("f6965ea7-f281-4eb9-9de2-560a52d954a3");
+
+        givenBidRequest(BidRequest.builder().build());
+
+        // when
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        assertThat(request.getSource())
+                .isEqualTo(Source.builder().tid("f6965ea7-f281-4eb9-9de2-560a52d954a3").build());
+    }
+
+    @Test
     public void shouldSetDefaultAtIfInitialValueIsEqualsToZero() {
         // given
         givenBidRequest(BidRequest.builder().at(0).build());
@@ -758,6 +782,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -798,6 +823,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -837,6 +863,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -876,6 +903,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -942,6 +970,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -983,6 +1012,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                idGenerator,
                 jacksonMapper);
 
         final ObjectNode extBidRequest = mapper.valueToTree(ExtBidRequest.of(ExtRequestPrebid.builder()
