@@ -15,6 +15,8 @@ import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -75,6 +77,8 @@ import java.util.stream.StreamSupport;
  * Executes an OpenRTB v2.5 Auction.
  */
 public class ExchangeService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ExchangeService.class);
 
     private static final String PREBID_EXT = "prebid";
     private static final String CONTEXT_EXT = "context";
@@ -482,7 +486,8 @@ public class ExchangeService {
      * Returns original {@link User} if user.buyeruid already contains uid value for bidder.
      * Otherwise, returns new {@link User} containing updated {@link ExtUser} and user.buyeruid.
      * <p>
-     * Also, removes user.keywords, gender, yob, geo and ext in case bidder does not use first party data.
+     * Also, removes user.keywords, gender, yob, geo and ext (except user.ext.eids and user.ext.digitrust)
+     * in case bidder does not use first party data.
      */
     private User prepareUser(User user, ExtUser extUser, String bidder, BidderAliases aliases,
                              Map<String, String> uidsBody, UidsCookie uidsCookie, boolean useFirstPartyData,
@@ -499,12 +504,19 @@ public class ExchangeService {
             }
 
             if (shouldRemoveUserFields) {
+                final ExtUser updatedExtUser = extUser == null
+                        ? null
+                        : ExtUser.builder()
+                        .eids(extUser.getEids())
+                        .digitrust(extUser.getDigitrust())
+                        .build();
+
                 userBuilder
                         .keywords(null)
                         .gender(null)
                         .yob(null)
                         .geo(null)
-                        .ext(null);
+                        .ext(mapper.mapper().valueToTree(updatedExtUser));
             } else if (shouldUpdateUserExt) {
                 userBuilder.ext(mapper.mapper().valueToTree(extUser.toBuilder().prebid(null).build()));
             }
@@ -616,9 +628,16 @@ public class ExchangeService {
 
         final Map<String, ExtRequestPrebidSchainSchain> bidderToPrebidSchains = new HashMap<>();
         for (ExtRequestPrebidSchain schain : schains) {
-            final List<String> schainBidders = schain.getBidders();
-            if (CollectionUtils.isNotEmpty(schainBidders)) {
-                schainBidders.forEach(bidder -> bidderToPrebidSchains.put(bidder, schain.getSchain()));
+            final List<String> bidders = schain.getBidders();
+            if (CollectionUtils.isNotEmpty(bidders)) {
+                for (String bidder : bidders) {
+                    if (bidderToPrebidSchains.containsKey(bidder)) {
+                        bidderToPrebidSchains.remove(bidder);
+                        logger.debug("Schain bidder {0} is rejected since it was defined more than once", bidder);
+                        continue;
+                    }
+                    bidderToPrebidSchains.put(bidder, schain.getSchain());
+                }
             }
         }
         return bidderToPrebidSchains;
