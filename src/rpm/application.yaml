@@ -58,8 +58,6 @@ cache:
   video-ttl-seconds: 900
 settings:
   enforce-valid-account: true
-  targeting:
-    truncate-attr-chars: 20
   database:
     type: mysql
     stored-requests-query: SELECT uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%) UNION ALL SELECT uuid, config, 'imp' as dataType FROM stored_requests WHERE uuid IN (%IMP_ID_LIST%)
