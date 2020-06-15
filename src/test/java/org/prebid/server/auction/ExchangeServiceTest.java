@@ -516,7 +516,7 @@ public class ExchangeServiceTest extends VertxTest {
         final ObjectNode extBidRequest = mapper.valueToTree(ExtBidRequest.of(
                 ExtRequestPrebid.builder()
                         .schains(asList(schainForBidder1, schainForBidder2))
-                        .build()));
+                        .build(), null));
 
         final BidRequest bidRequest = givenBidRequest(asList(
                 givenImp(singletonMap(bidder1, 1), identity()),
