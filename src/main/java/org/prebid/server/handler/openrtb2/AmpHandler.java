@@ -116,8 +116,6 @@ public class AmpHandler implements Handler<RoutingContext> {
         // more accurately if we note the real start time, and use it to compute the auction timeout.
         final long startTime = clock.millis();
 
-        metrics.updateAmpRequestsMetric();
-
         final boolean isSafari = HttpUtil.isSafari(routingContext.request().headers().get(HttpUtil.USER_AGENT_HEADER));
         metrics.updateSafariRequestsMetric(isSafari);
 
@@ -318,14 +316,8 @@ public class AmpHandler implements Handler<RoutingContext> {
                 // TODO adminManager: enable when admin endpoints can be bound on application port
                 //adminManager.accept(AdminManager.COUNTER_KEY, logger,
                 //        logMessageFrom(invalidRequestException, message, context));
-
-                // TODO temporary disabled until 1.36 is out
-                //conditionalLogger.info(String.format("%s, Referer: %s", message,
-                //        context.request().headers().get(HttpUtil.REFERER_HEADER)), 100);
-
-                final String referer = context.request().headers().get(HttpUtil.REFERER_HEADER);
-                final String query = context.request().absoluteURI();
-                logger.error("{0}, Referer: {1}, Query: {2}", message, referer, query);
+                conditionalLogger.info(String.format("%s, Referer: %s", message,
+                        context.request().headers().get(HttpUtil.REFERER_HEADER)), 100);
 
                 status = HttpResponseStatus.BAD_REQUEST.code();
                 body = message;

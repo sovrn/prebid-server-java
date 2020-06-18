@@ -22,7 +22,6 @@ public enum MetricName {
 
     // auction
     requests,
-    amp_requests,
     app_requests,
     no_cookie_requests,
     safari_requests,

@@ -401,8 +401,4 @@ public class Metrics extends UpdatableMetrics {
     public void updateCacheRequestFailedTime(long timeElapsed) {
         updateTimer(MetricName.prebid_cache_request_error_time, timeElapsed);
     }
-
-    public void updateAmpRequestsMetric() {
-        incCounter(MetricName.amp_requests);
-    }
 }
