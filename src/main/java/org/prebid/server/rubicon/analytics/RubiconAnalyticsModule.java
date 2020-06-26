@@ -21,7 +21,6 @@ import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.ext.web.RoutingContext;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -32,7 +31,6 @@ import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
-import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderError;
@@ -80,7 +78,6 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -94,7 +91,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePostProcessor {
+public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
 
@@ -120,8 +117,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
 
     private static final String STORED_REQUEST_ID_AMP_URL_PARAM = "tag_id=";
     private static final String URL_PARAM_SEPARATOR = "&";
-
-    private static final Base64.Encoder BASE64_ENCODER = Base64.getUrlEncoder().withoutPadding();
 
     private static final Map<Integer, String> VIDEO_SIZE_AD_FORMATS;
 
@@ -159,14 +154,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
     private final HttpClient httpClient;
     private final JacksonMapper mapper;
 
-    private AtomicLong auctionEventCount = new AtomicLong();
-    private AtomicLong ampEventCount = new AtomicLong();
-    private AtomicLong bidWonCount = new AtomicLong();
+    private final AtomicLong auctionEventCount = new AtomicLong();
+    private final AtomicLong ampEventCount = new AtomicLong();
 
-    private Map<Integer, Long> accountToAuctionEventCount = new ConcurrentHashMap<>();
-    private Map<Integer, Long> accountToAmpEventCount = new ConcurrentHashMap<>();
-    private Map<Integer, Long> accountToBidWonCount = new ConcurrentHashMap<>();
-    private Map<Integer, Long> accountToNotificationEventCount = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> accountToAuctionEventCount = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> accountToAmpEventCount = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> accountToNotificationEventCount = new ConcurrentHashMap<>();
 
     public RubiconAnalyticsModule(String endpointUrl, Integer globalSamplingFactor, String pbsVersion,
                                   String pbsHostname, String dataCenterRegion, BidderCatalog bidderCatalog,
@@ -197,36 +190,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         }
     }
 
-    @Override
-    public Future<BidResponse> postProcess(RoutingContext routingContext, UidsCookie uidsCookie, BidRequest bidRequest,
-                                           BidResponse bidResponse, Account account) {
-        if (bidRequest.getApp() != null) {
-            final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
-            final HttpContext httpContext = HttpContext.from(routingContext);
-            final boolean hasRubiconId = hasRubiconId(httpContext);
-
-            final Integer accountId = parseId(account.getId());
-            final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
-
-            for (final SeatBid seatBid : bidResponse.getSeatbid()) {
-                final String bidder = seatBid.getSeat();
-                final Integer responseTime = serverLatencyMillisFrom(extBidResponse, bidder);
-                final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
-
-                for (final Bid bid : seatBid.getBid()) {
-                    // only continue if counter matches sampling factor
-                    if (shouldProcessEvent(accountId, accountSamplingFactor, accountToBidWonCount, bidWonCount)) {
-                        addEventCallbackToBid(bid,
-                                toBidWonEvent(httpContext, bidRequest, bidder, responseTime, serverHasUserId,
-                                        hasRubiconId, bid, accountId, accountSamplingFactor));
-                    }
-                }
-            }
-        }
-
-        return Future.succeededFuture(bidResponse);
-    }
-
     private boolean shouldProcessEvent(Integer accountId, Integer accountSamplingFactor,
                                        Map<Integer, Long> accountToEventCount, AtomicLong globalEventCount) {
         final boolean result;
@@ -242,22 +205,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         }
 
         return result;
-    }
-
-    private void addEventCallbackToBid(Bid bid, Event event) {
-        final byte[] eventBytes;
-        try {
-            eventBytes = mapper.mapper().writeValueAsBytes(event);
-        } catch (JsonProcessingException e) {
-            // not expected to happen though
-            logger.warn("Exception occurred while marshalling analytics event", e);
-            return;
-        }
-
-        final String encodedEvent = BASE64_ENCODER.encodeToString(eventBytes);
-        final String url = String.format("%s?type=bidWon&data=%s", endpointUrl, encodedEvent);
-
-        bid.setNurl(url);
     }
 
     private void processAuctionEvent(AuctionEvent auctionEvent) {
@@ -760,10 +707,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return videoAdFormat(imp, hasRubiconBid);
     }
 
-    private String videoAdFormatFromImp(Imp imp, String bidder) {
-        return imp != null ? videoAdFormat(imp, Objects.equals(bidder, RUBICON_BIDDER)) : null;
-    }
-
     private static boolean isRubiconVideoBid(org.prebid.server.rubicon.analytics.proto.Bid bid) {
         return Objects.equals(bid.getBidder(), RUBICON_BIDDER)
                 && bid.getBidResponse() != null
@@ -838,37 +781,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
                 .build();
     }
 
-    private Event toBidWonEvent(HttpContext httpContext, BidRequest bidRequest, String bidder,
-                                Integer serverLatencyMillis, Boolean serverHasUserId, boolean hasRubiconId,
-                                Bid bid, Integer accountId, Integer accountSamplingFactor) {
-        final Imp foundImp = findImpById(bidRequest.getImp(), bid.getImpid());
-        final BidType bidType = mediaTypeFromBid(bid);
-        final String bidTypeString = mediaTypeString(bidType);
-
-        return eventBuilderBaseFromApp(httpContext, bidRequest)
-                .bidsWon(Collections.singletonList(BidWon.builder()
-                        .transactionId(transactionIdFrom(bidRequest.getId(), bid.getImpid()))
-                        .accountId(accountId)
-                        .bidder(bidder)
-                        .samplingFactor(samplingFactor(accountSamplingFactor))
-                        .bidwonStatus(SUCCESS_STATUS)
-                        .mediaTypes(mediaTypesForBidWonFromImp(foundImp))
-                        .videoAdFormat(bidType == BidType.video ? videoAdFormatFromImp(foundImp, bidder) : null)
-                        // we do not have insight into any errors that might occur since the url is not
-                        // fired until creative is rendered
-                        .error(null)
-                        .adUnitCode(null) // does not apply to mobile ads
-                        .source(SERVER_SOURCE)
-                        .bidResponse(analyticsBidResponse(bid, bidTypeString, bidRequest.getCur().get(0),
-                                requestCurrencyRates(bidRequest.getExt())))
-                        .serverLatencyMillis(serverLatencyMillis)
-                        .serverHasUserId(serverHasUserId)
-                        .hasRubiconId(hasRubiconId)
-                        .params(paramsFrom(foundImp, bidder))
-                        .build()))
-                .build();
-    }
-
     private static Integer parseId(String id) {
         try {
             return NumberUtils.createInteger(id);
@@ -882,25 +794,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
         return accountSamplingFactor != null && accountSamplingFactor > 0
                 ? accountSamplingFactor
                 : globalSamplingFactor;
-    }
-
-    private static List<String> mediaTypesForBidWonFromImp(Imp imp) {
-        final List<String> mediaTypes;
-        if (imp != null) {
-            mediaTypes = new ArrayList<>();
-            if (imp.getBanner() != null) {
-                mediaTypes.add(BidType.banner.name());
-            }
-            if (imp.getVideo() != null) {
-                mediaTypes.add("video-instream");
-            }
-            if (imp.getXNative() != null) {
-                mediaTypes.add("native");
-            }
-        } else {
-            mediaTypes = Collections.emptyList();
-        }
-        return mediaTypes;
     }
 
     /**
@@ -1034,7 +927,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter, BidResponsePos
      * Holds correspondence between OpenRTB Bid and Analytics Bid.
      */
     @Value
-    private static final class TwinBids {
+    private static class TwinBids {
 
         Bid openrtbBid;
 

@@ -1,6 +1,5 @@
 package org.prebid.server.rubicon.analytics;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
@@ -64,7 +63,6 @@ import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
-import org.prebid.server.rubicon.proto.request.ExtRequest;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
@@ -76,7 +74,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -900,214 +897,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .build()),
                         123, 1000L, true)))
                 .build());
-    }
-
-    @Test
-    public void postProcessShouldUseGlobalSamplingFactor() {
-        // given
-        module = new RubiconAnalyticsModule(HOST_URL, 2, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, jacksonMapper);
-
-        final Bid bid1 = Bid.builder().build();
-        final Bid bid2 = Bid.builder().build();
-
-        // when
-        module.postProcess(
-                routingContext,
-                uidsCookie,
-                BidRequest.builder()
-                        .imp(emptyList())
-                        .app(App.builder().build())
-                        .cur(singletonList("USD"))
-                        .build(),
-                BidResponse.builder()
-                        .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
-                        .build(),
-                Account.builder().id("123").build());
-
-        // then
-        then(bid1.getNurl()).isNull();
-        then(bid2.getNurl()).isNotNull();
-    }
-
-    @Test
-    public void postProcessShouldUseAccountSamplingFactor() {
-        // given
-        module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, jacksonMapper);
-
-        final Bid bid1 = Bid.builder().build();
-        final Bid bid2 = Bid.builder().build();
-
-        // when
-        module.postProcess(
-                routingContext,
-                uidsCookie,
-                BidRequest.builder()
-                        .imp(emptyList())
-                        .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
-                        .cur(singletonList("USD"))
-                        .build(),
-                BidResponse.builder()
-                        .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
-                        .build(),
-                Account.builder().id("123").analyticsSamplingFactor(2).build());
-
-        // then
-        then(bid1.getNurl()).isNull();
-        then(bid2.getNurl()).isNotNull();
-    }
-
-    @Test
-    public void postProcessShouldSetIntegrationAndWrappernameForRubicon() throws JsonProcessingException {
-        // given
-        module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, jacksonMapper);
-
-        final Bid bid1 = Bid.builder().build();
-        final Bid bid2 = Bid.builder().impid("impId").build();
-
-        final ExtRequest updatedExt =
-                ExtRequest.of(ExtRequestPrebid.of(ExtRequestPrebidBidders.of(
-                        ExtRequestPrebidBiddersRubicon.of("updated", "wrappername"))));
-
-        // when
-        module.postProcess(
-                routingContext,
-                uidsCookie,
-                BidRequest.builder()
-                        .id("bidRequestId")
-                        .imp(emptyList())
-                        .app(App.builder().publisher(Publisher.builder().id("1234").build()).build())
-                        .cur(singletonList("USD"))
-                        .ext(mapper.valueToTree(updatedExt))
-                        .build(),
-                BidResponse.builder()
-                        .seatbid(singletonList(SeatBid.builder().bid(asList(bid1, bid2)).build()))
-                        .build(),
-                Account.builder().id("123").analyticsSamplingFactor(2).build());
-
-        // then
-        final BidWon expectedBidWod = BidWon.builder()
-                .transactionId("bidRequestId-impId")
-                .accountId(123)
-                .samplingFactor(2)
-                .bidwonStatus("success")
-                .mediaTypes(emptyList())
-                .source("server")
-                .hasRubiconId(true)
-                .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(null, null, null,
-                        Dimensions.of(null, null)))
-                .build();
-        final org.prebid.server.rubicon.analytics.proto.App app = org.prebid.server.rubicon.analytics.proto.App.of(null,
-                null, null, null);
-        final Event expectedEvent = Event.builder()
-                .integration("updated")
-                .wrapperName("wrappername")
-                .version("pbs-version-1")
-                .client(Client.builder().deviceClass("mobile").app(app).build())
-                .bidsWon(singletonList(expectedBidWod))
-                .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
-                .country("countryFromAuditCookie")
-                .build();
-        final Base64.Encoder encoder = Base64.getEncoder().withoutPadding();
-
-        then(bid1.getNurl()).isNull();
-        then(bid2.getNurl()).endsWith(encoder.encodeToString(mapper.writeValueAsBytes(expectedEvent)));
-    }
-
-    @Test
-    public void postProcessShouldIgnoreNonMobileRequests() {
-        // given
-        final Bid bid = Bid.builder().build();
-
-        // when
-        module.postProcess(
-                routingContext,
-                uidsCookie,
-                BidRequest.builder()
-                        .imp(emptyList())
-                        .build(),
-                BidResponse.builder()
-                        .seatbid(singletonList(SeatBid.builder().bid(singletonList(bid)).build()))
-                        .build(),
-                null);
-
-        // then
-        then(bid.getNurl()).isNull();
-    }
-
-    @Test
-    public void postProcessShouldSetBidNurlWithEventData() {
-        // given
-        final BidRequest bidRequest = sampleAuctionBidRequest(null, null);
-        final BidResponse bidResponse = sampleBidResponse();
-
-        // when
-        final BidResponse returnedBidResponse = module.postProcess(routingContext, uidsCookie, bidRequest,
-                bidResponse, Account.builder().id("1234").build()).result();
-
-        // then
-        then(returnedBidResponse.getSeatbid())
-                .flatExtracting(SeatBid::getBid)
-                .extracting(Bid::getNurl)
-                .allMatch(nurl -> nurl.startsWith("http://host-url/event?type=bidWon&data="))
-                .extracting(nurl -> nurl.replaceFirst("http://host-url/event\\?type=bidWon&data=", ""))
-                .extracting(payload -> mapper.readValue(Base64.getUrlDecoder().decode(payload), Event.class))
-                .containsOnly(expectedEventBuilderBaseFromApp("pbs", null)
-                                .bidsWon(singletonList(BidWon.builder()
-                                        .transactionId("bidRequestId-impId1")
-                                        .accountId(1234)
-                                        .bidder("rubicon")
-                                        .samplingFactor(1)
-                                        .bidwonStatus("success")
-                                        .mediaTypes(asList("banner", "video-instream"))
-                                        .videoAdFormat("interstitial")
-                                        .source("server")
-                                        .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                345, BigDecimal.valueOf(4.56), "video", Dimensions.of(500, 600)))
-                                        .serverLatencyMillis(101)
-                                        .serverHasUserId(true)
-                                        .hasRubiconId(true)
-                                        .params(Params.of(123, 456, 789))
-                                        .build()))
-                                .build(),
-                        expectedEventBuilderBaseFromApp("pbs", null)
-                                .bidsWon(singletonList(BidWon.builder()
-                                        .transactionId("bidRequestId-impId2")
-                                        .accountId(1234)
-                                        .bidder("appnexus")
-                                        .samplingFactor(1)
-                                        .bidwonStatus("success")
-                                        .mediaTypes(singletonList("video-instream"))
-                                        .videoAdFormat("mid-roll")
-                                        .source("server")
-                                        .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                456, BigDecimal.valueOf(5.67), "video", Dimensions.of(600, 700)))
-                                        .serverLatencyMillis(202)
-                                        .serverHasUserId(false)
-                                        .hasRubiconId(true)
-                                        .build()))
-                                .build(),
-                        expectedEventBuilderBaseFromApp("pbs", null)
-                                .bidsWon(singletonList(BidWon.builder()
-                                        .transactionId("bidRequestId-impId2")
-                                        .accountId(1234)
-                                        .bidder("appnexus")
-                                        .samplingFactor(1)
-                                        .bidwonStatus("success")
-                                        .mediaTypes(singletonList("video-instream"))
-                                        .videoAdFormat("mid-roll")
-                                        .source("server")
-                                        .bidResponse(org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                                                567, BigDecimal.valueOf(6.78), "video", Dimensions.of(600, 700)))
-                                        .serverLatencyMillis(202)
-                                        .serverHasUserId(false)
-                                        .hasRubiconId(true)
-                                        .build()))
-                                .build());
     }
 
     private static BidRequest sampleAuctionBidRequest(String integration, String wrappername) {
