@@ -113,8 +113,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final String PBS_INTEGRATION = "pbs";
 
-    private static final String MOBILE_DEVICE_CLASS = "mobile";
-
     private static final String STORED_REQUEST_ID_AMP_URL_PARAM = "tag_id=";
     private static final String URL_PARAM_SEPARATOR = "&";
 
@@ -835,7 +833,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .wrapperName(extWrappername)
                 .version(pbsVersion)
                 .client(Client.builder()
-                        .deviceClass(MOBILE_DEVICE_CLASS)
                         .os(getIfNotNull(device, Device::getOs))
                         .osVersion(getIfNotNull(device, Device::getOsv))
                         .make(getIfNotNull(device, Device::getMake))
