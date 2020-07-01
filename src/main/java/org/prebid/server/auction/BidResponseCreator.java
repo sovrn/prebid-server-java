@@ -48,6 +48,8 @@ import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtOptions;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
@@ -59,8 +61,6 @@ import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseDebug;
-import org.prebid.server.rubicon.proto.request.ExtRequest;
-import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
@@ -858,17 +858,20 @@ public class BidResponseCreator {
     }
 
     private String integrationFrom(BidRequest bidRequest) {
-        final ExtRequest extRequest;
-        try {
-            extRequest = mapper.mapper().convertValue(bidRequest.getExt(), ExtRequest.class);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        final ExtRequest extRequest = bidRequest.getExt();
         final ExtRequestPrebid prebid = extRequest == null ? null : extRequest.getPrebid();
-        final ExtRequestPrebidBidders bidders = prebid == null ? null : prebid.getBidders();
+        final ExtRequestPrebidBidders bidders = prebid == null ? null : biddersFrom(prebid);
         final ExtRequestPrebidBiddersRubicon rubicon = bidders != null ? bidders.getRubicon() : null;
         final String integration = rubicon != null ? rubicon.getIntegration() : null;
         return StringUtils.stripToNull(integration);
+    }
+
+    private ExtRequestPrebidBidders biddersFrom(ExtRequestPrebid prebid) {
+        try {
+            return mapper.mapper().convertValue(prebid.getBidders(), ExtRequestPrebidBidders.class);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static Events addIntegration(Events events, String integration) {

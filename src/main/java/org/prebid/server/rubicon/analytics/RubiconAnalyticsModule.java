@@ -40,9 +40,12 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
-import org.prebid.server.proto.openrtb.ext.request.ExtBidRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtApp;
+import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestCurrency;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
@@ -58,16 +61,12 @@ import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
 import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
-import org.prebid.server.rubicon.analytics.proto.ExtApp;
-import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
 import org.prebid.server.rubicon.analytics.proto.VideoAdFormat;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
-import org.prebid.server.rubicon.proto.request.ExtRequest;
-import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
@@ -354,13 +353,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     }
 
     private boolean isDebugEnabled(BidRequest bidRequest) {
-        final ObjectNode ext = bidRequest.getExt();
-        final ExtBidRequest extBidRequest = ext != null ? readExt(ext, ExtBidRequest.class) : null;
-        final org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid extRequestPrebid = extBidRequest != null
-                ? extBidRequest.getPrebid()
-                : null;
-        final Integer prebidDebug = extRequestPrebid != null ? extRequestPrebid.getDebug() : null;
-        return Objects.equals(prebidDebug, 1);
+        final ExtRequest ext = bidRequest.getExt();
+        final ExtRequestPrebid prebid = ext != null ? ext.getPrebid() : null;
+        final Integer debug = prebid != null ? prebid.getDebug() : null;
+        return Objects.equals(debug, 1);
     }
 
     private List<AdUnit> toAdUnits(BidRequest bidRequest,
@@ -508,13 +504,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .orElse(null);
     }
 
-    private Map<String, Map<String, BigDecimal>> requestCurrencyRates(ObjectNode extBidRequestNode) {
-        final ExtBidRequest extBidRequest = extBidRequestNode != null
-                ? readExt(extBidRequestNode, ExtBidRequest.class)
-                : null;
-
-        final org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid prebid = extBidRequest != null
-                ? extBidRequest.getPrebid()
+    private Map<String, Map<String, BigDecimal>> requestCurrencyRates(ExtRequest extRequest) {
+        final ExtRequestPrebid prebid = extRequest != null
+                ? extRequest.getPrebid()
                 : null;
 
         final ExtRequestCurrency currency = prebid != null ? prebid.getCurrency() : null;
@@ -799,7 +791,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
      */
     private Event.EventBuilder eventBuilderBaseFromApp(HttpContext httpContext, BidRequest bidRequest) {
         final App app = bidRequest.getApp();
-        final ExtApp appExt = readExt(app.getExt(), ExtApp.class);
+        final ExtApp appExt = app.getExt();
         final ExtAppPrebid appExtPrebid = appExt != null ? appExt.getPrebid() : null;
 
         return eventBuilderBase(httpContext, bidRequest, org.prebid.server.rubicon.analytics.proto.App.of(
@@ -853,10 +845,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private ExtRequestPrebidBiddersRubicon parseExtParameters(BidRequest bidRequest) {
         try {
-            final ExtRequest extRequest = mapper.mapper().convertValue(bidRequest.getExt(), ExtRequest.class);
+            final ExtRequest extRequest = bidRequest.getExt();
             final ExtRequestPrebid prebid = extRequest == null ? null : extRequest.getPrebid();
-            final ExtRequestPrebidBidders bidders = prebid == null ? null : prebid.getBidders();
-            return bidders == null ? ExtRequestPrebidBiddersRubicon.EMPTY : bidders.getRubicon();
+            final ObjectNode bidders = prebid == null ? null : prebid.getBidders();
+            return bidders == null
+                    ? ExtRequestPrebidBiddersRubicon.EMPTY
+                    : mapper.mapper().convertValue(bidders, ExtRequestPrebidBidders.class).getRubicon();
         } catch (IllegalArgumentException e) {
             return ExtRequestPrebidBiddersRubicon.EMPTY;
         }

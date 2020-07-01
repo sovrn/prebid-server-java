@@ -48,6 +48,8 @@ import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtOptions;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
@@ -58,8 +60,6 @@ import org.prebid.server.proto.openrtb.ext.response.ExtBidResponsePrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
-import org.prebid.server.rubicon.proto.request.ExtRequest;
-import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
@@ -1354,10 +1354,11 @@ public class BidResponseCreatorTest extends VertxTest {
         final BidRequest bidRequest = BidRequest.builder()
                 .cur(singletonList("USD"))
                 .imp(emptyList())
-                .ext(mapper.valueToTree(ExtRequest.of(
-                        ExtRequestPrebid.of(
+                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .bidders(mapper.valueToTree(
                                 ExtRequestPrebidBidders.of(
-                                        ExtRequestPrebidBiddersRubicon.of("integration", null))))))
+                                        ExtRequestPrebidBiddersRubicon.of("integration", null))))
+                        .build(), null))
                 .build();
 
         final Bid bid = Bid.builder().id("bidId1").impid("impId1").price(BigDecimal.valueOf(5.67)).build();

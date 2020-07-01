@@ -41,7 +41,11 @@ import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtApp;
+import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
@@ -57,13 +61,10 @@ import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
 import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
-import org.prebid.server.rubicon.analytics.proto.ExtApp;
-import org.prebid.server.rubicon.analytics.proto.ExtAppPrebid;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
-import org.prebid.server.rubicon.proto.request.ExtRequestPrebid;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
@@ -933,7 +934,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .app(App.builder()
                         .bundle("bundle")
                         .ver("version")
-                        .ext(mapper.valueToTree(ExtApp.of(ExtAppPrebid.of("sdkVersion", "sdkSource"))))
+                        .ext(ExtApp.of(ExtAppPrebid.of("sdkSource", "sdkVersion"), null))
                         .publisher(Publisher.builder().id("1234").build())
                         .build())
                 .imp(asList(
@@ -981,8 +982,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
                 .cur(singletonList("USD"))
-                .ext(mapper.valueToTree(ExtPrebid.of(ExtRequestPrebid.of(ExtRequestPrebidBidders.of(
-                        ExtRequestPrebidBiddersRubicon.of(integration, wrappername))), null)))
+                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .bidders(mapper.valueToTree(ExtRequestPrebidBidders.of(
+                                ExtRequestPrebidBiddersRubicon.of(integration, wrappername))))
+                        .build(), null))
                 .tmax(1000L)
                 .build();
     }
