@@ -292,6 +292,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         final Set<String> ccpaEnforcedBidders = extractCcpaEnforcedBidders(account, biddersToSync, privacy);
 
         final Map<String, PrivacyEnforcementAction> bidderNameToAction = tcfResponse.getActions();
+        final boolean userInGdprScope = tcfResponse.getUserInGdprScope() == null || tcfResponse.getUserInGdprScope();
 
         final Set<String> biddersRejectedByTcf = biddersToSync.stream()
                 .filter(bidder -> !ccpaEnforcedBidders.contains(bidder))
@@ -301,7 +302,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 .collect(Collectors.toSet());
 
         respondWith(context, uidsCookie, privacy, biddersToSync, biddersRejectedByTcf, ccpaEnforcedBidders, limit,
-                account.getId(), requestHasBidders);
+                account.getId(), requestHasBidders, userInGdprScope);
 
         return null;
     }
@@ -315,7 +316,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                                 boolean requestHasBidders) {
 
         respondWith(context, uidsCookie, privacy, biddersToSync, biddersToSync, Collections.emptySet(), limit, account,
-                requestHasBidders);
+                requestHasBidders, true);
 
         return null;
     }
@@ -331,7 +332,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                              Set<String> biddersRejectedByCcpa,
                              Integer limit,
                              String account,
-                             boolean requestHasBidders) {
+                             boolean requestHasBidders,
+                             boolean userInGdprScope) {
 
         updateCookieSyncTcfMetrics(bidders, biddersRejectedByTcf);
 
@@ -343,15 +345,17 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 .collect(Collectors.toList());
         updateCookieSyncMatchMetrics(bidders, bidderStatuses);
 
-        List<BidderUsersyncStatus> updatedBidderStatuses;
+        final List<BidderUsersyncStatus> updatedBidderStatuses;
         if (limit != null && limit > 0 && limit < bidderStatuses.size()) {
             Collections.shuffle(bidderStatuses);
 
             updatedBidderStatuses = requestHasBidders && !rubiconBidderStatusIsPresent(bidderStatuses)
-                    ? addRubiconBidderStatus(context, trimToLimit(bidderStatuses, limit), privacy, account)
-                    : trimToLimit(addRubiconBidderStatus(context, bidderStatuses, privacy, account), limit);
+                    ? addRubiconBidderStatus(context, trimToLimit(bidderStatuses, limit), privacy, account,
+                    userInGdprScope)
+                    : trimToLimit(addRubiconBidderStatus(context, bidderStatuses, privacy, account, userInGdprScope),
+                    limit);
         } else {
-            updatedBidderStatuses = addRubiconBidderStatus(context, bidderStatuses, privacy, account);
+            updatedBidderStatuses = addRubiconBidderStatus(context, bidderStatuses, privacy, account, userInGdprScope);
         }
 
         final CookieSyncResponse response = CookieSyncResponse.of(uidsCookie.hasLiveUids() ? "ok" : "no_cookie",
@@ -509,7 +513,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
     private List<BidderUsersyncStatus> addRubiconBidderStatus(RoutingContext context,
                                                               List<BidderUsersyncStatus> bidderStatuses,
-                                                              Privacy privacy, String account) {
+                                                              Privacy privacy, String account,
+                                                              boolean userInGdprScope) {
         final List<BidderUsersyncStatus> result;
         final boolean placeRubiconAtFirstPosition;
 
@@ -518,10 +523,10 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         // (no need for usersync), then /setuid processing for all bidders will fail because of absent account ID.
         // Solution: Add Rubicon bidder status to response (at the beginning position). This will carry out
         // the account param to /setuid endpoint for Rubicon and creates "uids-audit" cookie.
-        final boolean uidsAuditCookieIsPresent = uidsAuditCookieIsPresent(context);
         final boolean rubiconBidderStatusIsPresent = rubiconBidderStatusIsPresent(bidderStatuses);
 
-        if (!uidsAuditCookieIsPresent && !rubiconBidderStatusIsPresent && !bidderStatuses.isEmpty()) {
+        if (userInGdprScope && !uidsAuditCookieIsPresent(context) && !rubiconBidderStatusIsPresent
+                && !bidderStatuses.isEmpty()) {
             final Usersyncer usersyncer = bidderCatalog.usersyncerByName(RUBICON_BIDDER);
             final List<BidderUsersyncStatus> updatedBidderStatuses = new ArrayList<>(bidderStatuses);
 
