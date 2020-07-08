@@ -207,7 +207,7 @@ public class TcfDefinerServiceTest {
     @Test
     public void resultForVendorIdsShouldReturnRestrictAllWhenConsentIsMissing() {
         // when
-        target.resultForVendorIds(singleton(1), "1", null, "ip", null, null);
+        target.resultForVendorIds(singleton(1), "1", null, "ip", null, null, null);
 
         // then
         verify(tcf2Service).permissionsFor(any(), argThat(arg -> arg.getClass() == TCStringEmpty.class));
