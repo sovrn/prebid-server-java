@@ -17,7 +17,6 @@ import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.CaseInsensitiveHeaders;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
@@ -353,8 +352,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         assertThat(captor.getValue().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
                 .containsOnly(
-                        tuple(HttpHeaders.USER_AGENT.toString(), "userAgent"),
-                        tuple(HttpHeaders.CONTENT_TYPE.toString(), "application/json;charset=utf-8"));
+                        tuple("User-Agent", "userAgent"),
+                        tuple("Content-Type", "application/json;charset=utf-8"));
     }
 
     @Test
@@ -379,7 +378,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
 
         then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(
-                expectedEventBuilderBaseFromApp(integration, wrappername)
+                expectedEventBuilderBaseFromApp()
                         .auctions(singletonList(Auction.of("bidRequestId", 1, asList(
                                 AdUnit.builder()
                                         .transactionId("bidRequestId-impId1")
@@ -921,12 +920,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
-                        .os("os")
-                        .osv("2.23")
-                        .make("osMake")
-                        .model("osModel")
-                        .carrier("carrier")
-                        .connectiontype(17)
                         .lmt(1)
                         .ua("userAgent")
                         .geo(Geo.builder().country("countryFromRequest").build())
@@ -1010,12 +1003,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
-                        .os("os")
-                        .osv("2.23")
-                        .make("osMake")
-                        .model("osModel")
-                        .carrier("carrier")
-                        .connectiontype(17)
                         .lmt(1)
                         .ua("userAgent")
                         .build())
@@ -1137,18 +1124,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return map;
     }
 
-    private static Event.EventBuilder expectedEventBuilderBaseFromApp(String integration, String wrappername) {
+    private static Event.EventBuilder expectedEventBuilderBaseFromApp() {
         return Event.builder()
-                .integration(integration)
-                .wrapperName(wrappername)
+                .integration("dbpg")
+                .wrapperName("12314wp")
                 .version("pbs-version-1")
                 .client(Client.builder()
-                        .os("os")
-                        .osVersion("2.23")
-                        .make("osMake")
-                        .model("osModel")
-                        .carrier("carrier")
-                        .connectionType(17)
                         .app(org.prebid.server.rubicon.analytics.proto.App.of("bundle", "version", "sdkVersion",
                                 "sdkSource"))
                         .build())
@@ -1162,14 +1143,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return Event.builder()
                 .integration("pbs")
                 .version("pbs-version-1")
-                .client(Client.builder()
-                        .os("os")
-                        .osVersion("2.23")
-                        .make("osMake")
-                        .model("osModel")
-                        .carrier("carrier")
-                        .connectionType(17)
-                        .build())
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")

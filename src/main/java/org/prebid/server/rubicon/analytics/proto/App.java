@@ -8,6 +8,8 @@ import lombok.Value;
 @Value
 public class App {
 
+    public static final App EMPTY = App.of(null, null, null, null);
+
     String bundle;
 
     String version;

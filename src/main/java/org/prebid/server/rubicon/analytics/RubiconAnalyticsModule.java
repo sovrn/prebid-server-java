@@ -18,7 +18,6 @@ import com.iab.openrtb.response.SeatBid;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
-import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import lombok.Value;
@@ -93,10 +92,6 @@ import java.util.stream.Collectors;
 public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
-
-    private static final String REFERER_HEADER = "Referer";
-    private static final String DNT_HEADER = "DNT";
-    private static final String USER_AGENT_HEADER = "User-Agent";
 
     private static final String EVENT_PATH = "/event";
 
@@ -346,9 +341,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .eventTimeMillis(timestamp != null ? timestamp : Instant.now().toEpochMilli())
                 .integration(ObjectUtils.defaultIfNull(integration, PBS_INTEGRATION))
                 .version(pbsVersion)
-                .referrerUri(httpContext.getHeaders().get(REFERER_HEADER))
-                .limitAdTracking(StringUtils.equals(httpContext.getHeaders().get(DNT_HEADER), "1"))
-                .userAgent(httpContext.getHeaders().get(USER_AGENT_HEADER))
+                .referrerUri(httpContext.getHeaders().get(HttpUtil.REFERER_HEADER.toString()))
+                .limitAdTracking(StringUtils.equals(httpContext.getHeaders().get(HttpUtil.DNT_HEADER.toString()), "1"))
+                .userAgent(httpContext.getHeaders().get(HttpUtil.USER_AGENT_HEADER.toString()))
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion));
     }
 
@@ -794,26 +789,29 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final ExtApp appExt = app.getExt();
         final ExtAppPrebid appExtPrebid = appExt != null ? appExt.getPrebid() : null;
 
-        return eventBuilderBase(httpContext, bidRequest, org.prebid.server.rubicon.analytics.proto.App.of(
-                app.getBundle(),
-                app.getVer(),
-                getIfNotNull(appExtPrebid, ExtAppPrebid::getVersion),
-                getIfNotNull(appExtPrebid, ExtAppPrebid::getSource)));
+        final org.prebid.server.rubicon.analytics.proto.App clientApp = org.prebid.server.rubicon.analytics.proto.App
+                .of(app.getBundle(), app.getVer(), getIfNotNull(appExtPrebid, ExtAppPrebid::getVersion),
+                        getIfNotNull(appExtPrebid, ExtAppPrebid::getSource));
+        final Client client = clientApp.equals(org.prebid.server.rubicon.analytics.proto.App.EMPTY)
+                ? null
+                : Client.builder().app(clientApp).build();
+
+        return eventBuilderBase(httpContext, bidRequest)
+                .client(client);
     }
 
     /**
      * Prepares event from request from mobile web.
      */
     private Event.EventBuilder eventBuilderBaseFromSite(HttpContext httpContext, BidRequest bidRequest) {
-        return eventBuilderBase(httpContext, bidRequest, null)
+        return eventBuilderBase(httpContext, bidRequest)
                 .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage));
     }
 
     /**
      * Prepares event from request.
      */
-    private Event.EventBuilder eventBuilderBase(HttpContext httpContext, BidRequest bidRequest,
-                                                org.prebid.server.rubicon.analytics.proto.App clientApp) {
+    private Event.EventBuilder eventBuilderBase(HttpContext httpContext, BidRequest bidRequest) {
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
         final ExtRequestPrebidBiddersRubicon extParameter = parseExtParameters(bidRequest);
@@ -824,15 +822,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .integration(StringUtils.isBlank(extIntegration) ? PBS_INTEGRATION : extIntegration)
                 .wrapperName(extWrappername)
                 .version(pbsVersion)
-                .client(Client.builder()
-                        .os(getIfNotNull(device, Device::getOs))
-                        .osVersion(getIfNotNull(device, Device::getOsv))
-                        .make(getIfNotNull(device, Device::getMake))
-                        .model(getIfNotNull(device, Device::getModel))
-                        .carrier(getIfNotNull(device, Device::getCarrier))
-                        .connectionType(getIfNotNull(device, Device::getConnectiontype))
-                        .app(clientApp)
-                        .build())
                 .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
                 .userAgent(getIfNotNull(device, Device::getUa))
@@ -884,11 +873,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
      */
     private static MultiMap headers(Event event) {
         final MultiMap headers = MultiMap.caseInsensitiveMultiMap()
-                .add(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON);
+                .add(HttpUtil.CONTENT_TYPE_HEADER, APPLICATION_JSON);
 
         final String userAgent = event.getUserAgent();
         if (userAgent != null) {
-            headers.add(HttpHeaders.USER_AGENT, userAgent);
+            headers.add(HttpUtil.USER_AGENT_HEADER, userAgent);
         }
         return headers;
     }
