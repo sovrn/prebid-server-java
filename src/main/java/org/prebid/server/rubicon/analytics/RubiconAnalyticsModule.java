@@ -107,7 +107,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final String PBS_INTEGRATION = "pbs";
 
-    private static final String APP_DEVICE_CLASS = "app";
+    private static final String APP_DEVICE_CLASS = "APP";
 
     private static final String STORED_REQUEST_ID_AMP_URL_PARAM = "tag_id=";
     private static final String URL_PARAM_SEPARATOR = "&";
@@ -787,19 +787,36 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
      * Prepares event from request from mobile app.
      */
     private Event.EventBuilder eventBuilderBaseFromApp(HttpContext httpContext, BidRequest bidRequest) {
-        final App app = bidRequest.getApp();
-        final ExtApp appExt = app.getExt();
-        final ExtAppPrebid appExtPrebid = appExt != null ? appExt.getPrebid() : null;
+        return eventBuilderBase(httpContext, bidRequest)
+                .client(clientFrom(bidRequest));
+    }
+
+    private static Client clientFrom(BidRequest bidRequest) {
+        final org.prebid.server.rubicon.analytics.proto.App app = clientAppFrom(bidRequest.getApp());
+        final Integer connectionType = getIfNotNull(bidRequest.getDevice(), Device::getConnectiontype);
+
+        if (app == null && connectionType == null) {
+            return null;
+        }
+
+        return Client.builder()
+                .deviceClass(APP_DEVICE_CLASS)
+                .app(app)
+                .connectionType(connectionType)
+                .build();
+    }
+
+    private static org.prebid.server.rubicon.analytics.proto.App clientAppFrom(App app) {
+        final ExtAppPrebid prebid = getIfNotNull(app.getExt(), ExtApp::getPrebid);
 
         final org.prebid.server.rubicon.analytics.proto.App clientApp = org.prebid.server.rubicon.analytics.proto.App
-                .of(app.getBundle(), app.getVer(), getIfNotNull(appExtPrebid, ExtAppPrebid::getVersion),
-                        getIfNotNull(appExtPrebid, ExtAppPrebid::getSource));
-        final Client client = clientApp.equals(org.prebid.server.rubicon.analytics.proto.App.EMPTY)
-                ? null
-                : Client.builder().deviceClass(APP_DEVICE_CLASS).app(clientApp).build();
+                .of(
+                        app.getBundle(),
+                        app.getVer(),
+                        getIfNotNull(prebid, ExtAppPrebid::getVersion),
+                        getIfNotNull(prebid, ExtAppPrebid::getSource));
 
-        return eventBuilderBase(httpContext, bidRequest)
-                .client(client);
+        return clientApp.equals(org.prebid.server.rubicon.analytics.proto.App.EMPTY) ? null : clientApp;
     }
 
     /**

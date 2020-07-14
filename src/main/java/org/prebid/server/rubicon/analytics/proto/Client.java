@@ -8,6 +8,8 @@ import lombok.Value;
 @Value
 public class Client {
 
+    public static final Client EMPTY = Client.builder().build();
+
     @JsonProperty("deviceClass")
     String deviceClass;
 
