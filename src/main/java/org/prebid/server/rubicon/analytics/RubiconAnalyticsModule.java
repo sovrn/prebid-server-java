@@ -107,6 +107,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final String PBS_INTEGRATION = "pbs";
 
+    private static final String APP_DEVICE_CLASS = "app";
+
     private static final String STORED_REQUEST_ID_AMP_URL_PARAM = "tag_id=";
     private static final String URL_PARAM_SEPARATOR = "&";
 
@@ -794,7 +796,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                         getIfNotNull(appExtPrebid, ExtAppPrebid::getSource));
         final Client client = clientApp.equals(org.prebid.server.rubicon.analytics.proto.App.EMPTY)
                 ? null
-                : Client.builder().app(clientApp).build();
+                : Client.builder().deviceClass(APP_DEVICE_CLASS).app(clientApp).build();
 
         return eventBuilderBase(httpContext, bidRequest)
                 .client(client);

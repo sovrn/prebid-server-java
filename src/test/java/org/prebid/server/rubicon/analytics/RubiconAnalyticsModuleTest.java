@@ -1130,6 +1130,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .wrapperName("12314wp")
                 .version("pbs-version-1")
                 .client(Client.builder()
+                        .deviceClass("app")
                         .app(org.prebid.server.rubicon.analytics.proto.App.of("bundle", "version", "sdkVersion",
                                 "sdkSource"))
                         .build())
