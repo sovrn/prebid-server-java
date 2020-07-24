@@ -12,6 +12,7 @@ import io.restassured.config.RestAssuredConfig;
 import io.restassured.internal.mapping.Jackson2Mapper;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import org.apache.commons.lang3.StringUtils;
 import org.json.JSONException;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -33,6 +34,8 @@ import org.springframework.test.context.TestPropertySource;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
@@ -46,6 +49,8 @@ public abstract class IntegrationTest extends VertxTest {
 
     private static final int APP_PORT = 8080;
     private static final int WIREMOCK_PORT = 8090;
+    private static final Pattern UTC_MILLIS_PATTERN =
+            Pattern.compile(".*([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z).*");
 
     @SuppressWarnings("unchecked")
     @ClassRule
@@ -85,26 +90,30 @@ public abstract class IntegrationTest extends VertxTest {
             throws IOException {
 
         return auctionResponseFrom(templatePath, response,
-                "bidder_status.find { it.bidder == '%s' }.response_time_ms", bidders);
+                "bidder_status.find { it.bidder == '%s' }.response_time_ms", null, bidders);
     }
 
     static String openrtbAuctionResponseFrom(String templatePath, Response response, List<String> bidders)
             throws IOException {
 
-        return auctionResponseFrom(templatePath, response, "ext.responsetimemillis.%s", bidders);
+        return auctionResponseFrom(templatePath, response, "ext.responsetimemillis.%s",
+                "ext.debug.httpcalls.userservice[0].requestbody", bidders);
     }
 
     private static String auctionResponseFrom(String templatePath, Response response, String responseTimePath,
-                                              List<String> bidders) throws IOException {
+                                              String responseUserTimePath, List<String> bidders) throws IOException {
         final String hostAndPort = "localhost:" + WIREMOCK_PORT;
         final String cachePath = "/cache";
+        final String userServicePath = "/user-data-details";
         final String cacheEndpoint = "http://" + hostAndPort + cachePath;
+        final String userServiceEndpoint = "http://" + hostAndPort + userServicePath;
 
         String result = jsonFrom(templatePath)
                 .replaceAll("\\{\\{ cache.endpoint }}", cacheEndpoint)
                 .replaceAll("\\{\\{ cache.resource_url }}", cacheEndpoint + "?uuid=")
                 .replaceAll("\\{\\{ cache.host }}", hostAndPort)
-                .replaceAll("\\{\\{ cache.path }}", cachePath);
+                .replaceAll("\\{\\{ cache.path }}", cachePath)
+                .replaceAll("\\{\\{ userservice_uri }}", userServiceEndpoint);
 
         for (final String bidder : bidders) {
             result = result.replaceAll("\\{\\{ " + bidder + "\\.exchange_uri }}",
@@ -112,7 +121,32 @@ public abstract class IntegrationTest extends VertxTest {
             result = setResponseTime(response, result, bidder, responseTimePath);
         }
 
+        if (StringUtils.isNotBlank(responseUserTimePath)) {
+            result = setUserServiceTimestamp(response, result, responseUserTimePath);
+        }
         return result;
+    }
+
+    private static String setUserServiceTimestamp(Response response, String expectedResponseJson,
+                                                  String responseUserTimePath) {
+        final Object val;
+        try {
+            val = response.path(responseUserTimePath);
+        } catch (Exception ex) {
+            return expectedResponseJson;
+        }
+
+        if (val == null) {
+            return expectedResponseJson;
+        }
+        final String userRequest = val.toString();
+        final Matcher m = UTC_MILLIS_PATTERN.matcher(userRequest);
+        String userRequestDate;
+        if (m.find()) {
+            userRequestDate = m.group(1);
+            return expectedResponseJson.replaceAll("\\{\\{ userservice_time }}", userRequestDate);
+        }
+        return expectedResponseJson;
     }
 
     private static String setResponseTime(Response response, String expectedResponseJson, String bidder,

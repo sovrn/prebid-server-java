@@ -36,6 +36,8 @@ public class EventUtil {
     private static final String INT_PARAMETER = "int";
     private static final int INT_PARAMETER_MAX_LENGTH = 64;
 
+    private static final String LINE_ITEM_ID_PARAMETER = "l";
+
     private EventUtil() {
     }
 
@@ -137,6 +139,7 @@ public class EventUtil {
                 .format(format)
                 .analytics(analytics)
                 .integration(queryParams.get(INT_PARAMETER))
+                .lineItemId(queryParams.get(LINE_ITEM_ID_PARAMETER))
                 .build();
     }
 
@@ -175,6 +178,10 @@ public class EventUtil {
         } else if (eventRequest.getAnalytics() == EventRequest.Analytics.disabled) {
             result.append(nameValueAsQueryString(ANALYTICS_PARAMETER, DISABLED_ANALYTICS));
         }
+
+        result.append(StringUtils.isNotEmpty(eventRequest.getLineItemId())
+                ? nameValueAsQueryString(LINE_ITEM_ID_PARAMETER, eventRequest.getLineItemId())
+                : StringUtils.EMPTY); // skip parameter
 
         return result.toString();
     }

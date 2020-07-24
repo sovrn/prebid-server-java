@@ -14,6 +14,9 @@ import lombok.Value;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
+import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.deals.UserService;
+import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.events.EventRequest;
 import org.prebid.server.events.EventUtil;
 import org.prebid.server.exception.PreBidException;
@@ -38,13 +41,24 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
 
     private static final long DEFAULT_TIMEOUT = 1000L;
 
+    private final UidsCookieService uidsCookieService;
+    private final ApplicationEventService applicationEventService;
+    private final UserService userService;
     private final AnalyticsReporter analyticsReporter;
     private final TimeoutFactory timeoutFactory;
     private final ApplicationSettings applicationSettings;
     private final TrackingPixel trackingPixel;
 
-    public NotificationEventHandler(AnalyticsReporter analyticsReporter, TimeoutFactory timeoutFactory,
+    public NotificationEventHandler(UidsCookieService uidsCookieService,
+                                    ApplicationEventService applicationEventService,
+                                    UserService userService,
+                                    AnalyticsReporter analyticsReporter,
+                                    TimeoutFactory timeoutFactory,
                                     ApplicationSettings applicationSettings) {
+
+        this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
+        this.applicationEventService = applicationEventService;
+        this.userService = userService;
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
@@ -117,10 +131,23 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
             respondWithServerError(context, async.cause());
         } else {
             final Account account = async.result();
+            boolean eventsEnabledForAccount = Objects.equals(account.getEventsEnabled(), true);
+            boolean eventsEnabledForRequest = eventRequest.getAnalytics() == EventRequest.Analytics.enabled;
 
-            if (Objects.equals(account.getEventsEnabled(), true)) {
+            if (!eventsEnabledForAccount && eventsEnabledForRequest) {
+                respondWithUnauthorized(context, String.format("Account '%s' doesn't support events", account.getId()));
+                return;
+            }
+
+            final EventRequest.Type eventType = eventRequest.getType();
+            final String lineItemId = eventRequest.getLineItemId();
+            if (applicationEventService != null && eventsEnabledForAccount && lineItemId != null) {
+                applicationEventService.publishLineItemWinEvent(lineItemId);
+            }
+
+            if (eventsEnabledForRequest) {
                 final NotificationEvent notificationEvent = NotificationEvent.builder()
-                        .type(eventRequest.getType() == EventRequest.Type.win
+                        .type(eventType == EventRequest.Type.win
                                 ? NotificationEvent.Type.win : NotificationEvent.Type.imp)
                         .bidId(eventRequest.getBidId())
                         .account(account)
@@ -128,12 +155,16 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
                         .timestamp(eventRequest.getTimestamp())
                         .integration(eventRequest.getIntegration())
                         .httpContext(HttpContext.from(context))
+                        .lineItemId(lineItemId)
                         .build();
+
+                if (userService != null && lineItemId != null) {
+                    userService.processWinEvent(notificationEvent, uidsCookieService.parseFromRequest(context));
+                }
+
                 analyticsReporter.processEvent(notificationEvent);
 
                 respondWithOkStatus(context, eventRequest.getFormat() == EventRequest.Format.image);
-            } else {
-                respondWithUnauthorized(context, String.format("Account '%s' doesn't support events", account.getId()));
             }
         }
     }

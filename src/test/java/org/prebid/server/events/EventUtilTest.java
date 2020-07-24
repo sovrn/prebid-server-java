@@ -219,7 +219,8 @@ public class EventUtilTest {
                 .add("b", "bidId")
                 .add("ts", "1000")
                 .add("f", "i")
-                .add("x", "0"));
+                .add("x", "0")
+                .add("l", "lineItemId"));
 
         // when
         final EventRequest result = EventUtil.from(routingContext);
@@ -233,6 +234,7 @@ public class EventUtilTest {
                 .timestamp(1000L)
                 .format(EventRequest.Format.image)
                 .analytics(EventRequest.Analytics.disabled)
+                .lineItemId("lineItemId")
                 .build());
     }
 
@@ -272,6 +274,7 @@ public class EventUtilTest {
                 .format(EventRequest.Format.blank)
                 .analytics(EventRequest.Analytics.enabled)
                 .timestamp(1000L)
+                .lineItemId("lineItemId")
                 .build();
 
         // when
@@ -279,11 +282,11 @@ public class EventUtilTest {
 
         // then
         assertThat(result)
-                .isEqualTo("http://external-url/event?t=win&b=bidId&a=accountId&ts=1000&bidder=bidder&f=b&x=1");
+                .isEqualTo("http://external-url/event?t=win&b=bidId&a=accountId&ts=1000&bidder=bidder&f=b&x=1&l=lineItemId");
     }
 
     @Test
-    public void toUrlShouldReturnExpectedUrlWithoutFormatAndAnalytics() {
+    public void toUrlShouldReturnExpectedUrlWithoutFormatAndAnalyticsAndLineItemId() {
         // given
         final EventRequest eventRequest = EventRequest.builder()
                 .type(EventRequest.Type.win)

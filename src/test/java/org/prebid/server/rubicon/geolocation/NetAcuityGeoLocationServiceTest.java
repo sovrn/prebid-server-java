@@ -16,6 +16,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.metric.Metrics;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -40,10 +41,17 @@ public class NetAcuityGeoLocationServiceTest {
     @Mock
     private NetAcuityServerAddressProvider addressProvider;
 
+    @Mock
+    private Clock clock;
+
+    @Mock
+    private Metrics metrics;
+
     @Before
     public void setUp() throws UnknownHostException {
         vertx = Vertx.vertx();
-        netAcuityGeoLocationService = new NetAcuityGeoLocationService(vertx, addressProvider::getServerAddress);
+        netAcuityGeoLocationService = new NetAcuityGeoLocationService(vertx, addressProvider::getServerAddress,
+                clock, metrics);
 
         given(addressProvider.getServerAddress()).willReturn(InetAddress.getByName("localhost"));
     }
@@ -100,7 +108,7 @@ public class NetAcuityGeoLocationServiceTest {
     }
 
     @Test
-    public void lookupShouldReturnFailedFutureWhenAdressProviderThrowsException() {
+    public void lookupShouldReturnFailedFutureWhenAddressProviderThrowsException() {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         final TimeoutFactory timeoutFactory = new TimeoutFactory(clock);

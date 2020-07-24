@@ -209,7 +209,6 @@ public class AmpHandlerTest extends VertxTest {
 
         // TODO adminManager: enable when admin endpoints can be bound on application port
         //verify(adminManager).accept(eq(AdminManager.COUNTER_KEY), any(), any());
-
         assertThat(httpResponse.headers()).hasSize(2)
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
                 .containsOnly(
@@ -418,8 +417,8 @@ public class AmpHandlerTest extends VertxTest {
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponseWithExt(mapper.valueToTree(
-                        ExtBidResponse.of(ExtResponseDebug.of(null, auctionContext.getBidRequest()), null, null, null,
-                                null, ExtBidResponsePrebid.of(1000L)))));
+                        ExtBidResponse.of(ExtResponseDebug.of(null, auctionContext.getBidRequest(), null, null), null,
+                                null, null, null, ExtBidResponsePrebid.of(1000L)))));
 
         // when
         ampHandler.handle(routingContext);
@@ -441,8 +440,8 @@ public class AmpHandlerTest extends VertxTest {
 
         given(exchangeService.holdAuction(any()))
                 .willReturn(givenBidResponseWithExt(mapper.valueToTree(
-                        ExtBidResponse.of(ExtResponseDebug.of(null, auctionContext.getBidRequest()), null, null, null,
-                                null, ExtBidResponsePrebid.of(1000L)))));
+                        ExtBidResponse.of(ExtResponseDebug.of(null, auctionContext.getBidRequest(), null, null), null,
+                                null, null, null, ExtBidResponsePrebid.of(1000L)))));
 
         // when
         ampHandler.handle(routingContext);
@@ -596,7 +595,7 @@ public class AmpHandlerTest extends VertxTest {
         ampHandler.handle(routingContext);
 
         // then
-        verify(metrics).updateRequestTimeMetric(eq(500L));
+        verify(metrics).updateRequestTimeMetric(eq(MetricName.request_time), eq(500L));
     }
 
     @Test

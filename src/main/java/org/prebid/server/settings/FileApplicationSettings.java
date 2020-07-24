@@ -88,10 +88,10 @@ public class FileApplicationSettings implements ApplicationSettings {
                 existingStoredIdToJson(requestIds, storedIdToRequest),
                 existingStoredIdToJson(impIds, storedIdToImp),
                 Stream.of(
-                        errorsForMissedIds(requestIds, storedIdToRequest, StoredDataType.request),
-                        errorsForMissedIds(impIds, storedIdToImp, StoredDataType.imp))
-                        .flatMap(Collection::stream)
-                        .collect(Collectors.toList())));
+                errorsForMissedIds(requestIds, storedIdToRequest, StoredDataType.request),
+                errorsForMissedIds(impIds, storedIdToImp, StoredDataType.imp))
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList())));
     }
 
     /**

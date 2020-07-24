@@ -67,7 +67,7 @@ public class RsidCookieService {
      * If it does - excludes that char as well as all characters before it.
      */
     private static String preProcessRsidValue(String rsidRawValue) {
-        final int invalidCharIndex = rsidRawValue.indexOf("|");
+        final int invalidCharIndex = rsidRawValue.indexOf('|');
         return invalidCharIndex == -1 ? rsidRawValue : rsidRawValue.substring(invalidCharIndex + 1);
     }
 

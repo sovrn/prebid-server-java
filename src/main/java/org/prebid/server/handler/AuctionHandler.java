@@ -453,7 +453,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
                 .putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON)
                 .end(mapper.encode(response));
 
-        metrics.updateRequestTimeMetric(clock.millis() - startTime);
+        metrics.updateRequestTimeMetric(MetricName.request_time, clock.millis() - startTime);
     }
 
     private void handleResponseException(Throwable exception) {

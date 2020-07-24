@@ -20,6 +20,9 @@ import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.model.Tuple2;
+import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.deals.UserService;
+import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.settings.ApplicationSettings;
@@ -35,6 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -46,19 +51,26 @@ public class NotificationEventHandlerTest extends VertxTest {
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
     @Mock
+    private UidsCookieService uidsCookieService;
+    @Mock
+    private ApplicationEventService applicationEventService;
+    @Mock
+    private UserService userService;
+    @Mock
     private AnalyticsReporter analyticsReporter;
     @Mock
     private TimeoutFactory timeoutFactory;
     @Mock
     private ApplicationSettings applicationSettings;
+
+    private NotificationEventHandler notificationHandler;
+
     @Mock
     private RoutingContext routingContext;
     @Mock
     private HttpServerRequest httpRequest;
     @Mock
     private HttpServerResponse httpResponse;
-
-    private NotificationEventHandler notificationHandler;
 
     @Before
     public void setUp() {
@@ -71,14 +83,17 @@ public class NotificationEventHandlerTest extends VertxTest {
         given(httpResponse.putHeader(any(CharSequence.class), any(CharSequence.class))).willReturn(httpResponse);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
-        notificationHandler = new NotificationEventHandler(analyticsReporter, timeoutFactory, applicationSettings);
+        notificationHandler = new NotificationEventHandler(
+                uidsCookieService,
+                applicationEventService,
+                userService,
+                analyticsReporter,
+                timeoutFactory,
+                applicationSettings);
     }
 
     @Test
     public void shouldReturnBadRequestWhenTypeIsMissing() {
-        // given
-        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap());
-
         // when
         notificationHandler.handle(routingContext);
 
@@ -91,8 +106,9 @@ public class NotificationEventHandlerTest extends VertxTest {
     @Test
     public void shouldReturnBadRequestWhenTypeIsInvalid() {
         // given
-        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
-                .add("t", "invalid"));
+        given(httpRequest.params())
+                .willReturn(MultiMap.caseInsensitiveMultiMap()
+                        .add("t", "invalid"));
 
         // when
         notificationHandler.handle(routingContext);
@@ -106,8 +122,9 @@ public class NotificationEventHandlerTest extends VertxTest {
     @Test
     public void shouldReturnBadRequestWhenBidIdIsMissing() {
         // given
-        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
-                .add("t", "win"));
+        given(httpRequest.params())
+                .willReturn(MultiMap.caseInsensitiveMultiMap()
+                        .add("t", "win"));
 
         // when
         notificationHandler.handle(routingContext);
@@ -139,9 +156,10 @@ public class NotificationEventHandlerTest extends VertxTest {
     @Test
     public void shouldReturnUnauthorizedWhenAccountIsMissing() {
         // given
-        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
-                .add("t", "win")
-                .add("b", "bidId"));
+        given(httpRequest.params())
+                .willReturn(MultiMap.caseInsensitiveMultiMap()
+                        .add("t", "win")
+                        .add("b", "bidId"));
 
         // when
         notificationHandler.handle(routingContext);
@@ -286,6 +304,26 @@ public class NotificationEventHandlerTest extends VertxTest {
     }
 
     @Test
+    public void shouldUpdateEventForLineItemForEventTypeWinAndAccountEventsEnabled() {
+        //given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("t", "win")
+                .add("b", "bidId")
+                .add("l", "lineItemId")
+                .add("a", "accountId"));
+
+        final Account account = Account.builder().eventsEnabled(true).build();
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(account));
+
+        // when
+        notificationHandler.handle(routingContext);
+
+        // then
+        verify(applicationEventService).publishLineItemWinEvent(eq("lineItemId"));
+    }
+
+    @Test
     public void shouldNotPassEventToAnalyticsReporterWhenAnalyticsValueIsZero() {
         // given
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
@@ -294,11 +332,13 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("a", "accountId")
                 .add("x", "0"));
 
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(Account.builder().eventsEnabled(true).build()));
+
         // when
         notificationHandler.handle(routingContext);
 
         // then
-        verifyZeroInteractions(applicationSettings);
         verifyZeroInteractions(analyticsReporter);
     }
 
@@ -385,6 +425,47 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .integration("int_-123")
                 .httpContext(expectedHttpContext)
                 .build());
+    }
+
+    @Test
+    public void shouldPassEventObjectToUserServiceWhenLineItemIdParameterIsPresent() {
+        // given
+        given(httpRequest.params())
+                .willReturn(MultiMap.caseInsensitiveMultiMap()
+                        .add("t", "win")
+                        .add("b", "bidId")
+                        .add("a", "accountId")
+                        .add("l", "lineItemId"));
+
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(Account.builder().id("accountId").eventsEnabled(true).build()));
+
+        // when
+        notificationHandler.handle(routingContext);
+
+        // then
+        verify(uidsCookieService).parseFromRequest(eq(routingContext));
+
+        final Map<String, String> queryParams = new HashMap<>();
+        queryParams.put("t", "win");
+        queryParams.put("b", "bidId");
+        queryParams.put("a", "accountId");
+        queryParams.put("l", "lineItemId");
+        final HttpContext expectedHttpContext = HttpContext.builder()
+                .queryParams(queryParams)
+                .headers(Collections.emptyMap())
+                .cookies(Collections.emptyMap())
+                .build();
+        final NotificationEvent expectedEvent = NotificationEvent.builder()
+                .type(NotificationEvent.Type.win)
+                .bidId("bidId")
+                .account(Account.builder().id("accountId").eventsEnabled(true).build())
+                .httpContext(expectedHttpContext)
+                .lineItemId("lineItemId")
+                .build();
+
+        verify(userService).processWinEvent(eq(expectedEvent), isNull());
+        verify(analyticsReporter).processEvent(eq(expectedEvent));
     }
 
     private Integer captureResponseStatusCode() {

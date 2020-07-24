@@ -64,7 +64,7 @@ public class CircuitBreakerSecuredHttpClientTest {
     @Test
     public void requestShouldFailsOnInvalidUrl() {
         // when and then
-        assertThatThrownBy(() -> httpClient.request(HttpMethod.GET, "invalid_url", null, null, 0L))
+        assertThatThrownBy(() -> httpClient.request(HttpMethod.GET, "invalid_url", null, (String) null, 0L))
                 .isInstanceOf(PreBidException.class)
                 .hasMessage("Invalid url: invalid_url");
     }
@@ -78,7 +78,7 @@ public class CircuitBreakerSecuredHttpClientTest {
         final Future<?> future = doRequest(context);
 
         // then
-        verify(wrappedHttpClient).request(any(), anyString(), any(), any(), anyLong());
+        verify(wrappedHttpClient).request(any(), anyString(), any(), (String) any(), anyLong());
 
         assertThat(future.succeeded()).isTrue();
     }
@@ -92,7 +92,7 @@ public class CircuitBreakerSecuredHttpClientTest {
         final Future<?> future = doRequest(context);
 
         // then
-        verify(wrappedHttpClient).request(any(), anyString(), any(), any(), anyLong());
+        verify(wrappedHttpClient).request(any(), anyString(), any(), (String) any(), anyLong());
 
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(RuntimeException.class).hasMessage("exception");
@@ -109,7 +109,8 @@ public class CircuitBreakerSecuredHttpClientTest {
         final Future<?> future2 = doRequest(context); // 2 call
 
         // then
-        verify(wrappedHttpClient).request(any(), anyString(), any(), any(), anyLong()); // invoked only on 1 call
+        // invoked only on 1 call
+        verify(wrappedHttpClient).request(any(), anyString(), any(), (String) any(), anyLong());
 
         assertThat(future1.failed()).isTrue();
         assertThat(future1.cause()).isInstanceOf(RuntimeException.class).hasMessage("exception");
@@ -131,7 +132,7 @@ public class CircuitBreakerSecuredHttpClientTest {
 
         // then
         verify(wrappedHttpClient, times(2))
-                .request(any(), anyString(), any(), any(), anyLong()); // invoked only on 1 & 3 calls
+                .request(any(), anyString(), any(), (String) any(), anyLong()); // invoked only on 1 & 3 calls
 
         assertThat(future1.failed()).isTrue();
         assertThat(future1.cause()).isInstanceOf(RuntimeException.class).hasMessage("exception");
@@ -156,7 +157,7 @@ public class CircuitBreakerSecuredHttpClientTest {
 
         // then
         verify(wrappedHttpClient, times(2))
-                .request(any(), anyString(), any(), any(), anyLong()); // invoked only on 1 & 3 calls
+                .request(any(), anyString(), any(), (String) any(), anyLong()); // invoked only on 1 & 3 calls
 
         assertThat(future1.failed()).isTrue();
         assertThat(future1.cause()).isInstanceOf(RuntimeException.class).hasMessage("exception");
@@ -181,7 +182,7 @@ public class CircuitBreakerSecuredHttpClientTest {
 
         // then
         verify(wrappedHttpClient, times(2))
-                .request(any(), anyString(), any(), any(), anyLong()); // invoked on 1 & 2 calls
+                .request(any(), anyString(), any(), (String) any(), anyLong()); // invoked on 1 & 2 calls
 
         assertThat(future1.failed()).isTrue();
         assertThat(future1.cause()).isInstanceOf(RuntimeException.class).hasMessage("exception1");
@@ -220,7 +221,7 @@ public class CircuitBreakerSecuredHttpClientTest {
     @SuppressWarnings("unchecked")
     private <T> void givenHttpClientReturning(T... results) {
         BDDMockito.BDDMyOngoingStubbing<Future<HttpClientResponse>> stubbing =
-                given(wrappedHttpClient.request(any(), anyString(), any(), any(), anyLong()));
+                given(wrappedHttpClient.request(any(), anyString(), any(), (String) any(), anyLong()));
         for (T result : results) {
             if (result instanceof Exception) {
                 stubbing = stubbing.willReturn(Future.failedFuture((Throwable) result));
@@ -231,7 +232,8 @@ public class CircuitBreakerSecuredHttpClientTest {
     }
 
     private Future<HttpClientResponse> doRequest(String url, TestContext context) {
-        final Future<HttpClientResponse> future = httpClient.request(HttpMethod.GET, url, null, null, 0L);
+        final Future<HttpClientResponse> future = httpClient.request(HttpMethod.GET, url, null, (String) null,
+                0L);
 
         final Async async = context.async();
         future.setHandler(ar -> async.complete());

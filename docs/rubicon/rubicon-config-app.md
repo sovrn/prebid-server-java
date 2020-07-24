@@ -5,7 +5,7 @@ This document describes all configuration properties available for Prebid Server
 ## GDPR
 - `gdpr.rubicon.enable-cookie` - this setting enables cookie usage or in other words enables /cookie_sync or /setuid enpoints
 - `gdpr.rubicon.rsid-cookie-encryption-key` - encryption key to decode RSID cookie value.
-- `gdpr.rubicon.audit-cookie-encryption-key` - set key for uid audit cookie using Blowfish algorithm
+- `gdpr.rubicon.audit-cookie-encryption-key` - set key for uid audit cookie using Blowfish algorithm.
 - `gdpr.rubicon.host-ip` - the ip pbs hosted on.
 
 ## Geo location

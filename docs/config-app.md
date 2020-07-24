@@ -277,7 +277,49 @@ If not defined in config all other Health Checkers would be disabled and endpoin
 - `max-timeout-ms` - this setting controls maximum timeout for /auction endpoint.
 - `timeout-adjustment-ms` - reduces timeout value passed in legacy Auction request so that Prebid Server can handle timeouts from adapters and respond to the request before it times out.
 
+## Programmatic Guaranteed Delivery
+- `deals.planner.plan-endpoint` - planner endpoint to get plans from.
+- `deals.planner.update-period` - cron expression to start job for requesting Line Item metadata updates from the Planner.
+- `deals.planner.plan-advance-period` - cron expression to start job for advancing Line Items to the next plan.
+- `deals.planner.retry-period-sec` - how long (in seconds) to wait before re-sending a request to the Planner that previously failed with 5xx HTTP error code.
+- `deals.planner.timeout-ms` - default operation timeout for requests to planner's endpoints.
+- `deals.planner.register-endpoint` - register endpoint to get plans from.
+- `deals.planner.register-period-sec` - time period (in seconds) to send register request to the Planner.
+- `deals.planner.username` - username for planner BasicAuth.
+- `deals.planner.password` - password for planner BasicAuth.
+- `deals.delivery-stats.delivery-period` - cron expression to start job for sending delivery progress to planner.
+- `deals.delivery-stats.cached-reports-number` - how many reports to cache while planner is unresponsive.
+- `deals.delivery-stats.timeout-ms` - default operation timeout for requests to delivery progress endpoints.
+- `deals.delivery-stats.username` - username for delivery progress BasicAuth.
+- `deals.delivery-stats.password` - password for delivery progress BasicAuth.
+- `deals.delivery-stats.line-items-per-report` - max number of line items in each report to split for batching. Default is 25.
+- `deals.delivery-stats.reports-interval-ms` - interval in ms between consecutive reports. Default is 0.
+- `deals.delivery-stats.batches-interval-ms` - interval in ms between consecutive batches. Default is 1000.
+- `deals.delivery-stats.request-compression-enabled` - enables request gzip compression when set to true.
+- `deals.delivery-progress.line-item-status-ttl-sec` - how long to store line item's metrics after it was expired.
+- `deals.delivery-progress.cached-plans-number` -  how many plans to store in metrics per line item.
+- `deals.delivery-progress.report-reset-period`- cron expression to start job for closing current delivery progress and starting new one.
+- `deals.delivery-progress-report.competitors-number`- number of line items top competitors to send in delivery progress report.
+- `deals.user-data.user-details-endpoint` - user Data Store endpoint to get user details from.
+- `deals.user-data.win-event-endpoint` - user Data Store endpoint to which win events should be sent.
+- `deals.user-data.timeout` - time to wait (in milliseconds) for User Data Service response.
+- `deals.user-data.user-ids` - list of Rules for determining user identifiers to send to User Data Store.
+- `deals.max-deals-per-bidder` - maximum number of deals to send to each bidder.
+- `deals.alert-proxy.enabled` - enable alert proxy service if `true`.
+- `deals.alert-proxy.url` - alert service endpoint to send alerts to.
+- `deals.alert-proxy.timeout-sec` - default operation timeout for requests to alert service endpoint.
+- `deals.alert-proxy.username` - username for alert proxy BasicAuth.
+- `deals.alert-proxy.password` - password for alert proxy BasicAuth.
+- `deals.alert-proxy.alert-types` - key value pair of alert type and sampling factor to send high priority alert.
+
+ 
+
 ## General settings
 - `host-id` - the  ID of node where prebid server deployed.
 - `external-url` - the setting stands for external URL prebid server is reachable by, for example address of the load-balancer e.g. http://prebid.host.com.
+- `hostname` - the hostname of node where prebid server deployed.
 - `admin.port` - the port to listen on administration requests.
+- `profile` - Deployment environment, i.e. dev/test/prod, etc.
+- `dataCenter` - Datacenter where pbs is deployed, i.e. aws or azure or on-prem, etc. 
+- `sub-system` - Name of PBS subsystem, i.e `PG-PBS`.
+- `system` - Name of PBS system, i.e. `PBS`.

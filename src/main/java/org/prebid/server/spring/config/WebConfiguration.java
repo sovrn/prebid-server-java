@@ -26,23 +26,20 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.HttpAdapterConnector;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cookie.UidsCookieService;
-import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.deals.UserService;
+import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.execution.TimeoutFactory;
-import org.prebid.server.handler.AccountCacheInvalidationHandler;
-import org.prebid.server.handler.AdminHandler;
 import org.prebid.server.handler.AuctionHandler;
 import org.prebid.server.handler.BidderParamHandler;
 import org.prebid.server.handler.CookieSyncHandler;
-import org.prebid.server.handler.CurrencyRatesHandler;
+import org.prebid.server.handler.CustomizedAdminEndpoint;
 import org.prebid.server.handler.ExceptionHandler;
 import org.prebid.server.handler.GetuidsHandler;
 import org.prebid.server.handler.NoCacheHandler;
 import org.prebid.server.handler.NotificationEventHandler;
 import org.prebid.server.handler.OptoutHandler;
-import org.prebid.server.handler.SettingsCacheNotificationHandler;
 import org.prebid.server.handler.SetuidHandler;
 import org.prebid.server.handler.StatusHandler;
-import org.prebid.server.handler.VersionHandler;
 import org.prebid.server.handler.VtrackHandler;
 import org.prebid.server.handler.info.BidderDetailsHandler;
 import org.prebid.server.handler.info.BiddersHandler;
@@ -58,14 +55,12 @@ import org.prebid.server.privacy.PrivacyExtractor;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.settings.ApplicationSettings;
-import org.prebid.server.settings.CachingApplicationSettings;
-import org.prebid.server.settings.SettingsCache;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.vertx.ContextRunner;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -101,6 +96,7 @@ public class WebConfiguration {
     private ExceptionHandler exceptionHandler;
 
     @Autowired
+    @Qualifier("router")
     private Router router;
 
     @Value("${http.port}")
@@ -167,7 +163,8 @@ public class WebConfiguration {
                   BiddersHandler biddersHandler,
                   BidderDetailsHandler bidderDetailsHandler,
                   NotificationEventHandler notificationEventHandler,
-                  StaticHandler staticHandler) {
+                  StaticHandler staticHandler,
+                  List<CustomizedAdminEndpoint> customizedAdminEndpoints) {
 
         final Router router = Router.router(vertx);
         router.route().handler(bodyHandler);
@@ -188,9 +185,13 @@ public class WebConfiguration {
         router.get("/info/bidders").handler(biddersHandler);
         router.get("/info/bidders/:bidderName").handler(bidderDetailsHandler);
         router.get("/event").handler(notificationEventHandler);
+
+        customizedAdminEndpoints.stream()
+                .filter(CustomizedAdminEndpoint::isOnApplicationPort)
+                .forEach(customizedAdminEndpoint -> customizedAdminEndpoint.router(router));
+
         router.get("/static/*").handler(staticHandler);
         router.get("/").handler(staticHandler); // serves index.html by default
-
         return router;
     }
 
@@ -399,10 +400,21 @@ public class WebConfiguration {
     }
 
     @Bean
-    NotificationEventHandler eventNotificationHandler(CompositeAnalyticsReporter compositeAnalyticsReporter,
-                                                      TimeoutFactory timeoutFactory,
-                                                      ApplicationSettings applicationSettings) {
-        return new NotificationEventHandler(compositeAnalyticsReporter, timeoutFactory, applicationSettings);
+    NotificationEventHandler notificationEventHandler(
+            UidsCookieService uidsCookieService,
+            @Autowired(required = false) ApplicationEventService applicationEventService,
+            @Autowired(required = false) UserService userService,
+            CompositeAnalyticsReporter compositeAnalyticsReporter,
+            TimeoutFactory timeoutFactory,
+            ApplicationSettings applicationSettings) {
+
+        return new NotificationEventHandler(
+                uidsCookieService,
+                applicationEventService,
+                userService,
+                compositeAnalyticsReporter,
+                timeoutFactory,
+                applicationSettings);
     }
 
     @Bean
@@ -430,113 +442,5 @@ public class WebConfiguration {
     private static class CoopSyncPriorities {
 
         private List<Collection<String>> pri;
-    }
-
-    @Configuration
-    @ConditionalOnProperty(prefix = "admin", name = "port")
-    static class AdminServerConfiguration {
-
-        private static final Logger logger = LoggerFactory.getLogger(AdminServerConfiguration.class);
-
-        @Autowired
-        private ContextRunner contextRunner;
-
-        @Autowired
-        private Vertx vertx;
-
-        @Autowired
-        private BodyHandler bodyHandler;
-
-        @Autowired
-        private VersionHandler versionHandler;
-
-        @Autowired
-        private AdminHandler adminHandler;
-
-        @Autowired
-        private CurrencyRatesHandler currencyRatesHandler;
-
-        @Autowired(required = false)
-        private AccountCacheInvalidationHandler accountCacheInvalidationHandler;
-
-        @Autowired(required = false)
-        private SettingsCacheNotificationHandler cacheNotificationHandler;
-
-        @Autowired(required = false)
-        private SettingsCacheNotificationHandler ampCacheNotificationHandler;
-
-        @Value("${admin.port}")
-        private int adminPort;
-
-        @Bean
-        @ConditionalOnProperty(prefix = "settings.in-memory-cache", name = "account-invalidation-enabled",
-                havingValue = "true")
-        AccountCacheInvalidationHandler accountCacheInvalidationHandler(
-                CachingApplicationSettings cachingApplicationSettings) {
-            return new AccountCacheInvalidationHandler(cachingApplicationSettings);
-        }
-
-        @Bean
-        @ConditionalOnProperty(prefix = "settings.in-memory-cache", name = "notification-endpoints-enabled",
-                havingValue = "true")
-        SettingsCacheNotificationHandler ampCacheNotificationHandler(
-                SettingsCache ampSettingsCache, JacksonMapper mapper) {
-
-            return new SettingsCacheNotificationHandler(ampSettingsCache, mapper);
-        }
-
-        @Bean
-        @ConditionalOnProperty(prefix = "settings.in-memory-cache", name = "notification-endpoints-enabled",
-                havingValue = "true")
-        SettingsCacheNotificationHandler cacheNotificationHandler(SettingsCache settingsCache, JacksonMapper mapper) {
-            return new SettingsCacheNotificationHandler(settingsCache, mapper);
-        }
-
-        @Bean
-        VersionHandler versionHandler(JacksonMapper mapper) {
-            return VersionHandler.create("git-revision.json", mapper);
-        }
-
-        @Bean
-        AdminHandler adminHandler(AdminManager adminManager) {
-            return new AdminHandler(adminManager);
-        }
-
-        @Bean
-        @ConditionalOnProperty(prefix = "currency-converter.external-rates", name = "enabled", havingValue = "true")
-        CurrencyRatesHandler currencyRatesHandler(
-                CurrencyConversionService currencyConversionRates, JacksonMapper mapper) {
-
-            return new CurrencyRatesHandler(currencyConversionRates, mapper);
-        }
-
-        @PostConstruct
-        public void startAdminServer() {
-            logger.info("Starting Admin Server to serve requests on port {0,number,#}", adminPort);
-
-            final Router router = Router.router(vertx);
-            router.route().handler(bodyHandler);
-            router.route("/version").handler(versionHandler);
-            if (adminHandler != null) {
-                router.route("/admin").handler(adminHandler);
-            }
-            if (currencyRatesHandler != null) {
-                router.route("/currency-rates").handler(currencyRatesHandler);
-            }
-            if (cacheNotificationHandler != null) {
-                router.route("/storedrequests/openrtb2").handler(cacheNotificationHandler);
-            }
-            if (ampCacheNotificationHandler != null) {
-                router.route("/storedrequests/amp").handler(ampCacheNotificationHandler);
-            }
-            if (accountCacheInvalidationHandler != null) {
-                router.route("/cache/invalidate").handler(accountCacheInvalidationHandler);
-            }
-
-            contextRunner.<HttpServer>runOnServiceContext(promise ->
-                    vertx.createHttpServer().requestHandler(router).listen(adminPort, promise));
-
-            logger.info("Successfully started Admin Server");
-        }
     }
 }

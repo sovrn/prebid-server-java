@@ -525,6 +525,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .timestamp(1000L)
                 .integration("integration")
                 .httpContext(httpContext)
+                .lineItemId("lineItemId")
                 .build();
 
         // when
@@ -572,6 +573,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .bidder("bidder")
                 .account(Account.builder().id("222").build())
                 .httpContext(httpContext)
+                .lineItemId("lineItemId")
                 .build();
 
         // when

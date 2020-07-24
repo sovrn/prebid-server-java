@@ -11,6 +11,7 @@ import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
 import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
+import org.prebid.server.auction.BidResponseReducer;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.auction.InterstitialProcessor;
@@ -31,6 +32,8 @@ import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheTtl;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.deals.DealsProcessor;
+import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.events.EventsService;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.identity.IdGenerator;
@@ -38,6 +41,8 @@ import org.prebid.server.identity.IdGeneratorType;
 import org.prebid.server.identity.NoneIdGenerator;
 import org.prebid.server.identity.UUIDIdGenerator;
 import org.prebid.server.json.JacksonMapper;
+import org.prebid.server.log.CriteriaLogManager;
+import org.prebid.server.log.CriteriaManager;
 import org.prebid.server.manager.AdminManager;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
@@ -95,7 +100,7 @@ public class ServiceConfiguration {
                 CacheTtl.of(bannerCacheTtl, videoCacheTtl),
                 httpClient,
                 CacheService.getCacheEndpointUrl(scheme, host, path),
-                CacheService.getCachedAssetUrlTemplate(scheme, host, path, query),
+                CacheService.composeCachedAssetUrlTemplate(scheme, host, path, query),
                 eventsService,
                 metrics,
                 clock,
@@ -164,12 +169,15 @@ public class ServiceConfiguration {
             StoredRequestProcessor storedRequestProcessor,
             ImplicitParametersExtractor implicitParametersExtractor,
             UidsCookieService uidsCookieService,
+            @Autowired(required = false) DealsProcessor dealsProcessor,
             BidderCatalog bidderCatalog,
             RequestValidator requestValidator,
             TimeoutResolver timeoutResolver,
             TimeoutFactory timeoutFactory,
             ApplicationSettings applicationSettings,
-            JacksonMapper mapper) {
+            JacksonMapper mapper,
+            Clock clock,
+            CriteriaLogManager criteriaLogManager) {
 
         final List<String> blacklistedApps = splitCommaSeparatedString(blacklistedAppsString);
         final List<String> blacklistedAccounts = splitCommaSeparatedString(blacklistedAccountsString);
@@ -187,14 +195,17 @@ public class ServiceConfiguration {
                 storedRequestProcessor,
                 implicitParametersExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 new InterstitialProcessor(),
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                mapper);
+                mapper,
+                criteriaLogManager);
     }
 
     private static List<String> splitCommaSeparatedString(String listString) {
@@ -393,6 +404,7 @@ public class ServiceConfiguration {
             BidderCatalog bidderCatalog,
             EventsService eventsService,
             StoredRequestProcessor storedRequestProcessor,
+            BidResponseReducer bidResponseReducer,
             @Value("${auction.generate-bid-id}") boolean generateBidId,
             @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
             @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
@@ -401,8 +413,8 @@ public class ServiceConfiguration {
         if (truncateAttrChars < 0 || truncateAttrChars > 255) {
             throw new IllegalArgumentException("settings.targeting.truncate-attr-chars must be between 0 and 255");
         }
-        return new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor, generateBidId,
-                truncateAttrChars, enforceRandomBidId, mapper);
+        return new BidResponseCreator(cacheService, bidderCatalog, eventsService, storedRequestProcessor,
+                bidResponseReducer, generateBidId, truncateAttrChars, enforceRandomBidId, mapper);
     }
 
     @Bean
@@ -416,9 +428,11 @@ public class ServiceConfiguration {
             CurrencyConversionService currencyConversionService,
             BidResponseCreator bidResponseCreator,
             BidResponsePostProcessor bidResponsePostProcessor,
+            @Autowired(required = false) ApplicationEventService applicationEventService,
             Metrics metrics,
             Clock clock,
-            JacksonMapper mapper) {
+            JacksonMapper mapper,
+            CriteriaLogManager criteriaLogManager) {
 
         return new ExchangeService(
                 expectedCacheTimeMs,
@@ -430,9 +444,11 @@ public class ServiceConfiguration {
                 currencyConversionService,
                 bidResponseCreator,
                 bidResponsePostProcessor,
+                applicationEventService,
                 metrics,
                 clock,
-                mapper);
+                mapper,
+                criteriaLogManager);
     }
 
     @Bean
@@ -444,6 +460,11 @@ public class ServiceConfiguration {
             JacksonMapper mapper) {
 
         return new StoredRequestProcessor(defaultTimeoutMs, applicationSettings, metrics, timeoutFactory, mapper);
+    }
+
+    @Bean
+    BidResponseReducer bidResponseReducer() {
+        return new BidResponseReducer();
     }
 
     @Bean
@@ -493,8 +514,19 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    ResponseBidValidator responseValidator() {
-        return new ResponseBidValidator();
+    ResponseBidValidator responseValidator(JacksonMapper mapper,
+                                           @Value("${deals.enabled}") boolean dealsEnabled) {
+        return new ResponseBidValidator(mapper, dealsEnabled);
+    }
+
+    @Bean
+    CriteriaLogManager criteriaLogManager(JacksonMapper mapper) {
+        return new CriteriaLogManager(mapper);
+    }
+
+    @Bean
+    CriteriaManager criteriaManager(CriteriaLogManager criteriaLogManager, Vertx vertx) {
+        return new CriteriaManager(criteriaLogManager, vertx);
     }
 
     @Bean

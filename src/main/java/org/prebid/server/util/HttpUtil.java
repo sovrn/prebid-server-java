@@ -9,6 +9,7 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.exception.PreBidException;
 
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
@@ -16,6 +17,8 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.ZonedDateTime;
+import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -46,6 +49,9 @@ public final class HttpUtil {
     public static final CharSequence EXPIRES_HEADER = HttpHeaders.createOptimized("Expires");
     public static final CharSequence PRAGMA_HEADER = HttpHeaders.createOptimized("Pragma");
     public static final CharSequence LOCATION_HEADER = HttpHeaders.createOptimized("Location");
+    public static final CharSequence PG_TRX_ID = HttpHeaders.createOptimized("pg-trx-id");
+
+    private static final String BASIC_AUTH_PATTERN = "Basic %s";
 
     private HttpUtil() {
     }
@@ -137,6 +143,20 @@ public final class HttpUtil {
         return ip;
     }
 
+    public static ZonedDateTime getDateFromHeader(MultiMap headers, String header) {
+        final String isoTimeStamp = headers.get(header);
+        if (isoTimeStamp == null) {
+            return null;
+        }
+
+        try {
+            return ZonedDateTime.parse(isoTimeStamp);
+        } catch (Exception ex) {
+            throw new PreBidException(String.format("%s header is not compatible to ISO-8601 format: %s",
+                    header, isoTimeStamp));
+        }
+    }
+
     public static String getDomainFromUrl(String url) {
         if (StringUtils.isBlank(url)) {
             return null;
@@ -167,5 +187,13 @@ public final class HttpUtil {
         } else {
             response.end();
         }
+    }
+
+    /**
+     * Creates standart basic auth header value
+     */
+    public static String makeBasicAuthHeaderValue(String username, String password) {
+        return String.format(BASIC_AUTH_PATTERN, Base64.getEncoder().encodeToString((username + ':' + password)
+                .getBytes()));
     }
 }

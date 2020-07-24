@@ -357,6 +357,12 @@ public class AmpHandler implements Handler<RoutingContext> {
         return origin;
     }
 
+    private static String logMessageFrom(InvalidRequestException exception, String message, RoutingContext context) {
+        return exception.isNeedEnhancedLogging()
+                ? String.format("%s, Referer: %s", message, context.request().headers().get(HttpUtil.REFERER_HEADER))
+                : message;
+    }
+
     private void respondWith(RoutingContext context, int status, String body, long startTime,
                              MetricName metricRequestStatus, AmpEvent event) {
         // don't send the response if client has gone
@@ -369,7 +375,7 @@ public class AmpHandler implements Handler<RoutingContext> {
                     .setStatusCode(status)
                     .end(body);
 
-            metrics.updateRequestTimeMetric(clock.millis() - startTime);
+            metrics.updateRequestTimeMetric(MetricName.request_time, clock.millis() - startTime);
             metrics.updateRequestTypeMetric(REQUEST_TYPE_METRIC, metricRequestStatus);
             analyticsReporter.processEvent(event);
         }

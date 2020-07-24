@@ -1,0 +1,46 @@
+{
+  "puts": [
+    {
+      "type": "json",
+      "value": {
+        "id": "bidId2",
+        "impid": "impId2",
+        "price": 8.43,
+        "adm": "<Impression><![CDATA[]]></Impression>",
+        "crid": "crid2",
+        "dealid": "dealId2",
+        "w": 320,
+        "h": 320,
+        "wurl": "http://localhost:8000/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i"
+      }
+    },
+    {
+      "type": "json",
+      "value": {
+        "id": "bidId1",
+        "impid": "impId1",
+        "price": 8.43,
+        "adm": "<Impression><![CDATA[]]></Impression>",
+        "crid": "crid1",
+        "dealid": "dealId1",
+        "w": 300,
+        "h": 250,
+        "wurl": "http://localhost:8000/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i"
+      }
+    },
+    {
+      "type": "json",
+      "value": {
+        "id": "bidId4",
+        "impid": "impId4",
+        "price": 8.43,
+        "adm": "<Impression><![CDATA[]]></Impression>",
+        "crid": "crid1",
+        "dealid": "dealId3",
+        "w": 300,
+        "h": 250,
+        "wurl": "http://localhost:8000/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i"
+      }
+    }
+  ]
+}

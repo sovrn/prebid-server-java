@@ -18,36 +18,39 @@ public class EventsService {
     /**
      * Returns {@link Events} object based on given params.
      */
-    public Events createEvent(String bidId, String bidder, String accountId, Long timestamp) {
+    public Events createEvent(String bidId, String bidder, String accountId, String lineItemId, Long timestamp) {
         return Events.of(
-                eventUrl(EventRequest.Type.win, bidId, bidder, accountId, timestamp, EventRequest.Format.image),
-                eventUrl(EventRequest.Type.imp, bidId, bidder, accountId, timestamp, EventRequest.Format.image));
+                eventUrl(EventRequest.Type.win, bidId, bidder, accountId, EventRequest.Format.image,
+                        lineItemId, timestamp),
+                eventUrl(EventRequest.Type.imp, bidId, bidder, accountId, EventRequest.Format.image,
+                        lineItemId, timestamp));
     }
 
     /**
      * Returns value for "hb_winurl" targeting keyword.
      */
-    public String winUrlTargeting(String bidder, String accountId, Long timestamp) {
-        return eventUrl(EventRequest.Type.win, BIDID_PLACEHOLDER, bidder, accountId, timestamp,
-                EventRequest.Format.image);
+    public String winUrlTargeting(String bidder, String accountId, String lineItemId, Long timestamp) {
+        return eventUrl(EventRequest.Type.win, BIDID_PLACEHOLDER, bidder, accountId,
+                EventRequest.Format.image, lineItemId, timestamp);
     }
 
     /**
      * Returns url for win tracking.
      */
     public String winUrl(String bidId, String bidder, String accountId, Long timestamp) {
-        return eventUrl(EventRequest.Type.win, bidId, bidder, accountId, timestamp, EventRequest.Format.image);
+        return eventUrl(EventRequest.Type.win, bidId, bidder, accountId, EventRequest.Format.image, null, timestamp);
     }
 
     /**
      * Returns url for VAST tracking.
      */
-    public String vastUrlTracking(String bidId, String bidder, String accountId, Long timestamp) {
-        return eventUrl(EventRequest.Type.imp, bidId, bidder, accountId, timestamp, EventRequest.Format.blank);
+    public String vastUrlTracking(String bidId, String bidder, String accountId, String lineItemId, Long timestamp) {
+        return eventUrl(EventRequest.Type.imp, bidId, bidder, accountId, EventRequest.Format.blank, lineItemId,
+                timestamp);
     }
 
-    private String eventUrl(EventRequest.Type type, String bidId, String bidder, String accountId, Long timestamp,
-                            EventRequest.Format format) {
+    private String eventUrl(EventRequest.Type type, String bidId, String bidder, String accountId,
+                            EventRequest.Format format, String lineItemId, Long timestamp) {
         final EventRequest eventRequest = EventRequest.builder()
                 .type(type)
                 .bidId(bidId)
@@ -55,6 +58,7 @@ public class EventsService {
                 .bidder(bidder)
                 .timestamp(timestamp)
                 .format(format)
+                .lineItemId(lineItemId)
                 .build();
 
         return EventUtil.toUrl(externalUrl, eventRequest);

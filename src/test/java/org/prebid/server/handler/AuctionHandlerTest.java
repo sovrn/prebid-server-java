@@ -567,7 +567,7 @@ public class AuctionHandlerTest extends VertxTest {
         verify(metrics).updateAppAndNoCookieAndImpsRequestedMetrics(eq(true), anyBoolean(), anyBoolean(), eq(1));
         verify(metrics).updateImpTypesMetrics(singletonMap("banner", 1L));
         verify(metrics).updateAccountRequestMetrics(eq("accountId"), eq(MetricName.legacy));
-        verify(metrics).updateRequestTimeMetric(anyLong());
+        verify(metrics).updateRequestTimeMetric(eq(MetricName.request_time), anyLong());
         verify(metrics).updateAdapterRequestGotbidsMetrics(eq(RUBICON), eq("accountId"));
         verify(metrics).updateAdapterRequestTypeAndNoCookieMetrics(eq(RUBICON), eq(MetricName.legacy), eq(true));
         verify(metrics).updateAdapterResponseTime(eq(RUBICON), eq("accountId"), eq(100));

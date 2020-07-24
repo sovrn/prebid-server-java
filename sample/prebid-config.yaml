@@ -5,6 +5,42 @@ adapters:
     XAPI.Password: password1
 metrics:
   prefix: prebid
+admin-endpoints:
+  tracelog:
+    enabled: true
+    on-application-port: false
+    protected: false
+  storedrequest-amp:
+    enabled: true
+    on-application-port: true
+    protected: false
+  storedrequest:
+    enabled: true
+    on-application-port: true
+    protected: false
+  cache-invalidation:
+    enabled: true
+    on-application-port: true
+    protected: false
+  currency-rates:
+    enabled: true
+    on-application-port: true
+    protected: false
+  e2eadmin:
+    enabled: true
+    on-application-port: true
+    protected: true
+  lineitem-status:
+    enabled: true
+    on-application-port: true
+    protected: false
+  deals-status:
+    enabled: true
+    on-application-port: true
+    protected: false
+
+  credentials:
+    user: user
 cache:
   scheme: http
   host: localhost
@@ -22,4 +58,38 @@ gdpr:
       cache-dir: /var/tmp/vendor1
     v2:
       cache-dir: /var/tmp/vendor2
+deals:
+  enabled: true
+  simulation:
+    enabled: true
+  planner:
+    plan-endpoint: http://localhost/planner
+    register-endpoint: http://localhost/register
+    username: username
+    password: password
+  delivery-stats:
+    timeout-ms: 10000
+    endpoint: http://localhost/delivery
+    username: username
+    password: password
+  alert-proxy:
+    enabled: true
+    timeout-sec: 10
+    url: http://localhost/alert
+    username: username
+    password: password
+  user-data:
+    user-details-endpoint: http://localhost/user-details
+    win-event-endpoint: http://localhost/win-event
+    timeout: 1000
+    user-ids:
+      - type: khaos
+        source: uid
+        location: rubicon
+      - type: adnxs
+        source: uid
+        location: adnxs
+  max-deals-per-bidder: 3
+auction:
+  ad-server-currency: USD
 status-response: "ok"

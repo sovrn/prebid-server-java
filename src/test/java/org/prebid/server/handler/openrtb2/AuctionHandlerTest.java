@@ -301,13 +301,17 @@ public class AuctionHandlerTest extends VertxTest {
                 mapper.valueToTree(priceGranularity), null, mapper.createObjectNode());
         final BidRequest resolvedRequest = BidRequest.builder()
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.builder().mediatypepricegranularity(priceGranuality).build())
+                                .targeting(ExtRequestTargeting.builder().mediatypepricegranularity(priceGranuality)
+                                        .build())
                         .auctiontimestamp(0L)
-                        .build(), null))
+                                .auctiontimestamp(0L)
+                                .build(),
+                        null))
                 .build();
         given(exchangeService.holdAuction(any()))
                 .willReturn(Future.succeededFuture(BidResponse.builder()
-                        .ext(mapper.valueToTree(ExtBidResponse.of(ExtResponseDebug.of(null, resolvedRequest),
+                        .ext(mapper.valueToTree(ExtBidResponse.of(
+                                ExtResponseDebug.of(null, resolvedRequest, null, null),
                                 null, null, null, null, null)))
                         .build()));
 
@@ -475,7 +479,7 @@ public class AuctionHandlerTest extends VertxTest {
         auctionHandler.handle(routingContext);
 
         // then
-        verify(metrics).updateRequestTimeMetric(eq(500L));
+        verify(metrics).updateRequestTimeMetric(eq(MetricName.request_time), eq(500L));
     }
 
     @Test

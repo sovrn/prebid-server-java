@@ -164,7 +164,7 @@ public class VideoHandler implements Handler<RoutingContext> {
                     .setStatusCode(status)
                     .end(body);
 
-            metrics.updateRequestTimeMetric(clock.millis() - startTime);
+            metrics.updateRequestTimeMetric(REQUEST_TYPE_METRIC, clock.millis() - startTime);
             metrics.updateRequestTypeMetric(REQUEST_TYPE_METRIC, metricRequestStatus);
             analyticsReporter.processEvent(event);
         }

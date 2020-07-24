@@ -2,7 +2,9 @@ package org.prebid.server.cache;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.iab.openrtb.request.Deal;
 import com.iab.openrtb.request.Imp;
+import com.iab.openrtb.request.Pmp;
 import com.iab.openrtb.request.Video;
 import io.vertx.core.Future;
 import org.junit.Before;
@@ -32,6 +34,8 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
+import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.response.Bid;
 import org.prebid.server.proto.response.MediaType;
 import org.prebid.server.settings.model.Account;
@@ -143,15 +147,15 @@ public class CacheServiceTest extends VertxTest {
     public void getCachedAssetUrlTemplateShouldFailOnInvalidCacheServiceUrl() {
         // when and then
         assertThatIllegalArgumentException().isThrownBy(() ->
-                CacheService.getCachedAssetUrlTemplate("http", "{invalid:host}", "cache", "qs"));
+                CacheService.composeCachedAssetUrlTemplate("http", "{invalid:host}", "cache", "qs"));
         assertThatIllegalArgumentException().isThrownBy(() ->
-                CacheService.getCachedAssetUrlTemplate("invalid-schema", "example-server:80808", "cache", "qs"));
+                CacheService.composeCachedAssetUrlTemplate("invalid-schema", "example-server:80808", "cache", "qs"));
     }
 
     @Test
     public void getCachedAssetUrlTemplateShouldReturnValidUrl() {
         // when
-        final String result = CacheService.getCachedAssetUrlTemplate("http", "example.com", "cache", "qs");
+        final String result = CacheService.composeCachedAssetUrlTemplate("http", "example.com", "cache", "qs");
 
         // then
         assertThat(result).isEqualTo("http://example.com/cache?qs");
@@ -386,11 +390,15 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cacheBidsOpenrtbShouldStoreWinUrl() {
         // given
-        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder.id("bidId1").impid("impId1"));
-
+        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder.id("bidId1").impid("impId1")
+                .dealid("dealId"));
+        final List<Imp> imps = singletonList(givenImp(builder -> builder.id("impId1").pmp(Pmp.builder()
+                .deals(singletonList(Deal.builder().id("dealId")
+                        .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of("lineItemId", null, null, null)))).build()))
+                .build())));
         // when
         cacheService.cacheBidsOpenrtb(
-                singletonList(bid), singletonList(givenImp(builder -> builder.id("impId1"))),
+                singletonList(bid), imps,
                 CacheContext.builder()
                         .shouldCacheBids(true)
                         .bidderToBidIds(singletonMap("bidder", singletonList("bidId1")))
@@ -912,7 +920,7 @@ public class CacheServiceTest extends VertxTest {
                 .adm("<Impression></Impression>"));
         final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
 
-        given(eventsService.vastUrlTracking(anyString(), anyString(), any(), any()))
+        given(eventsService.vastUrlTracking(anyString(), anyString(), any(), any(), any()))
                 .willReturn("https://test-event.com/event?t=imp&b=bid1&f=b&a=accountId");
 
         // when
@@ -947,7 +955,7 @@ public class CacheServiceTest extends VertxTest {
                 .adm("<Impression>http:/test.com</Impression>"));
         final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
 
-        given(eventsService.vastUrlTracking(any(), any(), any(), any()))
+        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any()))
                 .willReturn("https://test-event.com/event?t=imp&b=bid1&f=b&a=accountId");
 
         // when
@@ -982,7 +990,7 @@ public class CacheServiceTest extends VertxTest {
                 .adm("<Impression>http:/test.com</Impression>"));
         final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
 
-        given(eventsService.vastUrlTracking(any(), any(), any(), any()))
+        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any()))
                 .willReturn("http://vast-url?param=value");
 
         // when
@@ -1003,6 +1011,33 @@ public class CacheServiceTest extends VertxTest {
                                         + "<![CDATA[http://vast-url?param=value&int=integration]]>"
                                         + "</Impression>"))
                                 .build());
+    }
+
+    @Test
+    public void cacheBidsOpenrtbShouldConsiderLineItemIdFetchedFromImps() {
+        // given
+        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder
+                .id("bid1")
+                .impid("impId1")
+                .dealid("dealId1"));
+        final Imp imp = givenImp(builder -> builder
+                .id("impId1")
+                .video(Video.builder().build())
+                .pmp(Pmp.builder()
+                        .deals(singletonList(Deal.builder()
+                                .id("dealId1")
+                                .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of("lineItemId", null, null, null))))
+                                .build()))
+                        .build()));
+
+        // when
+        cacheService.cacheBidsOpenrtb(singletonList(bid), singletonList(imp), CacheContext.builder()
+                .shouldCacheBids(true).shouldCacheVideoBids(true)
+                .bidderToVideoBidIdsToModify(singletonMap("bidder1", singletonList("bid1")))
+                .build(), Account.builder().id("accountId").build(), eventsContext, timeout);
+
+        // then
+        verify(eventsService).vastUrlTracking(eq("bid1"), eq("bidder1"), eq("accountId"), eq("lineItemId"), eq(null));
     }
 
     @Test
@@ -1047,7 +1082,7 @@ public class CacheServiceTest extends VertxTest {
                 .value(new TextNode("VAST"))
                 .build();
 
-        given(eventsService.vastUrlTracking(any(), any(), any(), any()))
+        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any()))
                 .willReturn("http://external-url/event");
 
         // when
@@ -1056,6 +1091,12 @@ public class CacheServiceTest extends VertxTest {
 
         // then
         final PutObject modifiedFirstPutObject = firstPutObject.toBuilder()
+                .bidid(null)
+                .bidder(null)
+                .timestamp(null)
+                .bidid(null)
+                .bidder(null)
+                .timestamp(null)
                 .bidid(null)
                 .bidder(null)
                 .timestamp(null)
@@ -1091,7 +1132,7 @@ public class CacheServiceTest extends VertxTest {
                 null, timeout);
 
         // then
-        verify(eventsService).vastUrlTracking(eq("bidId1"), eq("bidder1"), eq("account"), eq(1000L));
+        verify(eventsService).vastUrlTracking(eq("bidId1"), eq("bidder1"), eq("account"), eq(null), eq(1000L));
     }
 
     private static List<Bid> singleBidList() {

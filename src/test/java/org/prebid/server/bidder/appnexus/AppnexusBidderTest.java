@@ -367,7 +367,8 @@ public class AppnexusBidderTest extends VertxTest {
                 bidRequestBuilder -> bidRequestBuilder
                         .ext(jacksonMapper.fillExtension(
                                 ExtRequest.of(requestPrebid, null),
-                                AppnexusReqExt.of(AppnexusReqExtAppnexus.of(false, true)))),
+                                AppnexusReqExt.of(
+                                AppnexusReqExtAppnexus.of(false, true)))),
                 impBuilder -> impBuilder.banner(Banner.builder().build()),
                 extImpAppnexusBuilder -> extImpAppnexusBuilder.placementId(20));
 

@@ -8,12 +8,15 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
+import org.prebid.server.exception.PreBidException;
 
+import java.time.ZonedDateTime;
 import java.util.Map;
 
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.BDDMockito.given;
@@ -146,5 +149,41 @@ public class HttpUtilTest {
 
         // then
         assertThat(setCookieHeaderValue).isEqualTo("cookie=value; Path=/; Domain=rubicon.com; SameSite=None; Secure");
+    }
+
+    @Test
+    public void getDateFromHeaderShouldReturnDate() {
+        // given
+        final MultiMap headers = MultiMap.caseInsensitiveMultiMap().add("date-header",
+                "2019-11-04T13:31:24.365+02:00[Europe/Kiev]");
+
+        // when
+        final ZonedDateTime result = HttpUtil.getDateFromHeader(headers, "date-header");
+
+        // then
+        assertThat(result).isEqualTo(ZonedDateTime.parse("2019-11-04T13:31:24.365+02:00[Europe/Kiev]"));
+    }
+
+    @Test
+    public void getDateFromHeaderShouldThrowExceptionWhenHeaderWasNotFound() {
+        // given
+        final MultiMap headers = MultiMap.caseInsensitiveMultiMap();
+
+        // when
+        final ZonedDateTime result = HttpUtil.getDateFromHeader(headers, "not-exist");
+
+        // then
+        assertThat(result).isNull();
+    }
+
+    @Test
+    public void getDateFromHeaderShouldThrowExceptionWhenHeaderHasIncorrectFormat() {
+        // given
+        final MultiMap headers = MultiMap.caseInsensitiveMultiMap().add("date-header", "invalid");
+
+        // when and then
+        assertThatThrownBy(() -> HttpUtil.getDateFromHeader(headers, "date-header"))
+                .isInstanceOf(PreBidException.class)
+                .hasMessage("date-header header is not compatible to ISO-8601 format: invalid");
     }
 }

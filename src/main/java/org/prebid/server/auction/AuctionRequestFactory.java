@@ -22,6 +22,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
+import org.prebid.server.deals.DealsProcessor;
+import org.prebid.server.deals.model.DeepDebugLog;
+import org.prebid.server.deals.model.TxnLog;
 import org.prebid.server.exception.BlacklistedAccountException;
 import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
@@ -33,6 +36,7 @@ import org.prebid.server.identity.IdGenerator;
 import org.prebid.server.json.DecodeException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
+import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
@@ -58,6 +62,7 @@ import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Currency;
@@ -94,14 +99,17 @@ public class AuctionRequestFactory {
     private final StoredRequestProcessor storedRequestProcessor;
     private final ImplicitParametersExtractor paramsExtractor;
     private final UidsCookieService uidsCookieService;
+    private final DealsProcessor dealsProcessor;
     private final BidderCatalog bidderCatalog;
     private final RequestValidator requestValidator;
     private final InterstitialProcessor interstitialProcessor;
     private final TimeoutResolver timeoutResolver;
     private final TimeoutFactory timeoutFactory;
     private final ApplicationSettings applicationSettings;
+    private final Clock clock;
     private final IdGenerator idGenerator;
     private final JacksonMapper mapper;
+    private final CriteriaLogManager criteriaLogManager;
 
     public AuctionRequestFactory(long maxRequestSize,
                                  boolean enforceValidAccount,
@@ -112,14 +120,17 @@ public class AuctionRequestFactory {
                                  StoredRequestProcessor storedRequestProcessor,
                                  ImplicitParametersExtractor paramsExtractor,
                                  UidsCookieService uidsCookieService,
+                                 DealsProcessor dealsProcessor,
                                  BidderCatalog bidderCatalog,
                                  RequestValidator requestValidator,
                                  InterstitialProcessor interstitialProcessor,
                                  TimeoutResolver timeoutResolver,
                                  TimeoutFactory timeoutFactory,
                                  ApplicationSettings applicationSettings,
+                                 Clock clock,
                                  IdGenerator idGenerator,
-                                 JacksonMapper mapper) {
+                                 JacksonMapper mapper,
+                                 CriteriaLogManager criteriaLogManager) {
 
         this.maxRequestSize = maxRequestSize;
         this.enforceValidAccount = enforceValidAccount;
@@ -130,14 +141,17 @@ public class AuctionRequestFactory {
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.paramsExtractor = Objects.requireNonNull(paramsExtractor);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
+        this.dealsProcessor = dealsProcessor;
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.requestValidator = Objects.requireNonNull(requestValidator);
         this.interstitialProcessor = Objects.requireNonNull(interstitialProcessor);
         this.timeoutResolver = Objects.requireNonNull(timeoutResolver);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
+        this.clock = Objects.requireNonNull(clock);
         this.idGenerator = Objects.requireNonNull(idGenerator);
         this.mapper = Objects.requireNonNull(mapper);
+        this.criteriaLogManager = Objects.requireNonNull(criteriaLogManager);
     }
 
     /**
@@ -167,9 +181,15 @@ public class AuctionRequestFactory {
             return Future.failedFuture(e);
         }
 
-        return updateBidRequest(routingContext, incomingBidRequest)
+        final Future<AuctionContext> auctionContextFuture = updateBidRequest(routingContext, incomingBidRequest)
                 .compose(bidRequest -> toAuctionContext(routingContext, bidRequest, new ArrayList<>(),
                         startTime, timeoutResolver));
+
+        if (dealsProcessor != null) {
+            return auctionContextFuture.compose(dealsProcessor::populateDealsInfo);
+        } else {
+            return auctionContextFuture;
+        }
     }
 
     /**
@@ -189,6 +209,9 @@ public class AuctionRequestFactory {
                         .bidRequest(updateBidRequestWithAccountId(bidRequest, account.getId()))
                         .timeout(timeout)
                         .account(account)
+                        .txnLog(TxnLog.create().accountId(account.getId()))
+                        .deepDebugLog(createDeepDebugLog(bidRequest))
+                        .cacheHttpCalls(new HashMap<>())
                         .prebidErrors(errors)
                         .build());
     }
@@ -392,8 +415,7 @@ public class AuctionRequestFactory {
         final ExtUser ext = userExtOrNull(user);
 
         if (ext != null) {
-            final User.UserBuilder builder = user == null ? User.builder() : user.toBuilder();
-            return builder.ext(ext).build();
+            return user.toBuilder().ext(ext).build();
         }
         return null;
     }
@@ -529,7 +551,7 @@ public class AuctionRequestFactory {
                     .pricegranularity(populatePriceGranularity(targeting, isPriceGranularityNull,
                             isPriceGranularityTextual, impMediaTypes))
                     .mediatypepricegranularity(targeting.getMediatypepricegranularity())
-                    .includewinners(isIncludeWinnersNull ? true : targeting.getIncludewinners())
+                    .includewinners(isIncludeWinnersNull || targeting.getIncludewinners())
                     .includebidderkeys(isIncludeBidderKeysNull
                             ? !isWinningOnly(prebid.getCache())
                             : targeting.getIncludebidderkeys())
@@ -775,6 +797,9 @@ public class AuctionRequestFactory {
 
     private String accountFromExtPrebidStoredRequestId(BidRequest bidRequest) {
         final ExtRequest extRequest = bidRequest.getExt();
+        if (extRequest == null) {
+            return null;
+        }
         final ExtRequestPrebid extRequestPrebid = getIfNotNull(extRequest, ExtRequest::getPrebid);
         final ExtStoredRequest extStoredRequest = getIfNotNull(extRequestPrebid, ExtRequestPrebid::getStoredrequest);
         return extStoredRequest != null ? parseAccountFromStoredRequest(extStoredRequest) : null;
@@ -956,5 +981,18 @@ public class AuctionRequestFactory {
         return (publisher != null ? publisher.toBuilder() : Publisher.builder())
                 .id(accountId)
                 .build();
+    }
+
+    private DeepDebugLog createDeepDebugLog(BidRequest bidRequest) {
+        final ExtRequest ext = bidRequest.getExt();
+        return DeepDebugLog.create(ext != null && isDeepDebugEnabled(ext), clock);
+    }
+
+    /**
+     * Determines deep debug flag from {@link ExtRequest}.
+     */
+    private static boolean isDeepDebugEnabled(ExtRequest extRequest) {
+        final ExtRequestPrebid extRequestPrebid = extRequest != null ? extRequest.getPrebid() : null;
+        return extRequestPrebid != null && Objects.equals(extRequestPrebid.getTrace(), 1);
     }
 }

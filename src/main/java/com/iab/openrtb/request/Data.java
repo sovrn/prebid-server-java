@@ -1,6 +1,7 @@
 package com.iab.openrtb.request;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.Builder;
 import lombok.Value;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * The specific data providers in use should be published by the exchange
  * <em>a priori</em> to its bidders.
  */
+@Builder
 @Value
 public class Data {
 

@@ -46,7 +46,7 @@ public class TargetingKeywordsCreatorTest {
         final Map<String, String> keywords = TargetingKeywordsCreator.create(ExtPriceGranularity.of(2,
                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5)))), true, true,
                 false, 0)
-                .makeFor(bid, "bidder1", false, null, null, null, null, null);
+                .makeFor(bid, "bidder1", false, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).containsOnly(
@@ -87,7 +87,7 @@ public class TargetingKeywordsCreatorTest {
         final Map<String, String> keywords = TargetingKeywordsCreator.create(ExtPriceGranularity.of(2,
                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5)))), true, true,
                 false, 0)
-                .makeFor(bid, "veryververyverylongbidder1", false, null, null, null, null, null);
+                .makeFor(bid, "veryververyverylongbidder1", false, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).containsOnly(
@@ -133,18 +133,18 @@ public class TargetingKeywordsCreatorTest {
         final Map<String, String> keywords = TargetingKeywordsCreator.create(ExtPriceGranularity.of(2,
                 singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.5)))), true, true,
                 false, 0)
-                .makeFor(bid, "bidder1", true, "cacheId1", "videoCacheId1", null, null, null);
+                .makeFor(bid, "bidder1", true, "cacheId1", "videoCacheId1", null, null, null, "lineItemSource");
 
         // then
         assertThat(keywords).containsOnly(
                 entry("hb_pb_bidder1", "1.00"),
                 entry("hb_bidder_bidder1", "bidder1"),
                 entry("hb_size_bidder1", "50x100"),
-                entry("hb_deal_bidder1", "dealId1"),
+                entry("hb_deal_bidder1", "lineItemSource-dealId1"),
                 entry("hb_pb", "1.00"),
                 entry("hb_bidder", "bidder1"),
                 entry("hb_size", "50x100"),
-                entry("hb_deal", "dealId1"),
+                entry("hb_deal", "lineItemSource-dealId1"),
                 entry("hb_cache_id", "cacheId1"),
                 entry("hb_cache_id_bidder1", "cacheId1"),
                 entry("hb_uuid", "videoCacheId1"),
@@ -188,7 +188,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, false, 0)
-                .makeFor(bid, "", true, null, null, null, null, null);
+                .makeFor(bid, "", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).contains(entry("hb_pb", "3.80"));
@@ -217,7 +217,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, false, 0)
-                .makeFor(bid, "bidder", true, null, null, null, null, null);
+                .makeFor(bid, "bidder", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).doesNotContainKeys("hb_cache_id_bidder", "hb_deal_bidder", "hb_size_bidder",
@@ -248,7 +248,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, true, 0)
-                .makeFor(bid, "bidder", true, null, null, null, null, null);
+                .makeFor(bid, "bidder", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).contains(
@@ -264,7 +264,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, false, true, false, 0)
-                .makeFor(bid, "bidder1", true, null, null, null, null, null);
+                .makeFor(bid, "bidder1", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).doesNotContainKeys("hb_bidder", "hb_pb");
@@ -278,7 +278,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, false, 0)
-                .makeFor(bid, "bidder1", true, null, null, null, null, null);
+                .makeFor(bid, "bidder1", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).containsKeys("hb_bidder", "hb_pb");
@@ -292,7 +292,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, false, false, false, 0)
-                .makeFor(bid, "bidder1", true, null, null, null, null, null);
+                .makeFor(bid, "bidder1", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).doesNotContainKeys("hb_bidder_bidder1", "hb_pb_bidder1");
@@ -306,7 +306,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, false, true, false, 0)
-                .makeFor(bid, "bidder1", true, null, null, null, null, null);
+                .makeFor(bid, "bidder1", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).containsKeys("hb_bidder_bidder1", "hb_pb_bidder1");
@@ -323,7 +323,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, false, 0)
-                .makeFor(bid, "bidder1", true, null, null, null, null, "http://extetranlUrl");
+                .makeFor(bid, "bidder1", true, null, null, null, null, "http://extetranlUrl", null);
 
         // then
         assertThat(keywords).contains(
@@ -344,7 +344,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, false, 0)
-                .makeFor(bid, "bidder1", false, null, null, null, null, "http://extetranlUrl");
+                .makeFor(bid, "bidder1", false, null, null, null, null, "http://extetranlUrl", null);
 
         // then
         assertThat(keywords).doesNotContainKeys("hb_bidid", "hb_bidid_bidder1", "hb_winurl", "hb_winurl_bidder1");
@@ -361,7 +361,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, true, true, false, 0)
-                .makeFor(bid, "bidder1", true, null, null, null, null, null);
+                .makeFor(bid, "bidder1", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).doesNotContainKeys("hb_bidid", "hb_bidid_bidder1", "hb_winurl", "hb_winurl_bidder1");
@@ -375,7 +375,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, false, true, false, 20)
-                .makeFor(bid, "someVeryLongBidderName", true, null, null, null, null, null);
+                .makeFor(bid, "someVeryLongBidderName", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).hasSize(2)
@@ -390,7 +390,7 @@ public class TargetingKeywordsCreatorTest {
         // when
         final Map<String, String> keywords = TargetingKeywordsCreator.create(
                 (String) null, false, true, false, 0)
-                .makeFor(bid, "someVeryLongBidderName", true, null, null, null, null, null);
+                .makeFor(bid, "someVeryLongBidderName", true, null, null, null, null, null, null);
 
         // then
         assertThat(keywords).hasSize(2)

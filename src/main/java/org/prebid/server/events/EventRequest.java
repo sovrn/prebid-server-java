@@ -26,6 +26,8 @@ public class EventRequest {
 
     String integration; // Rubicon-fork only
 
+    String lineItemId;
+
     public enum Type {
 
         win, imp

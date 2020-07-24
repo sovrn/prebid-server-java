@@ -35,6 +35,7 @@ import org.prebid.server.proto.response.Bid;
 import org.prebid.server.proto.response.MediaType;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.util.HttpUtil;
+import org.prebid.server.util.LineItemUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
@@ -196,7 +197,7 @@ public class CacheService {
             final JsonNode value = putObject.getValue();
             if (biddersAllowingVastUpdate.contains(putObject.getBidder()) && value != null) {
                 final String updatedVastXml = modifyVastXml(value.asText(), putObject.getBidid(),
-                        putObject.getBidder(), accountId, putObject.getTimestamp(), integration);
+                        putObject.getBidder(), accountId, null, putObject.getTimestamp(), integration);
                 builder.value(new TextNode(updatedVastXml)).build();
             }
 
@@ -237,7 +238,7 @@ public class CacheService {
 
             result = doCacheOpenrtb(cacheBids, videoCacheBids, cacheContext.getBidderToVideoBidIdsToModify(),
                     cacheContext.getBidderToBidIds(), account, eventsContext.getAuctionTimestamp(),
-                    timeout, eventsContext.getIntegration());
+                    imps, timeout, eventsContext.getIntegration());
         }
 
         return result;
@@ -313,13 +314,13 @@ public class CacheService {
     private Future<CacheServiceResult> doCacheOpenrtb(List<CacheBid> bids, List<CacheBid> videoBids,
                                                       Map<String, List<String>> bidderToVideoBidIdsToModify,
                                                       Map<String, List<String>> biddersToCacheBidIds,
-                                                      Account account, Long auctionTimestamp,
+                                                      Account account, Long auctionTimestamp, List<Imp> imps,
                                                       Timeout timeout, String integration) {
         final List<PutObject> putObjects = Stream.concat(
                 bids.stream().map(cacheBid -> createJsonPutObjectOpenrtb(cacheBid, biddersToCacheBidIds, account,
                         auctionTimestamp, integration)),
                 videoBids.stream().map(cacheBid -> createXmlPutObjectOpenrtb(cacheBid, bidderToVideoBidIdsToModify,
-                        account.getId(), auctionTimestamp, integration)))
+                        account.getId(), auctionTimestamp, integration, imps)))
                 .collect(Collectors.toList());
 
         if (putObjects.isEmpty()) {
@@ -426,7 +427,9 @@ public class CacheService {
      */
     private PutObject createXmlPutObjectOpenrtb(CacheBid cacheBid,
                                                 Map<String, List<String>> bidderToVideoBidIdsToModify,
-                                                String accountId, Long auctionTimestamp, String integration) {
+                                                String accountId, Long auctionTimestamp, String integration,
+                                                List<Imp> imps) {
+
         final com.iab.openrtb.response.Bid bid = cacheBid.getBid();
         String vastXml;
         if (bid.getAdm() == null) {
@@ -440,11 +443,13 @@ public class CacheService {
         }
 
         final String bidId = bid.getId();
+        final String lineItemId = LineItemUtil.lineItemIdFrom(bid, imps, mapper);
         final String modifiedVastXml = bidderToVideoBidIdsToModify.entrySet().stream()
                 .filter(biddersAndBidIds -> biddersAndBidIds.getValue().contains(bidId))
                 .findFirst()
                 .map(Map.Entry::getKey)
-                .map(bidder -> modifyVastXml(vastXml, bidId, bidder, accountId, auctionTimestamp, integration))
+                .map(bidder -> modifyVastXml(vastXml, bidId, bidder, accountId, lineItemId, auctionTimestamp,
+                        integration))
                 .orElse(vastXml);
 
         return PutObject.builder()
@@ -454,8 +459,8 @@ public class CacheService {
                 .build();
     }
 
-    private String modifyVastXml(String stringValue, String bidId, String bidder, String accountId, Long timestamp,
-                                 String integration) {
+    private String modifyVastXml(String stringValue, String bidId, String bidder, String accountId, String lineItemId,
+                                 Long timestamp, String integration) {
         final String closeTag = "</Impression>";
         final int closeTagIndex = stringValue.indexOf(closeTag);
 
@@ -464,7 +469,7 @@ public class CacheService {
             return stringValue;
         }
 
-        final String vastUrlTracking = eventsService.vastUrlTracking(bidId, bidder, accountId, timestamp);
+        final String vastUrlTracking = eventsService.vastUrlTracking(bidId, bidder, accountId, lineItemId, timestamp);
         final String vastUrlTrackingWithIntegration = addIntegration(vastUrlTracking, integration);
         final String impressionUrl = "<![CDATA[" + vastUrlTrackingWithIntegration + "]]>";
         final String openTag = "<Impression>";
@@ -580,8 +585,8 @@ public class CacheService {
     /**
      * Composes cached asset url template against the given query, schema and host.
      */
-    public static String getCachedAssetUrlTemplate(String cacheSchema, String cacheHost, String path,
-                                                   String cacheQuery) {
+    public static String composeCachedAssetUrlTemplate(String cacheSchema, String cacheHost, String path,
+                                                       String cacheQuery) {
         try {
             final URL baseUrl = getCacheBaseUrl(cacheSchema, cacheHost);
             return new URL(baseUrl, path + "?" + cacheQuery).toString();

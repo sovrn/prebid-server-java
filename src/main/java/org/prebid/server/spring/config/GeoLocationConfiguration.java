@@ -53,10 +53,10 @@ public class GeoLocationConfiguration {
         @Bean
         @ConditionalOnProperty(prefix = "geolocation.circuit-breaker", name = "enabled", havingValue = "false",
                 matchIfMissing = true)
-        GeoLocationService basicGeoLocationService(RemoteFileSyncerProperties fileSyncerProperties,
+        GeoLocationService basicGeoLocationService(RemoteFileSyncerProperties maxMindRemoteFileSyncerProperties,
                                                    Vertx vertx) {
 
-            return createGeoLocationService(fileSyncerProperties, vertx);
+            return createGeoLocationService(maxMindRemoteFileSyncerProperties, vertx);
         }
 
         @Bean
@@ -64,29 +64,34 @@ public class GeoLocationConfiguration {
         CircuitBreakerSecuredGeoLocationService circuitBreakerSecuredGeoLocationService(
                 Vertx vertx,
                 Metrics metrics,
-                RemoteFileSyncerProperties fileSyncerProperties,
+                RemoteFileSyncerProperties maxMindRemoteFileSyncerProperties,
                 @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
                 Clock clock) {
 
             return new CircuitBreakerSecuredGeoLocationService(vertx,
-                    createGeoLocationService(fileSyncerProperties, vertx), metrics,
+                    createGeoLocationService(maxMindRemoteFileSyncerProperties, vertx), metrics,
                     circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
                     circuitBreakerProperties.getClosingIntervalMs(), clock);
         }
 
-        private GeoLocationService createGeoLocationService(RemoteFileSyncerProperties fileSyncerProperties,
-                                                            Vertx vertx) {
+        private GeoLocationService createGeoLocationService(
+                RemoteFileSyncerProperties maxMindRemoteFileSyncerProperties, Vertx vertx) {
 
-            final HttpClientProperties httpClientProperties = fileSyncerProperties.getHttpClient();
+            final HttpClientProperties httpClientProperties = maxMindRemoteFileSyncerProperties.getHttpClient();
             final HttpClientOptions httpClientOptions = new HttpClientOptions()
                     .setConnectTimeout(httpClientProperties.getConnectTimeoutMs())
                     .setMaxRedirects(httpClientProperties.getMaxRedirects());
 
-            final RemoteFileSyncer remoteFileSyncer = RemoteFileSyncer.create(fileSyncerProperties.getDownloadUrl(),
-                    fileSyncerProperties.getSaveFilepath(), fileSyncerProperties.getTmpFilepath(),
-                    fileSyncerProperties.getRetryCount(), fileSyncerProperties.getRetryIntervalMs(),
-                    fileSyncerProperties.getTimeoutMs(), fileSyncerProperties.getUpdateIntervalMs(),
-                    vertx.createHttpClient(httpClientOptions), vertx, vertx.fileSystem());
+            final RemoteFileSyncer remoteFileSyncer =
+                    RemoteFileSyncer.create(
+                            maxMindRemoteFileSyncerProperties.getDownloadUrl(),
+                            maxMindRemoteFileSyncerProperties.getSaveFilepath(),
+                            maxMindRemoteFileSyncerProperties.getTmpFilepath(),
+                            maxMindRemoteFileSyncerProperties.getRetryCount(),
+                            maxMindRemoteFileSyncerProperties.getRetryIntervalMs(),
+                            maxMindRemoteFileSyncerProperties.getTimeoutMs(),
+                            maxMindRemoteFileSyncerProperties.getUpdateIntervalMs(),
+                            vertx.createHttpClient(httpClientOptions), vertx, vertx.fileSystem());
             final MaxMindGeoLocationService maxMindGeoLocationService = new MaxMindGeoLocationService();
 
             remoteFileSyncer.syncForFilepath(maxMindGeoLocationService);
@@ -108,8 +113,11 @@ public class GeoLocationConfiguration {
         @ConditionalOnProperty(prefix = "geolocation.circuit-breaker", name = "enabled", havingValue = "false",
                 matchIfMissing = true)
         NetAcuityGeoLocationService netAcuityGeoLocationService(
-                Vertx vertx, NetAcuityServerAddressProvider addressProvider) {
-            return createNetAcuityGeoLocationService(vertx, addressProvider);
+                Vertx vertx,
+                NetAcuityServerAddressProvider addressProvider,
+                Clock clock,
+                Metrics metrics) {
+            return createNetAcuityGeoLocationService(vertx, addressProvider, clock, metrics);
         }
 
         @Bean
@@ -118,18 +126,19 @@ public class GeoLocationConfiguration {
                 Vertx vertx,
                 NetAcuityServerAddressProvider netAcuityServerAddressProvider,
                 @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
-                Clock clock) {
+                Clock clock,
+                Metrics metrics) {
 
             return new CircuitBreakerSecuredNetAcuityGeoLocationService(
-                    createNetAcuityGeoLocationService(vertx, netAcuityServerAddressProvider),
+                    createNetAcuityGeoLocationService(vertx, netAcuityServerAddressProvider, clock, metrics),
                     netAcuityServerAddressProvider, vertx, circuitBreakerProperties.getOpeningThreshold(),
                     circuitBreakerProperties.getOpeningIntervalMs(), circuitBreakerProperties.getClosingIntervalMs(),
                     clock);
         }
 
         private static NetAcuityGeoLocationService createNetAcuityGeoLocationService(
-                Vertx vertx, NetAcuityServerAddressProvider addressProvider) {
-            return new NetAcuityGeoLocationService(vertx, addressProvider::getServerAddress);
+                Vertx vertx, NetAcuityServerAddressProvider addressProvider, Clock clock, Metrics metrics) {
+            return new NetAcuityGeoLocationService(vertx, addressProvider::getServerAddress, clock, metrics);
         }
 
         private static Set<String> parseServerNames(String serversString) {

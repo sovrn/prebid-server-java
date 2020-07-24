@@ -43,7 +43,7 @@ public class StoredRequestProcessor {
     private final TimeoutFactory timeoutFactory;
     private final Metrics metrics;
     private final JacksonMapper mapper;
-    private JsonMergeUtil jsonMergeUtil;
+    private final JsonMergeUtil jsonMergeUtil;
 
     public StoredRequestProcessor(long defaultTimeout,
                                   ApplicationSettings applicationSettings,

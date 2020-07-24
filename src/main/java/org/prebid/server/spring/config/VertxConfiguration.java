@@ -2,10 +2,12 @@ package org.prebid.server.spring.config;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
+import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.file.FileSystem;
 import io.vertx.ext.dropwizard.DropwizardMetricsOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 import org.prebid.server.vertx.ContextRunner;
+import org.prebid.server.vertx.LocalMessageCodec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +22,14 @@ public class VertxConfiguration {
                 .setMetricsOptions(new DropwizardMetricsOptions()
                         .setEnabled(true)
                         .setRegistryName(MetricsConfiguration.METRIC_REGISTRY_NAME)));
+    }
+
+    @Bean
+    EventBus eventBus(Vertx vertx) {
+        final EventBus eventBus = vertx.eventBus();
+        eventBus.registerCodec(LocalMessageCodec.create());
+
+        return eventBus;
     }
 
     @Bean

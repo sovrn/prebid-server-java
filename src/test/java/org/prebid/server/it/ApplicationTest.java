@@ -132,7 +132,6 @@ public class ApplicationTest extends IntegrationTest {
         final String expectedAuctionResponse = openrtbAuctionResponseFrom(
                 "openrtb2/rubicon_appnexus/test-auction-rubicon-appnexus-response.json",
                 response, asList(RUBICON, APPNEXUS, APPNEXUS_ALIAS));
-
         JSONAssert.assertEquals(expectedAuctionResponse, response.asString(), openrtbCacheDebugComparator());
     }
 
@@ -537,10 +536,10 @@ public class ApplicationTest extends IntegrationTest {
     public void shouldAskExchangeWithUpdatedSettingsFromCache() throws IOException, JSONException {
         // given
         // update stored settings cache
-        given(ADMIN_SPEC)
+        given(SPEC)
                 .body(jsonFrom("cache/update/test-update-settings-request.json"))
                 .when()
-                .post("/storedrequests/openrtb2")
+                .post("/pbs-admin/storedrequests/openrtb2")
                 .then()
                 .assertThat()
                 .body(Matchers.equalTo(""))
@@ -585,8 +584,8 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void adminHandlerShouldRespondWithOk() {
-        given(ADMIN_SPEC)
-                .get("/admin?logging=error&records=1200")
+        given(SPEC)
+                .get("/pbs-admin/admin?logging=error&records=1200")
                 .then()
                 .assertThat()
                 .statusCode(200);
@@ -611,10 +610,10 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void invalidateSettingsCacheShouldReturnExpectedResponse() {
-        given(ADMIN_SPEC)
+        given(SPEC)
                 .body("{\"requests\":[],\"imps\":[]}")
                 .when()
-                .delete("/storedrequests/openrtb2")
+                .delete("/pbs-admin/storedrequests/openrtb2")
                 .then()
                 .assertThat()
                 .body(Matchers.equalTo(""))
@@ -623,10 +622,10 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void updateAmpSettingsCacheShouldReturnExpectedResponse() {
-        given(ADMIN_SPEC)
+        given(SPEC)
                 .body("{\"requests\":{},\"imps\":{}}")
                 .when()
-                .post("/storedrequests/amp")
+                .post("/pbs-admin/storedrequests/amp")
                 .then()
                 .assertThat()
                 .body(Matchers.equalTo(""))
@@ -635,13 +634,28 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void invalidateAmpSettingsCacheShouldReturnExpectedResponse() {
-        given(ADMIN_SPEC)
+        given(SPEC)
                 .body("{\"requests\":[],\"imps\":[]}")
                 .when()
-                .delete("/storedrequests/amp")
+                .delete("/pbs-admin/storedrequests/amp")
                 .then()
                 .assertThat()
                 .body(Matchers.equalTo(""))
+                .statusCode(200);
+    }
+
+    @Test
+    public void traceHandlerShouldReturn200Ok() {
+        given(SPEC)
+                .when()
+                .param("level", "error")
+                .param("duration", "1000")
+                .param("account", "1001")
+                .param("bidderCode", "rubicon")
+                .param("lineitemId", "1001")
+                .post("/pbs-admin/tracelog")
+                .then()
+                .assertThat()
                 .statusCode(200);
     }
 

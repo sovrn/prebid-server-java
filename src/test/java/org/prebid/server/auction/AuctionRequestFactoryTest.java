@@ -31,6 +31,9 @@ import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
+import org.prebid.server.deals.DealsProcessor;
+import org.prebid.server.deals.model.DeepDebugLog;
+import org.prebid.server.deals.model.TxnLog;
 import org.prebid.server.exception.BlacklistedAccountException;
 import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
@@ -38,6 +41,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.identity.IdGenerator;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
@@ -70,6 +74,7 @@ import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,25 +104,33 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Mock
     private UidsCookieService uidsCookieService;
     @Mock
+    private DealsProcessor dealsProcessor;
+    @Mock
     private BidderCatalog bidderCatalog;
     @Mock
     private RequestValidator requestValidator;
     @Mock
     private InterstitialProcessor interstitialProcessor;
     @Mock
+    private TimeoutResolver timeoutResolver;
+    @Mock
+    private TimeoutFactory timeoutFactory;
+    @Mock
     private ApplicationSettings applicationSettings;
     @Mock
     private IdGenerator idGenerator;
 
+    private Clock clock = Clock.systemDefaultZone();
+
+    @Mock
+    private CriteriaLogManager criteriaLogManager;
+
     private AuctionRequestFactory factory;
+
     @Mock
     private RoutingContext routingContext;
     @Mock
     private HttpServerRequest httpRequest;
-    @Mock
-    private TimeoutResolver timeoutResolver;
-    @Mock
-    private TimeoutFactory timeoutFactory;
 
     @Before
     public void setUp() {
@@ -127,8 +140,16 @@ public class AuctionRequestFactoryTest extends VertxTest {
         given(routingContext.request()).willReturn(httpRequest);
         given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
 
+        given(routingContext.request()).willReturn(httpRequest);
+        given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
+
         given(timeoutResolver.resolve(any())).willReturn(2000L);
         given(timeoutResolver.adjustTimeout(anyLong())).willReturn(1900L);
+
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(Account.builder().id("1001").build()));
+        given(dealsProcessor.populateDealsInfo(any()))
+                .willAnswer(invocationOnMock -> Future.succeededFuture(invocationOnMock.getArgument(0)));
 
         factory = new AuctionRequestFactory(
                 Integer.MAX_VALUE,
@@ -140,14 +161,17 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
     }
 
     @Test
@@ -178,14 +202,17 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         givenValidBidRequest();
 
@@ -214,14 +241,17 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.failedFuture(new PreBidException("Not found")));
@@ -259,14 +289,17 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         given(routingContext.getBody()).willReturn(Buffer.buffer("body"));
 
@@ -740,9 +773,10 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.builder().build())
-                        .cache(ExtRequestPrebidCache.of(null, null, true))
-                        .build(), null))
+                                .targeting(ExtRequestTargeting.builder().build())
+                                .cache(ExtRequestPrebidCache.of(null, null, true))
+                                .build(),
+                        null))
                 .build());
 
         // when
@@ -770,19 +804,23 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .targeting(ExtRequestTargeting.builder().build())
-                        .build(), null))
+                                .targeting(ExtRequestTargeting.builder().build())
+                                .build(),
+                        null))
                 .build());
 
         // when
@@ -810,14 +848,17 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -849,14 +890,17 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -888,20 +932,24 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .cache(ExtRequestPrebidCache.of(null, null, null))
-                        .build(), null))
+                                .cache(ExtRequestPrebidCache.of(null, null, null))
+                                .build(),
+                        null))
                 .build());
 
         // when
@@ -924,8 +972,9 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .cache(ExtRequestPrebidCache.of(cacheBids, cacheVastxml, null))
-                        .build(), null))
+                                .cache(ExtRequestPrebidCache.of(cacheBids, cacheVastxml, null))
+                                .build(),
+                        null))
                 .build());
 
         // when
@@ -953,20 +1002,24 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .cache(ExtRequestPrebidCache.of(null, null, false))
-                        .build(), null))
+                                .cache(ExtRequestPrebidCache.of(null, null, false))
+                                .build(),
+                        null))
                 .build());
 
         // when
@@ -994,18 +1047,22 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 storedRequestProcessor,
                 paramsExtractor,
                 uidsCookieService,
+                dealsProcessor,
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
+                clock,
                 idGenerator,
-                jacksonMapper);
+                jacksonMapper,
+                criteriaLogManager);
 
         final ExtRequest extBidRequest = ExtRequest.of(ExtRequestPrebid.builder()
-                .cache(ExtRequestPrebidCache.of(null, null, null))
-                .build(), null);
+                        .cache(ExtRequestPrebidCache.of(null, null, null))
+                        .build(),
+                null);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -1465,65 +1522,6 @@ public class AuctionRequestFactoryTest extends VertxTest {
     }
 
     @Test
-    public void shouldReturnAuctionContextWithAccountIdTakenFromImpStoredRequestId() {
-        // given
-        givenBidRequest(BidRequest.builder()
-                .site(Site.builder().publisher(Publisher.builder().build()).build())
-                .imp(asList(Imp.builder()
-                                .ext(mapper.valueToTree(singletonMap("prebid",
-                                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("")).build())))
-                                .build(),
-                        Imp.builder()
-                                .ext(mapper.valueToTree(singletonMap("prebid",
-                                        ExtImpPrebid.builder().build())))
-                                .build(),
-                        Imp.builder()
-                                .ext(mapper.valueToTree(singletonMap("prebid",
-                                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("123-test")).build())))
-                                .build()
-                ))
-                .build());
-
-        final Account givenAccount = Account.builder().id("123").build();
-        given(applicationSettings.getAccountById(any(), any()))
-                .willReturn(Future.succeededFuture(givenAccount));
-
-        // when
-        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
-
-        // then
-        verify(applicationSettings).getAccountById(eq("123"), any());
-
-        assertThat(account).isSameAs(givenAccount);
-    }
-
-    @Test
-    public void shouldReturnAuctionContextWithAccountIdTakenFromStoredRequestId() {
-        // given
-        givenBidRequest(BidRequest.builder()
-                .ext(ExtRequest.of(
-                        ExtRequestPrebid.builder().storedrequest(ExtStoredRequest.of("123-test-test")).build(), null))
-                .site(Site.builder().publisher(Publisher.builder().build()).build())
-                .imp(singletonList(Imp.builder()
-                        .ext(mapper.valueToTree(singletonMap("prebid",
-                                ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("321-test-test")).build())))
-                        .build()))
-                .build());
-
-        final Account givenAccount = Account.builder().id("123").build();
-        given(applicationSettings.getAccountById(any(), any()))
-                .willReturn(Future.succeededFuture(givenAccount));
-
-        // when
-        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
-
-        // then
-        verify(applicationSettings).getAccountById(eq("123"), any());
-
-        assertThat(account).isSameAs(givenAccount);
-    }
-
-    @Test
     public void shouldReturnAuctionContextWithPopulatedSitePublisherId() {
         // given
         givenBidRequest(BidRequest.builder()
@@ -1592,6 +1590,110 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .extracting(App::getPublisher)
                 .extracting(Publisher::getId)
                 .containsOnly("123");
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromImpStoredRequestId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(asList(Imp.builder()
+                                .ext(mapper.valueToTree(singletonMap("prebid",
+                                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("")).build())))
+                                .build(),
+                        Imp.builder()
+                                .ext(mapper.valueToTree(singletonMap("prebid",
+                                        ExtImpPrebid.builder().build())))
+                                .build(),
+                        Imp.builder()
+                                .ext(mapper.valueToTree(singletonMap("prebid",
+                                        ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("123-test")).build())))
+                                .build()
+                ))
+                .build());
+
+        final Account givenAccount = Account.builder().id("123").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAccountIdTakenFromStoredRequestId() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .ext(ExtRequest.of(
+                        ExtRequestPrebid.builder().storedrequest(ExtStoredRequest.of("123-test-test")).build(), null))
+                .site(Site.builder().publisher(Publisher.builder().build()).build())
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.valueToTree(singletonMap("prebid",
+                                ExtImpPrebid.builder().storedrequest(ExtStoredRequest.of("321-test-test")).build())))
+                        .build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("123").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final Account account = factory.fromRequest(routingContext, 0L).result().getAccount();
+
+        // then
+        verify(applicationSettings).getAccountById(eq("123"), any());
+
+        assertThat(account).isSameAs(givenAccount);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithTxnLog() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().id("1001").build()).build())
+                .build());
+
+        // when
+        final TxnLog txnLog = factory.fromRequest(routingContext, 0L).result().getTxnLog();
+
+        // then
+        assertThat(txnLog).isNotNull().isEqualTo(TxnLog.create().accountId("1001"));
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithDeepDebugLogWhenDeepDebugIsOff() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .site(Site.builder().publisher(Publisher.builder().id("1001").build()).build())
+                .build());
+
+        // when
+        final DeepDebugLog deepDebugLog = factory.fromRequest(routingContext, 0L).result().getDeepDebugLog();
+
+        // then
+        assertThat(deepDebugLog).isNotNull().returns(false, DeepDebugLog::isDeepDebugEnabled);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithDeepDebugLogWhenDeepDebugIsOn() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .imp(emptyList())
+                .site(Site.builder().publisher(Publisher.builder().id("1001").build()).build())
+                .ext(ExtRequest.of(
+                        ExtRequestPrebid.builder().trace(1).build(), null))
+                .build());
+
+        // when
+        final DeepDebugLog deepDebugLog = factory.fromRequest(routingContext, 0L).result().getDeepDebugLog();
+
+        // then
+        assertThat(deepDebugLog).isNotNull().returns(true, DeepDebugLog::isDeepDebugEnabled);
     }
 
     private void givenImplicitParams(String referer, String domain, String ip, String ua) {

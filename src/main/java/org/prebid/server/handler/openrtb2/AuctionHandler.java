@@ -225,7 +225,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
                     .setStatusCode(status)
                     .end(body);
 
-            metrics.updateRequestTimeMetric(clock.millis() - startTime);
+            metrics.updateRequestTimeMetric(MetricName.request_time, clock.millis() - startTime);
             metrics.updateRequestTypeMetric(requestType, metricRequestStatus);
             analyticsReporter.processEvent(event);
         }
