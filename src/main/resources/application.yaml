@@ -16,34 +16,41 @@ admin:
   port: 8060
 admin-endpoints:
   tracelog:
-    enabled: true
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   logger-level-modifier:
-    enabled: true
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   storedrequest-amp:
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   storedrequest:
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   cache-invalidation:
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   currency-rates:
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   e2eadmin:
-    on-application-port: true
+    enabled: false
+    on-application-port: false
     protected: true
   lineitem-status:
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
   deals-status:
-    on-application-port: true
-    protected: false
+    enabled: false
+    on-application-port: false
+    protected: true
 http-client:
   max-pool-size: 4000
   connect-timeout-ms: 2500
@@ -222,7 +229,7 @@ geolocation:
         connect-timeout-ms: 2500
         max-redirects: 3
 device-info:
-  enabled: true
+  enabled: false
   device-atlas:
     remote-file-syncer:
       download-url: https://deviceatlas.com/getJSON.php?licencekey=

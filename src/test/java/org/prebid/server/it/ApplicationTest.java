@@ -536,7 +536,7 @@ public class ApplicationTest extends IntegrationTest {
     public void shouldAskExchangeWithUpdatedSettingsFromCache() throws IOException, JSONException {
         // given
         // update stored settings cache
-        given(SPEC)
+        given(ADMIN_SPEC)
                 .body(jsonFrom("cache/update/test-update-settings-request.json"))
                 .when()
                 .post("/pbs-admin/storedrequests/openrtb2")
@@ -584,7 +584,7 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void adminHandlerShouldRespondWithOk() {
-        given(SPEC)
+        given(ADMIN_SPEC)
                 .get("/pbs-admin/admin?logging=error&records=1200")
                 .then()
                 .assertThat()
@@ -610,7 +610,7 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void invalidateSettingsCacheShouldReturnExpectedResponse() {
-        given(SPEC)
+        given(ADMIN_SPEC)
                 .body("{\"requests\":[],\"imps\":[]}")
                 .when()
                 .delete("/pbs-admin/storedrequests/openrtb2")
@@ -622,7 +622,7 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void updateAmpSettingsCacheShouldReturnExpectedResponse() {
-        given(SPEC)
+        given(ADMIN_SPEC)
                 .body("{\"requests\":{},\"imps\":{}}")
                 .when()
                 .post("/pbs-admin/storedrequests/amp")
@@ -634,7 +634,7 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void invalidateAmpSettingsCacheShouldReturnExpectedResponse() {
-        given(SPEC)
+        given(ADMIN_SPEC)
                 .body("{\"requests\":[],\"imps\":[]}")
                 .when()
                 .delete("/pbs-admin/storedrequests/amp")
@@ -646,7 +646,7 @@ public class ApplicationTest extends IntegrationTest {
 
     @Test
     public void traceHandlerShouldReturn200Ok() {
-        given(SPEC)
+        given(ADMIN_SPEC)
                 .when()
                 .param("level", "error")
                 .param("duration", "1000")

@@ -399,7 +399,7 @@ public class PrematureReturnTest extends VertxTest {
     }
 
     private void awaitForLineItemMetadata() {
-        await().atMost(2, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+        await().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(() -> lineItemService.accountHasDeals("2001", ZonedDateTime.now(clock)));
     }
 

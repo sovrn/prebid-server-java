@@ -59,9 +59,9 @@ gdpr:
     v2:
       cache-dir: /var/tmp/vendor2
 deals:
-  enabled: true
+  enabled: false
   simulation:
-    enabled: true
+    enabled: false
   planner:
     plan-endpoint: http://localhost/planner
     register-endpoint: http://localhost/register

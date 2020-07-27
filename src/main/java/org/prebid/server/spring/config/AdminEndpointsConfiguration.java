@@ -32,6 +32,7 @@ import java.util.Map;
 
 @Configuration
 public class AdminEndpointsConfiguration {
+
     private static final String DEALS_SIMULATION_ENDPOINT = "/pbs-admin/e2eAdmin/*";
     private static final String DEALS_STATUS_ENDPOINT = "/pbs-admin/deals-status";
     private static final String DEALS_LINEITEM_STATUS_ENDPOINT = "/pbs-admin/lineitem-status";
@@ -53,7 +54,7 @@ public class AdminEndpointsConfiguration {
 
         final DealsStatusHandler dealsStatusHandler = new DealsStatusHandler(deliveryProgressService, mapper);
         return new CustomizedAdminEndpoint(DEALS_STATUS_ENDPOINT, dealsStatusHandler, isOnApplicationPort, isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -68,7 +69,7 @@ public class AdminEndpointsConfiguration {
         final LineItemStatusHandler lineItemStatusHandler = new LineItemStatusHandler(deliveryProgressService, mapper);
         return new CustomizedAdminEndpoint(DEALS_LINEITEM_STATUS_ENDPOINT, lineItemStatusHandler, isOnApplicationPort,
                 isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -82,7 +83,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(DEALS_SIMULATION_ENDPOINT, dealsSimulationAdminHandler, isOnApplicationPort,
                 isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -98,7 +99,7 @@ public class AdminEndpointsConfiguration {
         final CurrencyRatesHandler currencyRatesHandler = new CurrencyRatesHandler(currencyConversionRates, mapper);
         return new CustomizedAdminEndpoint(CURRENCY_RATES_ENDPOINT, currencyRatesHandler, isOnApplicationPort,
                 isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -116,7 +117,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(STOREDREQUESTS_OPENRTB_ENDPOINT, cacheNotificationHandler,
                 isOnApplicationPort, isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -134,7 +135,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(STOREDREQUESTS_AMP_ENDPOINT, settingsCacheNotificationHandler,
                 isOnApplicationPort, isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -151,7 +152,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(CACHE_INVALIDATE_ENDPOINT, accountCacheInvalidationHandler,
                 isOnApplicationPort, isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -164,7 +165,7 @@ public class AdminEndpointsConfiguration {
 
         final TracerLogHandler tracerLogHandler = new TracerLogHandler(criteriaManager);
         return new CustomizedAdminEndpoint(TRACELOG_ENDPOINT, tracerLogHandler, isOnApplicationPort, isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
@@ -176,7 +177,7 @@ public class AdminEndpointsConfiguration {
             @Value("${admin-endpoints.logger-level-modifier.protected}") boolean isProtected) {
         final AdminHandler adminHandler = new AdminHandler(adminManager);
         return new CustomizedAdminEndpoint(ADMIN_ENDPOINT, adminHandler, isOnApplicationPort, isProtected)
-                .credentials(adminEndpointCredentials);
+                .withCredentials(adminEndpointCredentials);
     }
 
     @Bean
