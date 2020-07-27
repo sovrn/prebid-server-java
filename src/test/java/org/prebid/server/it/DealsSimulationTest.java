@@ -173,7 +173,7 @@ public class DealsSimulationTest extends IntegrationTest {
     }
 
     private void awaitForLineItemMetadata(ZonedDateTime now) {
-        await().atMost(2, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+        await().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(() -> lineItemService.accountHasDeals("2001", now));
     }
 
