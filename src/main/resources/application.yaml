@@ -36,9 +36,9 @@ admin-endpoints:
     on-application-port: false
     protected: true
   currency-rates:
-    enabled: false
+    enabled: true
     on-application-port: false
-    protected: true
+    protected: false
   e2eadmin:
     enabled: false
     on-application-port: false

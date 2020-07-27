@@ -36,7 +36,7 @@ public class AdminEndpointsConfiguration {
     private static final String DEALS_SIMULATION_ENDPOINT = "/pbs-admin/e2eAdmin/*";
     private static final String DEALS_STATUS_ENDPOINT = "/pbs-admin/deals-status";
     private static final String DEALS_LINEITEM_STATUS_ENDPOINT = "/pbs-admin/lineitem-status";
-    private static final String CURRENCY_RATES_ENDPOINT = "/pbs-admin/currency-rates";
+    private static final String CURRENCY_RATES_ENDPOINT = "/currency-rates";
     private static final String STOREDREQUESTS_OPENRTB_ENDPOINT = "/pbs-admin/storedrequests/openrtb2";
     private static final String STOREDREQUESTS_AMP_ENDPOINT = "/pbs-admin/storedrequests/amp";
     private static final String CACHE_INVALIDATE_ENDPOINT = "/pbs-admin/cache/invalidate";
