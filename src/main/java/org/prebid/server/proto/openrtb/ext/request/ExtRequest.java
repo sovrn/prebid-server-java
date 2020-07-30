@@ -18,12 +18,7 @@ public class ExtRequest extends FlexibleExtension {
      */
     ExtRequestPrebid prebid;
 
-    /**
-     * Defines the contract for bidrequest.ext.rubicon
-     */
-    ExtRequestRubicon rubicon;
-
     public static ExtRequest empty() {
-        return of(null, null);
+        return of(null);
     }
 }

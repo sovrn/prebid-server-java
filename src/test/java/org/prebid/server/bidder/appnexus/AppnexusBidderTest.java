@@ -281,7 +281,7 @@ public class AppnexusBidderTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 bidRequestBuilder -> bidRequestBuilder
-                        .ext(ExtRequest.of(requestPrebid, null)),
+                        .ext(ExtRequest.of(requestPrebid)),
                 impBuilder -> impBuilder.banner(Banner.builder().build()),
                 extImpAppnexusBuilder -> extImpAppnexusBuilder.placementId(20));
 
@@ -309,7 +309,7 @@ public class AppnexusBidderTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(
                 bidRequestBuilder -> bidRequestBuilder
-                        .ext(ExtRequest.of(requestPrebid, null)),
+                        .ext(ExtRequest.of(requestPrebid)),
                 impBuilder -> impBuilder.banner(Banner.builder().build()),
                 extImpAppnexusBuilder -> extImpAppnexusBuilder.placementId(20));
 
@@ -338,7 +338,7 @@ public class AppnexusBidderTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(
                 bidRequestBuilder -> bidRequestBuilder
                         .ext(jacksonMapper.fillExtension(
-                                ExtRequest.of(requestPrebid, null),
+                                ExtRequest.of(requestPrebid),
                                 AppnexusReqExt.of(AppnexusReqExtAppnexus.of(false, true)))),
                 impBuilder -> impBuilder.banner(Banner.builder().build()),
                 extImpAppnexusBuilder -> extImpAppnexusBuilder.placementId(20));
@@ -366,7 +366,7 @@ public class AppnexusBidderTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(
                 bidRequestBuilder -> bidRequestBuilder
                         .ext(jacksonMapper.fillExtension(
-                                ExtRequest.of(requestPrebid, null),
+                                ExtRequest.of(requestPrebid),
                                 AppnexusReqExt.of(
                                 AppnexusReqExtAppnexus.of(false, true)))),
                 impBuilder -> impBuilder.banner(Banner.builder().build()),

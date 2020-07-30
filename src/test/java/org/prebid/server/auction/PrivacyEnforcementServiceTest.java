@@ -801,7 +801,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                         .regs(regs)
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .nosale(singletonList(bidder2Name))
-                                .build(), null)));
+                                .build())));
 
         final AuctionContext context = auctionContext(bidRequest);
 
@@ -860,7 +860,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                         .regs(regs)
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .nosale(singletonList("*"))
-                                .build(), null)));
+                                .build())));
 
         final AuctionContext context = auctionContext(bidRequest);
 

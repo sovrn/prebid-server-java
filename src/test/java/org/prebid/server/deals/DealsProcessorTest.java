@@ -618,7 +618,7 @@ public class DealsProcessorTest extends VertxTest {
         aliases.put("rubiconAlias", "rubicon");
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .device(Device.builder().ip("ip").ua("ua").build())
-                .ext(ExtRequest.of(ExtRequestPrebid.builder().aliases(aliases).build(), null)));
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().aliases(aliases).build())));
 
         final AuctionContext auctionContext = givenAuctionContext(bidRequest, givenAccount(identity()));
 

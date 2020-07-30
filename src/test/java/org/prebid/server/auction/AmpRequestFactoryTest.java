@@ -401,7 +401,7 @@ public class AmpRequestFactoryTest extends VertxTest {
 
         givenBidRequest(
                 builder -> builder
-                        .ext(ExtRequest.of(ExtRequestPrebid.builder().debug(0).build(), null)),
+                        .ext(ExtRequest.of(ExtRequestPrebid.builder().debug(0).build())),
                 Imp.builder().build());
 
         // when
@@ -1211,7 +1211,7 @@ public class AmpRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(
                 builder -> builder
-                        .ext(ExtRequest.of(ExtRequestPrebid.builder().debug(1).build(), null)),
+                        .ext(ExtRequest.of(ExtRequestPrebid.builder().debug(1).build())),
                 Imp.builder().build());
 
         // when
@@ -1246,6 +1246,6 @@ public class AmpRequestFactoryTest extends VertxTest {
     private static ExtRequest givenRequestExt(ExtRequestTargeting extRequestTargeting) {
         return ExtRequest.of(ExtRequestPrebid.builder()
                 .targeting(extRequestTargeting)
-                .build(), null);
+                .build());
     }
 }

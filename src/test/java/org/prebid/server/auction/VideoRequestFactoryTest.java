@@ -197,7 +197,7 @@ public class VideoRequestFactoryTest extends VertxTest {
                 .badv(singletonList("badv"))
                 .cur(singletonList("USD"))
                 .tmax(0L)
-                .ext(ExtRequest.of(ext, null))
+                .ext(ExtRequest.of(ext))
                 .build();
 
         final WithPodErrors<BidRequest> mergedBidRequest = WithPodErrors.of(

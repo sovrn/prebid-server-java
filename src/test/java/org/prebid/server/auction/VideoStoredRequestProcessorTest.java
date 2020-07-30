@@ -165,7 +165,7 @@ public class VideoStoredRequestProcessorTest extends VertxTest {
                 .badv(singletonList("badv"))
                 .cur(singletonList("USD"))
                 .tmax(0L)
-                .ext(ExtRequest.of(ext, null))
+                .ext(ExtRequest.of(ext))
                 .build();
 
         assertThat(result.result()).isEqualTo(WithPodErrors.of(expectedMergedRequest, emptyList()));

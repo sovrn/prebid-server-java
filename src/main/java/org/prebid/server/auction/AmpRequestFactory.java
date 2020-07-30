@@ -32,7 +32,6 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheBids;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheVastxml;
-import org.prebid.server.proto.openrtb.ext.request.ExtRequestRubicon;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
@@ -183,8 +182,7 @@ public class AmpRequestFactory {
             result = bidRequest.toBuilder()
                     .imp(setSecure ? Collections.singletonList(imps.get(0).toBuilder().secure(1).build()) : imps)
                     .test(ObjectUtils.defaultIfNull(updatedTest, test))
-                    .ext(extRequest(bidRequest, prebid, setDefaultTargeting, setDefaultCache, updatedDebug,
-                            bidRequest.getExt().getRubicon()))
+                    .ext(extRequest(bidRequest, prebid, setDefaultTargeting, setDefaultCache, updatedDebug))
                     .build();
         } else {
             result = bidRequest;
@@ -463,8 +461,7 @@ public class AmpRequestFactory {
      * Creates updated bidrequest.ext {@link ObjectNode}.
      */
     private ExtRequest extRequest(BidRequest bidRequest, ExtRequestPrebid prebid,
-                                  boolean setDefaultTargeting, boolean setDefaultCache,
-                                  Integer updatedDebug, ExtRequestRubicon extRequestRubicon) {
+                                  boolean setDefaultTargeting, boolean setDefaultCache, Integer updatedDebug) {
         final ExtRequest result;
         if (setDefaultTargeting || setDefaultCache || updatedDebug != null) {
             final ExtRequestPrebid.ExtRequestPrebidBuilder prebidBuilder = prebid != null
@@ -482,7 +479,7 @@ public class AmpRequestFactory {
                 prebidBuilder.debug(updatedDebug);
             }
 
-            result = ExtRequest.of(prebidBuilder.build(), extRequestRubicon);
+            result = ExtRequest.of(prebidBuilder.build());
         } else {
             result = bidRequest.getExt();
         }

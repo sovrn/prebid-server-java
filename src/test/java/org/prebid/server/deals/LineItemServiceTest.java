@@ -418,7 +418,6 @@ public class LineItemServiceTest extends VertxTest {
         assertThat(lineItem.getReadyAt()).isEqualTo(now.minusHours(1).plusMinutes(12));
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     public void updateLineItemsShouldMergeLineItemsWhenPlannerIsNotResponsive() {
         // given
@@ -1865,11 +1864,9 @@ public class LineItemServiceTest extends VertxTest {
                 .bidRequest(BidRequest.builder()
                         .user(User.builder().ext(
                                 ExtUser.builder().fcapIds(fcaps).build()).build())
-                        .ext(
-                                ExtRequest.of(ExtRequestPrebid.builder()
-                                                .aliases(singletonMap("rubiAlias", "rubicon"))
-                                                .build(),
-                                        null))
+                        .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                .aliases(singletonMap("rubiAlias", "rubicon"))
+                                .build()))
                         .build())
                 .build();
     }

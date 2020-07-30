@@ -1267,7 +1267,7 @@ public class RequestValidatorTest extends VertxTest {
                         .targeting(ExtRequestTargeting.builder()
                                 .pricegranularity(new TextNode("pricegranularity"))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1286,7 +1286,7 @@ public class RequestValidatorTest extends VertxTest {
                         .targeting(ExtRequestTargeting.builder()
                                 .pricegranularity(mapper.valueToTree(ExtPriceGranularity.of(2, emptyList())))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1307,7 +1307,7 @@ public class RequestValidatorTest extends VertxTest {
                                         .of(2, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
                                                 BigDecimal.valueOf(0))))))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1329,7 +1329,7 @@ public class RequestValidatorTest extends VertxTest {
                                         singletonList(ExtGranularityRange.of(
                                                 BigDecimal.valueOf(5), BigDecimal.valueOf(-1))))))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
         // when
         final ValidationResult result = requestValidator.validate(bidRequest);
@@ -1348,7 +1348,7 @@ public class RequestValidatorTest extends VertxTest {
                                 .pricegranularity(mapper.valueToTree(ExtPriceGranularity.of(-1, singletonList(
                                         ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.01))))))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
         // when
         final ValidationResult result = requestValidator.validate(bidRequest);
@@ -1370,7 +1370,7 @@ public class RequestValidatorTest extends VertxTest {
                                 .pricegranularity(mapper.valueToTree(priceGranularity))
                                 .mediatypepricegranularity(ExtMediaTypePriceGranularity.of(null, null, null))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1396,7 +1396,7 @@ public class RequestValidatorTest extends VertxTest {
                                 .pricegranularity(mapper.valueToTree(priceGranularity))
                                 .mediatypepricegranularity(mediaTypePriceGranuality)
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1419,7 +1419,7 @@ public class RequestValidatorTest extends VertxTest {
                                 .includebidderkeys(false)
                                 .includewinners(false)
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1441,7 +1441,7 @@ public class RequestValidatorTest extends VertxTest {
                         .targeting(ExtRequestTargeting.builder()
                                 .pricegranularity(mapper.valueToTree(priceGranuality))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1464,7 +1464,7 @@ public class RequestValidatorTest extends VertxTest {
                         .targeting(ExtRequestTargeting.builder()
                                 .pricegranularity(mapper.valueToTree(priceGranuality))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1486,7 +1486,7 @@ public class RequestValidatorTest extends VertxTest {
                         .targeting(ExtRequestTargeting.builder()
                                 .pricegranularity(mapper.valueToTree(priceGranularity))
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build();
 
         // when
@@ -1524,7 +1524,7 @@ public class RequestValidatorTest extends VertxTest {
         final BidRequest bidRequest = validBidRequestBuilder()
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("unknown-bidder", "rubicon"))
-                        .build(), null))
+                        .build()))
                 .user(User.builder()
                         .ext(ExtUser.builder()
                                 .prebid(ExtUserPrebid.of(singletonMap("unknown-bidder", "42")))
@@ -1702,7 +1702,7 @@ public class RequestValidatorTest extends VertxTest {
         // given
         final ExtRequest ext = ExtRequest.of(ExtRequestPrebid.builder()
                 .aliases(singletonMap("rubicon", "rubicon"))
-                .build(), null);
+                .build());
         final BidRequest bidRequest = validBidRequestBuilder().ext(ext).build();
 
         // when
@@ -1719,7 +1719,7 @@ public class RequestValidatorTest extends VertxTest {
         // given
         final ExtRequest ext = ExtRequest.of(ExtRequestPrebid.builder()
                 .aliases(singletonMap("alias", "fake"))
-                .build(), null);
+                .build());
         final BidRequest bidRequest = validBidRequestBuilder().ext(ext).build();
 
         // when
@@ -1735,7 +1735,7 @@ public class RequestValidatorTest extends VertxTest {
         // given
         final ExtRequest ext = ExtRequest.of(ExtRequestPrebid.builder()
                 .aliases(singletonMap("alias", "rubicon"))
-                .build(), null);
+                .build());
         final BidRequest bidRequest = validBidRequestBuilder().ext(ext).build();
 
         // when
@@ -2400,8 +2400,7 @@ public class RequestValidatorTest extends VertxTest {
         final BidRequest bidRequest = validBidRequestBuilder()
                 .ext(ExtRequest.of(
                         ExtRequestPrebid.builder()
-                                .bidadjustmentfactors(singletonMap("rubicon", BigDecimal.valueOf(-1.1))).build(),
-                        null))
+                                .bidadjustmentfactors(singletonMap("rubicon", BigDecimal.valueOf(-1.1))).build()))
                 .build();
 
         // when
@@ -2420,7 +2419,7 @@ public class RequestValidatorTest extends VertxTest {
                 .ext(ExtRequest.of(
                         ExtRequestPrebid.builder()
                                 .bidadjustmentfactors(singletonMap("unknownBidder", BigDecimal.valueOf(1.1F)))
-                                .build(), null))
+                                .build()))
                 .build();
 
         // when
@@ -2437,8 +2436,7 @@ public class RequestValidatorTest extends VertxTest {
         final BidRequest bidRequest = validBidRequestBuilder()
                 .ext(ExtRequest.of(
                         ExtRequestPrebid.builder()
-                                .bidadjustmentfactors(singletonMap("rubicon", BigDecimal.valueOf(1.1))).build(),
-                        null))
+                                .bidadjustmentfactors(singletonMap("rubicon", BigDecimal.valueOf(1.1))).build()))
                 .build();
 
         // when
@@ -2456,7 +2454,7 @@ public class RequestValidatorTest extends VertxTest {
                         ExtRequestPrebid.builder()
                                 .aliases(singletonMap("rubicon_alias", "rubicon"))
                                 .bidadjustmentfactors(singletonMap("rubicon_alias", BigDecimal.valueOf(1.1)))
-                                .build(), null))
+                                .build()))
                 .build();
 
         // when

@@ -197,7 +197,7 @@ public class AppnexusBidder implements Bidder<BidRequest> {
         final ExtRequest requestExt = bidRequest.getExt();
         if (isIncludeBrandCategory(requestExt)) {
             return mapper.fillExtension(
-                    ExtRequest.of(requestExt.getPrebid(), null),
+                    ExtRequest.of(requestExt.getPrebid()),
                     AppnexusReqExt.of(AppnexusReqExtAppnexus.of(true, true)));
         }
         return null;

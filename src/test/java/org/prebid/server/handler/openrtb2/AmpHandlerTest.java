@@ -434,7 +434,7 @@ public class AmpHandlerTest extends VertxTest {
         // given
         final AuctionContext auctionContext = givenAuctionContext(builder -> builder
                 .id("reqId1")
-                .ext(ExtRequest.of(ExtRequestPrebid.builder().debug(1).build(), null)));
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().debug(1).build())));
         given(ampRequestFactory.fromRequest(any(), anyLong()))
                 .willReturn(Future.succeededFuture(auctionContext));
 

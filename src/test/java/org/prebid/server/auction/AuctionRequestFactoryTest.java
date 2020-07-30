@@ -41,8 +41,8 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
-import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.identity.IdGenerator;
+import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
@@ -73,8 +73,8 @@ import java.util.List;
 import java.util.Map;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.singleton;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -634,7 +634,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.builder().pricegranularity(new TextNode("low")).build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -659,7 +659,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.builder().pricegranularity(new TextNode("invalid")).build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -679,7 +679,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().video(Video.builder().build()).ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.builder().build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -708,7 +708,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .targeting(ExtRequestTargeting.builder()
                                 .mediatypepricegranularity(mediaTypePriceGranularity)
                                 .build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -730,7 +730,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.builder().build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -752,7 +752,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.builder().build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -773,10 +773,9 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .targeting(ExtRequestTargeting.builder().build())
-                                .cache(ExtRequestPrebidCache.of(null, null, true))
-                                .build(),
-                        null))
+                        .targeting(ExtRequestTargeting.builder().build())
+                        .cache(ExtRequestPrebidCache.of(null, null, true))
+                        .build()))
                 .build());
 
         // when
@@ -818,9 +817,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .targeting(ExtRequestTargeting.builder().build())
-                                .build(),
-                        null))
+                        .targeting(ExtRequestTargeting.builder().build())
+                        .build()))
                 .build());
 
         // when
@@ -904,7 +902,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
-                .ext(ExtRequest.of(ExtRequestPrebid.builder().build(), null))
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().build()))
                 .build());
 
         // when
@@ -947,9 +945,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .cache(ExtRequestPrebidCache.of(null, null, null))
-                                .build(),
-                        null))
+                        .cache(ExtRequestPrebidCache.of(null, null, null))
+                        .build()))
                 .build());
 
         // when
@@ -972,9 +969,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .cache(ExtRequestPrebidCache.of(cacheBids, cacheVastxml, null))
-                                .build(),
-                        null))
+                        .cache(ExtRequestPrebidCache.of(cacheBids, cacheVastxml, null))
+                        .build()))
                 .build());
 
         // when
@@ -1017,9 +1013,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .cache(ExtRequestPrebidCache.of(null, null, false))
-                                .build(),
-                        null))
+                        .cache(ExtRequestPrebidCache.of(null, null, false))
+                        .build()))
                 .build());
 
         // when
@@ -1060,9 +1055,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 criteriaLogManager);
 
         final ExtRequest extBidRequest = ExtRequest.of(ExtRequestPrebid.builder()
-                        .cache(ExtRequestPrebidCache.of(null, null, null))
-                        .build(),
-                null);
+                .cache(ExtRequestPrebidCache.of(null, null, null))
+                .build());
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -1093,7 +1087,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("requestScopedBidderAlias", "bidder1"))
                         .targeting(ExtRequestTargeting.builder().build())
-                        .build(), null))
+                        .build()))
                 .build());
 
         given(bidderCatalog.isAlias("configScopedBidderAlias")).willReturn(true);
@@ -1121,7 +1115,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().ext(null).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("alias", "bidder"))
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -1138,7 +1132,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .debug(1)
-                        .build(), null))
+                        .build()))
                 .build());
 
         // when
@@ -1430,7 +1424,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("rubiconAlias", "rubicon"))
-                        .build(), null))
+                        .build()))
                 .build());
 
         final Account givenAccount = Account.builder().id("123").build();
@@ -1630,7 +1624,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // given
         givenBidRequest(BidRequest.builder()
                 .ext(ExtRequest.of(
-                        ExtRequestPrebid.builder().storedrequest(ExtStoredRequest.of("123-test-test")).build(), null))
+                        ExtRequestPrebid.builder().storedrequest(ExtStoredRequest.of("123-test-test")).build()))
                 .site(Site.builder().publisher(Publisher.builder().build()).build())
                 .imp(singletonList(Imp.builder()
                         .ext(mapper.valueToTree(singletonMap("prebid",
@@ -1686,7 +1680,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .imp(emptyList())
                 .site(Site.builder().publisher(Publisher.builder().id("1001").build()).build())
                 .ext(ExtRequest.of(
-                        ExtRequestPrebid.builder().trace(1).build(), null))
+                        ExtRequestPrebid.builder().trace(1).build()))
                 .build());
 
         // when

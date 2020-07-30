@@ -981,7 +981,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .bidders(mapper.valueToTree(ExtRequestPrebidBidders.of(
                                 ExtRequestPrebidBiddersRubicon.of(integration, wrappername))))
-                        .build(), null))
+                        .build()))
                 .tmax(1000L)
                 .build();
     }

@@ -354,6 +354,6 @@ public class VideoStoredRequestProcessor {
                 .targeting(targeting)
                 .build();
 
-        return ExtRequest.of(extRequestPrebid, null);
+        return ExtRequest.of(extRequestPrebid);
     }
 }

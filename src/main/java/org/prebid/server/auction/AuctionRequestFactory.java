@@ -492,7 +492,7 @@ public class AuctionRequestFactory {
                                 getIfNotNull(prebid, ExtRequestPrebid::getTargeting)))
                         .cache(ObjectUtils.defaultIfNull(updatedCache,
                                 getIfNotNull(prebid, ExtRequestPrebid::getCache)))
-                        .build(), ext.getRubicon());
+                        .build());
             }
         }
         return null;

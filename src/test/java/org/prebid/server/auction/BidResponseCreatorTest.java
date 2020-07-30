@@ -1688,7 +1688,7 @@ public class BidResponseCreatorTest extends VertxTest {
                         .bidders(mapper.valueToTree(
                                 ExtRequestPrebidBidders.of(
                                         ExtRequestPrebidBiddersRubicon.of("integration", null))))
-                        .build(), null))
+                        .build()))
                 .build();
 
         final Bid bid = Bid.builder().id("bidId1").impid("impId1").price(BigDecimal.valueOf(5.67)).build();
