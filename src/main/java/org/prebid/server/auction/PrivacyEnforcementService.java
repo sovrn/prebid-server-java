@@ -110,7 +110,7 @@ public class PrivacyEnforcementService {
         final MetricName requestType = auctionContext.getRequestTypeMetric();
         return getBidderToEnforcementAction(device, biddersToApplyTcf, aliases, extUser, regs, accountConfig, timeout,
                 auctionContext.getRoutingContext())
-                .map(bidderToEnforcement -> updatePrivacyMetrics(bidderToEnforcement, requestType, device))
+                .map(bidderToEnforcement -> updatePrivacyMetrics(bidderToEnforcement, aliases, requestType, device))
                 .map(bidderToEnforcement -> getBidderToPrivacyResult(
                         biddersToApplyTcf, bidderToUser, device, bidderToEnforcement))
                 .map(gdprResult -> merge(ccpaResult, gdprResult));
@@ -252,7 +252,7 @@ public class PrivacyEnforcementService {
         final String gdprConsent = extUser != null ? extUser.getConsent() : null;
         final String ipAddress = useGeoLocation && device != null ? device.getIp() : null;
 
-        final VendorIdResolver vendorIdResolver = VendorIdResolver.of(bidderCatalog, aliases);
+        final VendorIdResolver vendorIdResolver = VendorIdResolver.of(aliases);
 
         return tcfDefinerService.resultForBidderNames(
                 new HashSet<>(bidders),
@@ -298,10 +298,13 @@ public class PrivacyEnforcementService {
     }
 
     private Map<String, PrivacyEnforcementAction> updatePrivacyMetrics(
-            Map<String, PrivacyEnforcementAction> bidderToEnforcement, MetricName requestType, Device device) {
+            Map<String, PrivacyEnforcementAction> bidderToEnforcement,
+            BidderAliases aliases,
+            MetricName requestType,
+            Device device) {
 
         for (final Map.Entry<String, PrivacyEnforcementAction> bidderEnforcement : bidderToEnforcement.entrySet()) {
-            final String bidder = bidderEnforcement.getKey();
+            final String bidder = aliases.resolveBidder(bidderEnforcement.getKey());
             final PrivacyEnforcementAction enforcement = bidderEnforcement.getValue();
 
             metrics.updateAuctionTcfMetrics(
