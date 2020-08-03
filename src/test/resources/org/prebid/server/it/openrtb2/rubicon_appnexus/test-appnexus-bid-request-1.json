@@ -139,7 +139,8 @@
           "USD": {
             "EUR": 0.8110
           }
-        }
+        },
+        "usepbsrates": false
       },
       "aliases": {
         "appnexusAlias": "appnexus"

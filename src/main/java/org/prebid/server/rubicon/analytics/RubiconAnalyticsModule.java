@@ -393,6 +393,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
         final String currency = bidRequest.getCur().get(0);
         final Map<String, Map<String, BigDecimal>> requestCurrencyRates = requestCurrencyRates(bidRequest.getExt());
+        final Boolean usepbsrates = usepbsrates(bidRequest.getExt());
 
         for (final SeatBid seatBid : bidResponse.getSeatbid()) {
             final String bidder = seatBid.getSeat();
@@ -405,7 +406,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
                         .add(toTwinBids(bidder, imp, bid, SUCCESS_STATUS, null, responseTime, serverHasUserId,
-                                currency, requestCurrencyRates));
+                                currency, requestCurrencyRates, usepbsrates));
             }
         }
     }
@@ -434,9 +435,18 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
                         .add(toTwinBids(bidder, imp, null, status, bidError, responseTime, serverHasUserId, null,
-                                null));
+                                null, null));
             }
         }
+    }
+
+    /**
+     * Extracts usepbsrates flag from {@link ExtRequest}.
+     */
+    private static Boolean usepbsrates(ExtRequest requestExt) {
+        final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
+        final ExtRequestCurrency currency = prebid != null ? prebid.getCurrency() : null;
+        return currency != null ? currency.getUsepbsrates() : null;
     }
 
     /**
@@ -515,7 +525,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                 Integer serverLatencyMillis,
                                 Boolean serverHasUserId,
                                 String currency,
-                                Map<String, Map<String, BigDecimal>> requestCurrencyRates) {
+                                Map<String, Map<String, BigDecimal>> requestCurrencyRates,
+                                Boolean usepbsrates) {
 
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -528,7 +539,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                         .serverHasUserId(serverHasUserId)
                         .params(paramsFrom(imp, bidder))
                         .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(bid)), currency,
-                                requestCurrencyRates))
+                                requestCurrencyRates, usepbsrates))
                         .build();
 
         return new TwinBids(bid, analyticsBid);
@@ -581,22 +592,24 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     }
 
     private org.prebid.server.rubicon.analytics.proto.BidResponse analyticsBidResponse(
-            Bid bid, String mediaType, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates) {
+            Bid bid, String mediaType, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates,
+            Boolean usepbsrates) {
 
         return bid != null
                 ? org.prebid.server.rubicon.analytics.proto.BidResponse.of(
                 parseId(bid.getDealid()),
-                convertToUSD(bid.getPrice(), currency, requestCurrencyRates),
+                convertToUSD(bid.getPrice(), currency, requestCurrencyRates, usepbsrates),
                 mediaType,
                 Dimensions.of(bid.getW(), bid.getH()))
                 : null;
     }
 
     private BigDecimal convertToUSD(
-            BigDecimal price, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates) {
+            BigDecimal price, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates,
+            Boolean usepbsrates) {
 
         try {
-            return currencyService.convertCurrency(price, requestCurrencyRates, USD_CURRENCY, currency);
+            return currencyService.convertCurrency(price, requestCurrencyRates, USD_CURRENCY, currency, usepbsrates);
         } catch (PreBidException e) {
             logger.info("Unable to covert bid currency {0} to desired ad server currency {1}. {2}",
                     currency, USD_CURRENCY, e.getMessage());

@@ -81,8 +81,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * Executes an OpenRTB v2.5 Auction.
@@ -178,7 +176,8 @@ public class ExchangeService {
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(bidderRequest,
                                 auctionTimeout(timeout, cacheInfo.isDoCaching()), debugEnabled, aliases,
-                                bidAdjustments(requestExt), currencyRates(requestExt), context.getTxnLog()))
+                                bidAdjustments(requestExt), currencyRates(requestExt), usepbsrates(requestExt),
+                                context.getTxnLog()))
                         .collect(Collectors.toList())))
                 // send all the requests to the bidders and gathers results
                 .map(CompositeFuture::<BidderResponse>list)
@@ -223,6 +222,15 @@ public class ExchangeService {
         final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
         final ExtRequestCurrency currency = prebid != null ? prebid.getCurrency() : null;
         return currency != null ? currency.getRates() : null;
+    }
+
+    /**
+     * Extracts usepbsrates flag from {@link ExtRequest}.
+     */
+    private static Boolean usepbsrates(ExtRequest requestExt) {
+        final ExtRequestPrebid prebid = requestExt != null ? requestExt.getPrebid() : null;
+        final ExtRequestCurrency currency = prebid != null ? prebid.getCurrency() : null;
+        return currency != null ? currency.getUsepbsrates() : null;
     }
 
     /**
@@ -353,11 +361,6 @@ public class ExchangeService {
                 .collect(Collectors.toList());
 
         return makeBidderRequests(bidders, context, aliases, imps);
-    }
-
-    private static <T> Stream<T> asStream(Iterator<T> iterator) {
-        final Iterable<T> iterable = () -> iterator;
-        return StreamSupport.stream(iterable.spliterator(), false);
     }
 
     /**
@@ -855,6 +858,7 @@ public class ExchangeService {
                                                boolean debugEnabled, BidderAliases aliases,
                                                Map<String, BigDecimal> bidAdjustments,
                                                Map<String, Map<String, BigDecimal>> currencyConversionRates,
+                                               Boolean usepbsrates,
                                                TxnLog txnLog) {
         final String bidderName = bidderRequest.getBidder();
         final BigDecimal bidPriceAdjustmentFactor = bidAdjustments.get(bidderName);
@@ -867,7 +871,7 @@ public class ExchangeService {
         return httpBidderRequester.requestBids(bidder, bidRequest, timeout, debugEnabled)
                 .map(bidderSeatBid -> validBidderSeatBid(bidRequest, bidderSeatBid, bidderName, cur, txnLog))
                 .map(seat -> applyBidPriceChanges(seat, currencyConversionRates, adServerCurrency,
-                        bidPriceAdjustmentFactor))
+                        bidPriceAdjustmentFactor, usepbsrates))
                 .map(result -> BidderResponse.of(bidderName, result, responseTime(startTime)));
     }
 
@@ -928,7 +932,8 @@ public class ExchangeService {
      */
     private BidderSeatBid applyBidPriceChanges(BidderSeatBid bidderSeatBid,
                                                Map<String, Map<String, BigDecimal>> requestCurrencyRates,
-                                               String adServerCurrency, BigDecimal priceAdjustmentFactor) {
+                                               String adServerCurrency, BigDecimal priceAdjustmentFactor,
+                                               Boolean usepbsrates) {
         final List<BidderBid> bidderBids = bidderSeatBid.getBids();
         if (bidderBids.isEmpty()) {
             return bidderSeatBid;
@@ -943,7 +948,8 @@ public class ExchangeService {
             final BigDecimal price = bid.getPrice();
             try {
                 final BigDecimal finalPrice =
-                        currencyService.convertCurrency(price, requestCurrencyRates, adServerCurrency, bidCurrency);
+                        currencyService.convertCurrency(price, requestCurrencyRates, adServerCurrency, bidCurrency,
+                                usepbsrates);
 
                 final BigDecimal adjustedPrice = priceAdjustmentFactor != null
                         && priceAdjustmentFactor.compareTo(BigDecimal.ONE) != 0
@@ -954,10 +960,10 @@ public class ExchangeService {
                     bid.setPrice(adjustedPrice);
                 }
                 updatedBidderBids.add(bidderBid);
-            } catch (PreBidException ex) {
+            } catch (PreBidException e) {
                 errors.add(BidderError.generic(
                         String.format("Unable to covert bid currency %s to desired ad server currency %s. %s",
-                                bidCurrency, adServerCurrency, ex.getMessage())));
+                                bidCurrency, adServerCurrency, e.getMessage())));
             }
         }
 

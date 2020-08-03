@@ -42,8 +42,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,10 +68,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public class LineItemServiceTest extends VertxTest {
-
-    private static final DateTimeFormatter UTC_MILLIS_FORMATTER = new DateTimeFormatterBuilder()
-            .appendPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-            .toFormatter();
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -102,7 +96,8 @@ public class LineItemServiceTest extends VertxTest {
         given(clock.instant()).willReturn(now.toInstant());
         given(clock.getZone()).willReturn(ZoneOffset.UTC);
 
-        given(conversionService.convertCurrency(any(), anyMap(), anyString(), anyString())).willReturn(BigDecimal.ONE);
+        given(conversionService.convertCurrency(any(), anyMap(), anyString(), anyString(), any()))
+                .willReturn(BigDecimal.ONE);
 
         lineItemService = new LineItemService(2, targetingService, bidderCatalog, conversionService,
                 applicationEventService, "USD", clock, jacksonMapper, criteriaLogManager);
@@ -306,7 +301,8 @@ public class LineItemServiceTest extends VertxTest {
                                 emptySet())), now));
 
         final BigDecimal updatedCmp = BigDecimal.TEN;
-        given(conversionService.convertCurrency(any(), anyMap(), anyString(), anyString())).willReturn(updatedCmp);
+        given(conversionService.convertCurrency(any(), anyMap(), anyString(), anyString(), any()))
+                .willReturn(updatedCmp);
 
         // when
         lineItemService.updateLineItems(planResponse, true);

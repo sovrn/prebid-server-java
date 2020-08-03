@@ -152,7 +152,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         given(uidsAuditCookieService.getUidsAudit(anyMap()))
                 .willReturn(UidAudit.builder().country("countryFromAuditCookie").build());
 
-        given(currencyService.convertCurrency(any(), any(), any(), any()))
+        given(currencyService.convertCurrency(any(), any(), any(), any(), any()))
                 .willAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
 
         given(routingContext.request()).willReturn(httpRequest);
@@ -1176,7 +1176,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
     @SuppressWarnings("SameParameterValue")
     private void givenCurrencyConversion(BigDecimal value) {
-        given(currencyService.convertCurrency(any(), any(), any(), any()))
+        given(currencyService.convertCurrency(any(), any(), any(), any(), any()))
                 .willAnswer(invocationOnMock ->
                         invocationOnMock.getArgument(0) != null
                                 ? new BigDecimal(invocationOnMock.getArgument(0).toString())
