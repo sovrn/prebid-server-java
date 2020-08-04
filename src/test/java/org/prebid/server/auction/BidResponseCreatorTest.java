@@ -57,6 +57,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtOptions;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidAdservertargetingRule;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
@@ -109,6 +110,7 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidAdservertargetingRule.Source.xStatic;
 import static org.prebid.server.proto.openrtb.ext.response.BidType.banner;
 import static org.prebid.server.proto.openrtb.ext.response.BidType.xNative;
 
@@ -592,6 +594,106 @@ public class BidResponseCreatorTest extends VertxTest {
                         .build());
 
         verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void shouldReturnEmptyAssetIfImageTypeIsEmpty() throws JsonProcessingException {
+        // given
+        final Request nativeRequest = Request.builder()
+                .assets(singletonList(Asset.builder()
+                        .id(123)
+                        .img(ImageObject.builder().type(null).build())
+                        .data(DataObject.builder().type(2).build())
+                        .build()))
+                .build();
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .cur(singletonList("USD"))
+                .tmax(1000L)
+                .app(App.builder().build())
+                .imp(singletonList(Imp.builder()
+                        .id("imp1")
+                        .xNative(Native.builder().request(mapper.writeValueAsString(nativeRequest)).build())
+                        .build()))
+                .build();
+
+        final AuctionContext auctionContext = givenAuctionContext(bidRequest);
+
+        final Response responseAdm = Response.builder()
+                .assets(singletonList(com.iab.openrtb.response.Asset.builder()
+                        .id(123)
+                        .img(com.iab.openrtb.response.ImageObject.builder().type(null).build())
+                        .data(com.iab.openrtb.response.DataObject.builder().build())
+                        .build()))
+                .build();
+
+        final Bid bid = Bid.builder().id("bidId").price(BigDecimal.ONE).impid("imp1")
+                .adm(mapper.writeValueAsString(responseAdm))
+                .ext(mapper.valueToTree(singletonMap("bidExt", 1))).build();
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
+                givenSeatBid(BidderBid.of(bid, xNative, "USD")), 100));
+
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, auctionContext, null, CACHE_INFO,
+                ACCOUNT, false, 1000L, false, timeout).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid()).hasSize(1)
+                .flatExtracting(SeatBid::getBid)
+                .extracting(Bid::getAdm)
+                .extracting(adm -> mapper.readValue(adm, Response.class))
+                .flatExtracting(Response::getAssets)
+                .isEmpty();
+    }
+
+    @Test
+    public void shouldReturnEmptyAssetIfDataTypeIsEmpty() throws JsonProcessingException {
+        // given
+        final Request nativeRequest = Request.builder()
+                .assets(singletonList(Asset.builder()
+                        .id(123)
+                        .img(ImageObject.builder().type(1).build())
+                        .data(DataObject.builder().type(null).build())
+                        .build()))
+                .build();
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .cur(singletonList("USD"))
+                .tmax(1000L)
+                .app(App.builder().build())
+                .imp(singletonList(Imp.builder()
+                        .id("imp1")
+                        .xNative(Native.builder().request(mapper.writeValueAsString(nativeRequest)).build())
+                        .build()))
+                .build();
+
+        final AuctionContext auctionContext = givenAuctionContext(bidRequest);
+
+        final Response responseAdm = Response.builder()
+                .assets(singletonList(com.iab.openrtb.response.Asset.builder()
+                        .id(123)
+                        .img(com.iab.openrtb.response.ImageObject.builder().build())
+                        .data(com.iab.openrtb.response.DataObject.builder().build())
+                        .build()))
+                .build();
+
+        final Bid bid = Bid.builder().id("bidId").price(BigDecimal.ONE).impid("imp1")
+                .adm(mapper.writeValueAsString(responseAdm))
+                .ext(mapper.valueToTree(singletonMap("bidExt", 1))).build();
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
+                givenSeatBid(BidderBid.of(bid, xNative, "USD")), 100));
+
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, auctionContext, null, CACHE_INFO,
+                ACCOUNT, false, 1000L, false, timeout).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid()).hasSize(1)
+                .flatExtracting(SeatBid::getBid)
+                .extracting(Bid::getAdm)
+                .extracting(adm -> mapper.readValue(adm, Response.class))
+                .flatExtracting(Response::getAssets)
+                .isEmpty();
     }
 
     @Test
@@ -1129,6 +1231,36 @@ public class BidResponseCreatorTest extends VertxTest {
                         tuple("hb_bidid_bidder1", "bidId1"));
 
         verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void shouldPopulateTargetingKeywordsWithAdditionalValuesFromRequest() {
+        // given
+        final AuctionContext auctionContext = givenAuctionContext(BidRequest.builder()
+                .cur(singletonList("USD"))
+                .imp(emptyList())
+                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .adservertargeting(singletonList(ExtRequestPrebidAdservertargetingRule.of(
+                                "static_keyword1", xStatic, "static_keyword1")))
+                        .build()))
+                .build());
+        final ExtRequestTargeting targeting = givenTargeting();
+
+        final Bid bid = Bid.builder().id("bidId1").price(BigDecimal.valueOf(5.67)).impid("i1").build();
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of(
+                "bidder1", givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
+
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, auctionContext, targeting,
+                CACHE_INFO, ACCOUNT, false, 1000L, false, timeout).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid())
+                .flatExtracting(SeatBid::getBid).hasSize(1)
+                .extracting(extractedBid -> toExtPrebid(extractedBid.getExt()).getPrebid().getTargeting())
+                .flatExtracting(Map::entrySet)
+                .extracting(Map.Entry::getKey, Map.Entry::getValue)
+                .contains(tuple("static_keyword1", "static_keyword1"));
     }
 
     @Test
