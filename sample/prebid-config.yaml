@@ -1,3 +1,4 @@
+status-response: "ok"
 adapters:
   rubicon:
     enabled: true
@@ -92,4 +93,3 @@ deals:
   max-deals-per-bidder: 3
 auction:
   ad-server-currency: USD
-status-response: "ok"

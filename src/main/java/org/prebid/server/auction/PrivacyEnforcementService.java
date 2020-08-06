@@ -60,6 +60,7 @@ public class PrivacyEnforcementService {
     private final boolean useGeoLocation;
     private final BidderCatalog bidderCatalog;
     private final TcfDefinerService tcfDefinerService;
+    private final IpAddressHelper ipAddressHelper;
     private final Metrics metrics;
     private final boolean ccpaEnforce;
 
@@ -67,12 +68,14 @@ public class PrivacyEnforcementService {
 
     public PrivacyEnforcementService(BidderCatalog bidderCatalog,
                                      TcfDefinerService tcfDefinerService,
+                                     IpAddressHelper ipAddressHelper,
                                      Metrics metrics,
                                      boolean useGeoLocation,
                                      boolean ccpaEnforce) {
 
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.tcfDefinerService = Objects.requireNonNull(tcfDefinerService);
+        this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.metrics = Objects.requireNonNull(metrics);
         this.useGeoLocation = useGeoLocation;
         this.ccpaEnforce = ccpaEnforce;
@@ -161,11 +164,11 @@ public class PrivacyEnforcementService {
         return null;
     }
 
-    private static Device maskCcpaDevice(Device device) {
+    private Device maskCcpaDevice(Device device) {
         return device != null
                 ? device.toBuilder()
                 .ip(maskIpv4(device.getIp()))
-                .ipv6(maskIpv6(device.getIpv6(), 1))
+                .ipv6(maskIpv6(device.getIpv6()))
                 .geo(maskGeoDefault(device.getGeo()))
                 .ifa(null)
                 .macsha1(null).macmd5(null)
@@ -208,11 +211,11 @@ public class PrivacyEnforcementService {
         return null;
     }
 
-    private static Device maskCoppaDevice(Device device) {
+    private Device maskCoppaDevice(Device device) {
         return device != null
                 ? device.toBuilder()
                 .ip(maskIpv4(device.getIp()))
-                .ipv6(maskIpv6(device.getIpv6(), 2))
+                .ipv6(maskIpv6(device.getIpv6()))
                 .geo(maskGeoForCoppa(device.getGeo()))
                 .ifa(null)
                 .macsha1(null).macmd5(null)
@@ -407,13 +410,13 @@ public class PrivacyEnforcementService {
     /**
      * Returns masked device accordingly for each flag.
      */
-    private static Device maskTcfDevice(Device device, boolean maskIp, boolean maskGeo, boolean maskInfo) {
+    private Device maskTcfDevice(Device device, boolean maskIp, boolean maskGeo, boolean maskInfo) {
         if (device != null) {
             final Device.DeviceBuilder deviceBuilder = device.toBuilder();
             if (maskIp) {
                 deviceBuilder
                         .ip(maskIpv4(device.getIp()))
-                        .ipv6(maskIpv6(device.getIpv6(), 1));
+                        .ipv6(maskIpv6(device.getIpv6()));
             }
 
             if (maskGeo) {
@@ -484,8 +487,8 @@ public class PrivacyEnforcementService {
     /**
      * Masks ip v6 address by replacing last number of groups .
      */
-    private static String maskIpv6(String ip, Integer groupsNumber) {
-        return ip != null && InetAddressUtils.isIPv6Address(ip) ? maskIp(ip, ":", groupsNumber) : ip;
+    private String maskIpv6(String ip) {
+        return ip != null && InetAddressUtils.isIPv6Address(ip) ? ipAddressHelper.anonymizeIpv6(ip) : ip;
     }
 
     /**

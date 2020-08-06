@@ -113,6 +113,7 @@ public class DealsSimulationTest extends IntegrationTest {
         final Response beforePlansUpdateResponse = given(SPEC)
                 .header("Referer", "http://www.example.com")
                 .header("User-Agent", "userAgent")
+                .header("X-Forwarded-For", "185.199.110.153")
                 .header("pg-sim-timestamp", NOW.plusSeconds(2).toString())
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")
@@ -142,6 +143,7 @@ public class DealsSimulationTest extends IntegrationTest {
         final Response afterPlansUpdateResponse = given(SPEC)
                 .header("Referer", "http://www.example.com")
                 .header("User-Agent", "userAgent")
+                .header("X-Forwarded-For", "185.199.110.153")
                 .header("pg-sim-timestamp", NOW.plusMinutes(16).toString())
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")

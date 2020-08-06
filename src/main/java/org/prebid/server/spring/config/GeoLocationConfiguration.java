@@ -15,6 +15,7 @@ import org.prebid.server.spring.config.model.HttpClientProperties;
 import org.prebid.server.spring.config.model.RemoteFileSyncerProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -38,7 +39,7 @@ public class GeoLocationConfiguration {
     }
 
     @Configuration
-    @ConditionalOnProperty(prefix = "geolocation", name = "type", havingValue = "maxmind")
+    @ConditionalOnExpression("'${geolocation.enabled}' == true and '${geolocation.type}' == 'maxmind'")
     static class MaxMindGeoLocationConfiguration {
 
         @Bean

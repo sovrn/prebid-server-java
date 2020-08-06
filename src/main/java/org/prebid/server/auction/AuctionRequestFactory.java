@@ -20,6 +20,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.auction.model.AuctionContext;
+import org.prebid.server.auction.model.IpAddress;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.deals.DealsProcessor;
@@ -58,10 +59,6 @@ import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.model.ValidationResult;
 
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -98,6 +95,7 @@ public class AuctionRequestFactory {
     private final List<String> blacklistedAccounts;
     private final StoredRequestProcessor storedRequestProcessor;
     private final ImplicitParametersExtractor paramsExtractor;
+    private final IpAddressHelper ipAddressHelper;
     private final UidsCookieService uidsCookieService;
     private final DealsProcessor dealsProcessor;
     private final BidderCatalog bidderCatalog;
@@ -119,6 +117,7 @@ public class AuctionRequestFactory {
                                  List<String> blacklistedAccounts,
                                  StoredRequestProcessor storedRequestProcessor,
                                  ImplicitParametersExtractor paramsExtractor,
+                                 IpAddressHelper ipAddressHelper,
                                  UidsCookieService uidsCookieService,
                                  DealsProcessor dealsProcessor,
                                  BidderCatalog bidderCatalog,
@@ -140,6 +139,7 @@ public class AuctionRequestFactory {
         this.blacklistedAccounts = Objects.requireNonNull(blacklistedAccounts);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.paramsExtractor = Objects.requireNonNull(paramsExtractor);
+        this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.dealsProcessor = dealsProcessor;
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
@@ -182,8 +182,8 @@ public class AuctionRequestFactory {
         }
 
         final Future<AuctionContext> auctionContextFuture = updateBidRequest(routingContext, incomingBidRequest)
-                .compose(bidRequest -> toAuctionContext(routingContext, bidRequest, new ArrayList<>(),
-                        startTime, timeoutResolver));
+                .compose(bidRequest ->
+                        toAuctionContext(routingContext, bidRequest, new ArrayList<>(), startTime, timeoutResolver));
 
         if (dealsProcessor != null) {
             return auctionContextFuture.compose(dealsProcessor::populateDealsInfo);
@@ -326,40 +326,61 @@ public class AuctionRequestFactory {
      * and the request contains necessary info (User-Agent, IP-address).
      */
     private Device populateDevice(Device device, HttpServerRequest request) {
-        final String ip = device != null ? device.getIp() : null;
+        final String deviceIp = device != null ? device.getIp() : null;
+        final String deviceIpv6 = device != null ? device.getIpv6() : null;
+
+        String resolvedIp = sanitizeIp(deviceIp, IpAddress.IP.v4);
+        String resolvedIpv6 = sanitizeIp(deviceIpv6, IpAddress.IP.v6);
+
+        if (resolvedIp == null && resolvedIpv6 == null) {
+            final IpAddress requestIp = findIpFromRequest(request);
+
+            resolvedIp = getIpIfVersionIs(requestIp, IpAddress.IP.v4);
+            resolvedIpv6 = getIpIfVersionIs(requestIp, IpAddress.IP.v6);
+        }
+
+        logWarnIfNoIp(resolvedIp, resolvedIpv6);
+
         final String ua = device != null ? device.getUa() : null;
 
-        if (StringUtils.isBlank(ip) || StringUtils.isBlank(ua)) {
+        if (!Objects.equals(deviceIp, resolvedIp)
+                || !Objects.equals(deviceIpv6, resolvedIpv6)
+                || StringUtils.isBlank(ua)) {
+
             final Device.DeviceBuilder builder = device == null ? Device.builder() : device.toBuilder();
             builder.ua(StringUtils.isNotBlank(ua) ? ua : paramsExtractor.uaFrom(request));
 
-            if (StringUtils.isBlank(ip)) {
-                final String ipFromRequest = paramsExtractor.ipFrom(request);
-                final InetAddress inetAddress = ipFromRequest != null ? inetAddressByIp(ipFromRequest) : null;
+            builder
+                    .ip(resolvedIp)
+                    .ipv6(resolvedIpv6);
 
-                builder.ip(resolveDeviceIp(ip, ipFromRequest, inetAddress))
-                        .ipv6(resolveDeviceIpv6(ip, ipFromRequest, inetAddress));
-            }
             return builder.build();
         }
 
         return null;
     }
 
-    private String resolveDeviceIp(String deviceIp, String ipFromRequest, InetAddress inetAddress) {
-        return deviceIp == null && inetAddress instanceof Inet4Address ? ipFromRequest : deviceIp;
+    private String sanitizeIp(String ip, IpAddress.IP version) {
+        final IpAddress ipAddress = ip != null ? ipAddressHelper.toIpAddress(ip) : null;
+        return ipAddress != null && ipAddress.getVersion() == version ? ip : null;
     }
 
-    private String resolveDeviceIpv6(String deviceIp, String ipFromRequest, InetAddress inetAddress) {
-        return deviceIp == null && inetAddress instanceof Inet6Address ? ipFromRequest : deviceIp;
+    private IpAddress findIpFromRequest(HttpServerRequest request) {
+        final List<String> requestIps = paramsExtractor.ipFrom(request);
+        return requestIps.stream()
+                .map(ipAddressHelper::toIpAddress)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
-    private InetAddress inetAddressByIp(String ip) {
-        try {
-            return InetAddress.getByName(ip);
-        } catch (UnknownHostException e) {
-            logger.debug("Error occurred while checking IP", e);
-            return null;
+    private static String getIpIfVersionIs(IpAddress requestIp, IpAddress.IP version) {
+        return requestIp != null && requestIp.getVersion() == version ? requestIp.getIp() : null;
+    }
+
+    private void logWarnIfNoIp(String resolvedIp, String resolvedIpv6) {
+        if (resolvedIp == null && resolvedIpv6 == null) {
+            logger.warn("No IP address found in OpenRTB request and HTTP request headers.");
         }
     }
 

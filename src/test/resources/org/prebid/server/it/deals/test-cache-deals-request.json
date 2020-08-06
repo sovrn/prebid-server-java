@@ -11,7 +11,7 @@
         "dealid": "dealId2",
         "w": 320,
         "h": 320,
-        "wurl": "http://localhost:8000/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i"
+        "wurl": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i"
       }
     },
     {
@@ -25,7 +25,7 @@
         "dealid": "dealId1",
         "w": 300,
         "h": 250,
-        "wurl": "http://localhost:8000/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i"
+        "wurl": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i"
       }
     },
     {
@@ -39,7 +39,7 @@
         "dealid": "dealId3",
         "w": 300,
         "h": 250,
-        "wurl": "http://localhost:8000/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i"
+        "wurl": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i"
       }
     }
   ]

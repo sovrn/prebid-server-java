@@ -383,6 +383,7 @@ public class PrematureReturnTest extends VertxTest {
         return given(SPEC)
                 .header("Referer", "http://www.example.com")
                 .header("User-Agent", "userAgent")
+                .header("X-Forwarded-For", "185.199.110.153")
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")
                 .body(IntegrationTest.jsonFrom("deals/premature/test-auction-request.json"))
