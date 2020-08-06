@@ -101,7 +101,7 @@ public class GeoLocationConfiguration {
     }
 
     @Configuration
-    @ConditionalOnProperty(prefix = "geolocation", name = "type", havingValue = "netacuity")
+    @ConditionalOnExpression("'${geolocation.enabled}' == true and '${geolocation.type}' == 'netacuity'")
     static class NetAcuityGeoLocationConfiguration {
 
         @Bean

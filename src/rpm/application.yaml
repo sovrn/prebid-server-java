@@ -96,6 +96,7 @@ gdpr:
   rubicon:
     enable-cookie: true
 geolocation:
+  enabled: true
   type: netacuity
   circuit-breaker:
     enabled: true
