@@ -27,20 +27,18 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@Configuration
-@ConditionalOnProperty(prefix = "geolocation", name = "enabled", havingValue = "true")
 public class GeoLocationConfiguration {
 
-    @Bean
-    @ConfigurationProperties(prefix = "geolocation.circuit-breaker")
-    @ConditionalOnProperty(prefix = "geolocation.circuit-breaker", name = "enabled", havingValue = "true")
-    CircuitBreakerProperties geolocationCircuitBreakerProperties() {
-        return new CircuitBreakerProperties();
-    }
-
     @Configuration
-    @ConditionalOnExpression("'${geolocation.enabled}' == true and '${geolocation.type}' == 'maxmind'")
+    @ConditionalOnExpression("${geolocation.enabled} == true and '${geolocation.type}' == 'maxmind'")
     static class MaxMindGeoLocationConfiguration {
+
+        @Bean
+        @ConditionalOnProperty(prefix = "geolocation.circuit-breaker", name = "enabled", havingValue = "true")
+        @ConfigurationProperties(prefix = "geolocation.circuit-breaker")
+        CircuitBreakerProperties maxMindCircuitBreakerProperties() {
+            return new CircuitBreakerProperties();
+        }
 
         @Bean
         @ConfigurationProperties(prefix = "geolocation.maxmind.remote-file-syncer")
@@ -48,16 +46,13 @@ public class GeoLocationConfiguration {
             return new RemoteFileSyncerProperties();
         }
 
-        /**
-         * Default geolocation service implementation.
-         */
         @Bean
         @ConditionalOnProperty(prefix = "geolocation.circuit-breaker", name = "enabled", havingValue = "false",
                 matchIfMissing = true)
-        GeoLocationService basicGeoLocationService(RemoteFileSyncerProperties maxMindRemoteFileSyncerProperties,
+        GeoLocationService basicGeoLocationService(RemoteFileSyncerProperties fileSyncerProperties,
                                                    Vertx vertx) {
 
-            return createGeoLocationService(maxMindRemoteFileSyncerProperties, vertx);
+            return createGeoLocationService(fileSyncerProperties, vertx);
         }
 
         @Bean
@@ -65,34 +60,29 @@ public class GeoLocationConfiguration {
         CircuitBreakerSecuredGeoLocationService circuitBreakerSecuredGeoLocationService(
                 Vertx vertx,
                 Metrics metrics,
-                RemoteFileSyncerProperties maxMindRemoteFileSyncerProperties,
-                @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
+                RemoteFileSyncerProperties fileSyncerProperties,
+                @Qualifier("maxMindCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
                 Clock clock) {
 
             return new CircuitBreakerSecuredGeoLocationService(vertx,
-                    createGeoLocationService(maxMindRemoteFileSyncerProperties, vertx), metrics,
+                    createGeoLocationService(fileSyncerProperties, vertx), metrics,
                     circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
                     circuitBreakerProperties.getClosingIntervalMs(), clock);
         }
 
-        private GeoLocationService createGeoLocationService(
-                RemoteFileSyncerProperties maxMindRemoteFileSyncerProperties, Vertx vertx) {
+        private GeoLocationService createGeoLocationService(RemoteFileSyncerProperties fileSyncerProperties,
+                                                            Vertx vertx) {
 
-            final HttpClientProperties httpClientProperties = maxMindRemoteFileSyncerProperties.getHttpClient();
+            final HttpClientProperties httpClientProperties = fileSyncerProperties.getHttpClient();
             final HttpClientOptions httpClientOptions = new HttpClientOptions()
                     .setConnectTimeout(httpClientProperties.getConnectTimeoutMs())
                     .setMaxRedirects(httpClientProperties.getMaxRedirects());
 
-            final RemoteFileSyncer remoteFileSyncer =
-                    RemoteFileSyncer.create(
-                            maxMindRemoteFileSyncerProperties.getDownloadUrl(),
-                            maxMindRemoteFileSyncerProperties.getSaveFilepath(),
-                            maxMindRemoteFileSyncerProperties.getTmpFilepath(),
-                            maxMindRemoteFileSyncerProperties.getRetryCount(),
-                            maxMindRemoteFileSyncerProperties.getRetryIntervalMs(),
-                            maxMindRemoteFileSyncerProperties.getTimeoutMs(),
-                            maxMindRemoteFileSyncerProperties.getUpdateIntervalMs(),
-                            vertx.createHttpClient(httpClientOptions), vertx, vertx.fileSystem());
+            final RemoteFileSyncer remoteFileSyncer = RemoteFileSyncer.create(fileSyncerProperties.getDownloadUrl(),
+                    fileSyncerProperties.getSaveFilepath(), fileSyncerProperties.getTmpFilepath(),
+                    fileSyncerProperties.getRetryCount(), fileSyncerProperties.getRetryIntervalMs(),
+                    fileSyncerProperties.getTimeoutMs(), fileSyncerProperties.getUpdateIntervalMs(),
+                    vertx.createHttpClient(httpClientOptions), vertx, vertx.fileSystem());
             final MaxMindGeoLocationService maxMindGeoLocationService = new MaxMindGeoLocationService();
 
             remoteFileSyncer.syncForFilepath(maxMindGeoLocationService);
@@ -101,8 +91,15 @@ public class GeoLocationConfiguration {
     }
 
     @Configuration
-    @ConditionalOnExpression("'${geolocation.enabled}' == true and '${geolocation.type}' == 'netacuity'")
+    @ConditionalOnExpression("${geolocation.enabled} == true and '${geolocation.type}' == 'netacuity'")
     static class NetAcuityGeoLocationConfiguration {
+
+        @Bean
+        @ConditionalOnProperty(prefix = "geolocation.circuit-breaker", name = "enabled", havingValue = "true")
+        @ConfigurationProperties(prefix = "geolocation.circuit-breaker")
+        CircuitBreakerProperties netAcuityCircuitBreakerProperties() {
+            return new CircuitBreakerProperties();
+        }
 
         @Bean
         NetAcuityServerAddressProvider netAcuityAddressProvider(
@@ -118,6 +115,7 @@ public class GeoLocationConfiguration {
                 NetAcuityServerAddressProvider addressProvider,
                 Clock clock,
                 Metrics metrics) {
+
             return createNetAcuityGeoLocationService(vertx, addressProvider, clock, metrics);
         }
 
@@ -126,7 +124,7 @@ public class GeoLocationConfiguration {
         CircuitBreakerSecuredNetAcuityGeoLocationService circuitBreakerSecuredNetAcuityGeoLocationService(
                 Vertx vertx,
                 NetAcuityServerAddressProvider netAcuityServerAddressProvider,
-                @Qualifier("geolocationCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
+                @Qualifier("netAcuityCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
                 Clock clock,
                 Metrics metrics) {
 
