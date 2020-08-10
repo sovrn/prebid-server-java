@@ -1955,6 +1955,40 @@ public class BidResponseCreatorTest extends VertxTest {
                                 .withFixedOffsetZone(), ExtTraceDeal.Category.pacing, "debug message 1"))));
     }
 
+    // Rubicon-fork specific tests
+
+    @Test
+    public void shouldPopulateImpIdsInExtBidderError() throws JsonProcessingException {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .cur(singletonList("USD"))
+                .tmax(1000L)
+                .app(App.builder().build())
+                .imp(emptyList())
+                .build();
+        final AuctionContext auctionContext = givenAuctionContext(bidRequest);
+
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of(
+                "bidder1",
+                BidderSeatBid.of(
+                        emptyList(),
+                        null,
+                        singletonList(BidderError.of("bad_input", BidderError.Type.bad_input, singleton("impId")))),
+                100));
+        final BidRequestCacheInfo cacheInfo = BidRequestCacheInfo.builder().doCaching(false).build();
+
+        // when
+        final BidResponse bidResponse = bidResponseCreator.create(bidderResponses, auctionContext, null, cacheInfo,
+                ACCOUNT, false, 0L, false, timeout).result();
+
+        // then
+        final ExtBidResponse responseExt = mapper.treeToValue(bidResponse.getExt(), ExtBidResponse.class);
+        assertThat(responseExt.getErrors()).containsOnly(
+                entry("bidder1", singletonList(ExtBidderError.of(2, "bad_input", singleton("impId")))));
+    }
+
+    // end of Rubicon-fork specific tests
+
     private void givenCacheServiceResult(Map<Bid, CacheIdInfo> cacheBids) {
         givenCacheServiceResult(CacheServiceResult.of(null, null, cacheBids));
     }
