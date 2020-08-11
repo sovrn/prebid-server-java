@@ -58,6 +58,7 @@ import org.prebid.server.rubicon.analytics.proto.BidError;
 import org.prebid.server.rubicon.analytics.proto.BidWon;
 import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
+import org.prebid.server.rubicon.analytics.proto.Error;
 import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.Impression;
@@ -643,7 +644,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return AdUnit.builder()
                 .transactionId(transactionIdFrom(bidRequest.getId(), imp.getId()))
                 .status(openrtbBidsFound ? SUCCESS_STATUS : errorsFound ? ERROR_STATUS : NO_BID_STATUS)
-                .error(null) // multiple errors may exist, we do not have insight what to choose
+                .error(openrtbBidsFound ? null : pickAdUnitError(bids))
                 .mediaTypes(mediaTypesFromImp(imp))
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
                 .dimensions(dimensions(imp))
@@ -686,6 +687,27 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static String transactionIdFrom(String bidRequestId, String impId) {
         return String.format("%s-%s", bidRequestId, impId);
+    }
+
+    private static Error pickAdUnitError(List<TwinBids> bids) {
+        final List<BidError> bidErrors = bids.stream()
+                .map(TwinBids::getAnalyticsBid)
+                .map(org.prebid.server.rubicon.analytics.proto.Bid::getError)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (allErrorsAreTimeouts(bidErrors)) {
+            final BidError firstError = bidErrors.get(0);
+            return Error.of(firstError.getCode(), firstError.getDescription());
+        }
+
+        // multiple errors with different type exist, we do not have insight what to choose
+        return null;
+    }
+
+    private static boolean allErrorsAreTimeouts(List<BidError> bidErrors) {
+        return bidErrors.stream().map(BidError::getCode).distinct().count() == 1
+                && Objects.equals(bidErrors.get(0).getCode(), BidError.TIMEOUT_ERROR);
     }
 
     private static List<String> mediaTypesFromImp(Imp imp) {

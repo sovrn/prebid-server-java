@@ -58,6 +58,7 @@ import org.prebid.server.rubicon.analytics.proto.BidError;
 import org.prebid.server.rubicon.analytics.proto.BidWon;
 import org.prebid.server.rubicon.analytics.proto.Client;
 import org.prebid.server.rubicon.analytics.proto.Dimensions;
+import org.prebid.server.rubicon.analytics.proto.Error;
 import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
 import org.prebid.server.rubicon.analytics.proto.Impression;
@@ -356,6 +357,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         tuple("Content-Type", "application/json;charset=utf-8"));
     }
 
+    @SuppressWarnings("checkstyle:methodlength")
     @Test
     public void processAuctionEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
         // given
@@ -377,9 +379,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
         verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
 
-        then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(
-                expectedEventBuilderBaseFromApp()
-                        .auctions(singletonList(Auction.of("bidRequestId", 1, asList(
+        then(mapper.readValue(eventCaptor.getValue(), Event.class)).isEqualTo(expectedEventBuilderBaseFromApp()
+                .auctions(singletonList(Auction.of("bidRequestId", 1,
+                        asList(
                                 AdUnit.builder()
                                         .transactionId("bidRequestId-impId1")
                                         .status("success")
@@ -505,6 +507,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .build()))
+                                        .error(Error.of("timeout-error", "Timeout error"))
                                         .build()), 123, 1000L, true))).build());
     }
 
@@ -749,6 +752,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
+    @SuppressWarnings("checkstyle:methodlength")
     @Test
     public void processAmpEventShouldPostEventToEndpointWithExpectedBody() throws IOException {
         // given
@@ -896,6 +900,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .build()))
+                                        .error(Error.of("timeout-error", "Timeout error"))
                                         .build()),
                         123, 1000L, true)))
                 .build());
