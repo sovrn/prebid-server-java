@@ -1147,7 +1147,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
-                .country("countryFromRequest");
+                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest"));
     }
 
     private static Event.EventBuilder expectedEventBuilderBaseFromSite() {
@@ -1157,7 +1157,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
-                .country("countryFromAuditCookie")
+                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie"))
                 .referrerUri("http://referer/page");
     }
 

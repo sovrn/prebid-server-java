@@ -879,7 +879,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
                 .userAgent(getIfNotNull(device, Device::getUa))
-                .country(ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext)));
+                .geo(geo(httpContext, device));
     }
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
@@ -897,6 +897,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         } catch (IllegalArgumentException e) {
             return ExtRequestPrebidBiddersRubicon.EMPTY;
         }
+    }
+
+    private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpContext httpContext, Device device) {
+        final String country = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
+
+        return country != null ? org.prebid.server.rubicon.analytics.proto.Geo.of(country) : null;
     }
 
     private String countryFrom(Device device) {
