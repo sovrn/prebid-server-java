@@ -145,7 +145,7 @@ public class WebConfiguration {
         return ExceptionHandler.create(metrics);
     }
 
-    @Bean
+    @Bean("router")
     Router router(BodyHandler bodyHandler,
                   NoCacheHandler noCacheHandler,
                   CorsHandler corsHandler,
@@ -163,8 +163,8 @@ public class WebConfiguration {
                   BiddersHandler biddersHandler,
                   BidderDetailsHandler bidderDetailsHandler,
                   NotificationEventHandler notificationEventHandler,
-                  StaticHandler staticHandler,
-                  List<CustomizedAdminEndpoint> customizedAdminEndpoints) {
+                  List<CustomizedAdminEndpoint> customizedAdminEndpoints,
+                  StaticHandler staticHandler) {
 
         final Router router = Router.router(vertx);
         router.route().handler(bodyHandler);
@@ -192,6 +192,7 @@ public class WebConfiguration {
 
         router.get("/static/*").handler(staticHandler);
         router.get("/").handler(staticHandler); // serves index.html by default
+
         return router;
     }
 

@@ -1,5 +1,21 @@
 vertx:
   uploads-dir: /app/prebid-server/data/file-uploads
+admin-endpoints:
+  version:
+    enabled: true
+    protected: false
+  currency-rates:
+    enabled: true
+    protected: false
+  storedrequest:
+    enabled: true
+    protected: false
+  storedrequest-amp:
+    enabled: true
+    protected: false
+  cache-invalidation:
+    enabled: true
+    protected: false
 http-client:
   circuit-breaker:
     enabled: true
