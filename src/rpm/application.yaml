@@ -3,18 +3,23 @@ vertx:
 admin-endpoints:
   version:
     enabled: true
+    on-application-port: true
     protected: false
   currency-rates:
     enabled: true
+    on-application-port: true
     protected: false
   storedrequest:
     enabled: true
+    on-application-port: true
     protected: false
   storedrequest-amp:
     enabled: true
+    on-application-port: true
     protected: false
   cache-invalidation:
     enabled: true
+    on-application-port: true
     protected: false
 http-client:
   circuit-breaker:
