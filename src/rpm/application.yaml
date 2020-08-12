@@ -30,6 +30,8 @@ http-client:
 adapters:
   adform:
     enabled: true
+  adgeneration:
+    enabled: true
   appnexus:
     enabled: true
   brightroll:
@@ -37,6 +39,8 @@ adapters:
   consumable:
     enabled: true
   conversant:
+    enabled: true
+  grid:
     enabled: true
   ix:
     enabled: true
