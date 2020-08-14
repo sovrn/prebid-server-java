@@ -85,7 +85,8 @@ public class RequestContext {
             case appBundle:
                 return getIfNotNull(bidRequest.getApp(), App::getBundle);
             case adslot:
-                return getStringFromImpExt("context.data.adslot");
+                return getFirstNonNullStringFromImpExt("context.data.adslot", "context.data.pbadslot",
+                        "context.data.adserver.adslot");
             case deviceGeoExt:
                 return getValueFrom(geoExt, category, RequestContext::nodeToString);
             case deviceExt:
@@ -192,6 +193,10 @@ public class RequestContext {
 
     public TxnLog txnLog() {
         return txnLog;
+    }
+
+    private String getFirstNonNullStringFromImpExt(String... path) {
+        return Arrays.stream(path).map(this::getStringFromImpExt).filter(Objects::nonNull).findFirst().orElse(null);
     }
 
     private String getStringFromImpExt(String path) {

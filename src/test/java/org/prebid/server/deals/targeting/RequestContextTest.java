@@ -132,7 +132,34 @@ public class RequestContextTest extends VertxTest {
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
         final RequestContext context =
                 new RequestContext(request(identity()),
-                        imp(i -> i.ext(obj("context", obj("data", obj("adslot", "/123/456"))))), txnLog, jacksonMapper);
+                        imp(i -> i.ext(obj("context", obj("data", obj("adslot", "/123/456"))))), txnLog,
+                        jacksonMapper);
+
+        // when and then
+        assertThat(context.lookupString(category)).isEqualTo("/123/456");
+    }
+
+    @Test
+    public void lookupStringShouldReturnAdslotFromAlternativePbadslotPath() {
+        // given
+        final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
+        final RequestContext context =
+                new RequestContext(request(identity()),
+                        imp(i -> i.ext(obj("context", obj("data", obj("pbadslot", "/123/456"))))), txnLog,
+                        jacksonMapper);
+
+        // when and then
+        assertThat(context.lookupString(category)).isEqualTo("/123/456");
+    }
+
+    @Test
+    public void lookupStringShouldReturnAdslotFromAlternativeAdServerAdSlotPath() {
+        // given
+        final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
+        final RequestContext context =
+                new RequestContext(request(identity()),
+                        imp(i -> i.ext(obj("context", obj("data", obj("adserver", obj("adslot", "/123/456")))))),
+                        txnLog, jacksonMapper);
 
         // when and then
         assertThat(context.lookupString(category)).isEqualTo("/123/456");
