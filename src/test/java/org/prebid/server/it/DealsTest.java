@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 @RunWith(SpringRunner.class)
-@TestPropertySource(locations = {"deals/test-deals-application.properties"})
+@TestPropertySource(locations = {"test-application.properties", "deals/test-deals-application.properties"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class DealsTest extends IntegrationTest {
 

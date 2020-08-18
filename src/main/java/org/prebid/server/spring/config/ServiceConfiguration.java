@@ -13,9 +13,11 @@ import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
 import org.prebid.server.auction.BidResponseReducer;
 import org.prebid.server.auction.ExchangeService;
+import org.prebid.server.auction.FpdResolver;
 import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.auction.InterstitialProcessor;
 import org.prebid.server.auction.IpAddressHelper;
+import org.prebid.server.auction.OrtbTypesResolver;
 import org.prebid.server.auction.PreBidRequestContextFactory;
 import org.prebid.server.auction.PrivacyEnforcementService;
 import org.prebid.server.auction.StoredRequestProcessor;
@@ -125,6 +127,16 @@ public class ServiceConfiguration {
     }
 
     @Bean
+    FpdResolver fpdResolver(JacksonMapper mapper) {
+        return new FpdResolver(mapper);
+    }
+
+    @Bean
+    OrtbTypesResolver ortbTypesResolver() {
+        return new OrtbTypesResolver();
+    }
+
+    @Bean
     TimeoutResolver timeoutResolver(
             @Value("${default-timeout-ms}") long defaultTimeout,
             @Value("${max-timeout-ms}") long maxTimeout,
@@ -187,12 +199,12 @@ public class ServiceConfiguration {
             @Autowired(required = false) DealsProcessor dealsProcessor,
             BidderCatalog bidderCatalog,
             RequestValidator requestValidator,
+            OrtbTypesResolver ortbTypesResolver,
             TimeoutResolver timeoutResolver,
             TimeoutFactory timeoutFactory,
             ApplicationSettings applicationSettings,
             JacksonMapper mapper,
-            Clock clock,
-            CriteriaLogManager criteriaLogManager) {
+            Clock clock) {
 
         final List<String> blacklistedApps = splitCommaSeparatedString(blacklistedAppsString);
         final List<String> blacklistedAccounts = splitCommaSeparatedString(blacklistedAccountsString);
@@ -215,13 +227,13 @@ public class ServiceConfiguration {
                 bidderCatalog,
                 requestValidator,
                 new InterstitialProcessor(),
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                mapper,
-                criteriaLogManager);
+                mapper);
     }
 
     private static List<String> splitCommaSeparatedString(String listString) {
@@ -233,10 +245,18 @@ public class ServiceConfiguration {
     @Bean
     AmpRequestFactory ampRequestFactory(StoredRequestProcessor storedRequestProcessor,
                                         AuctionRequestFactory auctionRequestFactory,
+                                        OrtbTypesResolver ortbTypesResolver,
+                                        FpdResolver fpdResolver,
                                         TimeoutResolver timeoutResolver,
                                         JacksonMapper mapper) {
 
-        return new AmpRequestFactory(storedRequestProcessor, auctionRequestFactory, timeoutResolver, mapper);
+        return new AmpRequestFactory(
+                storedRequestProcessor,
+                auctionRequestFactory,
+                ortbTypesResolver,
+                fpdResolver,
+                timeoutResolver,
+                mapper);
     }
 
     @Bean
@@ -439,6 +459,7 @@ public class ServiceConfiguration {
             BidderCatalog bidderCatalog,
             StoredResponseProcessor storedResponseProcessor,
             PrivacyEnforcementService privacyEnforcementService,
+            FpdResolver fpdResolver,
             HttpBidderRequester httpBidderRequester,
             ResponseBidValidator responseBidValidator,
             CurrencyConversionService currencyConversionService,
@@ -455,6 +476,7 @@ public class ServiceConfiguration {
                 bidderCatalog,
                 storedResponseProcessor,
                 privacyEnforcementService,
+                fpdResolver,
                 httpBidderRequester,
                 responseBidValidator,
                 currencyConversionService,

@@ -1,5 +1,6 @@
 package org.prebid.server.auction;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
@@ -10,6 +11,7 @@ import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.Source;
 import com.iab.openrtb.request.User;
+import io.netty.buffer.ByteBufInputStream;
 import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
@@ -34,10 +36,8 @@ import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.identity.IdGenerator;
-import org.prebid.server.json.DecodeException;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
-import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
@@ -59,6 +59,7 @@ import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.model.ValidationResult;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -107,7 +108,7 @@ public class AuctionRequestFactory {
     private final Clock clock;
     private final IdGenerator idGenerator;
     private final JacksonMapper mapper;
-    private final CriteriaLogManager criteriaLogManager;
+    private final OrtbTypesResolver ortbTypesResolver;
 
     public AuctionRequestFactory(long maxRequestSize,
                                  boolean enforceValidAccount,
@@ -123,13 +124,13 @@ public class AuctionRequestFactory {
                                  BidderCatalog bidderCatalog,
                                  RequestValidator requestValidator,
                                  InterstitialProcessor interstitialProcessor,
+                                 OrtbTypesResolver ortbTypesResolver,
                                  TimeoutResolver timeoutResolver,
                                  TimeoutFactory timeoutFactory,
                                  ApplicationSettings applicationSettings,
                                  Clock clock,
                                  IdGenerator idGenerator,
-                                 JacksonMapper mapper,
-                                 CriteriaLogManager criteriaLogManager) {
+                                 JacksonMapper mapper) {
 
         this.maxRequestSize = maxRequestSize;
         this.enforceValidAccount = enforceValidAccount;
@@ -145,13 +146,13 @@ public class AuctionRequestFactory {
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.requestValidator = Objects.requireNonNull(requestValidator);
         this.interstitialProcessor = Objects.requireNonNull(interstitialProcessor);
+        this.ortbTypesResolver = Objects.requireNonNull(ortbTypesResolver);
         this.timeoutResolver = Objects.requireNonNull(timeoutResolver);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.clock = Objects.requireNonNull(clock);
         this.idGenerator = Objects.requireNonNull(idGenerator);
         this.mapper = Objects.requireNonNull(mapper);
-        this.criteriaLogManager = Objects.requireNonNull(criteriaLogManager);
     }
 
     /**
@@ -174,16 +175,18 @@ public class AuctionRequestFactory {
      * Creates {@link AuctionContext} based on {@link RoutingContext}.
      */
     public Future<AuctionContext> fromRequest(RoutingContext routingContext, long startTime) {
+        final List<String> errors = new ArrayList<>();
         final BidRequest incomingBidRequest;
         try {
-            incomingBidRequest = parseRequest(routingContext);
+            incomingBidRequest = parseRequest(routingContext, errors);
         } catch (InvalidRequestException e) {
             return Future.failedFuture(e);
         }
 
         final Future<AuctionContext> auctionContextFuture = updateBidRequest(routingContext, incomingBidRequest)
                 .compose(bidRequest ->
-                        toAuctionContext(routingContext, bidRequest, new ArrayList<>(), startTime, timeoutResolver));
+                        toAuctionContext(routingContext, bidRequest, errors, startTime,
+                                timeoutResolver));
 
         if (dealsProcessor != null) {
             return auctionContextFuture.compose(dealsProcessor::populateDealsInfo);
@@ -221,7 +224,7 @@ public class AuctionRequestFactory {
      * <p>
      * Throws {@link InvalidRequestException} if body is empty, exceeds max request size or couldn't be deserialized.
      */
-    private BidRequest parseRequest(RoutingContext context) {
+    private BidRequest parseRequest(RoutingContext context, List<String> errors) {
         final Buffer body = context.getBody();
         if (body == null) {
             throw new InvalidRequestException("Incoming request has no body");
@@ -232,9 +235,18 @@ public class AuctionRequestFactory {
                     String.format("Request size exceeded max size of %d bytes.", maxRequestSize));
         }
 
+        final JsonNode bidRequestNode;
         try {
-            return mapper.decodeValue(body, BidRequest.class);
-        } catch (DecodeException e) {
+            bidRequestNode = mapper.mapper().readTree(new ByteBufInputStream(body.getByteBuf()));
+        } catch (IOException e) {
+            throw new InvalidRequestException(String.format("Error decoding bidRequest: %s", e.getMessage()));
+        }
+
+        ortbTypesResolver.normalizeFpdFields(bidRequestNode, errors);
+
+        try {
+            return mapper.mapper().treeToValue(bidRequestNode, BidRequest.class);
+        } catch (JsonProcessingException e) {
             throw new InvalidRequestException(String.format("Error decoding bidRequest: %s", e.getMessage()));
         }
     }

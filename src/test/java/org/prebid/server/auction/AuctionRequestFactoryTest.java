@@ -115,10 +115,6 @@ public class AuctionRequestFactoryTest extends VertxTest {
     @Mock
     private InterstitialProcessor interstitialProcessor;
     @Mock
-    private TimeoutResolver timeoutResolver;
-    @Mock
-    private TimeoutFactory timeoutFactory;
-    @Mock
     private ApplicationSettings applicationSettings;
     @Mock
     private IdGenerator idGenerator;
@@ -134,6 +130,12 @@ public class AuctionRequestFactoryTest extends VertxTest {
     private RoutingContext routingContext;
     @Mock
     private HttpServerRequest httpRequest;
+    @Mock
+    private OrtbTypesResolver ortbTypesResolver;
+    @Mock
+    private TimeoutResolver timeoutResolver;
+    @Mock
+    private TimeoutFactory timeoutFactory;
 
     @Before
     public void setUp() {
@@ -169,13 +171,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
     }
 
     @Test
@@ -211,13 +213,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         givenValidBidRequest();
 
@@ -251,13 +253,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.failedFuture(new PreBidException("Not found")));
@@ -300,13 +302,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         given(routingContext.getBody()).willReturn(Buffer.buffer("body"));
 
@@ -332,7 +334,19 @@ public class AuctionRequestFactoryTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class);
         assertThat(((InvalidRequestException) future.cause()).getMessages()).hasSize(1)
-                .element(0).asString().startsWith("Error decoding bidRequest: Failed to decode:");
+                .element(0).asString().startsWith("Error decoding bidRequest: Unrecognized token 'body'");
+    }
+
+    @Test
+    public void shouldCallOrtbFieldsResolver() {
+        // given
+        givenValidBidRequest();
+
+        // when
+        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        verify(ortbTypesResolver).normalizeFpdFields(any(), any());
     }
 
     @Test
@@ -915,13 +929,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
@@ -959,13 +973,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -1002,13 +1016,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -1045,13 +1059,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -1114,13 +1128,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -1159,13 +1173,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 bidderCatalog,
                 requestValidator,
                 interstitialProcessor,
+                ortbTypesResolver,
                 timeoutResolver,
                 timeoutFactory,
                 applicationSettings,
                 clock,
                 idGenerator,
-                jacksonMapper,
-                criteriaLogManager);
+                jacksonMapper);
 
         final ExtRequest extBidRequest = ExtRequest.of(ExtRequestPrebid.builder()
                 .cache(ExtRequestPrebidCache.of(null, null, null))

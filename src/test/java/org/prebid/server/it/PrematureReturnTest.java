@@ -60,8 +60,7 @@ import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @RunWith(SpringRunner.class)
-@TestPropertySource(locations = {"test-application.properties",
-        "deals/test-deals-application.properties"})
+@TestPropertySource(locations = {"test-application.properties", "deals/test-deals-application.properties"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class PrematureReturnTest extends VertxTest {
 
