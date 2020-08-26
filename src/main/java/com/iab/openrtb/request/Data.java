@@ -18,10 +18,14 @@ import java.util.List;
 @Value
 public class Data {
 
-    /** Exchange-specific ID for the data provider. */
+    /**
+     * Exchange-specific ID for the data provider.
+     */
     String id;
 
-    /** Exchange-specific name for the data provider. */
+    /**
+     * Exchange-specific name for the data provider.
+     */
     String name;
 
     /**
@@ -30,6 +34,8 @@ public class Data {
      */
     List<Segment> segment;
 
-    /** Placeholder for exchange-specific extensions to OpenRTB. */
+    /**
+     * Placeholder for exchange-specific extensions to OpenRTB.
+     */
     ObjectNode ext;
 }
