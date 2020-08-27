@@ -1250,7 +1250,6 @@ public class ExchangeServiceTest extends VertxTest {
         final User capturedBidRequestUser = captureBidRequest().getUser();
         assertThat(capturedBidRequestUser).isEqualTo(User.builder()
                 .buyeruid("buyeridFromRequest")
-                .ext(ExtUser.builder().build())
                 .build());
     }
 
@@ -1300,7 +1299,6 @@ public class ExchangeServiceTest extends VertxTest {
         final User capturedBidRequestUser = captureBidRequest().getUser();
         assertThat(capturedBidRequestUser).isEqualTo(User.builder()
                 .buyeruid("uidval")
-                .ext(ExtUser.builder().build())
                 .build());
     }
 
@@ -1555,7 +1553,7 @@ public class ExchangeServiceTest extends VertxTest {
                 .extracting(App::getExt, App::getKeywords)
                 .containsOnly(
                         tuple(ExtApp.of(null, dataNode), "keyword"),
-                        tuple(ExtApp.of(null, null), "keyword"));
+                        tuple(null, "keyword"));
     }
 
     @Test
