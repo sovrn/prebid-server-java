@@ -8,19 +8,18 @@ admin-endpoints:
   currency-rates:
     enabled: true
     on-application-port: true
-    protected: false
   storedrequest:
     enabled: true
     on-application-port: true
-    protected: false
   storedrequest-amp:
     enabled: true
     on-application-port: true
-    protected: false
   cache-invalidation:
     enabled: true
     on-application-port: true
-    protected: false
+  tracelog:
+    enabled: true
+    on-application-port: true
 http-client:
   circuit-breaker:
     enabled: true
