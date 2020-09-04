@@ -56,6 +56,8 @@ adapters:
     enabled: true
   triplelift:
     enabled: true
+  ttx:
+    enabled: true
   yieldmo:
     enabled: true
   yieldone:
