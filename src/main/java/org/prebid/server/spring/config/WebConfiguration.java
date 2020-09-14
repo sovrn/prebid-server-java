@@ -48,7 +48,7 @@ import org.prebid.server.handler.openrtb2.VideoHandler;
 import org.prebid.server.health.HealthChecker;
 import org.prebid.server.health.PeriodicHealthChecker;
 import org.prebid.server.json.JacksonMapper;
-import org.prebid.server.manager.AdminManager;
+import org.prebid.server.log.HttpInteractionLogger;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
 import org.prebid.server.privacy.PrivacyExtractor;
@@ -251,11 +251,17 @@ public class WebConfiguration {
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
             Clock clock,
-            AdminManager adminManager,
+            HttpInteractionLogger httpInteractionLogger,
             JacksonMapper mapper) {
 
         return new org.prebid.server.handler.openrtb2.AuctionHandler(
-                auctionRequestFactory, exchangeService, analyticsReporter, metrics, clock, adminManager, mapper);
+                auctionRequestFactory,
+                exchangeService,
+                analyticsReporter,
+                metrics,
+                clock,
+                httpInteractionLogger,
+                mapper);
     }
 
     @Bean
@@ -268,7 +274,7 @@ public class WebConfiguration {
             BidderCatalog bidderCatalog,
             AmpProperties ampProperties,
             AmpResponsePostProcessor ampResponsePostProcessor,
-            AdminManager adminManager,
+            HttpInteractionLogger httpInteractionLogger,
             JacksonMapper mapper) {
 
         return new AmpHandler(
@@ -280,7 +286,7 @@ public class WebConfiguration {
                 bidderCatalog,
                 ampProperties.getCustomTargetingSet(),
                 ampResponsePostProcessor,
-                adminManager,
+                httpInteractionLogger,
                 mapper);
     }
 

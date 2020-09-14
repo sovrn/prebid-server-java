@@ -3,7 +3,6 @@ package org.prebid.server.exception;
 import java.util.Collections;
 import java.util.List;
 
-@SuppressWarnings("serial")
 public class InvalidRequestException extends RuntimeException {
 
     private final List<String> messages;
