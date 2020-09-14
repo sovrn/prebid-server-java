@@ -17,6 +17,12 @@ admin-endpoints:
   cache-invalidation:
     enabled: true
     on-application-port: true
+  logging-httpinteraction:
+    enabled: true
+    on-application-port: true
+  logging-changelevel:
+    enabled: true
+    on-application-port: true
   tracelog:
     enabled: true
     on-application-port: true
