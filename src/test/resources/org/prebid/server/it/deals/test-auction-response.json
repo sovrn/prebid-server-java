@@ -17,7 +17,7 @@
               "type": "banner",
               "targeting": {
                 "hb_deal_rubicon": "rubicon-dealId1",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26l%3DlineItem1",
+                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem1",
                 "hb_cache_id": "3f37ff80-b395-449f-a80e-c21a38bb6eec",
                 "hb_cache_path_rubicon": "/cache",
                 "hb_cache_host_rubicon": "{{ cache.host }}",
@@ -41,8 +41,8 @@
                 }
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem1",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem1"
+                "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem1",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem1"
               }
             }
           }
@@ -61,7 +61,7 @@
               "type": "banner",
               "targeting": {
                 "hb_deal_rubicon": "rubicon-dealId2",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26l%3DlineItem2",
+                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem2",
                 "hb_size_rubicon": "320x320",
                 "hb_cache_id": "13e78248-7339-4e35-b297-874d0031bc1a",
                 "hb_cache_path_rubicon": "/cache",
@@ -85,8 +85,8 @@
                 }
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem2",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem2"
+                "win": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem2",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem2"
               }
             }
           }
@@ -105,7 +105,7 @@
               "type": "banner",
               "targeting": {
                 "hb_deal_rubicon": "rubicon-dealId3",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26l%3DlineItem3",
+                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem3",
                 "hb_size_rubicon": "300x250",
                 "hb_cache_id": "1cdcf339-e59b-4e2c-8382-1fb845d4961c",
                 "hb_cache_path_rubicon": "/cache",
@@ -129,8 +129,8 @@
                 }
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem3",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem3"
+                "win": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem3",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem3"
               }
             }
           }
@@ -147,7 +147,7 @@
         "cache": [
           {
             "uri": "{{ cache.endpoint }}",
-            "requestbody": "{\"puts\":[{\"type\":\"json\",\"value\":{\"id\":\"bidId2\",\"impid\":\"impId2\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid2\",\"dealid\":\"dealId2\",\"w\":320,\"h\":320,\"wurl\":\"http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i\"}},{\"type\":\"json\",\"value\":{\"id\":\"bidId1\",\"impid\":\"impId1\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId1\",\"w\":300,\"h\":250,\"wurl\":\"http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i\"}},{\"type\":\"json\",\"value\":{\"id\":\"bidId4\",\"impid\":\"impId4\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId3\",\"w\":300,\"h\":250,\"wurl\":\"http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i\"}}]}",
+            "requestbody": "{\"puts\":[{\"type\":\"json\",\"value\":{\"id\":\"bidId2\",\"impid\":\"impId2\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid2\",\"dealid\":\"dealId2\",\"w\":320,\"h\":320,\"wurl\":\"http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=\"}},{\"type\":\"json\",\"value\":{\"id\":\"bidId1\",\"impid\":\"impId1\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId1\",\"w\":300,\"h\":250,\"wurl\":\"http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=\"}},{\"type\":\"json\",\"value\":{\"id\":\"bidId4\",\"impid\":\"impId4\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId3\",\"w\":300,\"h\":250,\"wurl\":\"http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=\"}}]}",
             "responsebody": "{\"responses\":[{\"uuid\":\"13e78248-7339-4e35-b297-874d0031bc1a\"},{\"uuid\":\"3f37ff80-b395-449f-a80e-c21a38bb6eec\"},{\"uuid\":\"1cdcf339-e59b-4e2c-8382-1fb845d4961c\"}]}",
             "status": 200
           }

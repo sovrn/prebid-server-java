@@ -215,8 +215,8 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("b", "bidId")
                 .add("a", "accountId")
                 .add("f", "b")
-                .add("x", "1")
-                .add("int", "invalid***"));
+                .add("x", "invalid")
+                .add("int", "pbjs+="));
 
         // when
         notificationHandler.handle(routingContext);
@@ -393,7 +393,7 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("a", "accountId")
                 .add("bidder", "bidder")
                 .add("ts", "1000")
-                .add("int", "int_-123"));
+                .add("int", "pbjs"));
 
         final Account account = Account.builder().eventsEnabled(true).build();
         given(applicationSettings.getAccountById(anyString(), any()))
@@ -409,7 +409,7 @@ public class NotificationEventHandlerTest extends VertxTest {
         queryParams.put("a", "accountId");
         queryParams.put("bidder", "bidder");
         queryParams.put("ts", "1000");
-        queryParams.put("int", "int_-123");
+        queryParams.put("int", "pbjs");
         final HttpContext expectedHttpContext = HttpContext.builder()
                 .queryParams(queryParams)
                 .headers(Collections.emptyMap())
@@ -422,7 +422,7 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .account(account)
                 .bidder("bidder")
                 .timestamp(1000L)
-                .integration("int_-123")
+                .integration("pbjs")
                 .httpContext(expectedHttpContext)
                 .build());
     }

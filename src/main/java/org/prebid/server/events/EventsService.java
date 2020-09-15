@@ -18,39 +18,88 @@ public class EventsService {
     /**
      * Returns {@link Events} object based on given params.
      */
-    public Events createEvent(String bidId, String bidder, String accountId, String lineItemId, Long timestamp) {
+    public Events createEvent(
+            String bidId, String bidder, String accountId, String lineItemId, Long timestamp, String integration) {
+
         return Events.of(
-                eventUrl(EventRequest.Type.win, bidId, bidder, accountId, EventRequest.Format.image,
-                        lineItemId, timestamp),
-                eventUrl(EventRequest.Type.imp, bidId, bidder, accountId, EventRequest.Format.image,
-                        lineItemId, timestamp));
+                eventUrl(
+                        EventRequest.Type.win,
+                        bidId,
+                        bidder,
+                        accountId,
+                        lineItemId,
+                        timestamp,
+                        EventRequest.Format.image,
+                        integration),
+                eventUrl(
+                        EventRequest.Type.imp,
+                        bidId,
+                        bidder,
+                        accountId,
+                        lineItemId,
+                        timestamp,
+                        EventRequest.Format.image,
+                        integration));
     }
 
     /**
      * Returns value for "hb_winurl" targeting keyword.
      */
-    public String winUrlTargeting(String bidder, String accountId, String lineItemId, Long timestamp) {
-        return eventUrl(EventRequest.Type.win, BIDID_PLACEHOLDER, bidder, accountId,
-                EventRequest.Format.image, lineItemId, timestamp);
+    public String winUrlTargeting(
+            String bidder, String accountId, String lineItemId, Long timestamp, String integration) {
+
+        return eventUrl(
+                EventRequest.Type.win,
+                BIDID_PLACEHOLDER,
+                bidder,
+                accountId,
+                lineItemId,
+                timestamp,
+                EventRequest.Format.image,
+                integration);
     }
 
     /**
      * Returns url for win tracking.
      */
-    public String winUrl(String bidId, String bidder, String accountId, Long timestamp) {
-        return eventUrl(EventRequest.Type.win, bidId, bidder, accountId, EventRequest.Format.image, null, timestamp);
+    public String winUrl(String bidId, String bidder, String accountId, Long timestamp, String integration) {
+        return eventUrl(
+                EventRequest.Type.win,
+                bidId,
+                bidder,
+                accountId,
+                null,
+                timestamp,
+                EventRequest.Format.image,
+                integration);
     }
 
     /**
      * Returns url for VAST tracking.
      */
-    public String vastUrlTracking(String bidId, String bidder, String accountId, String lineItemId, Long timestamp) {
-        return eventUrl(EventRequest.Type.imp, bidId, bidder, accountId, EventRequest.Format.blank, lineItemId,
-                timestamp);
+    public String vastUrlTracking(
+            String bidId, String bidder, String accountId, String lineItemId, Long timestamp, String integration) {
+
+        return eventUrl(
+                EventRequest.Type.imp,
+                bidId,
+                bidder,
+                accountId,
+                lineItemId,
+                timestamp,
+                EventRequest.Format.blank,
+                integration);
     }
 
-    private String eventUrl(EventRequest.Type type, String bidId, String bidder, String accountId,
-                            EventRequest.Format format, String lineItemId, Long timestamp) {
+    private String eventUrl(EventRequest.Type type,
+                            String bidId,
+                            String bidder,
+                            String accountId,
+                            String lineItemId,
+                            Long timestamp,
+                            EventRequest.Format format,
+                            String integration) {
+
         final EventRequest eventRequest = EventRequest.builder()
                 .type(type)
                 .bidId(bidId)
@@ -58,6 +107,7 @@ public class EventsService {
                 .bidder(bidder)
                 .timestamp(timestamp)
                 .format(format)
+                .integration(integration)
                 .lineItemId(lineItemId)
                 .build();
 

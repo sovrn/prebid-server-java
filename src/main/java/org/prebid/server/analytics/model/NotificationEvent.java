@@ -23,7 +23,7 @@ public class NotificationEvent {
 
     Long timestamp;
 
-    String integration; // Rubicon-fork only
+    String integration;
 
     HttpContext httpContext;
 

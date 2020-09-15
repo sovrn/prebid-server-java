@@ -22,9 +22,9 @@ public class EventRequest {
 
     Format format;
 
-    Analytics analytics;
+    String integration;
 
-    String integration; // Rubicon-fork only
+    Analytics analytics;
 
     String lineItemId;
 

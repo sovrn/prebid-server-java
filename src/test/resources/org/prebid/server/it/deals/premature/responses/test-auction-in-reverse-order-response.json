@@ -19,7 +19,7 @@
                 "hb_pb": "10.60",
                 "hb_pb_rubicon": "10.60",
                 "hb_deal_rubicon": "rubicon-dealId1",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26l%3DlineItem1",
+                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem1",
                 "hb_size": "300x250",
                 "hb_bidder": "rubicon",
                 "hb_size_rubicon": "300x250",
@@ -29,8 +29,8 @@
                 "hb_deal": "rubicon-dealId1"
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem1",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&l=lineItem1"
+                "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem1",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem1"
               }
             }
           }

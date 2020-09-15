@@ -406,7 +406,7 @@ public class CacheServiceTest extends VertxTest {
                 Account.builder().id("accountId").eventsEnabled(true).build(), eventsContext, timeout);
 
         // then
-        verify(eventsService).winUrl(eq("bidId1"), eq("bidder"), eq("accountId"), isNull());
+        verify(eventsService).winUrl(eq("bidId1"), eq("bidder"), eq("accountId"), isNull(), isNull());
     }
 
     @Test
@@ -916,11 +916,15 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cacheBidsOpenrtbShouldAddTrackingLinkToImpTagWhenItIsEmpty() throws IOException {
         // given
-        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder.id("bid1").impid("impId1")
+        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder
+                .id("bid1")
+                .impid("impId1")
                 .adm("<Impression></Impression>"));
-        final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
+        final Imp imp1 = givenImp(builder -> builder
+                .id("impId1")
+                .video(Video.builder().build()));
 
-        given(eventsService.vastUrlTracking(anyString(), anyString(), any(), any(), any()))
+        given(eventsService.vastUrlTracking(anyString(), anyString(), any(), any(), any(), any()))
                 .willReturn("https://test-event.com/event?t=imp&b=bid1&f=b&a=accountId");
 
         // when
@@ -951,11 +955,15 @@ public class CacheServiceTest extends VertxTest {
     public void cacheBidsOpenrtbShouldAddTrackingImpToBidAdmXmlWhenThatBidShouldBeModifiedAndContainsImpTag()
             throws IOException {
         // given
-        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder.id("bid1").impid("impId1")
+        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder
+                .id("bid1")
+                .impid("impId1")
                 .adm("<Impression>http:/test.com</Impression>"));
-        final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
+        final Imp imp1 = givenImp(builder -> builder
+                .id("impId1")
+                .video(Video.builder().build()));
 
-        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any()))
+        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any(), any()))
                 .willReturn("https://test-event.com/event?t=imp&b=bid1&f=b&a=accountId");
 
         // when
@@ -984,36 +992,6 @@ public class CacheServiceTest extends VertxTest {
     }
 
     @Test
-    public void cacheBidsOpenrtbShouldAddIntegrationToVastUrlTracking() throws IOException {
-        // given
-        final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder.id("bid1").impid("impId1")
-                .adm("<Impression>http:/test.com</Impression>"));
-        final Imp imp1 = givenImp(builder -> builder.id("impId1").video(Video.builder().build()));
-
-        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any()))
-                .willReturn("http://vast-url?param=value");
-
-        // when
-        cacheService.cacheBidsOpenrtb(singletonList(bid), singletonList(imp1),
-                CacheContext.builder()
-                        .shouldCacheVideoBids(true)
-                        .bidderToVideoBidIdsToModify(singletonMap("bidder", singletonList("bid1")))
-                        .bidderToBidIds(singletonMap("bidder", singletonList("bid1")))
-                        .build(), account, EventsContext.builder().integration("integration").build(), timeout);
-
-        // then
-        final BidCacheRequest bidCacheRequest = captureBidCacheRequest();
-        assertThat(bidCacheRequest.getPuts())
-                .containsOnly(
-                        PutObject.builder()
-                                .type("xml")
-                                .value(new TextNode("<Impression>http:/test.com</Impression><Impression>"
-                                        + "<![CDATA[http://vast-url?param=value&int=integration]]>"
-                                        + "</Impression>"))
-                                .build());
-    }
-
-    @Test
     public void cacheBidsOpenrtbShouldConsiderLineItemIdFetchedFromImps() {
         // given
         final com.iab.openrtb.response.Bid bid = givenBidOpenrtb(builder -> builder
@@ -1031,20 +1009,28 @@ public class CacheServiceTest extends VertxTest {
                         .build()));
 
         // when
-        cacheService.cacheBidsOpenrtb(singletonList(bid), singletonList(imp), CacheContext.builder()
-                .shouldCacheBids(true).shouldCacheVideoBids(true)
-                .bidderToVideoBidIdsToModify(singletonMap("bidder1", singletonList("bid1")))
-                .build(), Account.builder().id("accountId").build(), eventsContext, timeout);
+        cacheService.cacheBidsOpenrtb(
+                singletonList(bid),
+                singletonList(imp),
+                CacheContext.builder()
+                        .shouldCacheBids(true)
+                        .shouldCacheVideoBids(true)
+                        .bidderToVideoBidIdsToModify(singletonMap("bidder1", singletonList("bid1")))
+                        .build(),
+                Account.builder().id("accountId").build(),
+                eventsContext,
+                timeout);
 
         // then
-        verify(eventsService).vastUrlTracking(eq("bid1"), eq("bidder1"), eq("accountId"), eq("lineItemId"), eq(null));
+        verify(eventsService).vastUrlTracking(
+                eq("bid1"), eq("bidder1"), eq("accountId"), eq("lineItemId"), isNull(), isNull());
     }
 
     @Test
     public void cachePutObjectsShouldTolerateGlobalTimeoutAlreadyExpired() {
         // when
-        final Future<BidCacheResponse> future = cacheService.cachePutObjects(singletonList(PutObject.builder().build()),
-                emptySet(), "", "", expiredTimeout);
+        final Future<BidCacheResponse> future = cacheService.cachePutObjects(
+                singletonList(PutObject.builder().build()), emptySet(), "", "", expiredTimeout);
 
         // then
         assertThat(future.failed()).isTrue();
@@ -1054,8 +1040,7 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cachePutObjectsShouldReturnResultWithEmptyListWhenPutObjectsIsEmpty() {
         // when
-        final Future<BidCacheResponse> result = cacheService.cachePutObjects(emptyList(), emptySet(), null, null,
-                null);
+        final Future<BidCacheResponse> result = cacheService.cachePutObjects(emptyList(), emptySet(), null, null, null);
 
         // then
         verifyZeroInteractions(httpClient);
@@ -1082,12 +1067,12 @@ public class CacheServiceTest extends VertxTest {
                 .value(new TextNode("VAST"))
                 .build();
 
-        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any()))
+        given(eventsService.vastUrlTracking(any(), any(), any(), any(), any(), anyString()))
                 .willReturn("http://external-url/event");
 
         // when
-        cacheService.cachePutObjects(asList(firstPutObject, secondPutObject), singleton("bidder1"), "account",
-                "integration", timeout);
+        cacheService.cachePutObjects(
+                asList(firstPutObject, secondPutObject), singleton("bidder1"), "account", "pbjs", timeout);
 
         // then
         final PutObject modifiedFirstPutObject = firstPutObject.toBuilder()
@@ -1103,7 +1088,7 @@ public class CacheServiceTest extends VertxTest {
                 .value(new TextNode("<VAST version=\"3.0\"><Ad><Wrapper><AdSystem>"
                         + "prebid.org wrapper</AdSystem><VASTAdTagURI><![CDATA[adm2]]></VASTAdTagURI>"
                         + "<Impression><!"
-                        + "[CDATA[http://external-url/event&int=integration]]>"
+                        + "[CDATA[http://external-url/event]]>"
                         + "</Impression><Creatives></Creatives></Wrapper></Ad></VAST>"))
                 .build();
         final PutObject modifiedSecondPutObject = secondPutObject.toBuilder()
@@ -1128,11 +1113,11 @@ public class CacheServiceTest extends VertxTest {
                 .build();
 
         // when
-        cacheService.cachePutObjects(singletonList(firstPutObject), singleton("bidder1"), "account",
-                null, timeout);
+        cacheService.cachePutObjects(singletonList(firstPutObject), singleton("bidder1"), "account", "pbjs", timeout);
 
         // then
-        verify(eventsService).vastUrlTracking(eq("bidId1"), eq("bidder1"), eq("account"), eq(null), eq(1000L));
+        verify(eventsService).vastUrlTracking(
+                eq("bidId1"), eq("bidder1"), eq("account"), isNull(), eq(1000L), eq("pbjs"));
     }
 
     private static List<Bid> singleBidList() {

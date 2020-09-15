@@ -36,7 +36,7 @@ public class VtrackHandler implements Handler<RoutingContext> {
     private static final Logger logger = LoggerFactory.getLogger(VtrackHandler.class);
 
     private static final String ACCOUNT_PARAMETER = "a";
-    private static final String INT_PARAMETER = "int";
+    private static final String INTEGRATION_PARAMETER = "int";
 
     private final long defaultTimeout;
     private final boolean allowUnknownBidder;
@@ -70,8 +70,8 @@ public class VtrackHandler implements Handler<RoutingContext> {
         final String integration;
         try {
             accountId = accountId(context);
-            integration = integration(context);
             vtrackPuts = vtrackPuts(context);
+            integration = integration(context);
         } catch (IllegalArgumentException e) {
             respondWithBadRequest(context, e.getMessage());
             return;
@@ -90,11 +90,6 @@ public class VtrackHandler implements Handler<RoutingContext> {
                     String.format("Account '%s' is required query parameter and can't be empty", ACCOUNT_PARAMETER));
         }
         return accountId;
-    }
-
-    public static String integration(RoutingContext context) {
-        EventUtil.validateIntegration(context);
-        return context.request().getParam(INT_PARAMETER);
     }
 
     private List<PutObject> vtrackPuts(RoutingContext context) {
@@ -122,6 +117,11 @@ public class VtrackHandler implements Handler<RoutingContext> {
         return putObjects;
     }
 
+    public static String integration(RoutingContext context) {
+        EventUtil.validateIntegration(context);
+        return context.request().getParam(INTEGRATION_PARAMETER);
+    }
+
     /**
      * Returns fallback {@link Account} if account not found or propagate error if fetching failed.
      */
@@ -132,9 +132,13 @@ public class VtrackHandler implements Handler<RoutingContext> {
         return Future.failedFuture(exception);
     }
 
-    private void handleAccountResult(AsyncResult<Account> asyncAccount, RoutingContext context,
-                                     List<PutObject> vtrackPuts, String accountId, String integration,
+    private void handleAccountResult(AsyncResult<Account> asyncAccount,
+                                     RoutingContext context,
+                                     List<PutObject> vtrackPuts,
+                                     String accountId,
+                                     String integration,
                                      Timeout timeout) {
+
         if (asyncAccount.failed()) {
             respondWithServerError(context, "Error occurred while fetching account", asyncAccount.cause());
         } else {

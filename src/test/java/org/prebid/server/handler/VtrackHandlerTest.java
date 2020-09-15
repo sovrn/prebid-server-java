@@ -3,7 +3,6 @@ package org.prebid.server.handler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.TextNode;
 import io.vertx.core.Future;
-import io.vertx.core.MultiMap;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
@@ -72,8 +71,7 @@ public class VtrackHandlerTest extends VertxTest {
         given(routingContext.response()).willReturn(httpResponse);
 
         given(httpRequest.getParam("a")).willReturn("accountId");
-        given(httpRequest.getParam("int")).willReturn("integration");
-        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap().add("int", "integration"));
+        given(httpRequest.getParam("int")).willReturn("pbjs");
 
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
@@ -213,8 +211,7 @@ public class VtrackHandlerTest extends VertxTest {
         handler.handle(routingContext);
 
         // then
-        verify(cacheService).cachePutObjects(eq(putObjects), eq(emptySet()), eq("accountId"), eq("integration"),
-                any());
+        verify(cacheService).cachePutObjects(eq(putObjects), eq(emptySet()), eq("accountId"), eq("pbjs"), any());
     }
 
     @Test
@@ -236,7 +233,7 @@ public class VtrackHandlerTest extends VertxTest {
         // then
         verifyZeroInteractions(bidderCatalog);
 
-        verify(cacheService).cachePutObjects(eq(putObjects), eq(emptySet()), eq("accountId"), eq("integration"), any());
+        verify(cacheService).cachePutObjects(eq(putObjects), eq(emptySet()), eq("accountId"), eq("pbjs"), any());
     }
 
     @Test
@@ -267,8 +264,8 @@ public class VtrackHandlerTest extends VertxTest {
         handler.handle(routingContext);
 
         // then
-        verify(cacheService).cachePutObjects(eq(putObjects), eq(singleton("updatable_bidder")), eq("accountId"),
-                eq("integration"), any());
+        verify(cacheService).cachePutObjects(
+                eq(putObjects), eq(singleton("updatable_bidder")), eq("accountId"), eq("pbjs"), any());
 
         verify(httpResponse).end(eq("{\"responses\":[{\"uuid\":\"uuid1\"}]}"));
     }
@@ -299,8 +296,7 @@ public class VtrackHandlerTest extends VertxTest {
 
         // then
         final HashSet<String> expectedBidders = new HashSet<>(asList("bidder", "updatable_bidder"));
-        verify(cacheService).cachePutObjects(eq(putObjects), eq(expectedBidders), eq("accountId"), eq("integration"),
-                any());
+        verify(cacheService).cachePutObjects(eq(putObjects), eq(expectedBidders), eq("accountId"), eq("pbjs"), any());
 
         verify(httpResponse).end(eq("{\"responses\":[{\"uuid\":\"uuid1\"},{\"uuid\":\"uuid2\"}]}"));
     }
@@ -336,8 +332,7 @@ public class VtrackHandlerTest extends VertxTest {
 
         // then
         final HashSet<String> expectedBidders = new HashSet<>(asList("bidder", "updatable_bidder"));
-        verify(cacheService).cachePutObjects(eq(putObjects), eq(expectedBidders), eq("accountId"), eq("integration"),
-                any());
+        verify(cacheService).cachePutObjects(eq(putObjects), eq(expectedBidders), eq("accountId"), eq("pbjs"), any());
 
         verify(httpResponse).end(eq("{\"responses\":[{\"uuid\":\"uuid1\"},{\"uuid\":\"uuid2\"}]}"));
     }

@@ -12,5 +12,5 @@ public class EventsContext {
 
     Long auctionTimestamp;
 
-    String integration; // Rubicon-fork only
+    String integration;
 }
