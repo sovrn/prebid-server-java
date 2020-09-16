@@ -45,6 +45,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
@@ -289,6 +290,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .imp(emptyList())
                         .app(App.builder().build())
                         .cur(singletonList("USD"))
+                        .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                .channel(ExtRequestPrebidChannel.of("app"))
+                                .build()))
                         .build());
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
@@ -986,6 +990,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .bidders(mapper.valueToTree(ExtRequestPrebidBidders.of(
                                 ExtRequestPrebidBiddersRubicon.of(integration, wrappername))))
+                        .channel(ExtRequestPrebidChannel.of("app"))
                         .build()))
                 .tmax(1000L)
                 .build();
@@ -1011,7 +1016,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
-                        .connectiontype(17)
                         .lmt(1)
                         .ua("userAgent")
                         .build())
@@ -1063,6 +1067,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .build())
                                 .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
                                 .build()))
+                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .channel(ExtRequestPrebidChannel.of("amp"))
+                        .build()))
                 .cur(singletonList("JPY"))
                 .tmax(1000L)
                 .build();

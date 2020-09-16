@@ -22,6 +22,8 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -45,6 +47,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestCurrency;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
@@ -70,6 +73,7 @@ import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountAnalyticsConfig;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
@@ -77,8 +81,10 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +133,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static final String APPLICATION_JSON =
             HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
 
+    public static final String PBJS_REQUEST_CHANNEL = "PBJS";
+    public static final String AMP_REQUEST_CHANNEL = "AMP";
+    public static final String APP_REQUEST_CHANNEL = "App";
+    public static final String WEB_CHANNEL = "web";
+    public static final String AMP_CHANNEL = "amp";
+    public static final String APP_CHANNEL = "app";
+    public static final String OTHER_CHANNEL = "other";
+    public static final Set<String> DEFAULT_SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList(APP_CHANNEL, AMP_CHANNEL));
+
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
         VIDEO_SIZE_AD_FORMATS.put(201, VideoAdFormat.PREROLL);
@@ -156,11 +171,18 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private final Map<Integer, Long> accountToAmpEventCount = new ConcurrentHashMap<>();
     private final Map<Integer, Long> accountToNotificationEventCount = new ConcurrentHashMap<>();
 
-    public RubiconAnalyticsModule(String endpointUrl, Integer globalSamplingFactor, String pbsVersion,
-                                  String pbsHostname, String dataCenterRegion, BidderCatalog bidderCatalog,
-                                  UidsCookieService uidsCookieService, UidsAuditCookieService uidsAuditCookieService,
-                                  CurrencyConversionService currencyService, HttpClient httpClient,
+    public RubiconAnalyticsModule(String endpointUrl,
+                                  Integer globalSamplingFactor,
+                                  String pbsVersion,
+                                  String pbsHostname,
+                                  String dataCenterRegion,
+                                  BidderCatalog bidderCatalog,
+                                  UidsCookieService uidsCookieService,
+                                  UidsAuditCookieService uidsAuditCookieService,
+                                  CurrencyConversionService currencyService,
+                                  HttpClient httpClient,
                                   JacksonMapper mapper) {
+
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl) + EVENT_PATH);
         this.globalSamplingFactor = globalSamplingFactor;
         this.pbsVersion = pbsVersion;
@@ -185,26 +207,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private boolean shouldProcessEvent(Integer accountId, Integer accountSamplingFactor,
-                                       Map<Integer, Long> accountToEventCount, AtomicLong globalEventCount) {
-        final boolean result;
-
-        if (accountSamplingFactor != null && accountSamplingFactor > 0) {
-            final long eventCount = accountToEventCount.compute(accountId,
-                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
-            result = eventCount % accountSamplingFactor == 0;
-        } else if (globalSamplingFactor != null && globalSamplingFactor > 0) {
-            result = globalEventCount.incrementAndGet() % globalSamplingFactor == 0;
-        } else {
-            result = false;
-        }
-
-        return result;
-    }
-
     private void processAuctionEvent(AuctionEvent auctionEvent) {
         final AuctionContext auctionContext = auctionEvent.getAuctionContext();
-        if (auctionContext == null) { // this can happens when exception is thrown while processing
+        if (auctionContext == null) { // this can happen when exception is thrown while processing
             return;
         }
 
@@ -213,28 +218,29 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final Account account = auctionContext.getAccount();
         final BidResponse bidResponse = auctionEvent.getBidResponse();
 
-        // only send event for mobile requests
-        if (httpContext == null || bidRequest == null || account == null || bidResponse == null
-                || bidRequest.getApp() == null) {
+        if (httpContext == null || bidRequest == null || account == null || bidResponse == null) {
             return;
         }
 
         final Integer accountId = parseId(account.getId());
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
 
-        // only continue if counter matches sampling factor
-        if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
+        if (shouldProcessEvent(
+                account, accountId, bidRequest, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
+
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
 
-            postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
-                    this::eventBuilderBaseFromApp), isDebugEnabled(bidRequest));
+            postEvent(
+                    toAuctionEvent(
+                            httpContext, bidRequest, adUnits, accountId, accountSamplingFactor, this::eventBuilderBase),
+                    isDebugEnabled(bidRequest));
         }
     }
 
     private void processAmpEvent(AmpEvent ampEvent) {
         final AuctionContext auctionContext = ampEvent.getAuctionContext();
-        if (auctionContext == null) { // this can happens when exception is thrown while processing
+        if (auctionContext == null) { // this can happen when exception is thrown while processing
             return;
         }
 
@@ -243,9 +249,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final Account account = auctionContext.getAccount();
         final BidResponse bidResponse = ampEvent.getBidResponse();
 
-        // only send event for web requests
-        if (httpContext == null || bidRequest == null || account == null || bidResponse == null
-                || bidRequest.getSite() == null) {
+        if (httpContext == null || bidRequest == null || account == null || bidResponse == null) {
             return;
         }
 
@@ -255,19 +259,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final String storedId = parseStoredId(httpContext.getUri());
 
         // only continue if counter matches sampling factor
-        if (shouldProcessEvent(accountId, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
+        if (shouldProcessEvent(
+                account, accountId, bidRequest, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
+
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
             final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, storedId);
 
-            postEvent(toAuctionEvent(httpContext, bidRequest, adUnits, accountId, accountSamplingFactor,
-                    this::eventBuilderBaseFromSite), isDebugEnabled(bidRequest));
+            postEvent(
+                    toAuctionEvent(
+                            httpContext, bidRequest, adUnits, accountId, accountSamplingFactor, this::eventBuilderBase),
+                    isDebugEnabled(bidRequest));
         }
-    }
-
-    private String parseStoredId(String uri) {
-        // substringBetween can't handle "amp?tag_id=1001"
-        final String tagIdValueAndOthers = StringUtils.substringAfter(uri, STORED_REQUEST_ID_AMP_URL_PARAM);
-        return StringUtils.substringBefore(tagIdValueAndOthers, URL_PARAM_SEPARATOR);
     }
 
     private void processNotificationEvent(NotificationEvent notificationEvent) {
@@ -305,6 +307,63 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 : makeImpEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration);
 
         postEvent(event, false);
+    }
+
+    private boolean shouldProcessEvent(Account account,
+                                       Integer accountId,
+                                       BidRequest bidRequest,
+                                       Integer accountSamplingFactor,
+                                       Map<Integer, Long> accountToEventCount,
+                                       AtomicLong globalEventCount) {
+
+        if (isChannelNotSupported(bidRequest, account)) {
+            return false;
+        }
+
+        if (accountSamplingFactor != null && accountSamplingFactor > 0) {
+            final long eventCount = accountToEventCount.compute(accountId,
+                    (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
+            return eventCount % accountSamplingFactor == 0;
+        } else if (globalSamplingFactor != null && globalSamplingFactor > 0) {
+            return globalEventCount.incrementAndGet() % globalSamplingFactor == 0;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean isChannelNotSupported(BidRequest bidRequest, Account account) {
+        final String requestChannel = channelFromRequest(bidRequest);
+
+        final Map<String, Boolean> auctionEvents =
+                getIfNotNull(account.getAnalyticsConfig(), AccountAnalyticsConfig::getAuctionEvents);
+        if (MapUtils.isNotEmpty(auctionEvents) && BooleanUtils.isNotTrue(auctionEvents.get(requestChannel))) {
+            return true;
+        }
+
+        return !DEFAULT_SUPPORTED_CHANNELS.contains(requestChannel);
+    }
+
+    private static String channelFromRequest(BidRequest bidRequest) {
+        final String channel = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest.getExt(),
+                ExtRequest::getPrebid),
+                ExtRequestPrebid::getChannel),
+                ExtRequestPrebidChannel::getName);
+
+        if (StringUtils.isBlank(channel) || StringUtils.equalsIgnoreCase(channel, PBJS_REQUEST_CHANNEL)) {
+            return WEB_CHANNEL;
+        } else if (StringUtils.equalsIgnoreCase(channel, AMP_REQUEST_CHANNEL)) {
+            return AMP_CHANNEL;
+        } else if (StringUtils.equalsIgnoreCase(channel, APP_REQUEST_CHANNEL)) {
+            return APP_CHANNEL;
+        } else {
+            return OTHER_CHANNEL;
+        }
+    }
+
+    private static String parseStoredId(String uri) {
+        // substringBetween can't handle "amp?tag_id=1001"
+        final String tagIdValueAndOthers = StringUtils.substringAfter(uri, STORED_REQUEST_ID_AMP_URL_PARAM);
+        return StringUtils.substringBefore(tagIdValueAndOthers, URL_PARAM_SEPARATOR);
     }
 
     private Event makeWinEvent(String bidId, String bidder, Integer accountId, HttpContext httpContext,
@@ -818,14 +877,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 : globalSamplingFactor;
     }
 
-    /**
-     * Prepares event from request from mobile app.
-     */
-    private Event.EventBuilder eventBuilderBaseFromApp(HttpContext httpContext, BidRequest bidRequest) {
-        return eventBuilderBase(httpContext, bidRequest)
-                .client(clientFrom(bidRequest));
-    }
-
     private static Client clientFrom(BidRequest bidRequest) {
         final org.prebid.server.rubicon.analytics.proto.App app = clientAppFrom(bidRequest.getApp());
         final Integer connectionType = getIfNotNull(bidRequest.getDevice(), Device::getConnectiontype);
@@ -842,24 +893,16 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     }
 
     private static org.prebid.server.rubicon.analytics.proto.App clientAppFrom(App app) {
-        final ExtAppPrebid prebid = getIfNotNull(app.getExt(), ExtApp::getPrebid);
+        final ExtAppPrebid prebid = getIfNotNull(getIfNotNull(app, App::getExt), ExtApp::getPrebid);
 
         final org.prebid.server.rubicon.analytics.proto.App clientApp = org.prebid.server.rubicon.analytics.proto.App
                 .of(
-                        app.getBundle(),
-                        app.getVer(),
+                        getIfNotNull(app, App::getBundle),
+                        getIfNotNull(app, App::getVer),
                         getIfNotNull(prebid, ExtAppPrebid::getVersion),
                         getIfNotNull(prebid, ExtAppPrebid::getSource));
 
         return clientApp.equals(org.prebid.server.rubicon.analytics.proto.App.EMPTY) ? null : clientApp;
-    }
-
-    /**
-     * Prepares event from request from mobile web.
-     */
-    private Event.EventBuilder eventBuilderBaseFromSite(HttpContext httpContext, BidRequest bidRequest) {
-        return eventBuilderBase(httpContext, bidRequest)
-                .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage));
     }
 
     /**
@@ -879,6 +922,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
                 .userAgent(getIfNotNull(device, Device::getUa))
+                .client(clientFrom(bidRequest))
+                .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage))
                 .geo(geo(httpContext, device));
     }
 
