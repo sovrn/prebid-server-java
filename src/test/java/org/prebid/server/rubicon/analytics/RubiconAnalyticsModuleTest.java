@@ -69,6 +69,7 @@ import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountAnalyticsConfig;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
@@ -274,6 +275,35 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processAuctionEventShouldProcessWebRequestsIfAllowedByAccount() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(emptyList())
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .build())
+                        .account(Account.builder()
+                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .build())
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(emptyList())
+                        .build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
     }
 
     @Test

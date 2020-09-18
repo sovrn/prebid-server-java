@@ -336,8 +336,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
         final Map<String, Boolean> auctionEvents =
                 getIfNotNull(account.getAnalyticsConfig(), AccountAnalyticsConfig::getAuctionEvents);
-        if (MapUtils.isNotEmpty(auctionEvents) && BooleanUtils.isNotTrue(auctionEvents.get(requestChannel))) {
-            return true;
+        if (MapUtils.isNotEmpty(auctionEvents)) {
+            return BooleanUtils.isNotTrue(auctionEvents.get(requestChannel));
         }
 
         return !DEFAULT_SUPPORTED_CHANNELS.contains(requestChannel);
