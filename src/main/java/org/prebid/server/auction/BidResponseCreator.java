@@ -70,8 +70,6 @@ import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseDebug;
 import org.prebid.server.proto.openrtb.ext.response.ExtTraceDeal;
-import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
-import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.VideoStoredDataResult;
 import org.prebid.server.util.HttpUtil;
@@ -1270,27 +1268,8 @@ public class BidResponseCreator {
     private String integrationFrom(AuctionContext auctionContext) {
         final ExtRequest extRequest = auctionContext.getBidRequest().getExt();
         final ExtRequestPrebid prebid = extRequest == null ? null : extRequest.getPrebid();
-        String integration = prebid != null ? StringUtils.stripToNull(prebid.getIntegration()) : null;
-        integration = integration != null ? integration : integrationFromRubicon(prebid);
 
-        return ObjectUtils.defaultIfNull(
-                integration,
-                auctionContext.getAccount().getDefaultIntegration());
-    }
-
-    private String integrationFromRubicon(ExtRequestPrebid prebid) {
-        final ExtRequestPrebidBidders bidders = prebid == null ? null : biddersFrom(prebid);
-        final ExtRequestPrebidBiddersRubicon rubicon = bidders != null ? bidders.getRubicon() : null;
-        final String integration = rubicon != null ? rubicon.getIntegration() : null;
-        return StringUtils.stripToNull(integration);
-    }
-
-    private ExtRequestPrebidBidders biddersFrom(ExtRequestPrebid prebid) {
-        try {
-            return mapper.mapper().convertValue(prebid.getBidders(), ExtRequestPrebidBidders.class);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        return prebid != null ? prebid.getIntegration() : null;
     }
 
     private static <T> Set<T> nullIfEmpty(Set<T> set) {

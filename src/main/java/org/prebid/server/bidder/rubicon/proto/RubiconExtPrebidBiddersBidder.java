@@ -7,7 +7,5 @@ import lombok.Value;
 @Value
 public class RubiconExtPrebidBiddersBidder {
 
-    String integration;
-
     RubiconExtPrebidBiddersBidderDebug debug;
 }

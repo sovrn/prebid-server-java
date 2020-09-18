@@ -41,5 +41,7 @@ public class Event {
     @JsonProperty("referrerUri")
     String referrerUri;
 
+    String channel;
+
     Geo geo;
 }

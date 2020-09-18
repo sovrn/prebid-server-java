@@ -62,6 +62,8 @@ import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.validation.RequestValidator;
@@ -1684,6 +1686,61 @@ public class AuctionRequestFactoryTest extends VertxTest {
         // then
         assertThat(account).isEqualTo(Account.builder().id("").build());
         verifyZeroInteractions(applicationSettings);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithIntegrationFromAccount() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .imp(emptyList())
+                .site(Site.builder()
+                        .publisher(Publisher.builder().id("123").build())
+                        .build())
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("123").defaultIntegration("integration").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final AuctionContext auctionContext = factory.fromRequest(routingContext, 0L).result();
+
+        // then
+        assertThat(singletonList(auctionContext.getBidRequest()))
+                .extracting(BidRequest::getExt)
+                .extracting(ExtRequest::getPrebid)
+                .extracting(ExtRequestPrebid::getIntegration)
+                .containsOnly("integration");
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithIntegrationFromRubicon() {
+        // given
+        givenBidRequest(BidRequest.builder()
+                .imp(emptyList())
+                .site(Site.builder()
+                        .publisher(Publisher.builder().id("123").build())
+                        .build())
+                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .bidders(mapper.valueToTree(
+                                ExtRequestPrebidBidders.of(ExtRequestPrebidBiddersRubicon.of("dmbjs", null))))
+                        .build()))
+                .build());
+
+        final Account givenAccount = Account.builder().id("123").defaultIntegration("integration").build();
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.succeededFuture(givenAccount));
+
+        // when
+        final AuctionContext auctionContext = factory.fromRequest(routingContext, 0L).result();
+
+        // then
+        assertThat(singletonList(auctionContext.getBidRequest()))
+                .extracting(BidRequest::getExt)
+                .extracting(ExtRequest::getPrebid)
+                .extracting(ExtRequestPrebid::getIntegration)
+                .containsOnly("dmbjs");
     }
 
     @Test

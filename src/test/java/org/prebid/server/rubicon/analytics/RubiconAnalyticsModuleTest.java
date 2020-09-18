@@ -1019,8 +1019,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .build()))
                 .cur(singletonList("USD"))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .integration(integration)
                         .bidders(mapper.valueToTree(ExtRequestPrebidBidders.of(
-                                ExtRequestPrebidBiddersRubicon.of(integration, wrappername))))
+                                ExtRequestPrebidBiddersRubicon.of(null, wrappername))))
                         .channel(ExtRequestPrebidChannel.of("app"))
                         .build()))
                 .tmax(1000L)
@@ -1186,6 +1187,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
+                .channel("app")
                 .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest"));
     }
 
@@ -1196,6 +1198,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
+                .channel("amp")
                 .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie"))
                 .referrerUri("http://referer/page");
     }

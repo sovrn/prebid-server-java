@@ -54,6 +54,8 @@ import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
+import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.util.HttpUtil;
@@ -215,7 +217,7 @@ public class AuctionRequestFactory {
                 .map(account -> AuctionContext.builder()
                         .routingContext(routingContext)
                         .uidsCookie(uidsCookieService.parseFromRequest(routingContext))
-                        .bidRequest(updateBidRequestWithAccountId(bidRequest, account.getId()))
+                        .bidRequest(enrichBidRequestWithAccountBasedData(bidRequest, account))
                         .timeout(timeout)
                         .account(account)
                         .txnLog(TxnLog.create().accountId(account.getId()))
@@ -521,8 +523,10 @@ public class AuctionRequestFactory {
         final Map<String, String> updatedAliases = aliasesOrNull(prebid, imps);
         final ExtRequestPrebidCache updatedCache = cacheOrNull(prebid);
         final ExtRequestPrebidChannel updatedChannel = channelOrNull(prebid, bidRequest);
+        final String updatedIntegration = integrationOrNull(prebid);
 
-        if (updatedTargeting != null || updatedAliases != null || updatedCache != null || updatedChannel != null) {
+        if (updatedTargeting != null || updatedAliases != null || updatedCache != null || updatedChannel != null
+                || updatedIntegration != null) {
             final ExtRequestPrebid.ExtRequestPrebidBuilder prebidBuilder = prebid != null
                     ? prebid.toBuilder()
                     : ExtRequestPrebid.builder();
@@ -536,6 +540,8 @@ public class AuctionRequestFactory {
                             getIfNotNull(prebid, ExtRequestPrebid::getCache)))
                     .channel(ObjectUtils.defaultIfNull(updatedChannel,
                             getIfNotNull(prebid, ExtRequestPrebid::getChannel)))
+                    .integration(ObjectUtils.defaultIfNull(updatedIntegration,
+                            getIfNotNull(prebid, ExtRequestPrebid::getIntegration)))
                     .build());
         }
 
@@ -719,6 +725,27 @@ public class AuctionRequestFactory {
         }
 
         return null;
+    }
+
+    private String integrationOrNull(ExtRequestPrebid prebid) {
+        return StringUtils.isNotBlank(getIfNotNull(prebid, ExtRequestPrebid::getIntegration))
+                ? null
+                : integrationFromRubicon(prebid);
+    }
+
+    private String integrationFromRubicon(ExtRequestPrebid prebid) {
+        final ExtRequestPrebidBidders bidders = prebid == null ? null : biddersFrom(prebid);
+        final ExtRequestPrebidBiddersRubicon rubicon = bidders != null ? bidders.getRubicon() : null;
+        final String integration = rubicon != null ? rubicon.getIntegration() : null;
+        return StringUtils.stripToNull(integration);
+    }
+
+    private ExtRequestPrebidBidders biddersFrom(ExtRequestPrebid prebid) {
+        try {
+            return mapper.mapper().convertValue(prebid.getBidders(), ExtRequestPrebidBidders.class);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**
@@ -1000,36 +1027,82 @@ public class AuctionRequestFactory {
                 : Future.succeededFuture(Account.empty(accountId));
     }
 
+    private BidRequest enrichBidRequestWithAccountBasedData(BidRequest bidRequest, Account account) {
+        final ExtRequest requestExt = bidRequest.getExt();
+        final ExtRequest enrichedRequestExt = enrichExtRequest(requestExt, account);
+
+        final Site site = bidRequest.getSite();
+        final Site enrichedSite = enrichSiteWithAccountId(site, account);
+
+        final App app = bidRequest.getApp();
+        final App enrichedApp = enrichAppWithAccountId(app, account);
+
+        if (enrichedRequestExt != null
+                || enrichedSite != null || enrichedApp != null) {
+
+            return bidRequest.toBuilder()
+                    .ext(enrichedRequestExt != null ? enrichedRequestExt : requestExt)
+                    .site(enrichedSite != null ? enrichedSite : site)
+                    .app(enrichedApp != null ? enrichedApp : app)
+                    .build();
+        }
+
+        return bidRequest;
+    }
+
+    private ExtRequest enrichExtRequest(ExtRequest ext, Account account) {
+        final ExtRequestPrebid prebidExt = getIfNotNull(ext, ExtRequest::getPrebid);
+        final String integration = getIfNotNull(prebidExt, ExtRequestPrebid::getIntegration);
+        final String accountDefaultIntegration = account.getDefaultIntegration();
+
+        if (StringUtils.isBlank(integration) && StringUtils.isNotBlank(accountDefaultIntegration)) {
+            final ExtRequestPrebid.ExtRequestPrebidBuilder prebidExtBuilder =
+                    prebidExt != null ? prebidExt.toBuilder() : ExtRequestPrebid.builder();
+
+            prebidExtBuilder.integration(accountDefaultIntegration);
+
+            return ExtRequest.of(prebidExtBuilder.build());
+        }
+
+        return null;
+    }
+
     /**
      * Rubicon-fork can fetch account id not only from {@link Site} or {@link App},
      * so need to make sure it is updated in {@link BidRequest}.
      */
-    private static BidRequest updateBidRequestWithAccountId(BidRequest bidRequest, String accountId) {
-        if (StringUtils.isNotEmpty(accountId)) { // ignore fallback or empty account
-            final Site site = bidRequest.getSite();
-            final App app = bidRequest.getApp();
+    private static Site enrichSiteWithAccountId(Site site, Account account) {
+        final String accountId = account.getId();
 
-            if (site != null) {
-                final Publisher publisher = site.getPublisher();
-                final String publisherId = publisher != null ? publisher.getId() : null;
-                if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
-                    final Site updatedSite = site.toBuilder()
-                            .publisher(updatePublisherId(publisher, accountId))
-                            .build();
-                    return bidRequest.toBuilder().site(updatedSite).build();
-                }
-            } else if (app != null) {
-                final Publisher publisher = app.getPublisher();
-                final String publisherId = publisher != null ? publisher.getId() : null;
-                if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
-                    final App updatedApp = app.toBuilder()
-                            .publisher(updatePublisherId(publisher, accountId))
-                            .build();
-                    return bidRequest.toBuilder().app(updatedApp).build();
-                }
+        if (StringUtils.isNotEmpty(accountId) // ignore fallback or empty account
+                && site != null) {
+            final Publisher publisher = site.getPublisher();
+            final String publisherId = publisher != null ? publisher.getId() : null;
+            if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
+                return site.toBuilder()
+                        .publisher(updatePublisherId(publisher, accountId))
+                        .build();
             }
         }
-        return bidRequest;
+
+        return null;
+    }
+
+    private static App enrichAppWithAccountId(App app, Account account) {
+        final String accountId = account.getId();
+
+        if (StringUtils.isNotEmpty(accountId) // ignore fallback or empty account
+                && app != null) {
+            final Publisher publisher = app.getPublisher();
+            final String publisherId = publisher != null ? publisher.getId() : null;
+            if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
+                return app.toBuilder()
+                        .publisher(updatePublisherId(publisher, accountId))
+                        .build();
+            }
+        }
+
+        return null;
     }
 
     private static Publisher updatePublisherId(Publisher publisher, String accountId) {
