@@ -103,6 +103,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static final String EVENT_PATH = "/event";
 
     private static final String PREBID_EXT = "prebid";
+    private static final String CONTEXT_EXT = "context";
 
     private static final String SUCCESS_STATUS = "success";
     private static final String NO_BID_STATUS = "no-bid";
@@ -483,7 +484,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
             final Iterator<String> bidderIterator = impExt.fieldNames();
             while (bidderIterator.hasNext()) {
                 final String bidder = bidderIterator.next();
-                if (Objects.equals(bidder, PREBID_EXT) || analyticsBidExists(impIdToBids, impId, bidder)) {
+                if (Objects.equals(bidder, PREBID_EXT) || Objects.equals(bidder, CONTEXT_EXT)
+                        || analyticsBidExists(impIdToBids, impId, bidder)) {
                     continue;
                 }
 
