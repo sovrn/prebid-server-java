@@ -10,6 +10,7 @@ import com.iab.openrtb.request.Pmp;
 import com.iab.openrtb.response.Bid;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.bidder.model.BidderBid;
@@ -20,6 +21,7 @@ import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.validation.model.ValidationResult;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -46,15 +48,16 @@ public class ResponseBidValidator {
     }
 
     public ValidationResult validate(BidderBid bidderBid, BidRequest bidRequest) {
+        final List<String> warnings = new ArrayList<>();
         try {
             validateFieldsFor(bidderBid.getBid());
             if (dealsEnabled) {
-                validateDealsFor(bidderBid, bidRequest);
+                validateDealsFor(bidderBid, bidRequest, warnings);
             }
         } catch (ValidationException e) {
             return ValidationResult.error(e.getMessage());
         }
-        return ValidationResult.success();
+        return warnings.isEmpty() ? ValidationResult.success() : ValidationResult.warning(warnings);
     }
 
     private static void validateFieldsFor(Bid bid) throws ValidationException {
@@ -81,7 +84,8 @@ public class ResponseBidValidator {
         }
     }
 
-    private void validateDealsFor(BidderBid bidderBid, BidRequest bidRequest) throws ValidationException {
+    private void validateDealsFor(BidderBid bidderBid, BidRequest bidRequest,
+                                  List<String> warnings) throws ValidationException {
         final Bid bid = bidderBid.getBid();
         final String bidId = bid.getId();
 
@@ -98,10 +102,10 @@ public class ResponseBidValidator {
 
         if (dealId != null) {
             final Set<String> dealIdsFromImp = getDealIdsFromImp(imp);
-            if (!dealIdsFromImp.contains(dealId)) {
-                throw new ValidationException(
-                        "Bid \"%s\" has 'dealid' not present in corresponding imp in request. 'dealid' in bid: "
-                                + "'%s', deal Ids in imp: '%s'", bidId, dealId, String.join(",", dealIdsFromImp));
+            if (CollectionUtils.isNotEmpty(dealIdsFromImp) && !dealIdsFromImp.contains(dealId)) {
+                warnings.add(String.format("WARNING: Bid \"%s\" has 'dealid' not present in corresponding imp in"
+                                + " request. 'dealid' in bid: '%s', deal Ids in imp: '%s'",
+                        bidId, dealId, String.join(",", dealIdsFromImp)));
             }
 
             if (bidderBid.getType() == BidType.banner) {

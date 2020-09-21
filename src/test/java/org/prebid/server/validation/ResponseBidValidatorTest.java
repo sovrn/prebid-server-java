@@ -115,23 +115,22 @@ public class ResponseBidValidatorTest extends VertxTest {
     }
 
     @Test
-    public void validateShouldFailIfBidHasDealidAndImpHasNoDeals() {
+    public void validateShouldSuccessIfBidHasDealidAndImpHasNoDeals() {
         final ValidationResult result = responseBidValidator.validate(givenBid(bid -> bid.dealid("dealId1")),
                 givenRequest(identity()));
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" has 'dealid' not present in corresponding imp in request. 'dealid' in "
-                        + "bid: 'dealId1', deal Ids in imp: ''");
+        assertThat(result.getErrors()).hasSize(0);
+        assertThat(result.getWarnings()).hasSize(0);
     }
 
     @Test
-    public void validateShouldFailIfBidHasDealidMissingInImp() {
+    public void validateShouldWarnIfBidHasDealidMissingInImp() {
         final ValidationResult result = responseBidValidator.validate(givenBid(bid -> bid.dealid("dealId1")),
                 givenRequest(imp -> imp.pmp(pmp(asList(deal(d -> d.id("dealId2")), deal(d -> d.id("dealId3")))))));
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" has 'dealid' not present in corresponding imp in request. 'dealid' in "
-                        + "bid: 'dealId1', deal Ids in imp: 'dealId2,dealId3'");
+        assertThat(result.getWarnings()).hasSize(1)
+                .containsOnly("WARNING: Bid \"bidId1\" has 'dealid' not present in corresponding imp in request."
+                        + " 'dealid' in bid: 'dealId1', deal Ids in imp: 'dealId2,dealId3'");
     }
 
     @Test

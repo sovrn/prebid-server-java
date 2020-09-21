@@ -183,12 +183,12 @@ public class ExchangeService {
                 .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
                         .map(bidderRequest -> requestBids(
                                 bidderRequest,
+                                context,
                                 auctionTimeout(timeout, cacheInfo.isDoCaching()),
                                 debugEnabled,
                                 aliases,
                                 bidAdjustments(requestExt),
-                                currencyRates(requestExt), usepbsrates(requestExt),
-                                context.getTxnLog()))
+                                currencyRates(requestExt), usepbsrates(requestExt)))
                         .collect(Collectors.toList())))
                 // send all the requests to the bidders and gathers results
                 .map(CompositeFuture::<BidderResponse>list)
@@ -908,12 +908,11 @@ public class ExchangeService {
      * Passes the request to a corresponding bidder and wraps response in {@link BidderResponse} which also holds
      * recorded response time.
      */
-    private Future<BidderResponse> requestBids(BidderRequest bidderRequest, Timeout timeout,
-                                               boolean debugEnabled, BidderAliases aliases,
+    private Future<BidderResponse> requestBids(BidderRequest bidderRequest, AuctionContext auctionContext,
+                                               Timeout timeout, boolean debugEnabled, BidderAliases aliases,
                                                Map<String, BigDecimal> bidAdjustments,
                                                Map<String, Map<String, BigDecimal>> currencyConversionRates,
-                                               Boolean usepbsrates,
-                                               TxnLog txnLog) {
+                                               Boolean usepbsrates) {
         final String bidderName = bidderRequest.getBidder();
         final BigDecimal bidPriceAdjustmentFactor = bidAdjustments.get(bidderName);
         final BidRequest bidRequest = bidderRequest.getBidRequest();
@@ -923,7 +922,7 @@ public class ExchangeService {
         final long startTime = clock.millis();
 
         return httpBidderRequester.requestBids(bidder, bidRequest, timeout, debugEnabled)
-                .map(bidderSeatBid -> validBidderSeatBid(bidRequest, bidderSeatBid, bidderName, cur, txnLog))
+                .map(bidderSeatBid -> validBidderSeatBid(bidRequest, bidderSeatBid, bidderName, auctionContext, cur))
                 .map(seat -> applyBidPriceChanges(seat, currencyConversionRates, adServerCurrency,
                         bidPriceAdjustmentFactor, usepbsrates))
                 .map(result -> BidderResponse.of(bidderName, result, responseTime(startTime)));
@@ -937,7 +936,8 @@ public class ExchangeService {
      * Returns input argument as the result if no errors found or create new {@link BidderSeatBid} otherwise.
      */
     private BidderSeatBid validBidderSeatBid(BidRequest bidRequest, BidderSeatBid bidderSeatBid,
-                                             String bidder, List<String> requestCurrencies, TxnLog txnLog) {
+                                             String bidder, AuctionContext auctionContext,
+                                             List<String> requestCurrencies) {
 
         final List<BidderBid> bids = bidderSeatBid.getBids();
 
@@ -949,7 +949,7 @@ public class ExchangeService {
                     String.format("Cur parameter contains more than one currency. %s will be used",
                             requestCurrencies.get(0))));
         }
-
+        final TxnLog txnLog = auctionContext.getTxnLog();
         for (BidderBid bid : bids) {
             final String lineItemId = LineItemUtil.lineItemIdFrom(bid.getBid(), bidRequest.getImp(), mapper);
 
@@ -964,10 +964,17 @@ public class ExchangeService {
                 maybeRecordInTxnLog(lineItemId, txnLog::lineItemsResponseInvalidated);
             } else {
                 validBids.add(bid);
+                updateResponseWithWarnings(auctionContext, validationResult);
             }
         }
 
         return errors.isEmpty() ? bidderSeatBid : BidderSeatBid.of(validBids, bidderSeatBid.getHttpCalls(), errors);
+    }
+
+    private void updateResponseWithWarnings(AuctionContext auctionContext, ValidationResult validationResult) {
+        if (validationResult.hasWarnings()) {
+            auctionContext.getPrebidErrors().addAll(validationResult.getWarnings());
+        }
     }
 
     private static void maybeRecordInTxnLog(String lineItemId, Supplier<Set<String>> metricSupplier) {
@@ -981,7 +988,7 @@ public class ExchangeService {
      * and adjustment factor. Will drop bid if currency conversion is needed but not possible.
      * <p>
      * This method should always be invoked after
-     * {@link ExchangeService#validBidderSeatBid(BidRequest, BidderSeatBid, String, List, TxnLog)}
+     * {@link ExchangeService#validBidderSeatBid(BidRequest, BidderSeatBid, String, AuctionContext, List)}
      * to make sure {@link Bid#getPrice()} is not empty.
      */
     private BidderSeatBid applyBidPriceChanges(BidderSeatBid bidderSeatBid,
@@ -1046,7 +1053,7 @@ public class ExchangeService {
      * 'prices' metrics for each {@link BidderResponse}.
      * <p>
      * This method should always be invoked after
-     * {@link ExchangeService#validBidderSeatBid(BidRequest, BidderSeatBid, String, List, TxnLog)}
+     * {@link ExchangeService#validBidderSeatBid(BidRequest, BidderSeatBid, String, AuctionContext, List)}
      * to make sure {@link Bid#getPrice()} is not empty.
      */
     private List<BidderResponse> updateMetricsFromResponses(
