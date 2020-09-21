@@ -107,7 +107,6 @@ public class ResponseBidValidator {
                                 + " request. 'dealid' in bid: '%s', deal Ids in imp: '%s'",
                         bidId, dealId, String.join(",", dealIdsFromImp)));
             }
-
             if (bidderBid.getType() == BidType.banner) {
                 if (imp.getBanner() == null) {
                     throw new ValidationException("Bid \"%s\" has banner media type but corresponding imp in request "
@@ -121,13 +120,19 @@ public class ResponseBidValidator {
                             formatSizes(bannerFormats));
                 }
 
-                final List<Format> lineItemSizes = getLineItemSizes(imp);
-                if (bidSizeNotInFormats(bid, lineItemSizes)) {
-                    throw new ValidationException("Bid \"%s\" has 'w' and 'h' not matched to Line Item. Bid "
-                            + "dimensions: '%dx%d', Line Item sizes: '%s'", bidId, bid.getW(), bid.getH(),
-                            formatSizes(lineItemSizes));
+                if (isPgDeal(imp, dealId)) {
+                    validateIsInLineItemSizes(bid, bidId, imp);
                 }
             }
+        }
+    }
+
+    private void validateIsInLineItemSizes(Bid bid, String bidId, Imp imp) throws ValidationException {
+        final List<Format> lineItemSizes = getLineItemSizes(imp);
+        if (bidSizeNotInFormats(bid, lineItemSizes)) {
+            throw new ValidationException("Bid \"%s\" has 'w' and 'h' not matched to Line Item. Bid "
+                    + "dimensions: '%dx%d', Line Item sizes: '%s'", bidId, bid.getW(), bid.getH(),
+                    formatSizes(lineItemSizes));
         }
     }
 
@@ -175,6 +180,20 @@ public class ResponseBidValidator {
                 .flatMap(Collection::stream)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    private boolean isPgDeal(Imp imp, String dealId) {
+        return getDeals(imp)
+                .filter(Objects::nonNull)
+                .filter(deal -> Objects.equals(deal.getId(), dealId))
+                .map(Deal::getExt)
+                .filter(Objects::nonNull)
+                .map(this::dealExt)
+                .filter(Objects::nonNull)
+                .map(ExtDeal::getLine)
+                .filter(Objects::nonNull)
+                .map(ExtDealLine::getLineItemId)
+                .anyMatch(Objects::nonNull);
     }
 
     private ExtDeal dealExt(JsonNode ext) {

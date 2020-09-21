@@ -165,7 +165,7 @@ public class ResponseBidValidatorTest extends VertxTest {
                 givenRequest(imp -> imp
                         .pmp(pmp(singletonList(deal(d -> d
                                 .id("dealId1")
-                                .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of(null, null,
+                                .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of("lineItemId", null,
                                         singletonList(Format.builder().w(500).h(600).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
@@ -174,6 +174,23 @@ public class ResponseBidValidatorTest extends VertxTest {
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" has 'w' and 'h' not matched to Line Item. Bid dimensions: '300x400', "
                         + "Line Item sizes: '500x600'");
+    }
+
+    @Test
+    public void validateShouldSuccessIfBidIsBannerAndSizeHasNoMatchInLineItemForNonPgDeal() {
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(bid -> bid.dealid("dealId1").w(300).h(400), BidType.banner),
+                givenRequest(imp -> imp
+                        .pmp(pmp(singletonList(deal(d -> d
+                                .id("dealId1")
+                                .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of(null, null,
+                                        singletonList(Format.builder().w(500).h(600).build()), null))))))))
+                        .banner(Banner.builder()
+                                .format(singletonList(Format.builder().w(300).h(400).build()))
+                                .build())));
+
+        assertThat(result.getErrors()).hasSize(0);
+        assertThat(result.getWarnings()).hasSize(0);
     }
 
     @Test
