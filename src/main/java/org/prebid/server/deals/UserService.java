@@ -7,9 +7,7 @@ import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.collections.CollectionUtils;
 import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.model.AuctionContext;
-import org.prebid.server.cache.model.CacheHttpCall;
-import org.prebid.server.cache.model.CacheHttpRequest;
-import org.prebid.server.cache.model.CacheHttpResponse;
+import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.deals.lineitem.LineItem;
@@ -95,14 +93,14 @@ public class UserService {
         final Map<String, UidWithExpiry> uidsMap = context.getUidsCookie().getCookieUids().getUids();
         if (CollectionUtils.isEmpty(uidsMap.values())) {
             metrics.updateUserDetailsRequestPreparationFailed();
-            context.getCacheHttpCalls().put(USER_SERVICE, Collections.singletonList(CacheHttpCall.empty()));
+            context.getDebugHttpCalls().put(USER_SERVICE, Collections.singletonList(DebugHttpCall.empty()));
             return Future.succeededFuture(UserDetails.empty());
         }
 
         final List<UserId> userIds = getUserIds(uidsMap);
         if (CollectionUtils.isEmpty(userIds)) {
             metrics.updateUserDetailsRequestPreparationFailed();
-            context.getCacheHttpCalls().put(USER_SERVICE, Collections.singletonList(CacheHttpCall.empty()));
+            context.getDebugHttpCalls().put(USER_SERVICE, Collections.singletonList(DebugHttpCall.empty()));
             return Future.succeededFuture(UserDetails.empty());
         }
 
@@ -150,11 +148,14 @@ public class UserService {
         try {
             user = parseUserDetailsResponse(responseBody);
         } finally {
-            context.getCacheHttpCalls().put(USER_SERVICE, Collections.singletonList(
-                    CacheHttpCall.of(
-                            CacheHttpRequest.of(requestUrl, requestBody),
-                            CacheHttpResponse.of(responseStatusCode, responseBody),
-                            responseTime)));
+            context.getDebugHttpCalls().put(USER_SERVICE, Collections.singletonList(
+                    DebugHttpCall.builder()
+                            .requestUri(requestUrl)
+                            .requestBody(requestBody)
+                            .responseStatus(responseStatusCode)
+                            .responseBody(responseBody)
+                            .responseTimeMillis(responseTime)
+                            .build()));
         }
         metrics.updateRequestTimeMetric(MetricName.user_details_request_time, responseTime);
         metrics.updateUserDetailsRequestMetric(true);
@@ -199,9 +200,13 @@ public class UserService {
     private Future<UserDetails> failGetDetailsResponse(Throwable exception, AuctionContext context, String requestUrl,
                                                        String requestBody, long startTime) {
         final int responseTime = responseTime(startTime);
-        context.getCacheHttpCalls().putIfAbsent(USER_SERVICE,
-                Collections.singletonList(CacheHttpCall.of(CacheHttpRequest.of(requestUrl, requestBody), null,
-                        responseTime)));
+        context.getDebugHttpCalls().putIfAbsent(USER_SERVICE,
+                Collections.singletonList(
+                        DebugHttpCall.builder()
+                                .requestUri(requestUrl)
+                                .requestBody(requestBody)
+                                .responseTimeMillis(responseTime)
+                                .build()));
         metrics.updateUserDetailsRequestMetric(false);
         metrics.updateRequestTimeMetric(MetricName.user_details_request_time, responseTime);
         logger.warn("Error occurred while fetching user details", exception);

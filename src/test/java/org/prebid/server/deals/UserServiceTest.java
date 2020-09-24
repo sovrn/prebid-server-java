@@ -12,9 +12,8 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.model.AuctionContext;
-import org.prebid.server.cache.model.CacheHttpCall;
 import org.prebid.server.cache.model.CacheHttpRequest;
-import org.prebid.server.cache.model.CacheHttpResponse;
+import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
@@ -115,7 +114,7 @@ public class UserServiceTest extends VertxTest {
         uidsCookie = new UidsCookie(Uids.builder()
                 .uids(singletonMap("rubicon", new UidWithExpiry("uid", null)))
                 .build(), jacksonMapper);
-        auctionContext = AuctionContext.builder().uidsCookie(uidsCookie).cacheHttpCalls(new HashMap<>()).build();
+        auctionContext = AuctionContext.builder().uidsCookie(uidsCookie).debugHttpCalls(new HashMap<>()).build();
 
         timeout = new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())).create(500L);
     }
@@ -125,7 +124,7 @@ public class UserServiceTest extends VertxTest {
         // given
         final UidsCookie uidsCookie = new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper);
         final AuctionContext context = AuctionContext.builder().uidsCookie(uidsCookie)
-                .cacheHttpCalls(new HashMap<>()).build();
+                .debugHttpCalls(new HashMap<>()).build();
 
         // when
         final UserDetails result = userService.getUserDetails(context, timeout).result();
@@ -358,14 +357,14 @@ public class UserServiceTest extends VertxTest {
         // given
         final UidsCookie uidsCookie = new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper);
         final AuctionContext context = AuctionContext.builder().uidsCookie(uidsCookie)
-                .cacheHttpCalls(new HashMap<>()).build();
+                .debugHttpCalls(new HashMap<>()).build();
 
         // when
         userService.getUserDetails(context, timeout).result();
 
         // then
-        assertThat(context.getCacheHttpCalls()).hasSize(1)
-                .containsEntry("userservice", singletonList(CacheHttpCall.empty()));
+        assertThat(context.getDebugHttpCalls()).hasSize(1)
+                .containsEntry("userservice", singletonList(DebugHttpCall.empty()));
     }
 
     @Test
@@ -388,8 +387,8 @@ public class UserServiceTest extends VertxTest {
         userService.getUserDetails(auctionContext, timeout).result();
 
         // then
-        assertThat(auctionContext.getCacheHttpCalls()).hasSize(1)
-                .containsEntry("userservice", singletonList(CacheHttpCall.empty()));
+        assertThat(auctionContext.getDebugHttpCalls()).hasSize(1)
+                .containsEntry("userservice", singletonList(DebugHttpCall.empty()));
     }
 
     @Test
@@ -402,12 +401,15 @@ public class UserServiceTest extends VertxTest {
         userService.getUserDetails(auctionContext, timeout);
 
         // then
-        assertThat(auctionContext.getCacheHttpCalls()).hasSize(1)
-                .containsEntry("userservice", singletonList(CacheHttpCall.of(
-                        CacheHttpRequest.of("http://user-data.com",
-                                mapper.writeValueAsString(UserDetailsRequest.of(UTC_MILLIS_FORMATTER.format(now),
-                                        singletonList(UserId.of("khaos", "uid"))))),
-                        CacheHttpResponse.of(200, "invalid_body"), 0)));
+        assertThat(auctionContext.getDebugHttpCalls()).hasSize(1)
+                .containsEntry("userservice", singletonList(DebugHttpCall.builder()
+                        .requestUri("http://user-data.com")
+                        .requestBody(mapper.writeValueAsString(UserDetailsRequest.of(UTC_MILLIS_FORMATTER.format(now),
+                                singletonList(UserId.of("khaos", "uid")))))
+                        .responseStatus(200)
+                        .responseBody("invalid_body")
+                        .responseTimeMillis(0)
+                        .build()));
     }
 
     @Test
@@ -429,14 +431,18 @@ public class UserServiceTest extends VertxTest {
                         singletonList(UserId.of("khaos", "uid")))));
 
         // then
-        assertThat(auctionContext.getCacheHttpCalls()).hasSize(1)
-                .containsEntry("userservice", singletonList(CacheHttpCall.of(CacheHttpRequest.of("http://user-data.com",
-                        mapper.writeValueAsString(UserDetailsRequest.of(UTC_MILLIS_FORMATTER.format(now),
-                                singletonList(UserId.of("khaos", "uid"))))),
-                        CacheHttpResponse.of(200, mapper.writeValueAsString(
+        assertThat(auctionContext.getDebugHttpCalls()).hasSize(1)
+                .containsEntry("userservice", singletonList(DebugHttpCall.builder()
+                        .requestUri("http://user-data.com")
+                        .requestBody(mapper.writeValueAsString(UserDetailsRequest.of(UTC_MILLIS_FORMATTER.format(now),
+                                singletonList(UserId.of("khaos", "uid")))))
+                        .responseStatus(200)
+                        .responseBody(mapper.writeValueAsString(
                                 UserDetailsResponse.of(User.of(singletonList(UserData.of("1", "rubicon",
                                         asList(Segment.of("2222"), Segment.of("3333")))),
-                                        ExtUser.of(asList("L-1111", "O-2222")))))), 0)));
+                                        ExtUser.of(asList("L-1111", "O-2222"))))))
+                        .responseTimeMillis(0)
+                        .build()));
     }
 
     @Test
@@ -449,12 +455,13 @@ public class UserServiceTest extends VertxTest {
         userService.getUserDetails(auctionContext, timeout);
 
         // then
-        assertThat(auctionContext.getCacheHttpCalls()).hasSize(1)
-                .containsEntry("userservice", singletonList(CacheHttpCall.of(
-                        CacheHttpRequest.of("http://user-data.com",
-                                mapper.writeValueAsString(UserDetailsRequest.of(UTC_MILLIS_FORMATTER.format(now),
-                                        singletonList(UserId.of("khaos", "uid"))))),
-                        null, 0)));
+        assertThat(auctionContext.getDebugHttpCalls()).hasSize(1)
+                .containsEntry("userservice", singletonList(DebugHttpCall.builder()
+                        .requestUri("http://user-data.com")
+                        .requestBody(mapper.writeValueAsString(UserDetailsRequest.of(UTC_MILLIS_FORMATTER.format(now),
+                                singletonList(UserId.of("khaos", "uid")))))
+                        .responseTimeMillis(0)
+                        .build()));
     }
 
     @Test

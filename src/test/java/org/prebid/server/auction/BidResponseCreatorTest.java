@@ -35,11 +35,9 @@ import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheContext;
-import org.prebid.server.cache.model.CacheHttpCall;
-import org.prebid.server.cache.model.CacheHttpRequest;
-import org.prebid.server.cache.model.CacheHttpResponse;
 import org.prebid.server.cache.model.CacheIdInfo;
 import org.prebid.server.cache.model.CacheServiceResult;
+import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.deals.model.DeepDebugLog;
 import org.prebid.server.deals.model.TxnLog;
 import org.prebid.server.events.EventsContext;
@@ -63,6 +61,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
 import org.prebid.server.proto.openrtb.ext.response.Events;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebidVideo;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponsePrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
@@ -463,8 +462,7 @@ public class BidResponseCreatorTest extends VertxTest {
     public void shouldOverrideBidIdWhenGenerateBidIdIsTurnedOn() {
         // given
         final AuctionContext auctionContext = givenAuctionContext(givenBidRequest());
-        final ExtPrebid<ExtBidPrebid, ?> prebid = ExtPrebid.of(ExtBidPrebid.of(null, banner, null,
-                null, null, null, null), null);
+        final ExtPrebid<ExtBidPrebid, ?> prebid = ExtPrebid.of(ExtBidPrebid.builder().type(banner).build(), null);
         final Bid bid = Bid.builder()
                 .id("123")
                 .impid("imp123")
@@ -526,7 +524,7 @@ public class BidResponseCreatorTest extends VertxTest {
                         .price(BigDecimal.ONE)
                         .adm("adm")
                         .ext(mapper.valueToTree(ExtPrebid.of(
-                                ExtBidPrebid.of(null, banner, null, null, null, null, null),
+                                ExtBidPrebid.builder().type(banner).build(),
                                 singletonMap("bidExt", 1))))
                         .build()))
                 .build());
@@ -795,7 +793,7 @@ public class BidResponseCreatorTest extends VertxTest {
                         .impid("i1")
                         .price(BigDecimal.ONE)
                         .ext(mapper.valueToTree(
-                                ExtPrebid.of(ExtBidPrebid.of(null, banner, null, null, null, null, null), null)))
+                                ExtPrebid.of(ExtBidPrebid.builder().type(banner).build(), null)))
                         .build());
 
         verify(cacheService, never()).cacheBidsOpenrtb(anyList(), anyList(), any(), any(), any(), any());
@@ -1440,6 +1438,31 @@ public class BidResponseCreatorTest extends VertxTest {
     }
 
     @Test
+    public void shouldAddExtPrebidVideo() {
+        // given
+        final AuctionContext auctionContext = givenAuctionContext(givenBidRequest());
+
+        final Bid bid = Bid.builder().id("bidId1").price(BigDecimal.valueOf(5.67)).impid("i1").impid("i1")
+                .ext(mapper.createObjectNode().set("prebid", mapper.valueToTree(
+                        ExtBidPrebid.builder().video(ExtBidPrebidVideo.of(1, "category")).build()))).build();
+        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
+                givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
+
+        given(eventsService.winUrlTargeting(anyString(), anyString(), any(), anyLong(), anyString()))
+                .willReturn("http://win-url");
+
+        // when
+        final BidResponse bidResponse =
+                bidResponseCreator.create(bidderResponses, auctionContext, CACHE_INFO, false).result();
+
+        // then
+        assertThat(bidResponse.getSeatbid()).hasSize(1)
+                .flatExtracting(SeatBid::getBid)
+                .extracting(responseBid -> toExtPrebid(responseBid.getExt()).getPrebid().getVideo())
+                .containsOnly(ExtBidPrebidVideo.of(1, "category"));
+    }
+
+    @Test
     public void shouldNotAddExtPrebidEventsIfEventsAreNotEnabled() {
         // given
         final Account account = Account.builder().id("accountId").eventsEnabled(false).build();
@@ -1664,7 +1687,8 @@ public class BidResponseCreatorTest extends VertxTest {
         final BidRequestCacheInfo cacheInfo = BidRequestCacheInfo.builder().doCaching(true).build();
 
         givenCacheServiceResult(CacheServiceResult.of(
-                CacheHttpCall.of(null, null, 666), new RuntimeException("cacheError"), emptyMap()));
+                DebugHttpCall.builder().endpoint("http://cache-service/cache").responseTimeMillis(666).build(),
+                new RuntimeException("cacheError"), emptyMap()));
 
         // when
         final BidResponse bidResponse =
@@ -1876,10 +1900,19 @@ public class BidResponseCreatorTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest();
         final AuctionContext auctionContext = givenAuctionContext(bidRequest);
         givenCacheServiceResult(CacheServiceResult.of(
-                CacheHttpCall.of(CacheHttpRequest.of("test.uri", null), CacheHttpResponse.of(500, null), null),
-                null, emptyMap()));
-        auctionContext.getCacheHttpCalls().put("userservice", singletonList(CacheHttpCall.of(
-                CacheHttpRequest.of("userservice.uri", null), CacheHttpResponse.of(500, null), 200)));
+                DebugHttpCall.builder()
+                        .endpoint("http://cache-service/cache")
+                        .requestUri("test.uri")
+                        .responseStatus(500)
+                        .build(),
+                null,
+                emptyMap()));
+        auctionContext.getDebugHttpCalls().put("userservice", singletonList(
+                DebugHttpCall.builder()
+                        .requestUri("userservice.uri")
+                        .responseStatus(500)
+                        .responseTimeMillis(200)
+                        .build()));
 
         final BidRequestCacheInfo cacheInfo = BidRequestCacheInfo.builder().doCaching(true).build();
 
@@ -2006,7 +2039,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 .txnLog(TxnLog.create())
                 .timeout(timeout)
                 .deepDebugLog(DeepDebugLog.create(false, clock))
-                .cacheHttpCalls(new HashMap<>())
+                .debugHttpCalls(new HashMap<>())
                 .prebidErrors(emptyList());
 
         return contextCustomizer.apply(auctionContextBuilder)

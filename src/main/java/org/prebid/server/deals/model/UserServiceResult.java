@@ -2,7 +2,7 @@ package org.prebid.server.deals.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Value;
-import org.prebid.server.cache.model.CacheHttpCall;
+import org.prebid.server.cache.model.DebugHttpCall;
 
 @AllArgsConstructor(staticName = "of")
 @Value
@@ -10,9 +10,9 @@ public class UserServiceResult {
 
     UserDetails userDetails;
 
-    CacheHttpCall cacheHttpCall;
+    DebugHttpCall cacheHttpCall;
 
     public static UserServiceResult empty() {
-        return UserServiceResult.of(UserDetails.empty(), CacheHttpCall.empty());
+        return UserServiceResult.of(UserDetails.empty(), DebugHttpCall.empty());
     }
 }

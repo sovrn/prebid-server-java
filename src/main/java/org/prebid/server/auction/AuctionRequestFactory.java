@@ -222,7 +222,7 @@ public class AuctionRequestFactory {
                         .account(account)
                         .txnLog(TxnLog.create().accountId(account.getId()))
                         .deepDebugLog(createDeepDebugLog(bidRequest))
-                        .cacheHttpCalls(new HashMap<>())
+                        .debugHttpCalls(new HashMap<>())
                         .prebidErrors(errors)
                         .build());
     }

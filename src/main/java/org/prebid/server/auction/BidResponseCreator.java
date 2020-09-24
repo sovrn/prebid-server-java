@@ -1,6 +1,7 @@
 package org.prebid.server.auction;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.BidRequest;
@@ -34,11 +35,9 @@ import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cache.model.CacheContext;
-import org.prebid.server.cache.model.CacheHttpCall;
-import org.prebid.server.cache.model.CacheHttpRequest;
-import org.prebid.server.cache.model.CacheHttpResponse;
 import org.prebid.server.cache.model.CacheIdInfo;
 import org.prebid.server.cache.model.CacheServiceResult;
+import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.deals.model.DeepDebugLog;
 import org.prebid.server.deals.model.TxnLog;
 import org.prebid.server.events.EventsContext;
@@ -61,6 +60,7 @@ import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.proto.openrtb.ext.response.CacheAsset;
 import org.prebid.server.proto.openrtb.ext.response.Events;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebidVideo;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponsePrebid;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
@@ -95,6 +95,10 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 public class BidResponseCreator {
+
+    private static final TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>> EXT_PREBID_TYPE_REFERENCE =
+            new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
+            };
 
     private static final String CACHE = "cache";
     private static final String PREBID_EXT = "prebid";
@@ -346,7 +350,7 @@ public class BidResponseCreator {
         final DeepDebugLog deepDebugLog = auctionContext.getDeepDebugLog();
 
         final Map<String, List<ExtHttpCall>> httpCalls = debugEnabled
-                ? toExtHttpCalls(bidderResponses, cacheResult, auctionContext.getCacheHttpCalls())
+                ? toExtHttpCalls(bidderResponses, cacheResult, auctionContext.getDebugHttpCalls())
                 : null;
         final BidRequest bidRequest = debugEnabled ? auctionContext.getBidRequest() : null;
         final ExtDebugPgmetrics extDebugPgmetrics = debugEnabled ? toExtDebugPgmetrics(
@@ -471,13 +475,13 @@ public class BidResponseCreator {
 
     private static Map<String, List<ExtHttpCall>> toExtHttpCalls(List<BidderResponse> bidderResponses,
                                                                  CacheServiceResult cacheResult,
-                                                                 Map<String, List<CacheHttpCall>> contextHttpCalls) {
+                                                                 Map<String, List<DebugHttpCall>> contextHttpCalls) {
 
         final Map<String, List<ExtHttpCall>> bidderHttpCalls = bidderResponses.stream()
                 .collect(Collectors.toMap(BidderResponse::getBidder,
                         bidderResponse -> ListUtils.emptyIfNull(bidderResponse.getSeatBid().getHttpCalls())));
 
-        final CacheHttpCall httpCall = cacheResult.getHttpCall();
+        final DebugHttpCall httpCall = cacheResult.getHttpCall();
         final ExtHttpCall cacheExtHttpCall = httpCall != null ? toExtHttpCall(httpCall) : null;
         final Map<String, List<ExtHttpCall>> cacheHttpCalls = cacheExtHttpCall != null
                 ? Collections.singletonMap(CACHE, Collections.singletonList(cacheExtHttpCall))
@@ -495,15 +499,12 @@ public class BidResponseCreator {
         return httpCalls.isEmpty() ? null : httpCalls;
     }
 
-    private static ExtHttpCall toExtHttpCall(CacheHttpCall cacheHttpCall) {
-        final CacheHttpRequest request = cacheHttpCall.getRequest();
-        final CacheHttpResponse response = cacheHttpCall.getResponse();
-
+    private static ExtHttpCall toExtHttpCall(DebugHttpCall debugHttpCall) {
         return ExtHttpCall.builder()
-                .uri(request != null ? request.getUri() : null)
-                .requestbody(request != null ? request.getBody() : null)
-                .status(response != null ? response.getStatusCode() : null)
-                .responsebody(response != null ? response.getBody() : null)
+                .uri(debugHttpCall.getRequestUri())
+                .requestbody(debugHttpCall.getRequestBody())
+                .status(debugHttpCall.getResponseStatus())
+                .responsebody(debugHttpCall.getResponseBody())
                 .build();
     }
 
@@ -673,8 +674,8 @@ public class BidResponseCreator {
         final Map<String, Integer> responseTimeMillis = bidderResponses.stream()
                 .collect(Collectors.toMap(BidderResponse::getBidder, BidderResponse::getResponseTime));
 
-        final CacheHttpCall cacheHttpCall = cacheResult.getHttpCall();
-        final Integer cacheResponseTime = cacheHttpCall != null ? cacheHttpCall.getResponseTimeMillis() : null;
+        final DebugHttpCall debugHttpCall = cacheResult.getHttpCall();
+        final Integer cacheResponseTime = debugHttpCall != null ? debugHttpCall.getResponseTimeMillis() : null;
         if (cacheResponseTime != null) {
             responseTimeMillis.put(CACHE, cacheResponseTime);
         }
@@ -1085,9 +1086,16 @@ public class BidResponseCreator {
                         ? eventsService.createEvent(
                         eventBidId, bidder, account.getId(), lineItemId, auctionTimestamp, integration)
                         : null;
-
-        final ExtBidPrebid prebidExt = ExtBidPrebid.of(
-                generatedBidId, bidType, targetingKeywords, cache, storedVideo, events, null);
+        final ExtBidPrebidVideo extBidPrebidVideo = getExtBidPrebidVideo(bid.getExt());
+        final ExtBidPrebid prebidExt = ExtBidPrebid.builder()
+                .bidid(generatedBidId)
+                .type(bidType)
+                .targeting(targetingKeywords)
+                .cache(cache)
+                .storedRequestAttributes(storedVideo)
+                .events(events)
+                .video(extBidPrebidVideo)
+                .build();
 
         final ExtPrebid<ExtBidPrebid, ObjectNode> bidExt = ExtPrebid.of(prebidExt, bid.getExt());
         bid.setExt(mapper.mapper().valueToTree(bidExt));
@@ -1190,7 +1198,6 @@ public class BidResponseCreator {
         }
 
         final Map<BidType, TargetingKeywordsCreator> result = new EnumMap<>(BidType.class);
-        final int resolvedTruncateAttrChars = resolveTruncateAttrChars(targeting, account);
 
         final ObjectNode banner = mediaTypePriceGranularity.getBanner();
         final boolean isBannerNull = banner == null || banner.isNull();
@@ -1284,5 +1291,15 @@ public class BidResponseCreator {
             return null;
         }
         return Collections.unmodifiableMap(map);
+    }
+
+    /**
+     * Creates {@link ExtBidPrebidVideo} from bid extension.
+     */
+    private ExtBidPrebidVideo getExtBidPrebidVideo(ObjectNode bidExt) {
+        final ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid = mapper.mapper()
+                .convertValue(bidExt, EXT_PREBID_TYPE_REFERENCE);
+        final ExtBidPrebid extBidPrebid = extPrebid != null ? extPrebid.getPrebid() : null;
+        return extBidPrebid != null ? extBidPrebid.getVideo() : null;
     }
 }

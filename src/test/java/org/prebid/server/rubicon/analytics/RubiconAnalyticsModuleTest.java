@@ -1124,10 +1124,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .price(BigDecimal.valueOf(4.56))
                                         .w(500)
                                         .h(600)
-                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
-                                                "bidId1",
-                                                BidType.video,
-                                                singletonMap("key1", "value1"), null, null, null, null), null)))
+                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder()
+                                                .bidid("bidId1")
+                                                .type(BidType.video)
+                                                .targeting(singletonMap("key1", "value1"))
+                                                .build(), null)))
                                         .build()))
                                 .build(),
                         SeatBid.builder()
@@ -1140,10 +1141,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .price(BigDecimal.valueOf(5.67))
                                                 .w(600)
                                                 .h(700)
-                                                .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
-                                                        "bidId2",
-                                                        BidType.video,
-                                                        singletonMap("key21", "value21"), null, null, null, null),
+                                                .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder()
+                                                                .bidid("bidId2")
+                                                                .type(BidType.video)
+                                                                .targeting(singletonMap("key21", "value21"))
+                                                                .build(),
                                                         null)))
                                                 .build(),
                                         Bid.builder()
@@ -1153,10 +1155,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .price(BigDecimal.valueOf(6.78))
                                                 .w(600)
                                                 .h(700)
-                                                .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.of(
-                                                        null,
-                                                        BidType.video,
-                                                        singletonMap("key22", "value22"), null, null, null, null),
+                                                .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder()
+                                                                .bidid(null)
+                                                                .type(BidType.video)
+                                                                .targeting(singletonMap("key22", "value22"))
+                                                                .build(),
                                                         null)))
                                                 .build()))
                                 .build()))

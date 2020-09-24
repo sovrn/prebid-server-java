@@ -16,12 +16,11 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.cache.model.CacheContext;
-import org.prebid.server.cache.model.CacheHttpCall;
 import org.prebid.server.cache.model.CacheHttpRequest;
-import org.prebid.server.cache.model.CacheHttpResponse;
 import org.prebid.server.cache.model.CacheIdInfo;
 import org.prebid.server.cache.model.CacheServiceResult;
 import org.prebid.server.cache.model.CacheTtl;
+import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.cache.proto.BidCacheResult;
 import org.prebid.server.cache.proto.request.BannerValue;
 import org.prebid.server.cache.proto.request.BidCacheRequest;
@@ -427,10 +426,12 @@ public class CacheServiceTest extends VertxTest {
 
         // then
         final CacheServiceResult result = future.result();
+        final CacheHttpRequest request = givenCacheHttpRequest(bid);
         assertThat(result.getCacheBids()).isEmpty();
         assertThat(result.getError()).isInstanceOf(RuntimeException.class).hasMessage("Response exception");
         assertThat(result.getHttpCall()).isNotNull()
-                .isEqualTo(CacheHttpCall.of(givenCacheHttpRequest(bid), null, 0));
+                .isEqualTo(DebugHttpCall.builder().requestUri(request.getUri()).requestBody(request.getBody())
+                        .endpoint("http://cache-service/cache").responseTimeMillis(0).build());
     }
 
     @Test
@@ -451,11 +452,13 @@ public class CacheServiceTest extends VertxTest {
 
         // then
         final CacheServiceResult result = future.result();
+        final CacheHttpRequest request = givenCacheHttpRequest(bid);
         assertThat(result.getCacheBids()).isEmpty();
         assertThat(result.getError()).isInstanceOf(PreBidException.class).hasMessage("HTTP status code 503");
         assertThat(result.getHttpCall()).isNotNull()
-                .isEqualTo(CacheHttpCall.of(givenCacheHttpRequest(bid),
-                        CacheHttpResponse.of(503, "response"), 0));
+                .isEqualTo(DebugHttpCall.builder().endpoint("http://cache-service/cache")
+                        .requestBody(request.getBody()).requestUri(request.getUri()).responseStatus(503)
+                        .responseBody("response").responseTimeMillis(0).build());
     }
 
     @Test
@@ -476,11 +479,13 @@ public class CacheServiceTest extends VertxTest {
 
         // then
         final CacheServiceResult result = future.result();
+        final CacheHttpRequest request = givenCacheHttpRequest(bid);
         assertThat(result.getCacheBids()).isEmpty();
         assertThat(result.getError()).isInstanceOf(PreBidException.class).hasMessage("Cannot parse response: response");
         assertThat(result.getHttpCall()).isNotNull()
-                .isEqualTo(CacheHttpCall.of(givenCacheHttpRequest(bid),
-                        CacheHttpResponse.of(200, "response"), 0));
+                .isEqualTo(DebugHttpCall.builder().endpoint("http://cache-service/cache")
+                        .requestUri(request.getUri()).requestBody(request.getBody())
+                        .responseStatus(200).responseBody("response").responseTimeMillis(0).build());
     }
 
     @Test
@@ -502,12 +507,14 @@ public class CacheServiceTest extends VertxTest {
 
         // then
         final CacheServiceResult result = future.result();
+        final CacheHttpRequest request = givenCacheHttpRequest(bid);
         assertThat(result.getCacheBids()).isEmpty();
         assertThat(result.getError()).isNotNull().isInstanceOf(PreBidException.class)
                 .hasMessage("The number of response cache objects doesn't match with bids");
         assertThat(result.getHttpCall()).isNotNull()
-                .isEqualTo(CacheHttpCall.of(givenCacheHttpRequest(bid),
-                        CacheHttpResponse.of(200, "{}"), 0));
+                .isEqualTo(DebugHttpCall.builder().endpoint("http://cache-service/cache")
+                        .requestBody(request.getBody()).requestUri(request.getUri())
+                        .responseStatus(200).responseBody("{}").responseTimeMillis(0).build());
     }
 
     @Test
@@ -526,9 +533,12 @@ public class CacheServiceTest extends VertxTest {
 
         // then
         final CacheServiceResult result = future.result();
+        final CacheHttpRequest request = givenCacheHttpRequest(bid);
         assertThat(result.getHttpCall()).isNotNull()
-                .isEqualTo(CacheHttpCall.of(givenCacheHttpRequest(bid),
-                        CacheHttpResponse.of(200, "{\"responses\":[{\"uuid\":\"uuid1\"}]}"), 0));
+                .isEqualTo(DebugHttpCall.builder().endpoint("http://cache-service/cache")
+                        .requestUri(request.getUri()).requestBody(request.getBody())
+                        .responseStatus(200).responseBody("{\"responses\":[{\"uuid\":\"uuid1\"}]}")
+                        .responseTimeMillis(0).build());
     }
 
     @Test
