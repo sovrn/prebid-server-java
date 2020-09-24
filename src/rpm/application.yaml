@@ -37,6 +37,8 @@ adapters:
     enabled: true
   adgeneration:
     enabled: true
+  adhese:
+    enabled: true
   appnexus:
     enabled: true
   brightroll:
@@ -53,15 +55,23 @@ adapters:
     enabled: true
   pubmatic:
     enabled: true
+  pubnative:
+    enabled: true
   pulsepoint:
+    enabled: true
+  rtbhouse:
     enabled: true
   rubicon:
     enabled: true
   sovrn:
     enabled: true
+  tappx:
+    enabled: true
   triplelift:
     enabled: true
   ttx:
+    enabled: true
+  vrtcal:
     enabled: true
   yieldmo:
     enabled: true
