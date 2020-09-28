@@ -74,11 +74,13 @@ public class DeliveryProgressService implements ApplicationEventProcessor {
      */
     public DeliveryProgressReport getOverallDeliveryProgressReport() {
         final DeliveryProgress overallDeliveryProgressCopy =
-                DeliveryProgress.fromAnotherCopyingPlans(overallDeliveryProgress);
+                overallDeliveryProgress.copyWithOriginalPlans();
 
-        lineItemService.getLineItemIds()
-                .forEach(key -> overallDeliveryProgressCopy.getLineItemStatuses()
-                        .putIfAbsent(key, LineItemStatus.of(key)));
+        lineItemService.getLineItems()
+                .forEach(lineItem -> overallDeliveryProgressCopy.getLineItemStatuses()
+                        .putIfAbsent(lineItem.getLineItemId(), LineItemStatus.of(lineItem.getLineItemId(),
+                                lineItem.getSource(), lineItem.getDealId(), lineItem.getExtLineItemId(),
+                                lineItem.getAccountId())));
 
         overallDeliveryProgressCopy.mergeFrom(currentDeliveryProgress);
         return deliveryProgressReportFactory.fromDeliveryProgress(overallDeliveryProgressCopy, ZonedDateTime.now(clock),
@@ -135,7 +137,7 @@ public class DeliveryProgressService implements ApplicationEventProcessor {
     }
 
     /**
-     * Prepare report from statuses to send it to planner.
+     * Prepare report from statuses to send it to delivery stats.
      */
     public void createDeliveryProgressReports(ZonedDateTime now) {
         final DeliveryProgress deliveryProgressToReport = currentDeliveryProgress;

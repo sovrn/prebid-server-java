@@ -158,11 +158,16 @@ public class DealsConfiguration {
                 ApplicationEventService applicationEventService,
                 @Value("${auction.ad-server-currency}") String adServerCurrency,
                 Clock clock,
-                JacksonMapper mapper,
                 CriteriaLogManager criteriaLogManager) {
 
-            return new LineItemService(maxDealsPerBidder, targetingService, bidderCatalog, conversionService,
-                    applicationEventService, adServerCurrency, clock, mapper, criteriaLogManager);
+            return new LineItemService(maxDealsPerBidder,
+                    targetingService,
+                    bidderCatalog,
+                    conversionService,
+                    applicationEventService,
+                    adServerCurrency,
+                    clock,
+                    criteriaLogManager);
         }
 
         @Bean
@@ -446,11 +451,16 @@ public class DealsConfiguration {
                 ApplicationEventService applicationEventService,
                 @Value("${auction.ad-server-currency}") String adServerCurrency,
                 Clock clock,
-                JacksonMapper mapper,
                 CriteriaLogManager criteriaLogManager) {
 
-            return new SimulationAwareLineItemService(maxDealsPerBidder, targetingService, bidderCatalog,
-                    conversionService, applicationEventService, adServerCurrency, clock, mapper,
+            return new SimulationAwareLineItemService(
+                    maxDealsPerBidder,
+                    targetingService,
+                    bidderCatalog,
+                    conversionService,
+                    applicationEventService,
+                    adServerCurrency,
+                    clock,
                     criteriaLogManager);
         }
 

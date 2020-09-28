@@ -103,8 +103,6 @@ public class DeliveryProgressServiceTest extends VertxTest {
         given(lineItemService.getLineItemById(anyString())).willReturn(
                 lineItem12);
 
-        given(lineItemService.getLineItemIds()).willReturn(singleton("lineItem2"));
-
         // when
         deliveryProgressService.processDeliveryProgressUpdateEvent();
         recordLineItemsServed(40, "lineItem1");
@@ -122,7 +120,7 @@ public class DeliveryProgressServiceTest extends VertxTest {
         assertThat(overallProgress).isNotNull();
         assertThat(overallProgress.getLineItemStatuses()).isNotNull();
         assertThat(overallProgress.getLineItemStatuses().keySet())
-                .containsOnly("lineItem1", "lineItem2");
+                .containsOnly("lineItem1");
         final LineItemStatus overallLineItemStatus = overallProgress.getLineItemStatuses().get("lineItem1");
         assertThat(overallLineItemStatus).isNotNull();
         assertThat(overallLineItemStatus.getDeliveryPlans())

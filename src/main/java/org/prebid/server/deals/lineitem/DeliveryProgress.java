@@ -41,21 +41,21 @@ public class DeliveryProgress {
         return new DeliveryProgress(startTimeStamp, lineItemService);
     }
 
-    public static DeliveryProgress fromAnotherCopyingPlans(DeliveryProgress another) {
-        final DeliveryProgress progress = DeliveryProgress.of(another.getStartTimeStamp(),
-                another.lineItemService);
+    public DeliveryProgress copyWithOriginalPlans() {
+        final DeliveryProgress progress = DeliveryProgress.of(this.getStartTimeStamp(),
+                this.lineItemService);
 
-        for (final LineItemStatus originalStatus : another.lineItemStatuses.values()) {
+        for (final LineItemStatus originalStatus : this.lineItemStatuses.values()) {
             progress.lineItemStatuses.put(originalStatus.getLineItemId(), createStatusWithPlans(originalStatus));
         }
 
-        progress.mergeFrom(another);
+        progress.mergeFrom(this);
 
         return progress;
     }
 
-    private static LineItemStatus createStatusWithPlans(LineItemStatus originalStatus) {
-        final LineItemStatus status = LineItemStatus.of(originalStatus.getLineItemId());
+    private LineItemStatus createStatusWithPlans(LineItemStatus originalStatus) {
+        final LineItemStatus status = createLineItemStatus(originalStatus.getLineItemId());
         status.getDeliveryPlans().addAll(originalStatus.getDeliveryPlans());
         return status;
     }
@@ -104,7 +104,7 @@ public class DeliveryProgress {
      * exists.
      */
     public void recordWinEvent(String lineItemId) {
-        final LineItemStatus lineItemStatus = lineItemStatuses.computeIfAbsent(lineItemId, LineItemStatus::of);
+        final LineItemStatus lineItemStatus = lineItemStatuses.computeIfAbsent(lineItemId, this::createLineItemStatus);
         final Event winEvent = lineItemStatus.getEvents().stream()
                 .filter(event -> event.getType().equals(WIN_EVENT_TYPE))
                 .findAny()
@@ -112,6 +112,13 @@ public class DeliveryProgress {
 
         winEvent.getCount().increment();
         lineItemStatus.getEvents().add(winEvent);
+    }
+
+    private LineItemStatus createLineItemStatus(String lineItemId) {
+        final LineItem lineItem = lineItemService.getLineItemById(lineItemId);
+        return lineItem != null
+                ? LineItemStatus.of(lineItem)
+                : LineItemStatus.of(lineItemId);
     }
 
     /**
@@ -124,7 +131,7 @@ public class DeliveryProgress {
                 mergeRequestsCount(accountId, requestsCount, requestsPerAccount));
 
         another.lineItemStatuses.forEach((lineItemId, lineItemStatus) ->
-                lineItemStatuses.computeIfAbsent(lineItemId, LineItemStatus::of).merge(lineItemStatus));
+                lineItemStatuses.computeIfAbsent(lineItemId, this::createLineItemStatus).merge(lineItemStatus));
 
         another.lineItemIdToLost.forEach((lineItemId, currentLineItemLost) ->
                 mergeCurrentLineItemLostReportToOverall(lineItemId, currentLineItemLost, lineItemIdToLost));
@@ -135,7 +142,7 @@ public class DeliveryProgress {
         final LineItemStatus existingLineItemStatus = lineItemStatuses.get(lineItemId);
         final DeliveryPlan activeDeliveryPlan = lineItem.getActiveDeliveryPlan();
         if (existingLineItemStatus == null) {
-            final LineItemStatus lineItemStatus = LineItemStatus.of(lineItem.getLineItemId());
+            final LineItemStatus lineItemStatus = createLineItemStatus(lineItem.getLineItemId());
             lineItemStatus.getDeliveryPlans().add(activeDeliveryPlan);
             lineItemStatuses.put(lineItemId, lineItemStatus);
         } else {
@@ -148,7 +155,7 @@ public class DeliveryProgress {
      */
     public void mergePlanFromLineItem(LineItem lineItem) {
         final LineItemStatus currentLineItemStatus = lineItemStatuses.computeIfAbsent(lineItem.getLineItemId(),
-                LineItemStatus::of);
+                this::createLineItemStatus);
         final DeliveryPlan updatedDeliveryPlan = lineItem.getActiveDeliveryPlan();
 
         final Set<DeliveryPlan> deliveryPlans = currentLineItemStatus.getDeliveryPlans();
@@ -222,7 +229,7 @@ public class DeliveryProgress {
 
     public void updateWithActiveLineItems(Collection<LineItem> lineItems) {
         lineItems.forEach(lineItem -> lineItemStatuses.putIfAbsent(lineItem.getLineItemId(),
-                LineItemStatus.of(lineItem.getLineItemId())));
+                createLineItemStatus(lineItem.getLineItemId())));
     }
 
     public Map<String, LineItemStatus> getLineItemStatuses() {
@@ -265,7 +272,7 @@ public class DeliveryProgress {
      * Increments {@link LineItemStatus} metric, creates line item status if does not exist.
      */
     private void increment(String lineItemId, Consumer<LineItemStatus> inc) {
-        inc.accept(lineItemStatuses.computeIfAbsent(lineItemId, LineItemStatus::of));
+        inc.accept(lineItemStatuses.computeIfAbsent(lineItemId, this::createLineItemStatus));
     }
 
     /**

@@ -15,6 +15,14 @@ public class LineItemStatus {
 
     String lineItemId;
 
+    String source;
+
+    String dealId;
+
+    String extLineItemId;
+
+    String accountId;
+
     LongAdder domainMatched;
 
     LongAdder targetMatched;
@@ -43,8 +51,12 @@ public class LineItemStatus {
 
     Set<DeliveryPlan> deliveryPlans;
 
-    private LineItemStatus(String lineItemId) {
+    private LineItemStatus(String lineItemId, String source, String dealId, String extLineItemId, String accountId) {
         this.lineItemId = lineItemId;
+        this.source = source;
+        this.dealId = dealId;
+        this.extLineItemId = extLineItemId;
+        this.accountId = accountId;
 
         domainMatched = new LongAdder();
         targetMatched = new LongAdder();
@@ -63,8 +75,18 @@ public class LineItemStatus {
         deliveryPlans = new ConcurrentHashSet<>();
     }
 
+    public static LineItemStatus of(String lineItemId, String source, String dealId, String extLineItemId,
+                                    String accountId) {
+        return new LineItemStatus(lineItemId, source, dealId, extLineItemId, accountId);
+    }
+
+    public static LineItemStatus of(LineItem lineItem) {
+        return new LineItemStatus(lineItem.getLineItemId(), lineItem.getSource(), lineItem.getDealId(),
+                lineItem.getExtLineItemId(), lineItem.getAccountId());
+    }
+
     public static LineItemStatus of(String lineItemId) {
-        return new LineItemStatus(lineItemId);
+        return new LineItemStatus(lineItemId, null, null, null, null);
     }
 
     public void incDomainMatched() {

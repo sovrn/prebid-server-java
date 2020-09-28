@@ -162,12 +162,13 @@ public class DeliveryProgressTest extends VertxTest {
 
         final LineItem lineItem = mock(LineItem.class);
         given(lineItemService.getLineItemById("lineItemId1")).willReturn(lineItem);
+        given(lineItem.getLineItemId()).willReturn("lineItemId1");
         given(lineItem.getActiveDeliveryPlan()).willReturn(DeliveryPlan.of(givenDeliverySchedule(now, "planId1")));
 
         deliveryProgress.recordTransactionLog(txnLog, singletonMap("planId1", 1));
-        // when
 
-        final DeliveryProgress copiedDeliveryProgress = DeliveryProgress.fromAnotherCopyingPlans(deliveryProgress);
+        // when
+        final DeliveryProgress copiedDeliveryProgress = deliveryProgress.copyWithOriginalPlans();
 
         // then
         final LineItemStatus lineItemStatusCopied = copiedDeliveryProgress.getLineItemStatuses().get("lineItemId1");

@@ -100,7 +100,7 @@ public class LineItemServiceTest extends VertxTest {
                 .willReturn(BigDecimal.ONE);
 
         lineItemService = new LineItemService(2, targetingService, bidderCatalog, conversionService,
-                applicationEventService, "USD", clock, jacksonMapper, criteriaLogManager);
+                applicationEventService, "USD", clock, criteriaLogManager);
     }
 
     @Test
@@ -290,7 +290,7 @@ public class LineItemServiceTest extends VertxTest {
         // given
         final String defaultCurrency = "RUB";
         lineItemService = new LineItemService(2, targetingService, bidderCatalog, conversionService,
-                applicationEventService, defaultCurrency, clock, jacksonMapper, criteriaLogManager);
+                applicationEventService, defaultCurrency, clock, criteriaLogManager);
 
         final List<LineItemMetaData> planResponse = asList(
                 givenLineItemMetaData("lineItem1", null, null,
@@ -1698,7 +1698,7 @@ public class LineItemServiceTest extends VertxTest {
         givenBidderCatalog();
 
         lineItemService = new LineItemService(3, targetingService, bidderCatalog, conversionService,
-                applicationEventService, "USD", clock, jacksonMapper, criteriaLogManager);
+                applicationEventService, "USD", clock, criteriaLogManager);
 
         final List<LineItemMetaData> planResponse = asList(
                 givenLineItemMetaData("id1", now, "1",

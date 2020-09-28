@@ -8,7 +8,6 @@ import org.prebid.server.deals.LineItemService;
 import org.prebid.server.deals.TargetingService;
 import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.deals.model.MatchLineItemsResult;
-import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.util.HttpUtil;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,11 +25,10 @@ public class SimulationAwareLineItemService extends LineItemService {
                                           ApplicationEventService applicationEventService,
                                           @Value("${auction.ad-server-currency}}") String adServerCurrency,
                                           Clock clock,
-                                          JacksonMapper mapper,
                                           CriteriaLogManager criteriaLogManager) {
 
         super(maxDealsPerBidder, targetingService, bidderCatalog, conversionService, applicationEventService,
-                adServerCurrency, clock, mapper, criteriaLogManager);
+                adServerCurrency, clock, criteriaLogManager);
     }
 
     @Override

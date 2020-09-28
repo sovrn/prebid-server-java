@@ -70,7 +70,7 @@ public class DeliveryProgressReportFactory {
                 .vendor(deploymentProperties.getPbsVendor())
                 .clientAuctions(deliveryProgress.getRequests().sum())
                 .lineItemStatus(makeLineItemStatusReports(deliveryProgress, lineItemStatuses,
-                        deliveryProgress.getLineItemStatuses(), isOverall, now))
+                        deliveryProgress.getLineItemStatuses(), isOverall))
                 .build();
     }
 
@@ -94,7 +94,7 @@ public class DeliveryProgressReportFactory {
         final int batchesNumber = lineItemsCount / batchSize + (lineItemsCount % batchSize > 0 ? 1 : 0);
         final Set<DeliveryProgressReport> reportsBatch = IntStream.range(0, batchesNumber)
                 .mapToObj(batchNumber -> updateReportWithLineItems(deliveryProgress, lineItemStatuses,
-                        overallLineItemStatuses, lineItemsCount, batchNumber, batchSize, now, isOverall))
+                        overallLineItemStatuses, lineItemsCount, batchNumber, batchSize, isOverall))
                 .map(deliveryProgressReport -> deliveryProgressReport
                         .reportId(reportId)
                         .reportTimeStamp(reportTimeStamp)
@@ -118,7 +118,6 @@ public class DeliveryProgressReportFactory {
             int lineItemsCount,
             int batchNumber,
             int batchSize,
-            ZonedDateTime now,
             boolean isOverall) {
         final int startBatchIndex = batchNumber * batchSize;
         final int endBatchIndex = (batchNumber + 1) * batchSize;
@@ -126,21 +125,21 @@ public class DeliveryProgressReportFactory {
                 lineItemStatuses.subList(startBatchIndex, Math.min(endBatchIndex, lineItemsCount));
         return DeliveryProgressReport.builder()
                 .lineItemStatus(makeLineItemStatusReports(deliveryProgress, batchList,
-                        overallLineItemStatuses, isOverall, now));
+                        overallLineItemStatuses, isOverall));
     }
 
     private Set<LineItemStatus> makeLineItemStatusReports(
             DeliveryProgress deliveryProgress,
             List<org.prebid.server.deals.lineitem.LineItemStatus> lineItemStatuses,
             Map<String, org.prebid.server.deals.lineitem.LineItemStatus> overallLineItemStatuses,
-            boolean isOverall, ZonedDateTime now) {
+            boolean isOverall) {
 
         return lineItemStatuses.stream()
                 .map(lineItemStatus -> toLineItemStatusReport(lineItemStatus,
                         overallLineItemStatuses != null
                                 ? overallLineItemStatuses.get(lineItemStatus.getLineItemId())
                                 : null,
-                        deliveryProgress, isOverall, now))
+                        deliveryProgress, isOverall))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
@@ -168,8 +167,7 @@ public class DeliveryProgressReportFactory {
 
     private LineItemStatus toLineItemStatusReport(org.prebid.server.deals.lineitem.LineItemStatus lineItemStatus,
                                                   org.prebid.server.deals.lineitem.LineItemStatus overallLineItemStatus,
-                                                  DeliveryProgress deliveryProgress, boolean isOverall,
-                                                  ZonedDateTime now) {
+                                                  DeliveryProgress deliveryProgress, boolean isOverall) {
         final String lineItemId = lineItemStatus.getLineItemId();
         final LineItem lineItem = lineItemService.getLineItemById(lineItemId);
         if (isOverall && lineItem == null) {
@@ -183,11 +181,15 @@ public class DeliveryProgressReportFactory {
         }
 
         return LineItemStatus.builder()
-                .lineItemSource(ObjectUtils.getIfNotNull(lineItem, LineItem::getSource))
+                .lineItemSource(ObjectUtils.firstNonNull(lineItemStatus::getSource,
+                        () -> ObjectUtils.getIfNotNull(lineItem, LineItem::getSource)))
                 .lineItemId(lineItemId)
-                .dealId(ObjectUtils.getIfNotNull(lineItem, LineItem::getDealId))
-                .extLineItemId(ObjectUtils.getIfNotNull(lineItem, LineItem::getExtLineItemId))
-                .accountAuctions(accountRequests(lineItem, deliveryProgress))
+                .dealId(ObjectUtils.firstNonNull(lineItemStatus::getDealId,
+                        () -> ObjectUtils.getIfNotNull(lineItem, LineItem::getDealId)))
+                .extLineItemId(ObjectUtils.firstNonNull(lineItemStatus::getExtLineItemId,
+                        () -> ObjectUtils.getIfNotNull(lineItem, LineItem::getExtLineItemId)))
+                .accountAuctions(accountRequests(ObjectUtils.firstNonNull(lineItemStatus::getAccountId,
+                        () -> ObjectUtils.getIfNotNull(lineItem, LineItem::getAccountId)), deliveryProgress))
                 .domainMatched(lineItemStatus.getDomainMatched().sum())
                 .targetMatched(lineItemStatus.getTargetMatched().sum())
                 .targetMatchedButFcapped(lineItemStatus.getTargetMatchedButFcapped().sum())
@@ -215,8 +217,7 @@ public class DeliveryProgressReportFactory {
         return readyAt != null ? UTC_MILLIS_FORMATTER.format(readyAt) : null;
     }
 
-    private Long accountRequests(LineItem lineItem, DeliveryProgress deliveryProgress) {
-        final String accountId = ObjectUtils.getIfNotNull(lineItem, LineItem::getAccountId);
+    private Long accountRequests(String accountId, DeliveryProgress deliveryProgress) {
         final LongAdder accountRequests = accountId != null
                 ? deliveryProgress.getRequestsPerAccount().get(accountId)
                 : null;

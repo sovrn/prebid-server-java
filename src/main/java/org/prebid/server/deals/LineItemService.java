@@ -21,7 +21,6 @@ import org.prebid.server.deals.proto.LineItemMetaData;
 import org.prebid.server.deals.proto.Price;
 import org.prebid.server.deals.targeting.TargetingDefinition;
 import org.prebid.server.exception.TargetingSyntaxException;
-import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.CriteriaLogManager;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
@@ -76,7 +75,6 @@ public class LineItemService {
     protected final ApplicationEventService applicationEventService;
     private final String adServerCurrency;
     private final Clock clock;
-    private final JacksonMapper mapper;
     private final CriteriaLogManager criteriaLogManager;
 
     protected final Map<String, LineItem> idToLineItems;
@@ -89,7 +87,6 @@ public class LineItemService {
                            ApplicationEventService applicationEventService,
                            String adServerCurrency,
                            Clock clock,
-                           JacksonMapper mapper,
                            CriteriaLogManager criteriaLogManager) {
 
         this.maxDealsPerBidder = maxDealsPerBidder;
@@ -99,7 +96,6 @@ public class LineItemService {
         this.applicationEventService = Objects.requireNonNull(applicationEventService);
         this.adServerCurrency = Objects.requireNonNull(adServerCurrency);
         this.clock = Objects.requireNonNull(clock);
-        this.mapper = Objects.requireNonNull(mapper);
         this.criteriaLogManager = Objects.requireNonNull(criteriaLogManager);
 
         idToLineItems = new ConcurrentHashMap<>();
