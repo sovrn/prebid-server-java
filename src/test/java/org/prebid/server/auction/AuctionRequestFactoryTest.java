@@ -1893,6 +1893,21 @@ public class AuctionRequestFactoryTest extends VertxTest {
     }
 
     @Test
+    public void shouldNotUpdatePublisherIfResolvedAccountIsEmpty() {
+        // given
+        givenValidBidRequest();
+
+        // when
+        final BidRequest bidRequest = factory.fromRequest(routingContext, 0L).result().getBidRequest();
+
+        // then
+        assertThat(singleton(bidRequest))
+                .extracting(BidRequest::getSite)
+                .extracting(Site::getPublisher)
+                .containsNull();
+    }
+
+    @Test
     public void shouldReturnAuctionContextWithTxnLog() {
         // given
         givenBidRequest(BidRequest.builder()

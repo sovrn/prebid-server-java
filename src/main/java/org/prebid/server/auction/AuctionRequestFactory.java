@@ -1078,7 +1078,7 @@ public class AuctionRequestFactory {
                 && site != null) {
             final Publisher publisher = site.getPublisher();
             final String publisherId = publisher != null ? publisher.getId() : null;
-            if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
+            if (!Objects.equals(publisherId, accountId)) {
                 return site.toBuilder()
                         .publisher(updatePublisherId(publisher, accountId))
                         .build();
@@ -1095,7 +1095,7 @@ public class AuctionRequestFactory {
                 && app != null) {
             final Publisher publisher = app.getPublisher();
             final String publisherId = publisher != null ? publisher.getId() : null;
-            if (publisherId == null || ObjectUtils.notEqual(publisher, accountId)) {
+            if (!Objects.equals(publisherId, accountId)) {
                 return app.toBuilder()
                         .publisher(updatePublisherId(publisher, accountId))
                         .build();
