@@ -395,12 +395,15 @@ public class CacheServiceTest extends VertxTest {
         // when
         cacheService.cacheBidsOpenrtb(
                 singletonList(bid),
-                givenAuctionContext(bidRequestBuilder -> bidRequestBuilder
-                        .imp(singletonList(givenImp(builder -> builder.id("impId1").pmp(Pmp.builder()
-                                .deals(singletonList(Deal.builder().id("dealId")
-                                        .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of("lineItemId", null, null,
-                                                null)))).build()))
-                                .build()))))),
+                givenAuctionContext(
+                        accountBuilder -> accountBuilder.eventsEnabled(true),
+                        bidRequestBuilder -> bidRequestBuilder
+                                .imp(singletonList(givenImp(builder -> builder.id("impId1").pmp(Pmp.builder()
+                                        .deals(singletonList(Deal.builder().id("dealId")
+                                                .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of("lineItemId", null,
+                                                        null,
+                                                        null)))).build()))
+                                        .build()))))),
                 CacheContext.builder()
                         .shouldCacheBids(true)
                         .bidderToBidIds(singletonMap("bidder", singletonList("bidId1")))
@@ -408,7 +411,8 @@ public class CacheServiceTest extends VertxTest {
                 EventsContext.builder().enabledForAccountAndRequest(true).build());
 
         // then
-        verify(eventsService).winUrl(eq("bidId1"), eq("bidder"), eq("accountId"), isNull(), isNull());
+        verify(eventsService).winUrl(eq("bidId1"), eq("bidder"), eq("accountId"), eq("lineItemId"), eq(true),
+                isNull(), isNull());
     }
 
     @Test
@@ -980,14 +984,15 @@ public class CacheServiceTest extends VertxTest {
         // when
         cacheService.cacheBidsOpenrtb(
                 singletonList(bid),
-                givenAuctionContext(bidRequestBuilder -> bidRequestBuilder.imp(singletonList(imp1))),
+                givenAuctionContext(
+                        bidRequestBuilder -> bidRequestBuilder.imp(singletonList(imp1))),
                 CacheContext.builder()
                         .shouldCacheBids(true)
                         .shouldCacheVideoBids(true)
                         .bidderToVideoBidIdsToModify(singletonMap("bidder", singletonList("bid1")))
                         .bidderToBidIds(singletonMap("bidder", singletonList("bid1")))
                         .build(),
-                eventsContext);
+                EventsContext.builder().enabledForAccountAndRequest(true).build());
 
         // then
         final BidCacheRequest bidCacheRequest = captureBidCacheRequest();
@@ -1029,7 +1034,7 @@ public class CacheServiceTest extends VertxTest {
                         .bidderToVideoBidIdsToModify(singletonMap("bidder", singletonList("bid1")))
                         .bidderToBidIds(singletonMap("bidder", singletonList("bid1")))
                         .build(),
-                eventsContext);
+                EventsContext.builder().enabledForAccountAndRequest(true).build());
 
         // then
         final BidCacheRequest bidCacheRequest = captureBidCacheRequest();

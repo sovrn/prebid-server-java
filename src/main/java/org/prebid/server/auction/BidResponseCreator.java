@@ -1160,6 +1160,7 @@ public class BidResponseCreator {
                 bidder,
                 account.getId(),
                 lineItemId,
+                eventsContext.isEnabledForAccountAndRequest(),
                 eventsContext.getAuctionTimestamp(),
                 eventsContext.getIntegration())
                 : null;

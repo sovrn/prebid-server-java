@@ -26,8 +26,8 @@
                 "hb_deal": "rubicon-dealId1"
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=impId1-lineItem1&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem1",
-                "imp": "http://localhost:8080/event?t=imp&b=impId1-lineItem1&a=2001&ts=1000&bidder=rubicon&f=i&int=&l=lineItem1"
+                "win": "http://localhost:8080/event?t=win&b=impId1-lineItem1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1",
+                "imp": "http://localhost:8080/event?t=imp&b=impId1-lineItem1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1"
               }
             }
           }
