@@ -17,7 +17,6 @@
               "type": "banner",
               "targeting": {
                 "hb_deal_rubicon": "rubicon-dealId1",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem1",
                 "hb_cache_id": "3f37ff80-b395-449f-a80e-c21a38bb6eec",
                 "hb_cache_path_rubicon": "/cache",
                 "hb_cache_host_rubicon": "{{ cache.host }}",
@@ -30,8 +29,6 @@
                 "hb_size_rubicon": "300x250",
                 "hb_bidder_rubicon": "rubicon",
                 "hb_cache_host": "{{ cache.host }}",
-                "hb_bidid_rubicon": "bidId1",
-                "hb_bidid": "bidId1",
                 "hb_deal": "rubicon-dealId1"
               },
               "cache": {
@@ -61,7 +58,6 @@
               "type": "banner",
               "targeting": {
                 "hb_deal_rubicon": "rubicon-dealId2",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem2",
                 "hb_size_rubicon": "320x320",
                 "hb_cache_id": "13e78248-7339-4e35-b297-874d0031bc1a",
                 "hb_cache_path_rubicon": "/cache",
@@ -74,8 +70,6 @@
                 "hb_bidder": "rubicon",
                 "hb_bidder_rubicon": "rubicon",
                 "hb_cache_host": "{{ cache.host }}",
-                "hb_bidid_rubicon": "bidId2",
-                "hb_bidid": "bidId2",
                 "hb_deal": "rubicon-dealId2"
               },
               "cache": {
@@ -105,7 +99,6 @@
               "type": "banner",
               "targeting": {
                 "hb_deal_rubicon": "rubicon-dealId3",
-                "hb_winurl": "http%3A%2F%2Flocalhost%3A8080%2Fevent%3Ft%3Dwin%26b%3DBIDID%26a%3D2001%26ts%3D1000%26bidder%3Drubicon%26f%3Di%26int%3D%26l%3DlineItem3",
                 "hb_size_rubicon": "300x250",
                 "hb_cache_id": "1cdcf339-e59b-4e2c-8382-1fb845d4961c",
                 "hb_cache_path_rubicon": "/cache",
@@ -118,8 +111,6 @@
                 "hb_bidder": "rubicon",
                 "hb_bidder_rubicon": "rubicon",
                 "hb_cache_host": "{{ cache.host }}",
-                "hb_bidid_rubicon": "bidId4",
-                "hb_bidid": "bidId4",
                 "hb_deal": "rubicon-dealId3"
               },
               "cache": {

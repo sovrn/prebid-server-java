@@ -44,30 +44,6 @@ public class EventsServiceTest {
     }
 
     @Test
-    public void winUrlTargetingShouldReturnExpectedUrl() {
-        // when
-        final String winUrlTargeting = eventsService.winUrlTargeting(
-                "bidder", "accountId", "lineItemId", 1000L, "pbjs");
-
-        // then
-        assertThat(winUrlTargeting).isEqualTo(
-                "http://external-url/event?t=win&b=BIDID&a=accountId&ts=1000&bidder=bidder&f=i&int=pbjs&l=lineItemId");
-    }
-
-    @Test
-    public void winUrlTargetingShouldSkipLineItemIdIfMissing() {
-        // when
-        final String winUrl = eventsService.winUrl("bidId", "bidder", "accountId", 1000L, "pbjs");
-        final String winUrlTargeting = eventsService.winUrlTargeting("bidder", "accountId", "lineItemId", null, "pbjs");
-
-        // then
-        assertThat(winUrl).isEqualTo(
-                "http://external-url/event?t=win&b=bidId&a=accountId&ts=1000&bidder=bidder&f=i&int=pbjs");
-        assertThat(winUrlTargeting).isEqualTo(
-                "http://external-url/event?t=win&b=BIDID&a=accountId&bidder=bidder&f=i&int=pbjs&l=lineItemId");
-    }
-
-    @Test
     public void winUrlShouldReturnExpectedUrl() {
         // when
         final String winUrl = eventsService.winUrl("bidId", "bidder", "accountId", 1000L, "pbjs");
