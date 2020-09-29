@@ -115,12 +115,11 @@ public class DealsProcessor {
 
         final Device device = context.getBidRequest().getDevice();
         final Timeout timeout = context.getTimeout();
+        final GeoInfo geoInfo = context.getGeoInfo();
 
         final CompositeFuture compositeFuture = CompositeFuture.join(
                 deviceInfoService.getDeviceInfo(device.getUa()),
-                geoLocationService != null
-                        ? geoLocationService.lookup(device.getIp(), timeout)
-                        : Future.failedFuture("Geo location is disabled by configuration"),
+                geoInfo != null ? Future.succeededFuture(geoInfo) : lookupGeoInfo(device, timeout),
                 userService.getUserDetails(context, timeout));
 
         // AsyncResult has atomic nature: its result() method returns null when at least one future fails.
@@ -129,9 +128,8 @@ public class DealsProcessor {
         final Promise<Tuple3<DeviceInfo, GeoInfo, UserDetails>> promise = Promise.promise();
         compositeFuture.setHandler(ignored -> handleDealsInfo(compositeFuture, promise, context.getAccount().getId()));
         return promise.future()
-                .map((Tuple3<DeviceInfo, GeoInfo, UserDetails> tuple) -> enrichBidRequestWithDealsTargeting(
-                        context.getBidRequest(), tuple.getLeft(), tuple.getMiddle(), tuple.getRight()))
-                .map(bidRequest -> context.toBuilder().bidRequest(bidRequest).build())
+                .map((Tuple3<DeviceInfo, GeoInfo, UserDetails> tuple) ->
+                        enrichAuctionContext(context, tuple.getLeft(), tuple.getMiddle(), tuple.getRight()))
                 .map(this::matchAndPopulateDeals);
     }
 
@@ -158,6 +156,12 @@ public class DealsProcessor {
         }
 
         return resolvedImp;
+    }
+
+    private Future<GeoInfo> lookupGeoInfo(Device device, Timeout timeout) {
+        return geoLocationService != null
+                ? geoLocationService.lookup(device.getIp(), timeout)
+                : Future.failedFuture("Geo location is disabled by configuration");
     }
 
     /**
@@ -193,8 +197,10 @@ public class DealsProcessor {
      * Stores information from {@link DeviceInfoService}, {@link GeoLocationService} and {@link UserService}
      * to {@link BidRequest} to make it available during targeting evaluation.
      */
-    private BidRequest enrichBidRequestWithDealsTargeting(
-            BidRequest bidRequest, DeviceInfo deviceInfo, GeoInfo geoInfo, UserDetails userDetails) {
+    private AuctionContext enrichAuctionContext(
+            AuctionContext auctionContext, DeviceInfo deviceInfo, GeoInfo geoInfo, UserDetails userDetails) {
+
+        final BidRequest bidRequest = auctionContext.getBidRequest();
 
         final BidRequest.BidRequestBuilder requestBuilder = bidRequest.toBuilder();
 
@@ -206,7 +212,10 @@ public class DealsProcessor {
             requestBuilder.device(updatedDevice);
         }
 
-        return requestBuilder.build();
+        return auctionContext.toBuilder()
+                .bidRequest(requestBuilder.build())
+                .geoInfo(geoInfo)
+                .build();
     }
 
     /**

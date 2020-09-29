@@ -65,6 +65,7 @@ import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class DealsProcessorTest extends VertxTest {
 
@@ -814,6 +815,58 @@ public class DealsProcessorTest extends VertxTest {
                 mapper.valueToTree(ExtDeviceVendor.builder().connspeed("100").build()));
         assertThat(result.getBidRequest().getDevice().getExt())
                 .isEqualTo(expectedExtDevice);
+    }
+
+    @Test
+    public void populateDealsInfoShouldUseGeoInfoFromContext() {
+        // given
+        givenResultForLineItemDeviceGeoUserServices();
+
+        final BidRequest bidRequest = givenBidRequest(builder -> builder
+                .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
+                .device(Device.builder().build()));
+        final GeoInfo geoInfo = GeoInfo.builder()
+                .vendor("vendor")
+                .city("city")
+                .build();
+        final AuctionContext auctionContext = givenAuctionContext(bidRequest, givenAccount(identity())).toBuilder()
+                .geoInfo(geoInfo)
+                .build();
+
+        // when
+        final AuctionContext result = dealsProcessor.populateDealsInfo(auctionContext).result();
+
+        // then
+        final ExtGeo expectedExtGeo = ExtGeo.of();
+        expectedExtGeo.addProperty("vendor", mapper.valueToTree(ExtGeoVendor.builder().city("city").build()));
+        assertThat(result.getBidRequest().getDevice()).isEqualTo(Device.builder()
+                .geo(Geo.builder().ext(expectedExtGeo).build())
+                .build());
+        verifyZeroInteractions(geoLocationService);
+        assertThat(result.getGeoInfo()).isSameAs(geoInfo);
+    }
+
+    @Test
+    public void populateDealsInfoShouldStoreGeoInfoInContext() {
+        // given
+        givenResultForLineItemDeviceGeoUserServices();
+
+        final GeoInfo geoInfo = GeoInfo.builder()
+                .vendor("vendor")
+                .city("city")
+                .build();
+        given(geoLocationService.lookup(any(), any())).willReturn(Future.succeededFuture(geoInfo));
+
+        final BidRequest bidRequest = givenBidRequest(builder -> builder
+                .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
+                .device(Device.builder().build()));
+        final AuctionContext auctionContext = givenAuctionContext(bidRequest, givenAccount(identity()));
+
+        // when
+        final AuctionContext result = dealsProcessor.populateDealsInfo(auctionContext).result();
+
+        // then
+        assertThat(result.getGeoInfo()).isSameAs(geoInfo);
     }
 
     private void givenResultForLineItemDeviceGeoUserServices() {
