@@ -39,6 +39,7 @@ public class Metrics extends UpdatableMetrics {
     private final CookieSyncMetrics cookieSyncMetrics;
     private final PrivacyMetrics privacyMetrics;
     private final Map<String, CircuitBreakerMetrics> circuitBreakerMetrics;
+    private final CacheMetrics cacheMetrics;
     private final PgMetrics pgMetrics;
 
     public Metrics(MetricRegistry metricRegistry, CounterType counterType, AccountMetricsVerbosity
@@ -59,6 +60,7 @@ public class Metrics extends UpdatableMetrics {
         cookieSyncMetrics = new CookieSyncMetrics(metricRegistry, counterType);
         privacyMetrics = new PrivacyMetrics(metricRegistry, counterType);
         circuitBreakerMetrics = new HashMap<>();
+        cacheMetrics = new CacheMetrics(metricRegistry, counterType);
         pgMetrics = new PgMetrics(metricRegistry, counterType);
     }
 
@@ -92,6 +94,10 @@ public class Metrics extends UpdatableMetrics {
 
     CircuitBreakerMetrics forCircuitBreaker(String id) {
         return circuitBreakerMetrics.computeIfAbsent(id, circuitBreakerMetricsCreator);
+    }
+
+    CacheMetrics cache() {
+        return cacheMetrics;
     }
 
     public void updateSafariRequestsMetric(boolean isSafari) {
@@ -466,12 +472,19 @@ public class Metrics extends UpdatableMetrics {
         }
     }
 
-    public void updateCacheRequestSuccessTime(long timeElapsed) {
-        updateTimer(MetricName.prebid_cache_request_success_time, timeElapsed);
+    public void updateCacheRequestSuccessTime(String accountId, long timeElapsed) {
+        cache().requests().updateTimer(MetricName.ok, timeElapsed);
+        forAccount(accountId).cache().requests().updateTimer(MetricName.ok, timeElapsed);
     }
 
-    public void updateCacheRequestFailedTime(long timeElapsed) {
-        updateTimer(MetricName.prebid_cache_request_error_time, timeElapsed);
+    public void updateCacheRequestFailedTime(String accountId, long timeElapsed) {
+        cache().requests().updateTimer(MetricName.err, timeElapsed);
+        forAccount(accountId).cache().requests().updateTimer(MetricName.err, timeElapsed);
+    }
+
+    public void updateCacheCreativeSize(String accountId, int creativeSize) {
+        cache().updateHistogram(MetricName.creative_size, creativeSize);
+        forAccount(accountId).cache().updateHistogram(MetricName.creative_size, creativeSize);
     }
 
     private String resolveMetricsBidderName(String bidder) {

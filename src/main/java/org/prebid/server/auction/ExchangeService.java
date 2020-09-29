@@ -67,8 +67,8 @@ import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtSource;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.settings.model.Account;
-import org.prebid.server.util.LineItemUtil;
 import org.prebid.server.util.StreamUtil;
+import org.prebid.server.util.LineItemUtil;
 import org.prebid.server.validation.ResponseBidValidator;
 import org.prebid.server.validation.model.ValidationResult;
 
@@ -395,7 +395,7 @@ public class ExchangeService {
                 prepareUsers(bidders, context, aliases, bidRequest, extUser, uidsBody, biddersToConfigs);
 
         return privacyEnforcementService
-                .mask(context, bidderToUser, extUser, bidders, aliases)
+                .mask(context, bidderToUser, bidders, aliases)
                 .map(bidderToPrivacyResult ->
                         getBidderRequests(bidderToPrivacyResult, bidRequest, imps, biddersToConfigs, aliases));
     }

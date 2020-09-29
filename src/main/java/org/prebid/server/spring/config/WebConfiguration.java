@@ -51,7 +51,6 @@ import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.HttpInteractionLogger;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.optout.GoogleRecaptchaVerifier;
-import org.prebid.server.privacy.PrivacyExtractor;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.settings.ApplicationSettings;
@@ -224,10 +223,9 @@ public class WebConfiguration {
             HttpAdapterConnector httpAdapterConnector,
             Clock clock,
             TcfDefinerService tcfDefinerService,
-            PrivacyExtractor privacyExtractor,
+            PrivacyEnforcementService privacyEnforcementService,
             JacksonMapper mapper,
-            @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            @Value("${geolocation.enabled}") boolean useGeoLocation) {
+            @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId) {
 
         return new AuctionHandler(
                 applicationSettings,
@@ -238,10 +236,10 @@ public class WebConfiguration {
                 httpAdapterConnector,
                 clock,
                 tcfDefinerService,
-                privacyExtractor,
+                privacyEnforcementService,
                 mapper,
-                hostVendorId,
-                useGeoLocation);
+                hostVendorId
+        );
     }
 
     @Bean
@@ -326,7 +324,6 @@ public class WebConfiguration {
             TcfDefinerService tcfDefinerService,
             PrivacyEnforcementService privacyEnforcementService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            @Value("${geolocation.enabled}") boolean useGeoLocation,
             @Value("${cookie-sync.coop-sync.default}") boolean defaultCoopSync,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
@@ -334,7 +331,7 @@ public class WebConfiguration {
             JacksonMapper mapper) {
         return new CookieSyncHandler(enableCookie, uidsAuditCookieService, externalUrl, defaultTimeoutMs,
                 uidsCookieService, applicationSettings, bidderCatalog, tcfDefinerService, privacyEnforcementService,
-                hostVendorId, useGeoLocation, defaultCoopSync, coopSyncPriorities.getPri(), analyticsReporter, metrics,
+                hostVendorId, defaultCoopSync, coopSyncPriorities.getPri(), analyticsReporter, metrics,
                 timeoutFactory, mapper);
     }
 
@@ -344,18 +341,28 @@ public class WebConfiguration {
             UidsCookieService uidsCookieService,
             ApplicationSettings applicationSettings,
             BidderCatalog bidderCatalog,
+            PrivacyEnforcementService privacyEnforcementService,
             TcfDefinerService tcfDefinerService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            @Value("${geolocation.enabled}") boolean useGeoLocation,
             CompositeAnalyticsReporter analyticsReporter,
             Metrics metrics,
             TimeoutFactory timeoutFactory,
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService) {
 
-        return new SetuidHandler(defaultTimeoutMs, uidsCookieService, applicationSettings, bidderCatalog,
-                tcfDefinerService, hostVendorId, useGeoLocation, analyticsReporter, metrics, timeoutFactory,
-                enableCookie, uidsAuditCookieService);
+        return new SetuidHandler(
+                defaultTimeoutMs,
+                uidsCookieService,
+                applicationSettings,
+                bidderCatalog,
+                privacyEnforcementService,
+                tcfDefinerService,
+                hostVendorId,
+                analyticsReporter,
+                metrics,
+                timeoutFactory,
+                enableCookie,
+                uidsAuditCookieService);
     }
 
     @Bean
@@ -374,7 +381,12 @@ public class WebConfiguration {
             JacksonMapper mapper) {
 
         return new VtrackHandler(
-                defaultTimeoutMs, allowUnknownBidder, applicationSettings, bidderCatalog, cacheService, timeoutFactory,
+                defaultTimeoutMs,
+                allowUnknownBidder,
+                applicationSettings,
+                bidderCatalog,
+                cacheService,
+                timeoutFactory,
                 mapper);
     }
 
@@ -386,8 +398,11 @@ public class WebConfiguration {
             GoogleRecaptchaVerifier googleRecaptchaVerifier,
             UidsCookieService uidsCookieService) {
 
-        return new OptoutHandler(googleRecaptchaVerifier, uidsCookieService,
-                OptoutHandler.getOptoutRedirectUrl(externalUrl), HttpUtil.validateUrl(optoutUrl),
+        return new OptoutHandler(
+                googleRecaptchaVerifier,
+                uidsCookieService,
+                OptoutHandler.getOptoutRedirectUrl(externalUrl),
+                HttpUtil.validateUrl(optoutUrl),
                 HttpUtil.validateUrl(optinUrl));
     }
 

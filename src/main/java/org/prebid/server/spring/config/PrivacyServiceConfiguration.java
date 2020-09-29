@@ -2,6 +2,7 @@ package org.prebid.server.spring.config;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.geolocation.GeoLocationService;
 import org.prebid.server.json.JacksonMapper;
@@ -28,7 +29,6 @@ import org.prebid.server.privacy.gdpr.tcfstrategies.specialfeature.SpecialFeatur
 import org.prebid.server.privacy.gdpr.tcfstrategies.specialfeature.SpecialFeaturesStrategy;
 import org.prebid.server.privacy.gdpr.vendorlist.VendorListServiceV1;
 import org.prebid.server.privacy.gdpr.vendorlist.VendorListServiceV2;
-import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.model.GdprConfig;
 import org.prebid.server.settings.model.Purpose;
 import org.prebid.server.settings.model.Purposes;
@@ -127,19 +127,26 @@ public class PrivacyServiceConfiguration {
 
     @Bean
     TcfDefinerService tcfDefinerService(
-            RsidCookieService rsidCookieService,
             GdprConfig gdprConfig,
             @Value("${gdpr.eea-countries}") String eeaCountriesAsString,
             GdprService gdprService,
             Tcf2Service tcf2Service,
             @Autowired(required = false) GeoLocationService geoLocationService,
             BidderCatalog bidderCatalog,
+            IpAddressHelper ipAddressHelper,
             Metrics metrics) {
 
         final Set<String> eeaCountries = new HashSet<>(Arrays.asList(eeaCountriesAsString.trim().split(",")));
 
-        return new TcfDefinerService(rsidCookieService,
-                gdprConfig, eeaCountries, gdprService, tcf2Service, geoLocationService, bidderCatalog, metrics);
+        return new TcfDefinerService(
+                gdprConfig,
+                eeaCountries,
+                gdprService,
+                tcf2Service,
+                geoLocationService,
+                bidderCatalog,
+                ipAddressHelper,
+                metrics);
     }
 
     @Bean

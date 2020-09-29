@@ -204,6 +204,7 @@ public class ServiceConfiguration {
             TimeoutResolver timeoutResolver,
             TimeoutFactory timeoutFactory,
             ApplicationSettings applicationSettings,
+            PrivacyEnforcementService privacyEnforcementService,
             JacksonMapper mapper,
             Clock clock) {
 
@@ -234,6 +235,7 @@ public class ServiceConfiguration {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 mapper);
     }
 
@@ -525,15 +527,16 @@ public class ServiceConfiguration {
 
     @Bean
     PrivacyEnforcementService privacyEnforcementService(
+            RsidCookieService rsidCookieService,
             BidderCatalog bidderCatalog,
+            PrivacyExtractor privacyExtractor,
             TcfDefinerService tcfDefinerService,
             IpAddressHelper ipAddressHelper,
             Metrics metrics,
-            @Value("${geolocation.enabled}") boolean useGeoLocation,
             @Value("${ccpa.enforce}") boolean ccpaEnforce) {
 
-        return new PrivacyEnforcementService(
-                bidderCatalog, tcfDefinerService, ipAddressHelper, metrics, useGeoLocation, ccpaEnforce);
+        return new PrivacyEnforcementService(rsidCookieService,
+                bidderCatalog, privacyExtractor, tcfDefinerService, ipAddressHelper, metrics, ccpaEnforce);
     }
 
     @Bean

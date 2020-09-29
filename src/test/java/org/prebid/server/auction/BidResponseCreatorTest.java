@@ -240,7 +240,11 @@ public class BidResponseCreatorTest extends VertxTest {
                         .bidderToVideoBidIdsToModify(emptyMap())
                         .bidderToBidIds(biddersToCacheBidIds)
                         .build()),
-                eq(EventsContext.builder().enabledForAccountAndRequest(true).auctionTimestamp(1000L).build()));
+                eq(EventsContext.builder()
+                        .enabledForAccount(true)
+                        .enabledForRequest(true)
+                        .auctionTimestamp(1000L)
+                        .build()));
     }
 
     @Test
@@ -329,7 +333,11 @@ public class BidResponseCreatorTest extends VertxTest {
                         .bidderToVideoBidIdsToModify(singletonMap("bidder1", singletonList("bidId1")))
                         .bidderToBidIds(biddersToCacheBidIds)
                         .build()),
-                eq(EventsContext.builder().enabledForAccountAndRequest(true).auctionTimestamp(1000L).build()));
+                eq(EventsContext.builder()
+                        .enabledForAccount(true)
+                        .enabledForRequest(true)
+                        .auctionTimestamp(1000L)
+                        .build()));
     }
 
     @Test

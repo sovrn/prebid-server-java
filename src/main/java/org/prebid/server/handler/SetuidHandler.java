@@ -12,6 +12,7 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.SetuidEvent;
+import org.prebid.server.auction.PrivacyEnforcementService;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
 import org.prebid.server.cookie.UidsCookie;
@@ -41,21 +42,20 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private static final Logger logger = LoggerFactory.getLogger(SetuidHandler.class);
 
     private static final String BIDDER_PARAM = "bidder";
-    private static final String GDPR_PARAM = "gdpr";
-    private static final String GDPR_CONSENT_PARAM = "gdpr_consent";
     private static final String UID_PARAM = "uid";
     private static final String FORMAT_PARAM = "format";
     private static final String IMG_FORMAT_PARAM = "img";
     private static final String PIXEL_FILE_PATH = "static/tracking-pixel.png";
     private static final String ACCOUNT_PARAM = "account";
     private static final String RUBICON_BIDDER = "rubicon";
+    private static final String GDPR_CONSENT_PARAM = "gdpr_consent";
 
     private final long defaultTimeout;
     private final UidsCookieService uidsCookieService;
     private final ApplicationSettings applicationSettings;
+    private final PrivacyEnforcementService privacyEnforcementService;
     private final TcfDefinerService tcfDefinerService;
     private final Integer gdprHostVendorId;
-    private final boolean useGeoLocation;
     private final AnalyticsReporter analyticsReporter;
     private final Metrics metrics;
     private final TimeoutFactory timeoutFactory;
@@ -63,17 +63,25 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private final UidsAuditCookieService uidsAuditCookieService;
     private final Set<String> activeCookieFamilyNames;
 
-    public SetuidHandler(long defaultTimeout, UidsCookieService uidsCookieService,
-                         ApplicationSettings applicationSettings, BidderCatalog bidderCatalog,
-                         TcfDefinerService tcfDefinerService, Integer gdprHostVendorId, boolean useGeoLocation,
-                         AnalyticsReporter analyticsReporter, Metrics metrics, TimeoutFactory timeoutFactory,
-                         boolean enableCookie, UidsAuditCookieService uidsAuditCookieService) {
+    public SetuidHandler(long defaultTimeout,
+                         UidsCookieService uidsCookieService,
+                         ApplicationSettings applicationSettings,
+                         BidderCatalog bidderCatalog,
+                         PrivacyEnforcementService privacyEnforcementService,
+                         TcfDefinerService tcfDefinerService,
+                         Integer gdprHostVendorId,
+                         AnalyticsReporter analyticsReporter,
+                         Metrics metrics,
+                         TimeoutFactory timeoutFactory,
+                         boolean enableCookie,
+                         UidsAuditCookieService uidsAuditCookieService) {
+
         this.defaultTimeout = defaultTimeout;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
+        this.privacyEnforcementService = Objects.requireNonNull(privacyEnforcementService);
         this.tcfDefinerService = Objects.requireNonNull(tcfDefinerService);
         this.gdprHostVendorId = gdprHostVendorId;
-        this.useGeoLocation = useGeoLocation;
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
@@ -116,15 +124,14 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
         final Set<Integer> vendorIds = Collections.singleton(gdprHostVendorId);
         final String requestAccount = context.request().getParam(ACCOUNT_PARAM);
-        final String gdpr = context.request().getParam(GDPR_PARAM);
-        final String gdprConsent = context.request().getParam(GDPR_CONSENT_PARAM);
-        final String ip = useGeoLocation ? HttpUtil.ipFrom(context.request()) : null;
         final Timeout timeout = timeoutFactory.create(defaultTimeout);
 
         accountById(requestAccount, timeout)
-                .compose(account -> tcfDefinerService.resultForVendorIds(vendorIds, gdpr, gdprConsent, ip,
-                        account.getGdpr(), timeout, context))
-                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, cookieName, gdprConsent, ip));
+                .compose(account -> privacyEnforcementService.contextFromSetuidRequest(
+                        context.request(), account, timeout, context))
+                .compose(privacyContext -> tcfDefinerService.resultForVendorIds(
+                        vendorIds, privacyContext.getTcfContext()))
+                .setHandler(asyncResult -> handleResult(asyncResult, context, uidsCookie, cookieName));
     }
 
     private Future<Account> accountById(String accountId, Timeout timeout) {
@@ -135,7 +142,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
     }
 
     private void handleResult(AsyncResult<TcfResponse<Integer>> asyncResult, RoutingContext context,
-                              UidsCookie uidsCookie, String bidder, String gdprConsent, String ip) {
+                              UidsCookie uidsCookie, String bidder) {
         if (asyncResult.failed()) {
             respondWithError(context, bidder, asyncResult.cause());
         } else {
@@ -155,10 +162,10 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
             if (allowedCookie) {
                 if (bidder.equals(RUBICON_BIDDER)) {
-                    respondForRubiconBidder(context, uidsCookie, gdprConsent, ip, tcfResponse.getCountry(),
+                    respondForRubiconBidder(context, uidsCookie, tcfResponse.getCountry(),
                             tcfResponse.getUserInGdprScope());
                 } else {
-                    respondForOtherBidder(context, uidsCookie, gdprConsent, ip, tcfResponse.getCountry(), bidder,
+                    respondForOtherBidder(context, uidsCookie, tcfResponse.getCountry(), bidder,
                             tcfResponse.getUserInGdprScope());
                 }
             } else {
@@ -190,7 +197,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         analyticsReporter.processEvent(SetuidEvent.error(status));
     }
 
-    private void respondForRubiconBidder(RoutingContext context, UidsCookie uidsCookie, String gdprConsent, String ip,
+    private void respondForRubiconBidder(RoutingContext context, UidsCookie uidsCookie,
                                          String country, boolean userInGdprScope) {
         final Cookie uidsAuditCookie;
         if (userInGdprScope) {
@@ -205,6 +212,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
             try {
                 final String uid = context.request().getParam(UID_PARAM);
+                final String gdprConsent = context.request().getParam(GDPR_CONSENT_PARAM);
+                final String ip = HttpUtil.ipFrom(context.request());
                 uidsAuditCookie = uidsAuditCookieService
                         .createUidsAuditCookie(context, uid, account, gdprConsent, country, ip);
             } catch (PreBidException e) {
@@ -218,7 +227,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         respondWithCookie(context, RUBICON_BIDDER, uidsCookie, uidsAuditCookie);
     }
 
-    private void respondForOtherBidder(RoutingContext context, UidsCookie uidsCookie, String gdprConsent, String ip,
+    private void respondForOtherBidder(RoutingContext context, UidsCookie uidsCookie,
                                        String country, String bidder, boolean userInGdprScope) {
         final Cookie uidsAuditCookie;
         if (userInGdprScope) {
@@ -245,6 +254,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
 
             try {
                 final String uid = context.request().getParam(UID_PARAM);
+                final String gdprConsent = context.request().getParam(GDPR_CONSENT_PARAM);
+                final String ip = HttpUtil.ipFrom(context.request());
                 uidsAuditCookie = uidsAuditCookieService
                         .createUidsAuditCookie(context, uid, uidsAudit.getInitiatorId(), gdprConsent, country, ip);
             } catch (PreBidException e) {

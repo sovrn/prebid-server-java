@@ -7,6 +7,7 @@ import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Device;
+import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
@@ -25,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
+import org.prebid.server.assertion.FutureAssertion;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.IpAddress;
 import org.prebid.server.bidder.BidderCatalog;
@@ -42,8 +44,13 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.identity.IdGenerator;
-import org.prebid.server.log.CriteriaLogManager;
+import org.prebid.server.metric.MetricName;
+import org.prebid.server.privacy.ccpa.Ccpa;
+import org.prebid.server.privacy.gdpr.model.TcfContext;
+import org.prebid.server.privacy.model.Privacy;
+import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
@@ -81,6 +88,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
+import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -121,11 +129,10 @@ public class AuctionRequestFactoryTest extends VertxTest {
     private ApplicationSettings applicationSettings;
     @Mock
     private IdGenerator idGenerator;
-
-    private Clock clock = Clock.systemDefaultZone();
-
     @Mock
-    private CriteriaLogManager criteriaLogManager;
+    private PrivacyEnforcementService privacyEnforcementService;
+
+    private final Clock clock = Clock.systemDefaultZone();
 
     private AuctionRequestFactory factory;
 
@@ -154,6 +161,11 @@ public class AuctionRequestFactoryTest extends VertxTest {
         given(timeoutResolver.resolve(any())).willReturn(2000L);
         given(timeoutResolver.adjustTimeout(anyLong())).willReturn(1900L);
 
+        given(privacyEnforcementService.contextFromBidRequest(any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(PrivacyContext.of(
+                        Privacy.of("0", EMPTY, Ccpa.EMPTY, 0),
+                        TcfContext.empty())));
+
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.succeededFuture(Account.builder().id("1001").build()));
         given(dealsProcessor.populateDealsInfo(any()))
@@ -180,6 +192,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
     }
 
@@ -222,6 +235,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         givenValidBidRequest();
@@ -262,6 +276,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         given(applicationSettings.getAccountById(any(), any()))
@@ -311,6 +326,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         given(routingContext.getBody()).willReturn(Buffer.buffer("body"));
@@ -938,6 +954,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
         givenBidRequest(BidRequest.builder()
                 .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
@@ -982,6 +999,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -1025,6 +1043,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -1068,6 +1087,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -1137,6 +1157,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         givenBidRequest(BidRequest.builder()
@@ -1182,6 +1203,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 applicationSettings,
                 clock,
                 idGenerator,
+                privacyEnforcementService,
                 jacksonMapper);
 
         final ExtRequest extBidRequest = ExtRequest.of(ExtRequestPrebid.builder()
@@ -1713,6 +1735,61 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .extracting(ExtRequest::getPrebid)
                 .extracting(ExtRequestPrebid::getIntegration)
                 .containsOnly("integration");
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithWebRequestTypeMetric() {
+        // given
+        givenValidBidRequest();
+
+        // when
+        final Future<AuctionContext> auctionContextFuture = factory.fromRequest(routingContext, 0L);
+
+        // then
+        FutureAssertion.assertThat(auctionContextFuture).isSucceeded();
+        assertThat(auctionContextFuture.result().getRequestTypeMetric()).isEqualTo(MetricName.openrtb2web);
+    }
+
+    @Test
+    public void shouldReturnAuctionContextWithAppRequestTypeMetric() {
+        // given
+        givenBidRequest(BidRequest.builder().app(App.builder().build()).build());
+
+        // when
+        final Future<AuctionContext> auctionContextFuture = factory.fromRequest(routingContext, 0L);
+
+        // then
+        FutureAssertion.assertThat(auctionContextFuture).isSucceeded();
+        assertThat(auctionContextFuture.result().getRequestTypeMetric()).isEqualTo(MetricName.openrtb2app);
+    }
+
+    @Test
+    public void shouldEnrichRequestWithIpAddressAndCountryAndSaveAuctionContext() {
+        // given
+        givenBidRequest(BidRequest.builder().build());
+
+        final PrivacyContext privacyContext = PrivacyContext.of(
+                Privacy.of(EMPTY, EMPTY, Ccpa.EMPTY, 0),
+                TcfContext.builder()
+                        .geoInfo(GeoInfo.builder().vendor("v").country("ua").build())
+                        .build(),
+                "ip");
+        given(privacyEnforcementService.contextFromBidRequest(any(), any(), any(), any(), any()))
+                .willReturn(Future.succeededFuture(privacyContext));
+
+        // when
+        final Future<AuctionContext> auctionContextFuture = factory.fromRequest(routingContext, 0L);
+
+        // then
+        FutureAssertion.assertThat(auctionContextFuture).isSucceeded();
+
+        final AuctionContext auctionContext = auctionContextFuture.result();
+        assertThat(auctionContext.getBidRequest().getDevice()).isEqualTo(
+                Device.builder()
+                        .ip("ip")
+                        .geo(Geo.builder().country("ua").build())
+                        .build());
+        assertThat(auctionContext.getPrivacyContext()).isSameAs(privacyContext);
     }
 
     @Test
