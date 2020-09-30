@@ -579,22 +579,16 @@ public class CacheService {
             return null;
         }
 
-        final String lineItemId = LineItemUtil.lineItemIdFrom(bid, imps, mapper);
-
-        if (eventsContext.isEnabledForRequest() || StringUtils.isNotBlank(lineItemId)) {
-            final String bidId = bid.getId();
-            return findBidderForBidId(bidderToVideoBidIdsToModify, bidId)
-                    .map(bidder -> eventsService.vastUrlTracking(
-                            bidId,
-                            bidder,
-                            account.getId(),
-                            lineItemId,
-                            eventsContext.getAuctionTimestamp(),
-                            eventsContext.getIntegration()))
-                    .orElse(null);
-        }
-
-        return null;
+        final String bidId = bid.getId();
+        return findBidderForBidId(bidderToVideoBidIdsToModify, bidId)
+                .map(bidder -> eventsService.vastUrlTracking(
+                        bidId,
+                        bidder,
+                        account.getId(),
+                        LineItemUtil.lineItemIdFrom(bid, imps, mapper),
+                        eventsContext.getAuctionTimestamp(),
+                        eventsContext.getIntegration()))
+                .orElse(null);
     }
 
     private static Optional<String> findBidderForBidId(Map<String, List<String>> biddersToCacheBidIds, String bidId) {
