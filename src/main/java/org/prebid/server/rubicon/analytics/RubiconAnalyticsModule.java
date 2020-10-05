@@ -134,14 +134,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static final String APPLICATION_JSON =
             HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
 
-    public static final String PBJS_REQUEST_CHANNEL = "pbjs";
-    public static final String AMP_REQUEST_CHANNEL = "amp";
-    public static final String APP_REQUEST_CHANNEL = "app";
-    public static final String WEB_CHANNEL = "web";
-    public static final String AMP_CHANNEL = "amp";
-    public static final String APP_CHANNEL = "app";
     public static final String OTHER_CHANNEL = "other";
-    public static final Set<String> DEFAULT_SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList(APP_CHANNEL, AMP_CHANNEL));
+    public static final Set<String> SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList("web", "amp", "app"));
 
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
@@ -317,7 +311,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                        Map<Integer, Long> accountToEventCount,
                                        AtomicLong globalEventCount) {
 
-        if (isChannelNotSupported(bidRequest, account)) {
+        if (!isChannelSupported(bidRequest, account)) {
             return false;
         }
 
@@ -332,39 +326,25 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private boolean isChannelNotSupported(BidRequest bidRequest, Account account) {
-        final String requestChannel = channelFrom(bidRequest);
+    private boolean isChannelSupported(BidRequest bidRequest, Account account) {
+        final AccountAnalyticsConfig analyticsConfig = ObjectUtils.defaultIfNull(
+                account.getAnalyticsConfig(), AccountAnalyticsConfig.fallback());
+        final Map<String, Boolean> channelConfig = analyticsConfig.getAuctionEvents();
 
-        final Map<String, Boolean> auctionEvents =
-                getIfNotNull(account.getAnalyticsConfig(), AccountAnalyticsConfig::getAuctionEvents);
-        if (MapUtils.isNotEmpty(auctionEvents)) {
-            final Set<String> channelsInScope = auctionEvents.entrySet().stream()
-                    .filter(entry -> BooleanUtils.isTrue(entry.getValue()))
-                    .map(Map.Entry::getKey)
-                    .map(String::toLowerCase)
-                    .collect(Collectors.toSet());
+        final String channelFromRequest = channelFromRequest(bidRequest);
 
-            return !channelsInScope.contains(requestChannel);
-        }
-
-        return !DEFAULT_SUPPORTED_CHANNELS.contains(requestChannel);
+        return MapUtils.emptyIfNull(channelConfig).entrySet().stream()
+                .filter(entry -> StringUtils.equalsIgnoreCase(channelFromRequest, entry.getKey()))
+                .findFirst()
+                .map(entry -> BooleanUtils.isTrue(entry.getValue()))
+                .orElse(Boolean.FALSE);
     }
 
-    private static String channelFrom(BidRequest bidRequest) {
-        final String channel = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest.getExt(),
+    private static String channelFromRequest(BidRequest bidRequest) {
+        return getIfNotNull(getIfNotNull(getIfNotNull(bidRequest.getExt(),
                 ExtRequest::getPrebid),
                 ExtRequestPrebid::getChannel),
                 ExtRequestPrebidChannel::getName);
-
-        if (StringUtils.isBlank(channel) || StringUtils.equalsIgnoreCase(channel, PBJS_REQUEST_CHANNEL)) {
-            return WEB_CHANNEL;
-        } else if (StringUtils.equalsIgnoreCase(channel, AMP_REQUEST_CHANNEL)) {
-            return AMP_CHANNEL;
-        } else if (StringUtils.equalsIgnoreCase(channel, APP_REQUEST_CHANNEL)) {
-            return APP_CHANNEL;
-        } else {
-            return OTHER_CHANNEL;
-        }
     }
 
     private static String parseStoredId(String uri) {
@@ -931,7 +911,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .userAgent(getIfNotNull(device, Device::getUa))
                 .client(clientFrom(bidRequest))
                 .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage))
-                .channel(channelFrom(bidRequest))
+                .channel(channel(bidRequest))
                 .geo(geo(httpContext, device));
     }
 
@@ -973,6 +953,16 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private String countryFrom(HttpContext httpContext) {
         final UidAudit uidsAudit = uidsAuditCookieService.getUidsAudit(httpContext.getCookies());
         return uidsAudit != null ? uidsAudit.getCountry() : null;
+    }
+
+    private static String channel(BidRequest bidRequest) {
+        final String channel = StringUtils.lowerCase(channelFromRequest(bidRequest));
+
+        if (SUPPORTED_CHANNELS.contains(channel)) {
+            return channel;
+        }
+
+        return OTHER_CHANNEL;
     }
 
     /**

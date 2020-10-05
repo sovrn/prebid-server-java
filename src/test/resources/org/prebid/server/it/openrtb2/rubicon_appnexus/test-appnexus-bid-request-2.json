@@ -130,7 +130,6 @@
         },
         "usepbsrates": false
       },
-      "integration": "dmbjs",
       "aliases": {
         "appnexusAlias": "appnexus"
       },
@@ -155,7 +154,10 @@
         }
       },
       "auctiontimestamp": 1000,
-      "integration" : "dmbjs"
+      "integration": "dmbjs",
+      "channel": {
+        "name": "web"
+      }
     }
   }
 }

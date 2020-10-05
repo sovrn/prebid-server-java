@@ -216,6 +216,9 @@
               },
               "includewinners": true,
               "includebidderkeys": true
+            },
+            "channel": {
+              "name": "web"
             }
           }
         }
