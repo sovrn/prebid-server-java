@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class RegisterService implements Initializable, Suspendable {
+
     private static final Logger logger = LoggerFactory.getLogger(RegisterService.class);
 
     private static final DateTimeFormatter UTC_MILLIS_FORMATTER = new DateTimeFormatterBuilder()

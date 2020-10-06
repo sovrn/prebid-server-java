@@ -10,6 +10,7 @@ import java.util.Date;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class SharethroughMarkupUtilTest extends VertxTest {
+
     private static final Date TEST_TIME = new Date(1604455678999L);
 
     @Test
@@ -81,4 +82,3 @@ public class SharethroughMarkupUtilTest extends VertxTest {
         assertThat(result.contains(expectedContains)).isTrue();
     }
 }
-

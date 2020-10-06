@@ -5,6 +5,7 @@ import org.prebid.server.deals.targeting.RequestContext;
 
 @EqualsAndHashCode
 public class DomainMetricAwareExpression implements Expression {
+
     private final Expression domainFunction;
     private final String lineItemId;
 

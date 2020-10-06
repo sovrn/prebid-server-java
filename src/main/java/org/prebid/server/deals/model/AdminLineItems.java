@@ -8,5 +8,6 @@ import java.util.List;
 @Value
 @AllArgsConstructor(staticName = "of")
 public class AdminLineItems {
+
     List<String> ids;
 }

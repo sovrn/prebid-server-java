@@ -1,6 +1,7 @@
 package org.prebid.server.deals.model;
 
 public enum DeviceType {
+
     MOBILE("mobile"),
     DESKTOP("desktop"),
     TV("connected tv"),
