@@ -1006,7 +1006,7 @@ public class CacheServiceTest extends VertxTest {
                         .bidderToVideoBidIdsToModify(singletonMap("bidder", singletonList("bid1")))
                         .bidderToBidIds(singletonMap("bidder", singletonList("bid1")))
                         .build(),
-                EventsContext.builder().enabledForAccount(true).enabledForRequest(true).build());
+                EventsContext.builder().enabledForAccount(true).enabledForRequest(false).build());
 
         // then
         final BidCacheRequest bidCacheRequest = captureBidCacheRequest();
@@ -1048,7 +1048,7 @@ public class CacheServiceTest extends VertxTest {
                         .bidderToVideoBidIdsToModify(singletonMap("bidder", singletonList("bid1")))
                         .bidderToBidIds(singletonMap("bidder", singletonList("bid1")))
                         .build(),
-                EventsContext.builder().enabledForAccount(true).enabledForRequest(true).build());
+                EventsContext.builder().enabledForAccount(true).enabledForRequest(false).build());
 
         // then
         final BidCacheRequest bidCacheRequest = captureBidCacheRequest();

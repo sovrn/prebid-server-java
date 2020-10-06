@@ -2,7 +2,6 @@ package org.prebid.server.it;
 
 import io.restassured.response.Response;
 import org.json.JSONException;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -19,7 +18,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static io.restassured.RestAssured.given;
 import static java.util.Collections.singletonList;
 
-@Ignore
 @RunWith(SpringRunner.class)
 public class OrbidderTest extends IntegrationTest {
 

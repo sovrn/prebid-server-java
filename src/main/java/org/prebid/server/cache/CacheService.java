@@ -575,20 +575,20 @@ public class CacheService {
                                            EventsContext eventsContext,
                                            List<Imp> imps) {
 
-        if (!eventsContext.isEnabledForAccount()) {
-            return null;
+        if (eventsContext.isEnabledForAccount()) {
+            final String bidId = bid.getId();
+            return findBidderForBidId(bidderToVideoBidIdsToModify, bidId)
+                    .map(bidder -> eventsService.vastUrlTracking(
+                            bidId,
+                            bidder,
+                            account.getId(),
+                            LineItemUtil.lineItemIdFrom(bid, imps, mapper),
+                            eventsContext.getAuctionTimestamp(),
+                            eventsContext.getIntegration()))
+                    .orElse(null);
         }
 
-        final String bidId = bid.getId();
-        return findBidderForBidId(bidderToVideoBidIdsToModify, bidId)
-                .map(bidder -> eventsService.vastUrlTracking(
-                        bidId,
-                        bidder,
-                        account.getId(),
-                        LineItemUtil.lineItemIdFrom(bid, imps, mapper),
-                        eventsContext.getAuctionTimestamp(),
-                        eventsContext.getIntegration()))
-                .orElse(null);
+        return null;
     }
 
     private static Optional<String> findBidderForBidId(Map<String, List<String>> biddersToCacheBidIds, String bidId) {
