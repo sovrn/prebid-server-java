@@ -5,7 +5,7 @@
 
     <groupId>org.prebid</groupId>
     <artifactId>prebid-server</artifactId>
-    <version>1.45.0-SNAPSHOT</version>
+    <version>1.45.2-SNAPSHOT</version>
 
     <name>prebid-server</name>
     <description>Prebid Server (Server-side Header Bidding)</description>
@@ -702,6 +702,9 @@
                                 </source>
                                 <source>
                                     <location>${project.basedir}/src/rpm/logback-spring.xml</location>
+                                </source>
+                                <source>
+                                    <location>${project.basedir}/src/rpm/tcf-v1-fallback-vendorlist.json</location>
                                 </source>
                             </sources>
                         </mapping>
