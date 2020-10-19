@@ -68,7 +68,7 @@ public class ResponseBidValidatorTest extends VertxTest {
                 givenRequest(identity()));
 
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" does not contain a positive 'price'");
+                .containsOnly("Bid \"bidId1\" does not contain a 'price'");
     }
 
     @Test
@@ -77,7 +77,24 @@ public class ResponseBidValidatorTest extends VertxTest {
                 BigDecimal.valueOf(-1))), givenRequest(identity()));
 
         assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" does not contain a positive 'price'");
+                .containsOnly("Bid \"bidId1\" `price `has negative value");
+    }
+
+    @Test
+    public void validateShouldFailedIfNonDealBidHasZeroPrice() {
+        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
+                BigDecimal.valueOf(0))), givenRequest(identity()));
+
+        assertThat(result.getErrors()).hasSize(1)
+                .containsOnly("Non deal bid \"bidId1\" has 0 price");
+    }
+
+    @Test
+    public void validateShouldSuccessForDealZeroPriceBid() {
+        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
+                BigDecimal.valueOf(0)).dealid("dealId")), givenRequest(identity()));
+
+        assertThat(result.hasErrors()).isFalse();
     }
 
     @Test
