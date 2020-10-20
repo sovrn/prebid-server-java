@@ -39,9 +39,13 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.privacy.gdpr.model.TcfContext;
+import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtApp;
 import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpContext;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
@@ -62,6 +66,8 @@ import org.prebid.server.rubicon.analytics.proto.Dimensions;
 import org.prebid.server.rubicon.analytics.proto.Error;
 import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
+import org.prebid.server.rubicon.analytics.proto.Gam;
+import org.prebid.server.rubicon.analytics.proto.Gdpr;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -295,6 +301,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .account(Account.builder()
                                 .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
                                 .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
                 .httpContext(httpContext)
                 .bidResponse(BidResponse.builder()
@@ -494,6 +501,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .siteId(654)
                                         .zoneId(987)
                                         .adUnitCode("storedId1")
+                                        .pbAdSlot("pbAdSlot1")
+                                        .gam(Gam.of("adSlot1"))
                                         .bids(singletonList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
@@ -545,7 +554,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .build()))
                                         .error(Error.of("timeout-error", "Timeout error"))
-                                        .build()), 123, 1000L, true))).build());
+                                        .build()),
+                        123,
+                        1000L,
+                        true,
+                        Gdpr.of(true, false, null, null))))
+                .build());
     }
 
     @Test
@@ -823,6 +837,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .siteId(456)
                                         .zoneId(789)
                                         .adUnitCode("storedId1")
+                                        .pbAdSlot("pbAdSlot1")
                                         .bids(singletonList(org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                 .bidId("bidId1")
                                                 .bidder("rubicon")
@@ -845,6 +860,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .dimensions(singletonList(Dimensions.of(100, 200)))
                                         .adserverTargeting(singletonMap("key22", "value22"))
                                         .adUnitCode("storedId1")
+                                        .pbAdSlot("pbAdSlot1")
                                         .bids(asList(
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidId("bidId2")
@@ -886,6 +902,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .siteId(654)
                                         .zoneId(987)
                                         .adUnitCode("storedId1")
+                                        .pbAdSlot("pbAdSlot1")
                                         .bids(singletonList(org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                 .bidder("rubicon")
                                                 .status("no-bid")
@@ -939,7 +956,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                         .build()))
                                         .error(Error.of("timeout-error", "Timeout error"))
                                         .build()),
-                        123, 1000L, true)))
+                        123,
+                        1000L,
+                        true,
+                        Gdpr.of(true, false, null, null))))
                 .build());
     }
 
@@ -962,6 +982,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         rubiconExtWithStoredId.set("prebid", mapper.valueToTree(ExtImpPrebid.builder()
                 .storedrequest(ExtStoredRequest.of("storedId1"))
                 .build()));
+        rubiconExtWithStoredId.set("context", mapper.valueToTree(ExtImpContext.of(
+                null, null, mapper.createObjectNode()
+                        .put("pbadslot", "pbAdSlot1")
+                        .set("adserver", mapper.createObjectNode()
+                                .put("name", "gam")
+                                .put("adSlot", "adSlot1")))));
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
@@ -1032,11 +1058,13 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     private static BidRequest sampleAmpBidRequest() {
+        final ObjectNode impContextDataNode = mapper.createObjectNode().put("pbadslot", "pbAdSlot1");
+
         final ObjectNode multiBidderImpExt = mapper.createObjectNode();
         multiBidderImpExt.set("appnexus", mapper.createObjectNode());
         multiBidderImpExt.set("rubicon", mapper.createObjectNode());
         multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
-        multiBidderImpExt.set("context", mapper.createObjectNode()); // should be ignored
+        multiBidderImpExt.set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
 
         final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode();
         rubiconExtWithStoredId.set("rubicon", mapper.valueToTree(
@@ -1049,6 +1077,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         rubiconExtWithStoredId.set("prebid", mapper.valueToTree(ExtImpPrebid.builder()
                 .storedrequest(ExtStoredRequest.of("storedId1"))
                 .build()));
+        rubiconExtWithStoredId.set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
+
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
@@ -1067,13 +1097,16 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 Format.builder().w(300).h(400).build()))
                                         .build())
                                 .video(Video.builder().build())
-                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
-                                        ExtImpRubicon.builder()
-                                                .video(RubiconVideoParams.builder().sizeId(202).build())
-                                                .accountId(123)
-                                                .siteId(456)
-                                                .zoneId(789)
-                                                .build())))
+                                .ext(mapper.createObjectNode()
+                                        .<ObjectNode>set("rubicon", mapper.valueToTree(
+                                                ExtImpRubicon.builder()
+                                                        .video(RubiconVideoParams.builder().sizeId(202).build())
+                                                        .accountId(123)
+                                                        .siteId(456)
+                                                        .zoneId(789)
+                                                        .build()))
+                                        .set("context", mapper.valueToTree(ExtImpContext.of(
+                                                null, null, impContextDataNode))))
                                 .build(),
                         Imp.builder().id("impId2")
                                 .video(Video.builder().startdelay(-1).w(100).h(200).build())
@@ -1194,7 +1227,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
                 .channel("app")
-                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest"));
+                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest", 123));
     }
 
     private static Event.EventBuilder expectedEventBuilderBaseFromSite() {
@@ -1205,7 +1238,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
                 .channel("amp")
-                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie"))
+                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie", 123))
                 .referrerUri("http://referer/page");
     }
 
@@ -1220,6 +1253,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         return AuctionContext.builder()
                 .bidRequest(bidRequest)
                 .account(Account.builder().id("123").analyticsSamplingFactor(samplingFactor).build())
+                .privacyContext(PrivacyContext.of(null, TcfContext.builder().gdpr("1").build()))
+                .geoInfo(GeoInfo.builder().vendor("vendor").metroNielsen(123).build())
                 .build();
     }
 

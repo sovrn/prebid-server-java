@@ -10,7 +10,9 @@ import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
+import com.iab.openrtb.request.Regs;
 import com.iab.openrtb.request.Site;
+import com.iab.openrtb.request.User;
 import com.iab.openrtb.request.Video;
 import com.iab.openrtb.response.Bid;
 import com.iab.openrtb.response.BidResponse;
@@ -39,16 +41,24 @@ import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.json.JacksonMapper;
+import org.prebid.server.privacy.gdpr.TcfDefinerService;
+import org.prebid.server.privacy.gdpr.model.TcfContext;
+import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtApp;
 import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtImp;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpContext;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestCurrency;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
+import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -64,6 +74,8 @@ import org.prebid.server.rubicon.analytics.proto.Dimensions;
 import org.prebid.server.rubicon.analytics.proto.Error;
 import org.prebid.server.rubicon.analytics.proto.Event;
 import org.prebid.server.rubicon.analytics.proto.EventCreator;
+import org.prebid.server.rubicon.analytics.proto.Gam;
+import org.prebid.server.rubicon.analytics.proto.Gdpr;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
@@ -104,6 +116,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final String PREBID_EXT = "prebid";
     private static final String CONTEXT_EXT = "context";
+    private static final String PBADSLOT_EXT = "pbadslot";
+    private static final String ADSERVER_EXT = "adserver";
+    private static final String ADSLOT_EXT = "adSlot";
+    private static final String NAME_EXT = "name";
+    private static final String GAM_EXT = "gam";
 
     private static final String SUCCESS_STATUS = "success";
     private static final String NO_BID_STATUS = "no-bid";
@@ -124,6 +141,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final String USD_CURRENCY = "USD";
 
+    private static final String GDPR_ONE_STRING = "1";
+    private static final Integer GDPR_ONE_INTEGER = 1;
+
     private static final TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>> EXT_PREBID_TYPE_REFERENCE =
             new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
             };
@@ -134,8 +154,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static final String APPLICATION_JSON =
             HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
 
-    public static final String OTHER_CHANNEL = "other";
-    public static final Set<String> SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList("web", "amp", "app"));
+    private static final String OTHER_CHANNEL = "other";
+    private static final Set<String> SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList("web", "amp", "app"));
 
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
@@ -228,7 +248,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
             postEvent(
                     toAuctionEvent(
-                            httpContext, bidRequest, adUnits, accountId, accountSamplingFactor, this::eventBuilderBase),
+                            httpContext,
+                            auctionContext,
+                            adUnits,
+                            accountId,
+                            accountSamplingFactor,
+                            this::eventBuilderBase),
                     isDebugEnabled(bidRequest));
         }
     }
@@ -262,7 +287,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
             postEvent(
                     toAuctionEvent(
-                            httpContext, bidRequest, adUnits, accountId, accountSamplingFactor, this::eventBuilderBase),
+                            httpContext,
+                            auctionContext,
+                            adUnits,
+                            accountId,
+                            accountSamplingFactor,
+                            this::eventBuilderBase),
                     isDebugEnabled(bidRequest));
         }
     }
@@ -688,6 +718,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .map(org.prebid.server.rubicon.analytics.proto.Bid::getError)
                 .anyMatch(Objects::nonNull);
 
+        final ExtImp extImp = extImpFrom(imp);
+
         return AdUnit.builder()
                 .transactionId(transactionIdFrom(bidRequest.getId(), imp.getId()))
                 .status(openrtbBidsFound ? SUCCESS_STATUS : errorsFound ? ERROR_STATUS : NO_BID_STATUS)
@@ -696,6 +728,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
                 .dimensions(dimensions(imp))
                 .adUnitCode(storedId)
+                .pbAdSlot(pbAdSlotFromExtImp(extImp))
+                .gam(gamFromExtImp(extImp))
                 .siteId(params.getSiteId())
                 .zoneId(params.getZoneId())
                 .adserverTargeting(targetingForImp(bids))
@@ -820,6 +854,44 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
+    private ExtImp extImpFrom(Imp imp) {
+        try {
+            return mapper.mapper().treeToValue(imp.getExt(), ExtImp.class);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
+    private String pbAdSlotFromExtImp(ExtImp extImp) {
+        return getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
+                ExtImp::getContext),
+                ExtImpContext::getData),
+                data -> data.get(PBADSLOT_EXT)),
+                pbadslotNode -> pbadslotNode.isTextual() ? pbadslotNode.textValue() : null);
+    }
+
+    private Gam gamFromExtImp(ExtImp extImp) {
+        final ObjectNode adserverNode = getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
+                ExtImp::getContext),
+                ExtImpContext::getData),
+                data -> data.isObject() ? data.get(ADSERVER_EXT) : null),
+                adserver -> adserver.isObject() ? (ObjectNode) adserver : null);
+
+        final String adserverName = getIfNotNull(getIfNotNull(adserverNode,
+                adserver -> adserver.get(NAME_EXT)),
+                name -> name.isTextual() ? name.textValue() : null);
+
+        if (!StringUtils.equals(adserverName, GAM_EXT)) {
+            return null;
+        }
+
+        final String adSlot = getIfNotNull(getIfNotNull(adserverNode,
+                adserver -> adserver.get(ADSLOT_EXT)),
+                adSlotNode -> adSlotNode.isTextual() ? adSlotNode.textValue() : null);
+
+        return StringUtils.isNotBlank(adSlot) ? Gam.of(adSlot) : null;
+    }
+
     private Map<String, String> targetingForImp(List<TwinBids> bids) {
         return bids.stream()
                 .map(this::targetingFromBid)
@@ -836,17 +908,24 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return extBid != null ? extBid.getPrebid().getTargeting() : null;
     }
 
-    private Event toAuctionEvent(HttpContext httpContext, BidRequest bidRequest, List<AdUnit> adUnits,
-                                 Integer accountId, Integer accountSamplingFactor,
-                                 BiFunction<HttpContext, BidRequest, Event.EventBuilder> eventBuilderBase) {
-        return eventBuilderBase.apply(httpContext, bidRequest)
+    private Event toAuctionEvent(HttpContext httpContext,
+                                 AuctionContext auctionContext,
+                                 List<AdUnit> adUnits,
+                                 Integer accountId,
+                                 Integer accountSamplingFactor,
+                                 BiFunction<HttpContext, AuctionContext, Event.EventBuilder> eventBuilderBase) {
+
+        final BidRequest bidRequest = auctionContext.getBidRequest();
+
+        return eventBuilderBase.apply(httpContext, auctionContext)
                 .auctions(Collections.singletonList(Auction.of(
                         bidRequest.getId(),
                         samplingFactor(accountSamplingFactor),
                         adUnits,
                         accountId,
                         bidRequest.getTmax(),
-                        hasRubiconId(httpContext))))
+                        hasRubiconId(httpContext),
+                        gdpr(auctionContext))))
                 .build();
     }
 
@@ -863,6 +942,31 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return accountSamplingFactor != null && accountSamplingFactor > 0
                 ? accountSamplingFactor
                 : globalSamplingFactor;
+    }
+
+    private Gdpr gdpr(AuctionContext auctionContext) {
+        final PrivacyContext privacyContext = auctionContext.getPrivacyContext();
+        final TcfContext tcfContext = privacyContext.getTcfContext();
+        final BidRequest bidRequest = auctionContext.getBidRequest();
+
+        final boolean pbsApplies = Objects.equals(tcfContext.getGdpr(), GDPR_ONE_STRING);
+
+        final Integer gdpr = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest,
+                BidRequest::getRegs),
+                Regs::getExt),
+                ExtRegs::getGdpr);
+        final Boolean applies = Objects.equals(gdpr, GDPR_ONE_INTEGER);
+
+        final String consentString = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest,
+                BidRequest::getUser),
+                User::getExt),
+                ExtUser::getConsent);
+
+        final Integer version = TcfDefinerService.isConsentValid(tcfContext.getConsent())
+                ? tcfContext.getConsent().getVersion()
+                : null;
+
+        return Gdpr.of(pbsApplies, applies, consentString, version);
     }
 
     private static Client clientFrom(BidRequest bidRequest) {
@@ -896,7 +1000,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     /**
      * Prepares event from request.
      */
-    private Event.EventBuilder eventBuilderBase(HttpContext httpContext, BidRequest bidRequest) {
+    private Event.EventBuilder eventBuilderBase(HttpContext httpContext, AuctionContext auctionContext) {
+        final BidRequest bidRequest = auctionContext.getBidRequest();
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
         final String extIntegration = integrationFrom(bidRequest);
@@ -912,7 +1017,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .client(clientFrom(bidRequest))
                 .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage))
                 .channel(channel(bidRequest))
-                .geo(geo(httpContext, device));
+                .geo(geo(httpContext, auctionContext));
     }
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
@@ -939,10 +1044,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpContext httpContext, Device device) {
+    private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpContext httpContext, AuctionContext auctionContext) {
+        final Device device = auctionContext.getBidRequest().getDevice();
         final String country = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
 
-        return country != null ? org.prebid.server.rubicon.analytics.proto.Geo.of(country) : null;
+        final Integer dma = getIfNotNull(auctionContext.getGeoInfo(), GeoInfo::getMetroNielsen);
+
+        return country != null ? org.prebid.server.rubicon.analytics.proto.Geo.of(country, dma) : null;
     }
 
     private String countryFrom(Device device) {

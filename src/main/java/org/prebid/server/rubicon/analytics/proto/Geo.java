@@ -6,4 +6,6 @@ import lombok.Value;
 public class Geo {
 
     String country;
+
+    Integer dma;
 }

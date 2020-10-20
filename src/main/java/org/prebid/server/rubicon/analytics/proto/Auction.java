@@ -1,13 +1,11 @@
 package org.prebid.server.rubicon.analytics.proto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
 import lombok.Value;
 
 import java.util.List;
 
-@AllArgsConstructor(staticName = "of")
-@Value
+@Value(staticConstructor = "of")
 public class Auction {
 
     @JsonProperty("requestId")
@@ -27,4 +25,6 @@ public class Auction {
 
     @JsonProperty("hasRubiconId")
     Boolean hasRubiconId;
+
+    Gdpr gdpr;
 }
