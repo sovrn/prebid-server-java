@@ -13,11 +13,13 @@ import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.auction.BidderAliases;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
+import org.prebid.server.util.DealUtil;
 import org.prebid.server.validation.model.ValidationResult;
 
 import java.math.BigDecimal;
@@ -34,10 +36,9 @@ import java.util.stream.Stream;
  */
 public class ResponseBidValidator {
 
-    private static final String BIDDER_EXT = "bidder";
-    private static final String DEALS_ONLY = "dealsonly";
-
     private static final Logger logger = LoggerFactory.getLogger(ResponseBidValidator.class);
+
+    private static final String DEALS_ONLY = "dealsonly";
 
     private final JacksonMapper mapper;
     private final boolean dealsEnabled;
@@ -47,16 +48,18 @@ public class ResponseBidValidator {
         this.dealsEnabled = dealsEnabled;
     }
 
-    public ValidationResult validate(BidderBid bidderBid, BidRequest bidRequest) {
+    public ValidationResult validate(BidderBid bidderBid, BidRequest bidRequest, String bidder, BidderAliases aliases) {
         final List<String> warnings = new ArrayList<>();
+
         try {
             validateFieldsFor(bidderBid.getBid());
             if (dealsEnabled) {
-                validateDealsFor(bidderBid, bidRequest, warnings);
+                validateDealsFor(bidderBid, bidRequest, bidder, aliases, warnings);
             }
         } catch (ValidationException e) {
             return ValidationResult.error(e.getMessage());
         }
+
         return warnings.isEmpty() ? ValidationResult.success() : ValidationResult.warning(warnings);
     }
 
@@ -92,8 +95,12 @@ public class ResponseBidValidator {
         }
     }
 
-    private void validateDealsFor(BidderBid bidderBid, BidRequest bidRequest,
+    private void validateDealsFor(BidderBid bidderBid,
+                                  BidRequest bidRequest,
+                                  String bidder,
+                                  BidderAliases aliases,
                                   List<String> warnings) throws ValidationException {
+
         final Bid bid = bidderBid.getBid();
         final String bidId = bid.getId();
 
@@ -104,12 +111,12 @@ public class ResponseBidValidator {
 
         final String dealId = bid.getDealid();
 
-        if (isDealsOnlyImp(imp) && dealId == null) {
+        if (isDealsOnlyImp(imp, bidder) && dealId == null) {
             throw new ValidationException("Bid \"%s\" missing required field 'dealid'", bidId);
         }
 
         if (dealId != null) {
-            final Set<String> dealIdsFromImp = getDealIdsFromImp(imp);
+            final Set<String> dealIdsFromImp = getDealIdsFromImp(imp, bidder, aliases);
             if (CollectionUtils.isNotEmpty(dealIdsFromImp) && !dealIdsFromImp.contains(dealId)) {
                 warnings.add(String.format("WARNING: Bid \"%s\" has 'dealid' not present in corresponding imp in"
                                 + " request. 'dealid' in bid: '%s', deal Ids in imp: '%s'",
@@ -144,14 +151,15 @@ public class ResponseBidValidator {
         }
     }
 
-    private static boolean isDealsOnlyImp(Imp imp) {
-        final JsonNode dealsOnlyNode = imp.getExt().get(BIDDER_EXT).get(DEALS_ONLY);
+    private static boolean isDealsOnlyImp(Imp imp, String bidder) {
+        final JsonNode dealsOnlyNode = imp.getExt().get(bidder).get(DEALS_ONLY);
         return dealsOnlyNode != null && dealsOnlyNode.isBoolean() && dealsOnlyNode.asBoolean();
     }
 
-    private static Set<String> getDealIdsFromImp(Imp imp) {
+    private Set<String> getDealIdsFromImp(Imp imp, String bidder, BidderAliases aliases) {
         return getDeals(imp)
                 .filter(Objects::nonNull)
+                .filter(deal -> DealUtil.isBidderHasDeal(bidder, dealExt(deal.getExt()), aliases))
                 .map(Deal::getId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());

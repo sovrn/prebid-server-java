@@ -9,8 +9,13 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Pmp;
 import com.iab.openrtb.response.Bid;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
+import org.prebid.server.auction.BidderAliases;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
@@ -25,20 +30,33 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
 
 public class ResponseBidValidatorTest extends VertxTest {
 
+    private static final String BIDDER_NAME = "bidder1";
+
+    @Rule
+    public final MockitoRule mockitoRule = MockitoJUnit.rule();
+
     private ResponseBidValidator responseBidValidator;
+
+    @Mock
+    private BidderAliases bidderAliases;
 
     @Before
     public void setUp() {
         responseBidValidator = new ResponseBidValidator(jacksonMapper, true);
+
+        given(bidderAliases.resolveBidder(anyString())).willReturn(BIDDER_NAME);
     }
 
     @Test
     public void validateShouldFailIfMissingBid() {
         final ValidationResult result = responseBidValidator.validate(BidderBid.of(null, null, null),
-                givenRequest(identity()));
+                givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Empty bid object submitted.");
@@ -47,7 +65,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNoId() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.id(null)),
-                givenRequest(identity()));
+                givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid missing required field 'id'");
@@ -56,7 +74,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNoImpId() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.impid(null)),
-                givenRequest(identity()));
+                givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" missing required field 'impid'");
@@ -65,7 +83,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNoPrice() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(null)),
-                givenRequest(identity()));
+                givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" does not contain a 'price'");
@@ -74,7 +92,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNegativePrice() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
-                BigDecimal.valueOf(-1))), givenRequest(identity()));
+                BigDecimal.valueOf(-1))), givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" `price `has negative value");
@@ -83,7 +101,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailedIfNonDealBidHasZeroPrice() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
-                BigDecimal.valueOf(0))), givenRequest(identity()));
+                BigDecimal.valueOf(0))), givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Non deal bid \"bidId1\" has 0 price");
@@ -92,7 +110,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldSuccessForDealZeroPriceBid() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
-                BigDecimal.valueOf(0)).dealid("dealId")), givenRequest(identity()));
+                BigDecimal.valueOf(0)).dealid("dealId")), givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
     }
@@ -100,7 +118,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNoCrid() {
         final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.crid(null)),
-                givenRequest(identity()));
+                givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" missing creative ID");
@@ -109,7 +127,7 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNoCorrespondingImp() {
         final ValidationResult result = responseBidValidator.validate(givenBid(identity()),
-                givenRequest(imp -> imp.id("non-existing")));
+                givenRequest(imp -> imp.id("non-existing")), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" has no corresponding imp in request");
@@ -117,15 +135,19 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldReturnSuccessfulResultForValidNonDealBid() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(identity()),
-                givenRequest(imp -> imp.ext(mapper.createObjectNode().putNull("bidder"))));
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(identity()),
+                givenRequest(imp -> imp.ext(mapper.createObjectNode().putNull(BIDDER_NAME))),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
     }
 
     @Test
     public void validateShouldFailIfBidHasNoDealid() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(identity()), givenRequest(identity()));
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(identity()), givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" missing required field 'dealid'");
@@ -133,8 +155,8 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldSuccessIfBidHasDealidAndImpHasNoDeals() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(bid -> bid.dealid("dealId1")),
-                givenRequest(identity()));
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(bid -> bid.dealid("dealId1")), givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(0);
         assertThat(result.getWarnings()).hasSize(0);
@@ -142,8 +164,25 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldWarnIfBidHasDealidMissingInImp() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(bid -> bid.dealid("dealId1")),
-                givenRequest(imp -> imp.pmp(pmp(asList(deal(d -> d.id("dealId2")), deal(d -> d.id("dealId3")))))));
+        given(bidderAliases.resolveBidder(eq("anotherBidder"))).willReturn("anotherBidder");
+
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(bid -> bid.dealid("dealId1")),
+                givenRequest(imp -> imp.pmp(pmp(asList(
+                        deal(d -> d
+                                .id("dealId2")
+                                .ext(mapper.valueToTree(ExtDeal.of(
+                                        ExtDealLine.of(null, null, null, BIDDER_NAME))))),
+                        deal(d -> d
+                                .id("dealId3")
+                                .ext(mapper.valueToTree(ExtDeal.of(
+                                        ExtDealLine.of(null, null, null, BIDDER_NAME))))),
+                        deal(d -> d
+                                .id("dealId4")
+                                .ext(mapper.valueToTree(ExtDeal.of(
+                                        ExtDealLine.of(null, null, null, "anotherBidder"))))))))),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.getWarnings()).hasSize(1)
                 .containsOnly("WARNING: Bid \"bidId1\" has 'dealid' not present in corresponding imp in request."
@@ -154,7 +193,9 @@ public class ResponseBidValidatorTest extends VertxTest {
     public void validateShouldFailIfBidIsBannerAndImpHasNoBanner() {
         final ValidationResult result = responseBidValidator.validate(
                 givenBid(bid -> bid.dealid("dealId1"), BidType.banner),
-                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))));
+                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" has banner media type but corresponding imp in request is missing "
@@ -168,7 +209,9 @@ public class ResponseBidValidatorTest extends VertxTest {
                 givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(400).h(500).build()))
-                                .build())));
+                                .build())),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" has 'w' and 'h' not supported by corresponding imp in request. Bid "
@@ -186,7 +229,9 @@ public class ResponseBidValidatorTest extends VertxTest {
                                         singletonList(Format.builder().w(500).h(600).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
-                                .build())));
+                                .build())),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" has 'w' and 'h' not matched to Line Item. Bid dimensions: '300x400', "
@@ -204,7 +249,9 @@ public class ResponseBidValidatorTest extends VertxTest {
                                         singletonList(Format.builder().w(500).h(600).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
-                                .build())));
+                                .build())),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.getErrors()).hasSize(0);
         assertThat(result.getWarnings()).hasSize(0);
@@ -212,8 +259,11 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldReturnSuccessfulResultForValidDealNonBannerBid() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(bid -> bid.dealid("dealId1")),
-                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))));
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(bid -> bid.dealid("dealId1")),
+                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
     }
@@ -229,7 +279,9 @@ public class ResponseBidValidatorTest extends VertxTest {
                                         singletonList(Format.builder().w(300).h(400).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
-                                .build())));
+                                .build())),
+                BIDDER_NAME,
+                bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
     }
@@ -241,7 +293,7 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     private BidRequest givenRequest(Function<Imp.ImpBuilder, Imp.ImpBuilder> impCustomizer) {
         final ObjectNode ext = mapper.createObjectNode();
-        ext.putObject("bidder").put("dealsonly", true);
+        ext.putObject(BIDDER_NAME).put("dealsonly", true);
 
         final Imp.ImpBuilder impBuilder = Imp.builder()
                 .id("impId1")

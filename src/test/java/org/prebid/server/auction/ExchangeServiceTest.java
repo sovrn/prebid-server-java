@@ -202,7 +202,7 @@ public class ExchangeServiceTest extends VertxTest {
         given(fpdResolver.resolveSite(any(), any())).willAnswer(invocation -> invocation.getArgument(0));
         given(fpdResolver.resolveApp(any(), any())).willAnswer(invocation -> invocation.getArgument(0));
 
-        given(responseBidValidator.validate(any(), any())).willReturn(ValidationResult.success());
+        given(responseBidValidator.validate(any(), any(), any(), any())).willReturn(ValidationResult.success());
         given(usersyncer.getCookieFamilyName()).willReturn("cookieFamily");
 
         given(currencyService.convertCurrency(any(), any(), any(), any(), any()))
@@ -1055,7 +1055,7 @@ public class ExchangeServiceTest extends VertxTest {
                         .auctiontimestamp(1000L)
                         .build())));
 
-        given(responseBidValidator.validate(any(), any()))
+        given(responseBidValidator.validate(any(), any(), any(), any()))
                 .willReturn(ValidationResult.error("bid validation error"));
 
         final List<ExtBidderError> bidderErrors = singletonList(ExtBidderError.of(BidderError.Type.generic.getCode(),
@@ -2386,9 +2386,9 @@ public class ExchangeServiceTest extends VertxTest {
                 givenBid(Bid.builder().impid("impId").dealid("dealId2").price(BigDecimal.ONE).build()))));
 
         willReturn(ValidationResult.success()).given(responseBidValidator)
-                .validate(argThat(bid -> bid.getBid().getDealid().equals("dealId1")), any());
+                .validate(argThat(bid -> bid.getBid().getDealid().equals("dealId1")), any(), any(), any());
         willReturn(ValidationResult.error("validation error")).given(responseBidValidator)
-                .validate(argThat(bid -> bid.getBid().getDealid().equals("dealId2")), any());
+                .validate(argThat(bid -> bid.getBid().getDealid().equals("dealId2")), any(), any(), any());
 
         final BidRequest bidRequest = givenBidRequest(singletonList(givenImp(singletonMap("someBidder", 1),
                 builder -> builder
@@ -2502,7 +2502,7 @@ public class ExchangeServiceTest extends VertxTest {
         givenBidder(givenSeatBid(singletonList(
                 givenBid(Bid.builder().id("bidId2").impid("impId1").dealid("dealId2").price(BigDecimal.ONE).build()))));
 
-        given(responseBidValidator.validate(any(), any())).willReturn(ValidationResult.success());
+        given(responseBidValidator.validate(any(), any(), any(), any())).willReturn(ValidationResult.success());
 
         // when
         exchangeService.holdAuction(auctionContext);
@@ -2535,7 +2535,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         givenBidder(givenSeatBid(emptyList()));
 
-        given(responseBidValidator.validate(any(), any())).willReturn(ValidationResult.success());
+        given(responseBidValidator.validate(any(), any(), any(), any())).willReturn(ValidationResult.success());
 
         // when
         exchangeService.holdAuction(auctionContext);

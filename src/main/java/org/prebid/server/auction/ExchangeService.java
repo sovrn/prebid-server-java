@@ -66,6 +66,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtSource;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.settings.model.Account;
+import org.prebid.server.util.DealUtil;
 import org.prebid.server.util.LineItemUtil;
 import org.prebid.server.util.StreamUtil;
 import org.prebid.server.validation.ResponseBidValidator;
@@ -178,20 +179,12 @@ public class ExchangeService {
                                 auctionTimeout(timeout, cacheInfo.isDoCaching()),
                                 debugEnabled,
                                 aliases))
-                        .collect(Collectors.toList()))
-                        // send all the requests to the bidders and gathers results
-                        .map(CompositeFuture::<BidderResponse>list)
-                        .map(bidderResponses -> Tuple2.of(bidderRequests, bidderResponses)))
-                .map((Tuple2<List<BidderRequest>, List<BidderResponse>> bidderRequestsAndResponses) -> Tuple2.of(
-                        bidderRequestsAndResponses.getLeft(),
-                        storedResponseProcessor.mergeWithBidderResponses(
-                                bidderRequestsAndResponses.getRight(), storedResponse, bidRequest.getImp())))
-                .map((Tuple2<List<BidderRequest>, List<BidderResponse>> bidderRequestsAndResponses) ->
-                        validateAndAdjustBids(
-                                bidRequest,
-                                bidderRequestsAndResponses.getLeft(),
-                                bidderRequestsAndResponses.getRight(),
-                                context))
+                        .collect(Collectors.toList())))
+                // send all the requests to the bidders and gathers results
+                .map(CompositeFuture::<BidderResponse>list)
+                .map(bidderResponses -> storedResponseProcessor.mergeWithBidderResponses(
+                        bidderResponses, storedResponse, bidRequest.getImp()))
+                .map(bidderResponses -> validateAndAdjustBids(bidRequest, bidderResponses, aliases, context))
                 .map(bidderResponses -> updateMetricsFromResponses(bidderResponses, publisherId, aliases))
                 // produce response from bidder results
                 .compose(bidderResponses -> bidResponseCreator.create(
@@ -673,7 +666,7 @@ public class ExchangeService {
 
         final List<Deal> updatedDeals = originalDeals.stream()
                 .map(deal -> Tuple2.of(deal, toExtDeal(deal.getExt())))
-                .filter((Tuple2<Deal, ExtDeal> tuple) -> isBidderHasDeal(bidder, tuple.getRight(), aliases))
+                .filter((Tuple2<Deal, ExtDeal> tuple) -> DealUtil.isBidderHasDeal(bidder, tuple.getRight(), aliases))
                 .map((Tuple2<Deal, ExtDeal> tuple) -> prepareDeal(tuple.getLeft(), tuple.getRight()))
                 .collect(Collectors.toList());
 
@@ -693,17 +686,6 @@ public class ExchangeService {
             throw new PreBidException(
                     String.format("Error decoding bidRequest.imp.pmp.deal.ext: %s", e.getMessage()), e);
         }
-    }
-
-    /**
-     * Returns true if imp[].pmp.deal[].ext.line object has given bidder.
-     */
-    private static boolean isBidderHasDeal(String bidder, ExtDeal extDeal, BidderAliases aliases) {
-        final ExtDealLine extDealLine = extDeal != null ? extDeal.getLine() : null;
-        final String dealLineBidder = extDealLine != null ? extDealLine.getBidder() : null;
-        return dealLineBidder == null || Objects.equals(dealLineBidder, bidder)
-                || Objects.equals(aliases.resolveBidder(dealLineBidder), bidder)
-                || Objects.equals(aliases.resolveBidder(bidder), dealLineBidder); // filter only PG related deals
     }
 
     /**
@@ -908,20 +890,12 @@ public class ExchangeService {
                 .map(seatBid -> BidderResponse.of(bidderName, seatBid, responseTime(startTime)));
     }
 
-    private List<BidderResponse> validateAndAdjustBids(BidRequest bidRequest,
-                                                       List<BidderRequest> bidderRequests,
-                                                       List<BidderResponse> bidderResponses,
-                                                       AuctionContext auctionContext) {
-
-        final Map<String, BidRequest> bidRequestsByBidder = bidderRequests.stream()
-                .collect(Collectors.toMap(BidderRequest::getBidder, BidderRequest::getBidRequest));
+    private List<BidderResponse> validateAndAdjustBids(BidRequest bidRequest, List<BidderResponse> bidderResponses,
+                                                       BidderAliases aliases, AuctionContext auctionContext) {
 
         return bidderResponses.stream()
-                .map(bidderResponse -> validBidderResponse(
-                        bidderResponse,
-                        bidRequest.getCur(),
-                        bidRequestsByBidder.get(bidderResponse.getBidder()),
-                        auctionContext))
+                .map(bidderResponse -> validBidderResponse(bidderResponse, bidRequest.getCur(),
+                        aliases, auctionContext))
                 .map(bidderResponse -> applyBidPriceChanges(bidderResponse, bidRequest))
                 .collect(Collectors.toList());
     }
@@ -934,7 +908,7 @@ public class ExchangeService {
      * Returns input argument as the result if no errors found or creates new {@link BidderResponse} otherwise.
      */
     private BidderResponse validBidderResponse(BidderResponse bidderResponse, List<String> requestCurrencies,
-                                               BidRequest bidRequest, AuctionContext auctionContext) {
+                                               BidderAliases aliases, AuctionContext auctionContext) {
 
         final BidderSeatBid seatBid = bidderResponse.getSeatBid();
         final List<BidderBid> bids = seatBid.getBids();
@@ -947,13 +921,16 @@ public class ExchangeService {
                     String.format("Cur parameter contains more than one currency. %s will be used",
                             requestCurrencies.get(0))));
         }
+
         final TxnLog txnLog = auctionContext.getTxnLog();
+        final String bidder = bidderResponse.getBidder();
+        final BidRequest bidRequest = auctionContext.getBidRequest();
         for (BidderBid bid : bids) {
             final String lineItemId = LineItemUtil.lineItemIdFrom(bid.getBid(), bidRequest.getImp(), mapper);
 
-            maybeRecordInTxnLog(lineItemId, () -> txnLog.lineItemsReceivedFromBidder().get(bidderResponse.getBidder()));
+            maybeRecordInTxnLog(lineItemId, () -> txnLog.lineItemsReceivedFromBidder().get(bidder));
 
-            final ValidationResult validationResult = responseBidValidator.validate(bid, bidRequest);
+            final ValidationResult validationResult = responseBidValidator.validate(bid, bidRequest, bidder, aliases);
             if (validationResult.hasErrors()) {
                 for (String error : validationResult.getErrors()) {
                     errors.add(BidderError.generic(error));
