@@ -1017,7 +1017,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .client(clientFrom(bidRequest))
                 .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage))
                 .channel(channel(bidRequest))
-                .geo(geo(httpContext, auctionContext));
+                .user(user(httpContext, auctionContext));
     }
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
@@ -1044,13 +1044,23 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
+    private org.prebid.server.rubicon.analytics.proto.User user(
+            HttpContext httpContext, AuctionContext auctionContext) {
+
+        final org.prebid.server.rubicon.analytics.proto.Geo geo = geo(httpContext, auctionContext);
+
+        return geo != null ? org.prebid.server.rubicon.analytics.proto.User.of(geo) : null;
+    }
+
     private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpContext httpContext, AuctionContext auctionContext) {
         final Device device = auctionContext.getBidRequest().getDevice();
         final String country = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
 
-        final Integer dma = getIfNotNull(auctionContext.getGeoInfo(), GeoInfo::getMetroNielsen);
+        final Integer metroCode = getIfNotNull(auctionContext.getGeoInfo(), GeoInfo::getMetroNielsen);
 
-        return country != null ? org.prebid.server.rubicon.analytics.proto.Geo.of(country, dma) : null;
+        return country != null || metroCode != null
+                ? org.prebid.server.rubicon.analytics.proto.Geo.of(country, metroCode)
+                : null;
     }
 
     private String countryFrom(Device device) {

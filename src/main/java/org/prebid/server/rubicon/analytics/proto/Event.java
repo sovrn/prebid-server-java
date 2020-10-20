@@ -43,5 +43,5 @@ public class Event {
 
     String channel;
 
-    Geo geo;
+    User user;
 }

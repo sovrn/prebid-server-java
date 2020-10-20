@@ -70,6 +70,7 @@ import org.prebid.server.rubicon.analytics.proto.Gam;
 import org.prebid.server.rubicon.analytics.proto.Gdpr;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
+import org.prebid.server.rubicon.analytics.proto.User;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
@@ -1227,7 +1228,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
                 .channel("app")
-                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest", 123));
+                .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest", 123)));
     }
 
     private static Event.EventBuilder expectedEventBuilderBaseFromSite() {
@@ -1238,7 +1239,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
                 .channel("amp")
-                .geo(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie", 123))
+                .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie", 123)))
                 .referrerUri("http://referer/page");
     }
 
