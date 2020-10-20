@@ -264,6 +264,29 @@ public class DeliveryStatsServiceTest extends VertxTest {
     }
 
     @Test
+    public void sendDeliveryProgressReportShouldShouldRemoveReportFromQueueWhenDelStatsRespondWith409Conflict() {
+        // given
+        givenDeliveryProgressHttpResponse(httpClient, 409, null);
+
+        given(deliveryProgressReportFactory.batchFromDeliveryProgress(any(), any(), any(), anyInt(), anyBoolean()))
+                .willReturn(DeliveryProgressReportBatch.of(singleton(DeliveryProgressReport.builder().reportId("1")
+                                .lineItemStatus(emptySet())
+                                .dataWindowEndTimeStamp(now.minusHours(2).toString()).build()), "1",
+                        now.minusHours(2).toString()));
+
+        final DeliveryProgress deliveryProgress = DeliveryProgress.of(now.minusHours(3), lineItemService);
+
+        // when
+        deliveryStatsService.addDeliveryProgress(deliveryProgress, emptyMap());
+        deliveryStatsService.sendDeliveryProgressReports();
+
+        // then
+        final NavigableSet<DeliveryProgress> reports =
+                (NavigableSet<DeliveryProgress>) ReflectionTestUtils.getField(deliveryStatsService, "requiredBatches");
+        assertThat(reports).isEmpty();
+    }
+
+    @Test
     public void sendDeliveryProgressReportShouldCallAlertServiceWhenRequestFailed() {
         // given
         given(deliveryProgressReportFactory.batchFromDeliveryProgress(any(), any(), any(), anyInt(), anyBoolean()))
@@ -271,9 +294,9 @@ public class DeliveryStatsServiceTest extends VertxTest {
                                 .dataWindowEndTimeStamp(now.minusHours(2).toString()).build()), "1",
                         now.minusHours(2).toString()));
 
-        final DeliveryProgress deliveryProgress1 = DeliveryProgress.of(now.minusHours(3), lineItemService);
+        final DeliveryProgress deliveryProgress = DeliveryProgress.of(now.minusHours(3), lineItemService);
 
-        deliveryStatsService.addDeliveryProgress(deliveryProgress1, emptyMap());
+        deliveryStatsService.addDeliveryProgress(deliveryProgress, emptyMap());
 
         given(httpClient.post(anyString(), any(), anyString(), anyLong()))
                 .willReturn(Future.failedFuture(new TimeoutException("Timeout")));
@@ -299,10 +322,10 @@ public class DeliveryStatsServiceTest extends VertxTest {
                                 .dataWindowEndTimeStamp(now.minusHours(2).toString()).build()), "1",
                         now.minusHours(2).toString()));
 
-        final DeliveryProgress deliveryProgress1 = DeliveryProgress.of(now.minusHours(3), lineItemService);
+        final DeliveryProgress deliveryProgress = DeliveryProgress.of(now.minusHours(3), lineItemService);
 
         // when
-        deliveryStatsService.addDeliveryProgress(deliveryProgress1, emptyMap());
+        deliveryStatsService.addDeliveryProgress(deliveryProgress, emptyMap());
         deliveryStatsService.sendDeliveryProgressReports();
 
         // then
@@ -317,9 +340,9 @@ public class DeliveryStatsServiceTest extends VertxTest {
                                 .dataWindowEndTimeStamp(now.minusHours(4).toString()).build()), "1",
                         now.minusHours(4).toString()));
 
-        final DeliveryProgress deliveryProgress1 = DeliveryProgress.of(now.minusHours(5), lineItemService);
+        final DeliveryProgress deliveryProgress = DeliveryProgress.of(now.minusHours(5), lineItemService);
 
-        deliveryStatsService.addDeliveryProgress(deliveryProgress1, null);
+        deliveryStatsService.addDeliveryProgress(deliveryProgress, null);
 
         // when
         deliveryStatsService.suspend();
@@ -361,10 +384,10 @@ public class DeliveryStatsServiceTest extends VertxTest {
                         DeliveryProgressReportBatch.of(singleton(deliveryProgressReport), "1",
                                 now.minusHours(2).toString()));
 
-        final DeliveryProgress deliveryProgress1 = DeliveryProgress.of(now.minusHours(3), lineItemService);
+        final DeliveryProgress deliveryProgress = DeliveryProgress.of(now.minusHours(3), lineItemService);
 
         // when
-        deliveryStatsService.addDeliveryProgress(deliveryProgress1, emptyMap());
+        deliveryStatsService.addDeliveryProgress(deliveryProgress, emptyMap());
         deliveryStatsService.sendDeliveryProgressReports();
 
         // then

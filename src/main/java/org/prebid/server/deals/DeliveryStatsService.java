@@ -187,16 +187,27 @@ public class DeliveryStatsService implements Suspendable {
         } else {
             final int statusCode = result.result().getStatusCode();
             final String reportId = deliveryProgressReport.getReportId();
-            if (statusCode != 200) {
+            if (statusCode == 200 || statusCode == 409) {
+                handleSuccessfulResponse(deliveryProgressReport, promise, statusCode, reportId);
+            } else {
                 logger.warn("HTTP status code {0}", statusCode);
                 promise.fail(new PreBidException(String.format("Delivery stats service responded with status"
                         + " code = %s for report with id = %s", statusCode, deliveryProgressReport.getReportId())));
-            } else {
-                metrics.updateDeliveryRequestMetric(true);
-                promise.complete();
-                logger.info("Delivery progress report with {0} line items and id = {1} was successfully sent to"
-                        + " delivery stats service", deliveryProgressReport.getLineItemStatus().size(), reportId);
             }
+        }
+    }
+
+    private void handleSuccessfulResponse(DeliveryProgressReport deliveryProgressReport, Promise<Void> promise,
+                                          int statusCode, String reportId) {
+        metrics.updateDeliveryRequestMetric(true);
+        promise.complete();
+        if (statusCode == 409) {
+            logger.info("Delivery stats service respond with 409 duplicated, report with {0} line items and id = {1}"
+                            + " was already delivered before and will be removed from from delivery queue",
+                    deliveryProgressReport.getLineItemStatus().size(), reportId);
+        } else {
+            logger.info("Delivery progress report with {0} line items and id = {1} was successfully sent to"
+                    + " delivery stats service", deliveryProgressReport.getLineItemStatus().size(), reportId);
         }
     }
 
