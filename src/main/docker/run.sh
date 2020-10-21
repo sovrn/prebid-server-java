@@ -1,5 +1,13 @@
 #!/usr/bin/env sh
 
+CUSTOM_PARAMS=""
+if [[ "${prebid_server_type}" == "standalone" ]]; then
+  CUSTOM_PARAMS="$CUSTOM_PARAMS \
+        -Dlog.dir=/app/prebid-server/log/ \
+        -Dlogging.path=/app/prebid-server/log/ \
+        -Dlogging.config=/app/prebid-server/conf/logback-spring.xml"
+fi
+
 COMMAND="java \
 	-Dcom.sun.management.jmxremote \
 	-Dcom.sun.management.jmxremote.port=8005 \
@@ -7,6 +15,7 @@ COMMAND="java \
 	-Dcom.sun.management.jmxremote.ssl=false \
 	-Dvertx.cacheDirBase=/app/prebid-server/data/.vertx \
 	-XX:+UseParallelGC \
+	$CUSTOM_PARAMS \
 	-jar /app/prebid-server/prebid-server.jar"
 
 read_host_id() {
