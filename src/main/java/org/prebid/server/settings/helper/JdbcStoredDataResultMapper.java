@@ -70,7 +70,9 @@ public class JdbcStoredDataResultMapper {
                 final String data;
                 final String typeAsString;
                 try {
-                    fetchedAccountId = result.getString(0);
+                    // Rubicon stores account as INTEGER value, so need to treat as STRING
+                    final Object fetchedAccountIdAsObject = result.getValue(0);
+                    fetchedAccountId = fetchedAccountIdAsObject != null ? fetchedAccountIdAsObject.toString() : null;
                     id = result.getString(1);
                     data = result.getString(2);
                     typeAsString = result.getString(3);
