@@ -129,6 +129,7 @@ gdpr:
     v1:
       cache-dir: /app/prebid-server/data/vendorlist-cache
       fallback-vendor-list-path: /app/prebid-server/conf/tcf-v1-fallback-vendorlist.json
+      deprecated: true
     v2:
       cache-dir: /app/prebid-server/data/vendorlist2-cache
   purposes:
