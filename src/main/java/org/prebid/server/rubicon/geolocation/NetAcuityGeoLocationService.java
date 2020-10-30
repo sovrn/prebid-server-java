@@ -115,9 +115,9 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
         final String originalTimeZone = query.getTimezoneName();
         final String capitalizedTimeZone = WordUtils.capitalizeFully(originalTimeZone, '/', '_');
         try {
-            return ZoneId.of(capitalizedTimeZone);
+            return Objects.equals("?", originalTimeZone) ? null : ZoneId.of(capitalizedTimeZone);
         } catch (DateTimeException e) {
-            logger.warn(
+            logger.info(
                     "Unrecognized time zone from NetAcuity. "
                             + "Original designation: [{0}], capitalized designation: [{1}]",
                     originalTimeZone,
