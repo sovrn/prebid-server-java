@@ -5,6 +5,7 @@ import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Regs;
+import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
@@ -31,6 +32,7 @@ import org.prebid.server.privacy.PrivacyExtractor;
 import org.prebid.server.privacy.ccpa.Ccpa;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.privacy.gdpr.model.PrivacyEnforcementAction;
+import org.prebid.server.privacy.gdpr.model.RequestLogInfo;
 import org.prebid.server.privacy.gdpr.model.TCStringEmpty;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.gdpr.model.TcfResponse;
@@ -142,6 +144,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
     @Test
     public void contextFromBidRequestShouldReturnTcfContext() {
         // given
+        final String referer = "Referer";
         final BidRequest bidRequest = BidRequest.builder()
                 .regs(Regs.of(null, ExtRegs.of(1, "1YYY")))
                 .user(User.builder()
@@ -149,6 +152,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                                 .consent("consent")
                                 .build())
                         .build())
+                .site(Site.builder().ref(referer).build())
                 .build();
 
         final TcfContext tcfContext = TcfContext.builder()
@@ -156,19 +160,23 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .consentString("consent")
                 .consent(TCStringEmpty.create())
                 .build();
-        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
+
+        final String accountId = "account";
+        final MetricName requestType = MetricName.openrtb2web;
 
         // when
         final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(
-                bidRequest, Account.empty("account"), MetricName.openrtb2web, null, null);
+                bidRequest, Account.empty(accountId), requestType, null, null);
 
         // then
         final Privacy privacy = Privacy.of("1", "consent", Ccpa.of("1YYY"), 0);
         FutureAssertion.assertThat(privacyContext).succeededWith(PrivacyContext.of(privacy, tcfContext));
 
+        final RequestLogInfo expectedRequestLogInfo = RequestLogInfo.of(requestType, referer, accountId);
         verify(tcfDefinerService).resolveTcfContext(
-                eq(privacy), isNull(), isNull(), isNull(), same(MetricName.openrtb2web), isNull());
+                eq(privacy), isNull(), isNull(), isNull(), same(requestType), eq(expectedRequestLogInfo), isNull());
     }
 
     @Test
@@ -197,7 +205,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .inEea(false)
                 .geoInfo(GeoInfo.builder().vendor("v").country("ua").build())
                 .build();
-        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
 
         // when
@@ -209,7 +217,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         FutureAssertion.assertThat(privacyContext).succeededWith(PrivacyContext.of(privacy, tcfContext, "ip-masked"));
 
         verify(tcfDefinerService).resolveTcfContext(
-                eq(privacy), isNull(), eq("ip-masked"), isNull(), same(MetricName.openrtb2web), isNull());
+                eq(privacy), isNull(), eq("ip-masked"), isNull(), same(MetricName.openrtb2web), any(), isNull());
     }
 
     @Test
@@ -232,18 +240,22 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .consentString("consent")
                 .consent(TCStringEmpty.create())
                 .build();
-        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
+
+        final String accountId = "account";
 
         // when
         final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromLegacyRequest(
-                preBidRequestContext, Account.empty("account"), null);
+                preBidRequestContext, Account.empty(accountId), null);
 
         // then
         final Privacy privacy = Privacy.of("1", "consent", Ccpa.of("1YYY"), 0);
         FutureAssertion.assertThat(privacyContext).succeededWith(PrivacyContext.of(privacy, tcfContext));
 
-        verify(tcfDefinerService).resolveTcfContext(eq(privacy), any(), eq("ip"), isNull(), isNull());
+        final RequestLogInfo expectedRequestLogInfo = RequestLogInfo.of(MetricName.legacy, null, accountId);
+        verify(tcfDefinerService)
+                .resolveTcfContext(eq(privacy), any(), eq("ip"), isNull(), eq(expectedRequestLogInfo), isNull());
     }
 
     @Test
@@ -259,18 +271,22 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .consentString("consent")
                 .consent(TCStringEmpty.create())
                 .build();
-        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
+
+        final String accountId = "account";
 
         // when
         final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromSetuidRequest(
-                request, Account.empty("account"), null, null);
+                request, Account.empty(accountId), null, null);
 
         // then
         final Privacy privacy = Privacy.of("1", "consent", Ccpa.EMPTY, 0);
         FutureAssertion.assertThat(privacyContext).succeededWith(PrivacyContext.of(privacy, tcfContext));
 
-        verify(tcfDefinerService).resolveTcfContext(eq(privacy), any(), eq("ip"), isNull(), isNull());
+        final RequestLogInfo expectedRequestLogInfo = RequestLogInfo.of(null, null, accountId);
+        verify(tcfDefinerService)
+                .resolveTcfContext(eq(privacy), any(), eq("ip"), isNull(), eq(expectedRequestLogInfo), isNull());
     }
 
     @Test
@@ -291,18 +307,22 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .consentString("consent")
                 .consent(TCStringEmpty.create())
                 .build();
-        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any()))
+        given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
+
+        final String accountId = "account";
 
         // when
         final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromCookieSyncRequest(
-                cookieSyncRequest, httpServerRequest, Account.empty("account"), null, null);
+                cookieSyncRequest, httpServerRequest, Account.empty(accountId), null, null);
 
         // then
         final Privacy privacy = Privacy.of("1", "consent", Ccpa.of("1YYY"), 0);
         FutureAssertion.assertThat(privacyContext).succeededWith(PrivacyContext.of(privacy, tcfContext));
 
-        verify(tcfDefinerService).resolveTcfContext(eq(privacy), any(), eq("ip"), isNull(), isNull());
+        final RequestLogInfo expectedRequestLogInfo = RequestLogInfo.of(null, null, accountId);
+        verify(tcfDefinerService)
+                .resolveTcfContext(eq(privacy), any(), eq("ip"), isNull(), eq(expectedRequestLogInfo), isNull());
     }
 
     @Test

@@ -30,6 +30,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -54,8 +55,22 @@ public class ResponseBidValidatorTest extends VertxTest {
     }
 
     @Test
-    public void validateShouldFailIfMissingBid() {
-        final ValidationResult result = responseBidValidator.validate(BidderBid.of(null, null, null),
+    public void validateShouldFailedIfBidderBidCurrencyIsIncorrect() {
+        assertThatIllegalArgumentException().isThrownBy(() ->
+                responseBidValidator.validate(BidderBid.of(
+                        Bid.builder()
+                                .id("bidId1")
+                                .impid("impId1")
+                                .crid("crid1")
+                                .price(BigDecimal.ONE).build(),
+                        null,
+                        "USDD"),
+                        givenRequest(identity()), BIDDER_NAME, bidderAliases));
+    }
+
+    @Test
+    public void validateShouldFailedIfMissingBid() {
+        final ValidationResult result = responseBidValidator.validate(BidderBid.of(null, null, "USD"),
                 givenRequest(identity()), BIDDER_NAME, bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)

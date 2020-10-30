@@ -993,7 +993,8 @@ public class ExchangeService {
             final BigDecimal price = bid.getPrice();
             try {
                 final BigDecimal priceInAdServerCurrency = currencyService.convertCurrency(
-                        price, currencyRates(bidRequest), adServerCurrency, bidCurrency, usepbsrates);
+                        price, currencyRates(bidRequest), adServerCurrency,
+                        StringUtils.stripToNull(bidCurrency), usepbsrates);
 
                 final BigDecimal adjustedPrice = adjustPrice(priceAdjustmentFactor, priceInAdServerCurrency);
 
