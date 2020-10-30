@@ -91,6 +91,8 @@ import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
 import java.math.BigDecimal;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -414,16 +416,33 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .build();
     }
 
-    private Event.EventBuilder eventBuilderFromNotification(HttpContext httpContext, Long timestamp,
-                                                            String integration) {
+    private Event.EventBuilder eventBuilderFromNotification(
+            HttpContext httpContext, Long timestamp, String integration) {
+
+        final String referrerUri = httpContext.getHeaders().get(HttpUtil.REFERER_HEADER.toString());
+
         return Event.builder()
                 .eventTimeMillis(timestamp != null ? timestamp : Instant.now().toEpochMilli())
                 .integration(ObjectUtils.defaultIfNull(integration, PBS_INTEGRATION))
                 .version(pbsVersion)
-                .referrerUri(httpContext.getHeaders().get(HttpUtil.REFERER_HEADER.toString()))
+                .referrerUri(referrerUri)
+                .referrerHostname(referrerHostname(referrerUri))
                 .limitAdTracking(StringUtils.equals(httpContext.getHeaders().get(HttpUtil.DNT_HEADER.toString()), "1"))
                 .userAgent(httpContext.getHeaders().get(HttpUtil.USER_AGENT_HEADER.toString()))
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion));
+    }
+
+    private static String referrerHostname(String referrerUri) {
+        if (StringUtils.isBlank(referrerUri)) {
+            return null;
+        }
+
+        try {
+            return new URL(referrerUri).getHost();
+        } catch (MalformedURLException e) {
+            logger.warn("Could not extract hostname from referrer uri [{0}], error: {1}", referrerUri, e.getMessage());
+            return null;
+        }
     }
 
     private boolean isDebugEnabled(BidRequest bidRequest) {
@@ -1006,6 +1025,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
         final String extIntegration = integrationFrom(bidRequest);
         final String extWrappername = parseExtParameters(bidRequest).getWrappername();
+        final String referrerUri = getIfNotNull(bidRequest.getSite(), Site::getPage);
 
         return Event.builder()
                 .integration(StringUtils.isBlank(extIntegration) ? PBS_INTEGRATION : extIntegration)
@@ -1015,7 +1035,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
                 .userAgent(getIfNotNull(device, Device::getUa))
                 .client(clientFrom(bidRequest))
-                .referrerUri(getIfNotNull(bidRequest.getSite(), Site::getPage))
+                .referrerUri(referrerUri)
+                .referrerHostname(referrerHostname(referrerUri))
                 .channel(channel(bidRequest))
                 .user(user(httpContext, auctionContext));
     }

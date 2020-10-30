@@ -41,6 +41,9 @@ public class Event {
     @JsonProperty("referrerUri")
     String referrerUri;
 
+    @JsonProperty("referrerHostname")
+    String referrerHostname;
+
     String channel;
 
     User user;

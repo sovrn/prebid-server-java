@@ -594,6 +594,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .integration("integration")
                 .version("pbs-version-1")
                 .referrerUri("http://referer")
+                .referrerHostname("referer")
                 .limitAdTracking(true)
                 .userAgent("ua")
                 .bidsWon(singletonList(BidWon.builder()
@@ -642,6 +643,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .integration("pbs")
                 .version("pbs-version-1")
                 .referrerUri("http://referer")
+                .referrerHostname("referer")
                 .limitAdTracking(true)
                 .userAgent("ua")
                 .impressions(singletonList(Impression.builder()
@@ -1240,7 +1242,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .userAgent("userAgent")
                 .channel("amp")
                 .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie", 123)))
-                .referrerUri("http://referer/page");
+                .referrerUri("http://referer/page")
+                .referrerHostname("referer");
     }
 
     @SuppressWarnings("SameParameterValue")
