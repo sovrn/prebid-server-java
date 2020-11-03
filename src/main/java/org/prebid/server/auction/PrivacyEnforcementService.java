@@ -141,7 +141,7 @@ public class PrivacyEnforcementService {
         final String ipAddress = HttpUtil.ipFrom(httpRequest);
         final AccountGdprConfig accountGdpr = account.getGdpr();
         final String accountId = account.getId();
-        final RequestLogInfo requestLogInfo = requestLogInfo(null, null, accountId);
+        final RequestLogInfo requestLogInfo = requestLogInfo(MetricName.setuid, null, accountId);
         final String country = getFromRsidCookieIfNull(null, routingContext);
 
         return tcfDefinerService.resolveTcfContext(privacy, country, ipAddress, accountGdpr, requestLogInfo, timeout)
@@ -156,7 +156,7 @@ public class PrivacyEnforcementService {
         final String ipAddress = HttpUtil.ipFrom(httpRequest);
         final AccountGdprConfig accountGdpr = account.getGdpr();
         final String accountId = account.getId();
-        final RequestLogInfo requestLogInfo = requestLogInfo(null, null, accountId);
+        final RequestLogInfo requestLogInfo = requestLogInfo(MetricName.cookiesync, null, accountId);
         final String country = getFromRsidCookieIfNull(null, routingContext);
 
         return tcfDefinerService.resolveTcfContext(privacy, country, ipAddress, accountGdpr, requestLogInfo, timeout)
