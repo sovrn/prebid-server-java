@@ -1,7 +1,6 @@
 package org.prebid.server.deals.simulation;
 
 import io.vertx.core.Future;
-import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.deals.LineItemService;
@@ -50,9 +49,9 @@ public class SimulationAwareUserService extends UserService {
     }
 
     @Override
-    public void processWinEvent(NotificationEvent event, UidsCookie uids) {
+    public void processWinEvent(String lineItemId, String bidId, UidsCookie uids) {
         if (winEventsEnabled) {
-            super.processWinEvent(event, uids);
+            super.processWinEvent(lineItemId, bidId, uids);
         }
     }
 }

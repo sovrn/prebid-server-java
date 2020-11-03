@@ -47,6 +47,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
     private final AnalyticsReporter analyticsReporter;
     private final TimeoutFactory timeoutFactory;
     private final ApplicationSettings applicationSettings;
+    private final boolean dealsEnabled;
     private final TrackingPixel trackingPixel;
 
     public NotificationEventHandler(UidsCookieService uidsCookieService,
@@ -54,7 +55,8 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
                                     UserService userService,
                                     AnalyticsReporter analyticsReporter,
                                     TimeoutFactory timeoutFactory,
-                                    ApplicationSettings applicationSettings) {
+                                    ApplicationSettings applicationSettings,
+                                    boolean dealsEnabled) {
 
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.applicationEventService = applicationEventService;
@@ -62,6 +64,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
+        this.dealsEnabled = dealsEnabled;
 
         trackingPixel = createTrackingPixel();
     }
@@ -99,12 +102,8 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
         }
 
         final EventRequest eventRequest = EventUtil.from(context);
-        if (eventRequest.getAnalytics() == EventRequest.Analytics.enabled) {
-            getAccountById(eventRequest.getAccountId())
-                    .setHandler(async -> handleEvent(async, eventRequest, context));
-        } else {
-            respondWithOkStatus(context, eventRequest.getFormat() == EventRequest.Format.image);
-        }
+        getAccountById(eventRequest.getAccountId())
+                .setHandler(async -> handleEvent(async, eventRequest, context));
     }
 
     /**
@@ -131,6 +130,14 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
             respondWithServerError(context, async.cause());
         } else {
             final Account account = async.result();
+
+            final String lineItemId = eventRequest.getLineItemId();
+            final String bidId = eventRequest.getBidId();
+            if (dealsEnabled && lineItemId != null) {
+                applicationEventService.publishLineItemWinEvent(lineItemId);
+                userService.processWinEvent(lineItemId, bidId, uidsCookieService.parseFromRequest(context));
+            }
+
             boolean eventsEnabledForAccount = Objects.equals(account.getEventsEnabled(), true);
             boolean eventsEnabledForRequest = eventRequest.getAnalytics() == EventRequest.Analytics.enabled;
 
@@ -140,11 +147,6 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
             }
 
             final EventRequest.Type eventType = eventRequest.getType();
-            final String lineItemId = eventRequest.getLineItemId();
-            if (applicationEventService != null && eventsEnabledForAccount && lineItemId != null) {
-                applicationEventService.publishLineItemWinEvent(lineItemId);
-            }
-
             if (eventsEnabledForRequest) {
                 final NotificationEvent notificationEvent = NotificationEvent.builder()
                         .type(eventType == EventRequest.Type.win
@@ -158,14 +160,10 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
                         .lineItemId(lineItemId)
                         .build();
 
-                if (userService != null && lineItemId != null) {
-                    userService.processWinEvent(notificationEvent, uidsCookieService.parseFromRequest(context));
-                }
-
                 analyticsReporter.processEvent(notificationEvent);
 
-                respondWithOkStatus(context, eventRequest.getFormat() == EventRequest.Format.image);
             }
+            respondWithOkStatus(context, eventRequest.getFormat() == EventRequest.Format.image);
         }
     }
 

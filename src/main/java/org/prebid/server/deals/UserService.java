@@ -5,7 +5,6 @@ import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.apache.commons.collections.CollectionUtils;
-import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.cookie.UidsCookie;
@@ -221,12 +220,11 @@ public class UserService {
     }
 
     /**
-     * Accepts win {@link NotificationEvent}(with lineItemId) from the {@link NotificationEventHandler},
+     * Accepts lineItemId and bidId from the {@link NotificationEventHandler},
      * joins event data with corresponding Line Item metadata (provided by LineItemService)
      * and passes this information to the User Data Store to facilitate frequency capping.
      */
-    public void processWinEvent(NotificationEvent event, UidsCookie uids) {
-        final String lineItemId = event.getLineItemId();
+    public void processWinEvent(String lineItemId, String bidId, UidsCookie uids) {
         final LineItem lineItem = lineItemService.getLineItemById(lineItemId);
         final List<UserId> userIds = getUserIds(uids.getCookieUids().getUids());
 
@@ -237,7 +235,7 @@ public class UserService {
 
         final String body = mapper.encode(WinEventNotification.builder()
                 .bidderCode(lineItem.getSource())
-                .bidId(event.getBidId())
+                .bidId(bidId)
                 .lineItemId(lineItemId)
                 .region(dataCenterRegion)
                 .userIds(userIds)

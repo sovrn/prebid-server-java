@@ -89,7 +89,8 @@ public class NotificationEventHandlerTest extends VertxTest {
                 userService,
                 analyticsReporter,
                 timeoutFactory,
-                applicationSettings);
+                applicationSettings,
+                true);
     }
 
     @Test
@@ -324,6 +325,79 @@ public class NotificationEventHandlerTest extends VertxTest {
     }
 
     @Test
+    public void shouldProcessLineItemEventWhenRequestAnalyticsFlagDisabled() {
+        //given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("t", "win")
+                .add("b", "bidId")
+                .add("l", "lineItemId")
+                .add("a", "accountId")
+                .add("x", "0"));
+
+        final Account account = Account.builder().eventsEnabled(true).build();
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(account));
+
+        // when
+        notificationHandler.handle(routingContext);
+
+        // then
+        verify(applicationEventService).publishLineItemWinEvent(eq("lineItemId"));
+        verify(userService).processWinEvent(eq("lineItemId"), eq("bidId"), any());
+    }
+
+    @Test
+    public void shouldProcessLineItemEventWhenAccountEventsDisabled() {
+        //given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("t", "win")
+                .add("b", "bidId")
+                .add("l", "lineItemId")
+                .add("a", "accountId"));
+
+        final Account account = Account.builder().eventsEnabled(false).build();
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(account));
+
+        // when
+        notificationHandler.handle(routingContext);
+
+        // then
+        verify(applicationEventService).publishLineItemWinEvent(eq("lineItemId"));
+        verify(userService).processWinEvent(eq("lineItemId"), eq("bidId"), any());
+    }
+
+    @Test
+    public void shouldNotProcessLineItemEventWhenDealsDisabled() {
+        // given
+        notificationHandler = new NotificationEventHandler(
+                uidsCookieService,
+                applicationEventService,
+                userService,
+                analyticsReporter,
+                timeoutFactory,
+                applicationSettings,
+                false);
+
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("t", "win")
+                .add("b", "bidId")
+                .add("l", "lineItemId")
+                .add("a", "accountId"));
+
+        final Account account = Account.builder().eventsEnabled(true).build();
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(account));
+
+        // when
+        notificationHandler.handle(routingContext);
+
+        // then
+        verifyZeroInteractions(applicationEventService);
+        verifyZeroInteractions(userService);
+    }
+
+    @Test
     public void shouldNotPassEventToAnalyticsReporterWhenAnalyticsValueIsZero() {
         // given
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
@@ -464,7 +538,7 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .lineItemId("lineItemId")
                 .build();
 
-        verify(userService).processWinEvent(eq(expectedEvent), isNull());
+        verify(userService).processWinEvent(eq("lineItemId"), eq("bidId"), isNull());
         verify(analyticsReporter).processEvent(eq(expectedEvent));
     }
 

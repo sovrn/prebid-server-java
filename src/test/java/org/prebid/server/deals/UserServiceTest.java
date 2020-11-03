@@ -467,17 +467,12 @@ public class UserServiceTest extends VertxTest {
     @Test
     public void processWinEventShouldCallMetricsPreparationFailedMetricWhenHttpClientWhenMetaDataIsMissing() {
         // given
-        final NotificationEvent event = NotificationEvent.builder()
-                .bidId("bidId")
-                .lineItemId("lineItem1")
-                .build();
-
         given(lineItemService.getLineItemById(any())).willReturn(
                 null,
                 LineItem.of(LineItemMetaData.builder().build(), null, null, ZonedDateTime.now(clock)));
 
         // when
-        userService.processWinEvent(event, uidsCookie);
+        userService.processWinEvent("lineItem1", "bidId", uidsCookie);
 
         // then
         verify(metrics).updateWinRequestPreparationFailed();
@@ -487,10 +482,6 @@ public class UserServiceTest extends VertxTest {
     @Test
     public void processWinEventShouldCallMetricsPreparationFailedMetricWhenHttpClientWhenUserIdsAreMissing() {
         // given
-        final NotificationEvent event = NotificationEvent.builder()
-                .bidId("bidId")
-                .lineItemId("lineItem1")
-                .build();
         final List<FrequencyCap> frequencyCaps = singletonList(FrequencyCap.builder().fcapId("213").build());
         final UidsCookie emptyCookie = new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper);
 
@@ -503,7 +494,7 @@ public class UserServiceTest extends VertxTest {
                 null, null, ZonedDateTime.now(clock)));
 
         // when
-        userService.processWinEvent(event, emptyCookie);
+        userService.processWinEvent("lineItem1", "bidId", emptyCookie);
 
         // then
         verify(metrics).updateWinRequestPreparationFailed();
@@ -531,7 +522,7 @@ public class UserServiceTest extends VertxTest {
                 .willReturn(Future.succeededFuture(HttpClientResponse.of(400, null, null)));
 
         // when
-        userService.processWinEvent(event, uidsCookie);
+        userService.processWinEvent("lineItem1", "bidId", uidsCookie);
 
         // then
         verify(metrics).updateWinEventRequestMetric(eq(false));
@@ -541,10 +532,6 @@ public class UserServiceTest extends VertxTest {
     @Test
     public void processWinEventShouldCallMetricsWinRequestWithFalseWhenFailedFuture() {
         // given
-        final NotificationEvent event = NotificationEvent.builder()
-                .bidId("bidId")
-                .lineItemId("lineItem1")
-                .build();
         final List<FrequencyCap> frequencyCaps = singletonList(FrequencyCap.builder().fcapId("213").build());
 
         given(lineItemService.getLineItemById(any())).willReturn(LineItem.of(
@@ -559,7 +546,7 @@ public class UserServiceTest extends VertxTest {
                 .willReturn(Future.failedFuture(new TimeoutException("timeout")));
 
         // when
-        userService.processWinEvent(event, uidsCookie);
+        userService.processWinEvent("lineItem1", "bidId", uidsCookie);
 
         // then
         verify(metrics).updateWinEventRequestMetric(eq(false));
@@ -569,10 +556,6 @@ public class UserServiceTest extends VertxTest {
     @Test
     public void processWinEventShouldCallExpectedServicesWithExpectedParameters() throws IOException {
         // given
-        final NotificationEvent event = NotificationEvent.builder()
-                .bidId("bidId")
-                .lineItemId("lineItem1")
-                .build();
         final List<FrequencyCap> frequencyCaps = singletonList(FrequencyCap.builder().fcapId("213").build());
 
         given(lineItemService.getLineItemById(any())).willReturn(LineItem.of(
@@ -587,7 +570,7 @@ public class UserServiceTest extends VertxTest {
                 .willReturn(Future.succeededFuture(HttpClientResponse.of(200, null, null)));
 
         // when
-        userService.processWinEvent(event, uidsCookie);
+        userService.processWinEvent("lineItem1", "bidId", uidsCookie);
 
         // then
         verify(lineItemService).getLineItemById(eq("lineItem1"));

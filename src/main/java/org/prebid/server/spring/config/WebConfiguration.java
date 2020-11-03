@@ -428,7 +428,8 @@ public class WebConfiguration {
             @Autowired(required = false) UserService userService,
             CompositeAnalyticsReporter compositeAnalyticsReporter,
             TimeoutFactory timeoutFactory,
-            ApplicationSettings applicationSettings) {
+            ApplicationSettings applicationSettings,
+            @Value("${deals.enabled}") boolean dealsEnabled) {
 
         return new NotificationEventHandler(
                 uidsCookieService,
@@ -436,7 +437,8 @@ public class WebConfiguration {
                 userService,
                 compositeAnalyticsReporter,
                 timeoutFactory,
-                applicationSettings);
+                applicationSettings,
+                dealsEnabled);
     }
 
     @Bean
