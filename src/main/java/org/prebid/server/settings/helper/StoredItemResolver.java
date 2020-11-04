@@ -37,15 +37,17 @@ public class StoredItemResolver {
             throw new PreBidException(String.format("No stored %s found for id: %s", type, id));
         }
 
+        final String normalizedAccountId = normalizeAccountId(accountId);
+
         // at least one stored item has account
         if (storedItems.size() > 1) {
-            if (StringUtils.isEmpty(accountId)) {
+            if (StringUtils.isEmpty(normalizedAccountId)) {
                 // we cannot choose stored item among multiple without account
                 throw new PreBidException(String.format(
                         "Multiple stored %ss found for id: %s but no account was specified", type, id));
             }
             return storedItems.stream()
-                    .filter(storedItem -> Objects.equals(storedItem.getAccountId(), accountId))
+                    .filter(storedItem -> isSatisfiedStoredItem(id, storedItem.getAccountId(), normalizedAccountId))
                     .findAny()
                     .orElseThrow(() -> new PreBidException(String.format(
                             "No stored %s found among multiple id: %s for account: %s", type, id, accountId)));
@@ -53,11 +55,39 @@ public class StoredItemResolver {
 
         // only one stored item found
         final StoredItem storedItem = storedItems.iterator().next();
-        if (StringUtils.isBlank(accountId) || storedItem.getAccountId() == null
-                || Objects.equals(accountId, storedItem.getAccountId())) {
+        if (StringUtils.isBlank(normalizedAccountId) || storedItem.getAccountId() == null
+                || isSatisfiedStoredItem(id, storedItem.getAccountId(), normalizedAccountId)) {
             return storedItem;
         }
         throw new PreBidException(
                 String.format("No stored %s found for id: %s for account: %s", type, id, accountId));
+    }
+
+    private static String normalizeAccountId(String accountId) {
+        return Objects.equals(accountId, "ACCOUNT_ID") ? null : StringUtils.stripToNull(accountId);
+    }
+
+    private static boolean isSatisfiedStoredItem(String storedItemId, String storedItemAccountId, String accountId) {
+        return Objects.equals(storedItemAccountId, accountId) || accountIdFromStoredItemIdIsValid(storedItemId);
+    }
+
+    private static boolean accountIdFromStoredItemIdIsValid(String storedItemId) {
+        final String resolvedAccountId = resolveAccountIdFromStoredItemId(storedItemId);
+
+        if (StringUtils.isNumeric(resolvedAccountId)) {
+            try {
+                Integer.parseInt(resolvedAccountId);
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static String resolveAccountIdFromStoredItemId(String storedItemId) {
+        return StringUtils.isNotEmpty(storedItemId)
+                ? storedItemId.split("-")[0]
+                : null;
     }
 }

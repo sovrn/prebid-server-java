@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -116,6 +117,30 @@ public class StoredItemResolverTest {
         assertThatExceptionOfType(PreBidException.class)
                 .isThrownBy(() -> StoredItemResolver.resolve(StoredDataType.imp, "1002", "id", storedItems))
                 .withMessage("No stored imp found for id: id for account: 1002");
+    }
+
+    @Test
+    public void resolveShouldReturnResultWhenSingleStoredDataButPredefinedAccountInRequestAndNoAccountInStoredData() {
+        // given
+        final Set<StoredItem> storedItems = singleton(StoredItem.of(null, "data1"));
+
+        // when
+        final StoredItem storedItem = StoredItemResolver.resolve(StoredDataType.imp, "ACCOUNT_ID", "id", storedItems);
+
+        // then
+        assertThat(storedItem).isEqualTo(StoredItem.of(null, "data1"));
+    }
+
+    @Test
+    public void resolveShouldReturnResultWhenSingleStoredDataButAccountFromStoredDataIdIsSatisfied() {
+        // given
+        final Set<StoredItem> storedItems = singleton(StoredItem.of(null, "data1"));
+
+        // when
+        final StoredItem storedItem = StoredItemResolver.resolve(StoredDataType.imp, "1001", "1001-id", storedItems);
+
+        // then
+        assertThat(storedItem).isEqualTo(StoredItem.of(null, "data1"));
     }
 
     private static Set<StoredItem> givenSingleStoredData() {
