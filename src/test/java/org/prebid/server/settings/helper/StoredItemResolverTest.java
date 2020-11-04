@@ -143,6 +143,18 @@ public class StoredItemResolverTest {
         assertThat(storedItem).isEqualTo(StoredItem.of(null, "data1"));
     }
 
+    @Test
+    public void resolveShouldReturnResultWhenMultipleStoredDataButNoAccountInRequest() {
+        // given
+        final Set<StoredItem> storedItems = givenMultipleStoredData();
+
+        // when
+        final StoredItem storedItem = StoredItemResolver.resolve(StoredDataType.imp, null, "1001-amp", storedItems);
+
+        // then
+        assertThat(storedItem).isEqualTo(StoredItem.of("1001", "data1"));
+    }
+
     private static Set<StoredItem> givenSingleStoredData() {
         final Set<StoredItem> storedItems = new HashSet<>();
         storedItems.add(StoredItem.of("1001", "data1"));
