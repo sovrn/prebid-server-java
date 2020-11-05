@@ -50,7 +50,7 @@ public class StoredItemResolver {
                     .filter(storedItem -> Objects.equals(resolvedAccountId, storedItem.getAccountId()))
                     .findAny()
                     .orElseThrow(() -> new PreBidException(String.format(
-                            "No stored %s found among multiple id: %s for account: %s", type, id, accountId)));
+                            "No stored %s found among multiple id: %s for account: %s", type, id, resolvedAccountId)));
         }
 
         // only one stored item found
@@ -60,7 +60,7 @@ public class StoredItemResolver {
             return storedItem;
         }
         throw new PreBidException(
-                String.format("No stored %s found for id: %s for account: %s", type, id, accountId));
+                String.format("No stored %s found for id: %s for account: %s", type, id, resolvedAccountId));
     }
 
     private static String resolveAccountId(String accountId, String storedItemId) {
