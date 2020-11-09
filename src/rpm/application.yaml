@@ -65,6 +65,8 @@ adapters:
     enabled: true
   sovrn:
     enabled: true
+  synacormedia:
+    enabled: true
   tappx:
     enabled: true
   triplelift:
