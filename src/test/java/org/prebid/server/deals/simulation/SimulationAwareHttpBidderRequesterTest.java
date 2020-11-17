@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
+import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
@@ -52,17 +53,17 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
 
     @Mock
     private HttpClient httpClient;
-
     @Mock
     private BidderRequestCompletionTrackerFactory bidderRequestCompletionTrackerFactory;
-
+    @Mock
+    private BidderErrorNotifier bidderErrorNotifier;
     @Mock
     private LineItemService lineItemService;
 
     @Before
     public void setUp() {
         bidderRequester = new SimulationAwareHttpBidderRequester(
-                httpClient, bidderRequestCompletionTrackerFactory, lineItemService, jacksonMapper);
+                httpClient, bidderRequestCompletionTrackerFactory, bidderErrorNotifier, lineItemService, jacksonMapper);
     }
 
     @Test

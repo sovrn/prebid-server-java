@@ -12,6 +12,7 @@ import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.bidder.Bidder;
+import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
 import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.model.BidderBid;
@@ -53,10 +54,10 @@ public class SimulationAwareHttpBidderRequester extends HttpBidderRequester {
     public SimulationAwareHttpBidderRequester(
             HttpClient httpClient,
             BidderRequestCompletionTrackerFactory bidderRequestCompletionTrackerFactory,
-            LineItemService lineItemService,
+            BidderErrorNotifier bidderErrorNotifier, LineItemService lineItemService,
             JacksonMapper mapper) {
 
-        super(httpClient, bidderRequestCompletionTrackerFactory);
+        super(httpClient, bidderRequestCompletionTrackerFactory, bidderErrorNotifier);
 
         this.lineItemService = Objects.requireNonNull(lineItemService);
         this.mapper = Objects.requireNonNull(mapper);

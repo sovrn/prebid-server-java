@@ -5,6 +5,7 @@ import io.vertx.core.eventbus.EventBus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.bidder.BidderCatalog;
+import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
 import org.prebid.server.bidder.DealsBidderRequestCompletionTrackerFactory;
 import org.prebid.server.bidder.HttpBidderRequester;
@@ -363,11 +364,12 @@ public class DealsConfiguration {
         SimulationAwareHttpBidderRequester simulationAwareHttpBidderRequester(
                 HttpClient httpClient,
                 BidderRequestCompletionTrackerFactory completionTrackerFactory,
+                BidderErrorNotifier bidderErrorNotifier,
                 LineItemService lineItemService,
                 JacksonMapper mapper) {
 
             return new SimulationAwareHttpBidderRequester(
-                    httpClient, completionTrackerFactory, lineItemService, mapper);
+                    httpClient, completionTrackerFactory, bidderErrorNotifier, lineItemService, mapper);
         }
 
         @Bean
