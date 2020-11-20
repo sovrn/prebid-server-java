@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -414,6 +415,26 @@ public class NotificationEventHandlerTest extends VertxTest {
 
         // then
         verifyZeroInteractions(analyticsReporter);
+    }
+
+    @Test
+    public void shouldRespondWhenAnalyticsValueIsZeroAndDoNotSetStatusManually() {
+        // given
+        given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
+                .add("t", "win")
+                .add("b", "bidId")
+                .add("a", "accountId")
+                .add("x", "0"));
+
+        given(applicationSettings.getAccountById(anyString(), any()))
+                .willReturn(Future.succeededFuture(Account.builder().eventsEnabled(true).build()));
+
+        // when
+        notificationHandler.handle(routingContext);
+
+        // then
+        verify(httpResponse, never()).setStatusCode(anyInt());
+        verify(httpResponse).end();
     }
 
     @Test
