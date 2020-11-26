@@ -63,6 +63,8 @@ adapters:
     enabled: true
   rubicon:
     enabled: true
+  smartadserver:
+    enabled: true
   sovrn:
     enabled: true
   synacormedia:
