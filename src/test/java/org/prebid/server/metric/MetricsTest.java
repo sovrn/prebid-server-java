@@ -808,6 +808,26 @@ public class MetricsTest {
     }
 
     @Test
+    public void privacyShouldReturnSameMetricsOnSuccessiveCalls() {
+        assertThat(metrics.privacy()).isSameAs(metrics.privacy());
+    }
+
+    @Test
+    public void privacyTcfShouldReturnSameMetricsOnSuccessiveCalls() {
+        assertThat(metrics.privacy().tcf()).isSameAs(metrics.privacy().tcf());
+    }
+
+    @Test
+    public void privacyTcfVersionShouldReturnSameMetricsOnSuccessiveCalls() {
+        assertThat(metrics.privacy().tcf().v1()).isSameAs(metrics.privacy().tcf().v1());
+    }
+
+    @Test
+    public void privacyTcfVersionVendorListShouldReturnSameMetricsOnSuccessiveCalls() {
+        assertThat(metrics.privacy().tcf().v2().vendorList()).isSameAs(metrics.privacy().tcf().v2().vendorList());
+    }
+
+    @Test
     public void updatePrivacyCoppaMetricShouldIncrementMetric() {
         // when
         metrics.updatePrivacyCoppaMetric();
@@ -836,26 +856,6 @@ public class MetricsTest {
         assertThat(metricRegistry.counter("adapter.rubicon.openrtb2-web.tcf.request_blocked").getCount()).isEqualTo(1);
         assertThat(metricRegistry.counter("adapter.rubicon.openrtb2-web.tcf.analytics_blocked").getCount())
                 .isEqualTo(1);
-    }
-
-    @Test
-    public void privacyShouldReturnSameMetricsOnSuccessiveCalls() {
-        assertThat(metrics.privacy()).isSameAs(metrics.privacy());
-    }
-
-    @Test
-    public void privacyTcfShouldReturnSameMetricsOnSuccessiveCalls() {
-        assertThat(metrics.privacy().tcf()).isSameAs(metrics.privacy().tcf());
-    }
-
-    @Test
-    public void privacyTcfVersionShouldReturnSameMetricsOnSuccessiveCalls() {
-        assertThat(metrics.privacy().tcf().v1()).isSameAs(metrics.privacy().tcf().v1());
-    }
-
-    @Test
-    public void privacyTcfVersionVendorListShouldReturnSameMetricsOnSuccessiveCalls() {
-        assertThat(metrics.privacy().tcf().v2().vendorList()).isSameAs(metrics.privacy().tcf().v2().vendorList());
     }
 
     @Test
@@ -1122,6 +1122,46 @@ public class MetricsTest {
         assertThat(metricRegistry.histogram("prebid_cache.creative_size").getCount()).isEqualTo(1);
         assertThat(metricRegistry.histogram("account.accountId.prebid_cache.creative_size").getCount())
                 .isEqualTo(1);
+    }
+
+    @Test
+    public void shouldCreateCurrencyRatesGaugeMetric() {
+        // when
+        metrics.createCurrencyRatesGauge(() -> true);
+
+        // then
+        assertThat(metricRegistry.gauge("currency-rates.stale.count", () -> null).getValue()).isEqualTo(1L);
+    }
+
+    @Test
+    public void updateSettingsCacheRefreshTimeShouldUpdateTimer() {
+        // when
+        metrics.updateSettingsCacheRefreshTime(MetricName.stored_request, MetricName.initialize, 123L);
+
+        // then
+        assertThat(metricRegistry
+                .timer("settings.cache.stored-request.refresh.initialize.db_query_time")
+                .getCount())
+                .isEqualTo(1);
+    }
+
+    @Test
+    public void updateSettingsCacheRefreshErrorMetricShouldIncrementMetric() {
+        // when
+        metrics.updateSettingsCacheRefreshErrorMetric(MetricName.stored_request, MetricName.initialize);
+
+        // then
+        assertThat(metricRegistry.counter("settings.cache.stored-request.refresh.initialize.err").getCount())
+                .isEqualTo(1);
+    }
+
+    @Test
+    public void updateSettingsCacheEventMetricShouldIncrementMetric() {
+        // when
+        metrics.updateSettingsCacheEventMetric(MetricName.account, MetricName.hit);
+
+        // then
+        assertThat(metricRegistry.counter("settings.cache.account.hit").getCount()).isEqualTo(1);
     }
 
     @Test
