@@ -47,6 +47,8 @@ adapters:
     enabled: true
   conversant:
     enabled: true
+  deepintent:
+    enabled: true
   grid:
     enabled: true
   ix:
