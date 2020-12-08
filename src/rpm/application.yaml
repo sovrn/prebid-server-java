@@ -51,6 +51,8 @@ adapters:
     enabled: true
   grid:
     enabled: true
+  gumgum:
+    enabled: true
   ix:
     enabled: true
   openx:
@@ -64,6 +66,8 @@ adapters:
   rtbhouse:
     enabled: true
   rubicon:
+    enabled: true
+  smaato:
     enabled: true
   smartadserver:
     enabled: true
