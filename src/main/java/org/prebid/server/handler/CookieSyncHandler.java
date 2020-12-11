@@ -30,6 +30,7 @@ import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.privacy.gdpr.model.PrivacyEnforcementAction;
+import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.gdpr.model.TcfResponse;
 import org.prebid.server.privacy.model.Privacy;
 import org.prebid.server.privacy.model.PrivacyContext;
@@ -105,7 +106,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         this.activeBidders = activeBidders(bidderCatalog);
         this.tcfDefinerService = Objects.requireNonNull(tcfDefinerService);
         this.privacyEnforcementService = Objects.requireNonNull(privacyEnforcementService);
-        this.gdprHostVendorId = gdprHostVendorId;
+        this.gdprHostVendorId = validateHostVendorId(gdprHostVendorId);
         this.defaultCoopSync = defaultCoopSync;
         this.listOfCoopSyncBidders = CollectionUtils.isNotEmpty(listOfCoopSyncBidders)
                 ? listOfCoopSyncBidders
@@ -118,6 +119,13 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
     private static Set<String> activeBidders(BidderCatalog bidderCatalog) {
         return bidderCatalog.names().stream().filter(bidderCatalog::isActive).collect(Collectors.toSet());
+    }
+
+    private static Integer validateHostVendorId(Integer gdprHostVendorId) {
+        if (gdprHostVendorId == null) {
+            logger.warn("gdpr.host-vendor-id not specified. Will skip host company GDPR checks");
+        }
+        return gdprHostVendorId;
     }
 
     @Override
@@ -180,9 +188,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 .compose(account -> privacyEnforcementService.contextFromCookieSyncRequest(
                         cookieSyncRequest, context.request(), account, timeout, context)
                         .map(privacyContext -> Tuple2.of(account, privacyContext)))
-                .map((Tuple2<Account, PrivacyContext> accountAndPrivacy) -> tcfDefinerService.resultForVendorIds(
-                        vendorIds, accountAndPrivacy.getRight().getTcfContext())
-                        .compose(this::handleVendorIdResult)
+                .map((Tuple2<Account, PrivacyContext> accountAndPrivacy) -> allowedForVendorId(vendorIds,
+                        accountAndPrivacy.getRight().getTcfContext())
                         .compose(ignored -> tcfDefinerService.resultForBidderNames(
                                 biddersToSync,
                                 accountAndPrivacy.getRight().getTcfContext(),
@@ -223,6 +230,17 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         }
 
         return new HashSet<>(requestBidders);
+    }
+
+    /**
+     * Returns failed future if vendor is not allowed for cookie sync.
+     * If host vendor id is null, host allowed to sync cookies.
+     */
+    private Future<Void> allowedForVendorId(Set<Integer> vendorIds, TcfContext tcfContext) {
+        return gdprHostVendorId != null
+                ? tcfDefinerService.resultForVendorIds(vendorIds, tcfContext)
+                .compose(this::handleVendorIdResult)
+                : Future.succeededFuture();
     }
 
     private Set<String> addAllCoopSyncBidders(List<String> bidders) {

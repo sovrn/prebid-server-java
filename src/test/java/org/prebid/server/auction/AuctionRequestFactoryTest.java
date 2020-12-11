@@ -66,8 +66,6 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
-import org.prebid.server.proto.openrtb.ext.request.ExtUser;
-import org.prebid.server.proto.openrtb.ext.request.ExtUserDigiTrust;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
@@ -161,7 +159,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         given(timeoutResolver.resolve(any())).willReturn(2000L);
         given(timeoutResolver.adjustTimeout(anyLong())).willReturn(1900L);
 
-        given(privacyEnforcementService.contextFromBidRequest(any(), any(), any(), any(), any()))
+        given(privacyEnforcementService.contextFromBidRequest(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(PrivacyContext.of(
                         Privacy.of("0", EMPTY, Ccpa.EMPTY, 0),
                         TcfContext.empty())));
@@ -722,27 +720,6 @@ public class AuctionRequestFactoryTest extends VertxTest {
         assertThat(request.getSite()).isEqualTo(
                 Site.builder().domain("test.com").page("http://test.com")
                         .ext(ExtSite.of(0, null)).build());
-    }
-
-    @Test
-    public void shouldSetUserExtDigitrustPerfIfNotDefined() {
-        // given
-        givenBidRequest(BidRequest.builder()
-                .user(User.builder()
-                        .ext(ExtUser.builder()
-                                .digitrust(ExtUserDigiTrust.of("id", 123, null))
-                                .build())
-                        .build())
-                .build());
-
-        // when
-        final BidRequest request = factory.fromRequest(routingContext, 0L).result().getBidRequest();
-
-        // then
-        assertThat(request.getUser().getExt())
-                .isEqualTo(ExtUser.builder()
-                        .digitrust(ExtUserDigiTrust.of("id", 123, 0))
-                        .build());
     }
 
     @Test
@@ -1835,7 +1812,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                         .geoInfo(GeoInfo.builder().vendor("v").country("ua").build())
                         .build(),
                 "ip");
-        given(privacyEnforcementService.contextFromBidRequest(any(), any(), any(), any(), any()))
+        given(privacyEnforcementService.contextFromBidRequest(any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(privacyContext));
 
         // when

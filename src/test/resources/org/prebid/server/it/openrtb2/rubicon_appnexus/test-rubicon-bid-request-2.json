@@ -69,11 +69,6 @@
     "buyeruid": "J5VLCWQP-26-CWFT",
     "ext": {
       "consent": "BOEFEAyOEFEAyAHABDENAIgAAAB9vABAASA",
-      "digitrust": {
-        "id": "id",
-        "keyv": 123,
-        "pref": 0
-      },
       "eids": [
         {
           "source": "adserver.org",

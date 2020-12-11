@@ -398,6 +398,8 @@ public class TcfDefinerService {
             return TCStringEmpty.create();
         }
 
+        final int version = tcString.getVersion();
+        metrics.updatePrivacyTcfRequestsMetric(version);
         return tcString;
     }
 

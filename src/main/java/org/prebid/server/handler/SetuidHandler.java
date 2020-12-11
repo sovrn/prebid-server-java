@@ -81,7 +81,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.privacyEnforcementService = Objects.requireNonNull(privacyEnforcementService);
         this.tcfDefinerService = Objects.requireNonNull(tcfDefinerService);
-        this.gdprHostVendorId = gdprHostVendorId;
+        this.gdprHostVendorId = validateHostVendorId(gdprHostVendorId);
         this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
         this.metrics = Objects.requireNonNull(metrics);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
@@ -93,6 +93,13 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 .map(bidderCatalog::usersyncerByName)
                 .map(Usersyncer::getCookieFamilyName)
                 .collect(Collectors.toSet());
+    }
+
+    private static Integer validateHostVendorId(Integer gdprHostVendorId) {
+        if (gdprHostVendorId == null) {
+            logger.warn("gdpr.host-vendor-id not specified. Will skip host company GDPR checks");
+        }
+        return gdprHostVendorId;
     }
 
     @Override
@@ -119,6 +126,11 @@ public class SetuidHandler implements Handler<RoutingContext> {
             respondWith(context, status, body + (isCookieNameBlank ? "required" : "invalid"));
             metrics.updateUserSyncBadRequestMetric();
             analyticsReporter.processEvent(SetuidEvent.error(status));
+            return;
+        }
+
+        if (gdprHostVendorId == null) {
+            respondForOtherBidder(context, uidsCookie, null, cookieName, false);
             return;
         }
 
