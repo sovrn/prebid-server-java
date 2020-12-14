@@ -11,12 +11,14 @@ import org.prebid.server.auction.model.BidderResponse;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderSeatBid;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -37,16 +39,18 @@ public class BidResponseReducer {
         final Map<Imp, List<BidderBid>> impToBidderBids = bidderBids.stream()
                 .collect(Collectors.groupingBy(bidderBid -> idToImp.get(bidderBid.getBid().getImpid())));
 
-        final List<BidderBid> updatedBidderBids = impToBidderBids.entrySet().stream()
+        final Set<BidderBid> updatedBidderBids = impToBidderBids.entrySet().stream()
                 .map(impToBidders -> removeRedundantBidsForImp(impToBidders.getValue(), impToBidders.getKey()))
                 .flatMap(Collection::stream)
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
 
         final BidderResponse result;
         if (bidderBids.size() == updatedBidderBids.size()) {
             result = bidderResponse;
         } else {
-            final BidderSeatBid updatedSeatBid = BidderSeatBid.of(updatedBidderBids, seatBid.getHttpCalls(),
+            final BidderSeatBid updatedSeatBid = BidderSeatBid.of(
+                    new ArrayList<>(updatedBidderBids),
+                    seatBid.getHttpCalls(),
                     seatBid.getErrors());
             result = BidderResponse.of(bidderResponse.getBidder(), updatedSeatBid, bidderResponse.getResponseTime());
         }

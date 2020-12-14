@@ -19,7 +19,7 @@ import static org.assertj.core.api.Java6Assertions.assertThat;
 
 public class BidResponseReducerTest {
 
-    final BidResponseReducer bidResponseReducer = new BidResponseReducer();
+    private final BidResponseReducer bidResponseReducer = new BidResponseReducer();
 
     @Test
     public void removeRedundantBidsShouldReducePgDealsBidsByTopDealDroppingNonPgBids() {
