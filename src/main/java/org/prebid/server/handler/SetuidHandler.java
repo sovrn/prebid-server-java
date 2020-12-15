@@ -162,13 +162,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
             final TcfResponse<Integer> tcfResponse = asyncResult.result();
 
             final boolean notInGdprScope = BooleanUtils.isFalse(tcfResponse.getUserInGdprScope());
-
-            final Map<Integer, PrivacyEnforcementAction> vendorIdToAction = tcfResponse.getActions();
-            final PrivacyEnforcementAction privacyEnforcementAction = vendorIdToAction != null
-                    ? vendorIdToAction.get(gdprHostVendorId)
-                    : null;
-            final boolean blockPixelSync = privacyEnforcementAction == null
-                    || privacyEnforcementAction.isBlockPixelSync();
+            final boolean blockPixelSync = isPixelBlockedFrom(tcfResponse);
 
             final boolean allowedCookie = notInGdprScope || !blockPixelSync;
 
@@ -185,6 +179,15 @@ public class SetuidHandler implements Handler<RoutingContext> {
                         "The gdpr_consent param prevents cookies from being saved", bidder);
             }
         }
+    }
+
+    private boolean isPixelBlockedFrom(TcfResponse<Integer> tcfResponse) {
+        final Map<Integer, PrivacyEnforcementAction> vendorIdToAction = tcfResponse.getActions();
+        final PrivacyEnforcementAction privacyEnforcementAction = vendorIdToAction != null
+                ? vendorIdToAction.get(gdprHostVendorId)
+                : null;
+        return privacyEnforcementAction == null
+                || privacyEnforcementAction.isBlockPixelSync();
     }
 
     private void respondWithError(RoutingContext context, String bidder, Throwable exception) {
