@@ -988,7 +988,8 @@ public class BidResponseCreatorTest extends VertxTest {
                                         BigDecimal.valueOf(0.5))))))
                         .includewinners(true)
                         .includebidderkeys(true)
-                        .truncateattrchars(20)
+                        .includeformat(false)
+                .truncateattrchars(20)
                         .build()));
         final AuctionContext auctionContext = givenAuctionContext(
                 bidRequest,
@@ -1261,7 +1262,8 @@ public class BidResponseCreatorTest extends VertxTest {
                                 null))
                         .includewinners(true)
                         .includebidderkeys(true)
-                        .build())));
+                        .includeformat(false)
+                .build())));
 
         final Bid bid = Bid.builder().id("bidId").price(BigDecimal.valueOf(5.67)).impid("i1").build();
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
@@ -1689,7 +1691,8 @@ public class BidResponseCreatorTest extends VertxTest {
                                         BigDecimal.valueOf(0.5))))))
                         .includewinners(false)
                         .includebidderkeys(true)
-                        .build())));
+                        .includeformat(false)
+                .build())));
 
         final Bid bid = Bid.builder().id("bidId").price(BigDecimal.valueOf(5.67)).impid("i1").build();
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
@@ -1730,7 +1733,8 @@ public class BidResponseCreatorTest extends VertxTest {
                                         BigDecimal.valueOf(0.5))))))
                         .includewinners(true)
                         .includebidderkeys(false)
-                        .build())));
+                        .includeformat(false)
+                .build())));
 
         final Bid bid = Bid.builder().id("bidId").price(BigDecimal.valueOf(5.67)).impid("i1").build();
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
@@ -2240,6 +2244,7 @@ public class BidResponseCreatorTest extends VertxTest {
                                 BigDecimal.valueOf(0.5))))))
                 .includewinners(true)
                 .includebidderkeys(true)
+                .includeformat(false)
                 .build();
     }
 
