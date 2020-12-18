@@ -57,6 +57,7 @@ import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
+import org.prebid.server.settings.model.BidValidationEnforcement;
 import org.prebid.server.spring.config.model.CircuitBreakerProperties;
 import org.prebid.server.spring.config.model.ExternalConversionProperties;
 import org.prebid.server.spring.config.model.HttpClientProperties;
@@ -212,8 +213,8 @@ public class ServiceConfiguration {
             JacksonMapper mapper,
             Clock clock) {
 
-        final List<String> blacklistedApps = splitCommaSeparatedString(blacklistedAppsString);
-        final List<String> blacklistedAccounts = splitCommaSeparatedString(blacklistedAccountsString);
+        final List<String> blacklistedApps = splitToList(blacklistedAppsString);
+        final List<String> blacklistedAccounts = splitToList(blacklistedAccountsString);
 
         return new AuctionRequestFactory(
                 maxRequestSize,
@@ -307,7 +308,7 @@ public class ServiceConfiguration {
 
         return VideoStoredRequestProcessor.create(
                 enforceStoredRequest,
-                splitCommaSeparatedString(blacklistedAccountsString),
+                splitToList(blacklistedAccountsString),
                 defaultTimeoutMs,
                 adServerCurrency,
                 defaultBidRequestPath,
@@ -618,9 +619,15 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    ResponseBidValidator responseValidator(JacksonMapper mapper,
-                                           @Value("${deals.enabled}") boolean dealsEnabled) {
-        return new ResponseBidValidator(mapper, dealsEnabled);
+    ResponseBidValidator responseValidator(
+            @Value("${auction.validations.banner-creative-max-size}") BidValidationEnforcement bannerMaxSizeEnforcement,
+            @Value("${auction.validations.secure-markup}") BidValidationEnforcement secureMarkupEnforcement,
+            Metrics metrics,
+            JacksonMapper mapper,
+            @Value("${deals.enabled}") boolean dealsEnabled) {
+
+        return new ResponseBidValidator(bannerMaxSizeEnforcement, secureMarkupEnforcement, metrics, mapper,
+                dealsEnabled);
     }
 
     @Bean
@@ -710,9 +717,11 @@ public class ServiceConfiguration {
         return new LoggerControlKnob(vertx);
     }
 
-    private static List<String> splitCommaSeparatedString(String listString) {
-        return Stream.of(listString.split(","))
+    private static List<String> splitToList(String listAsString) {
+        return listAsString != null
+                ? Stream.of(listAsString.split(","))
                 .map(String::trim)
-                .collect(Collectors.toList());
+                .collect(Collectors.toList())
+                : null;
     }
 }

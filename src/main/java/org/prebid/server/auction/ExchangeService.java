@@ -173,18 +173,19 @@ public class ExchangeService {
                 .compose(impsRequiredRequest -> extractBidderRequests(context, impsRequiredRequest, aliases))
                 .map(bidderRequests -> updateRequestMetric(
                         bidderRequests, uidsCookie, aliases, publisherId, context.getRequestTypeMetric()))
-                .compose(bidderRequests -> CompositeFuture.join(bidderRequests.stream()
-                        .map(bidderRequest -> requestBids(
-                                bidderRequest,
-                                auctionTimeout(timeout, cacheInfo.isDoCaching()),
-                                debugEnabled,
-                                aliases))
-                        .collect(Collectors.toList())))
+                .compose(bidderRequests -> CompositeFuture.join(
+                        bidderRequests.stream()
+                                .map(bidderRequest -> requestBids(
+                                        bidderRequest,
+                                        auctionTimeout(timeout, cacheInfo.isDoCaching()),
+                                        debugEnabled,
+                                        aliases))
+                                .collect(Collectors.toList())))
                 // send all the requests to the bidders and gathers results
                 .map(CompositeFuture::<BidderResponse>list)
                 .map(bidderResponses -> storedResponseProcessor.mergeWithBidderResponses(
                         bidderResponses, storedResponse, bidRequest.getImp()))
-                .map(bidderResponses -> validateAndAdjustBids(bidRequest, bidderResponses, aliases, context))
+                .map(bidderResponses -> validateAndAdjustBids(bidderResponses, context, aliases))
                 .map(bidderResponses -> updateMetricsFromResponses(bidderResponses, publisherId, aliases))
                 // produce response from bidder results
                 .compose(bidderResponses -> bidResponseCreator.create(
@@ -884,8 +885,10 @@ public class ExchangeService {
      * Passes the request to a corresponding bidder and wraps response in {@link BidderResponse} which also holds
      * recorded response time.
      */
-    private Future<BidderResponse> requestBids(
-            BidderRequest bidderRequest, Timeout timeout, boolean debugEnabled, BidderAliases aliases) {
+    private Future<BidderResponse> requestBids(BidderRequest bidderRequest,
+                                               Timeout timeout,
+                                               boolean debugEnabled,
+                                               BidderAliases aliases) {
 
         final String bidderName = bidderRequest.getBidder();
         final Bidder<?> bidder = bidderCatalog.bidderByName(aliases.resolveBidder(bidderName));
@@ -895,13 +898,12 @@ public class ExchangeService {
                 .map(seatBid -> BidderResponse.of(bidderName, seatBid, responseTime(startTime)));
     }
 
-    private List<BidderResponse> validateAndAdjustBids(BidRequest bidRequest, List<BidderResponse> bidderResponses,
-                                                       BidderAliases aliases, AuctionContext auctionContext) {
+    private List<BidderResponse> validateAndAdjustBids(
+            List<BidderResponse> bidderResponses, AuctionContext auctionContext, BidderAliases aliases) {
 
         return bidderResponses.stream()
-                .map(bidderResponse -> validBidderResponse(bidderResponse, bidRequest.getCur(),
-                        aliases, auctionContext))
-                .map(bidderResponse -> applyBidPriceChanges(bidderResponse, bidRequest))
+                .map(bidderResponse -> validBidderResponse(bidderResponse, auctionContext, aliases))
+                .map(bidderResponse -> applyBidPriceChanges(bidderResponse, auctionContext.getBidRequest()))
                 .collect(Collectors.toList());
     }
 
@@ -912,45 +914,54 @@ public class ExchangeService {
      * <p>
      * Returns input argument as the result if no errors found or creates new {@link BidderResponse} otherwise.
      */
-    private BidderResponse validBidderResponse(BidderResponse bidderResponse, List<String> requestCurrencies,
-                                               BidderAliases aliases, AuctionContext auctionContext) {
+    private BidderResponse validBidderResponse(
+            BidderResponse bidderResponse, AuctionContext auctionContext, BidderAliases aliases) {
 
+        final BidRequest bidRequest = auctionContext.getBidRequest();
         final BidderSeatBid seatBid = bidderResponse.getSeatBid();
-        final List<BidderBid> bids = seatBid.getBids();
-
-        final List<BidderBid> validBids = new ArrayList<>(bids.size());
         final List<BidderError> errors = new ArrayList<>(seatBid.getErrors());
 
+        final List<String> requestCurrencies = bidRequest.getCur();
         if (requestCurrencies.size() > 1) {
             errors.add(BidderError.badInput(
                     String.format("Cur parameter contains more than one currency. %s will be used",
                             requestCurrencies.get(0))));
         }
 
+        final List<BidderBid> bids = seatBid.getBids();
+        final List<BidderBid> validBids = new ArrayList<>(bids.size());
+
         final TxnLog txnLog = auctionContext.getTxnLog();
         final String bidder = bidderResponse.getBidder();
-        final BidRequest bidRequest = auctionContext.getBidRequest();
-        for (BidderBid bid : bids) {
-            final String lineItemId = LineItemUtil.lineItemIdFrom(bid.getBid(), bidRequest.getImp(), mapper);
 
+        for (final BidderBid bid : bids) {
+            final String lineItemId = LineItemUtil.lineItemIdFrom(bid.getBid(), bidRequest.getImp(), mapper);
             maybeRecordInTxnLog(lineItemId, () -> txnLog.lineItemsReceivedFromBidder().get(bidder));
 
-            final ValidationResult validationResult = responseBidValidator.validate(bid, bidRequest, bidder, aliases);
-            if (validationResult.hasErrors()) {
-                for (String error : validationResult.getErrors()) {
-                    errors.add(BidderError.generic(error));
-                }
+            final ValidationResult validationResult =
+                    responseBidValidator.validate(bid, bidderResponse.getBidder(), auctionContext, aliases);
 
-                maybeRecordInTxnLog(lineItemId, txnLog::lineItemsResponseInvalidated);
-            } else {
-                validBids.add(bid);
-                updateResponseWithWarnings(auctionContext, validationResult);
+            if (validationResult.hasWarnings()) {
+                addAsBidderErrors(validationResult.getWarnings(), errors);
             }
+
+            if (validationResult.hasErrors()) {
+                addAsBidderErrors(validationResult.getErrors(), errors);
+                maybeRecordInTxnLog(lineItemId, txnLog::lineItemsResponseInvalidated);
+                continue;
+            }
+
+            validBids.add(bid);
+            updateResponseWithWarnings(auctionContext, validationResult);
         }
 
         return errors.isEmpty()
                 ? bidderResponse
                 : bidderResponse.with(BidderSeatBid.of(validBids, seatBid.getHttpCalls(), errors));
+    }
+
+    private void addAsBidderErrors(List<String> messages, List<BidderError> errors) {
+        messages.stream().map(BidderError::generic).forEach(errors::add);
     }
 
     private void updateResponseWithWarnings(AuctionContext auctionContext, ValidationResult validationResult) {
@@ -963,6 +974,13 @@ public class ExchangeService {
         if (lineItemId != null) {
             metricSupplier.get().add(lineItemId);
         }
+    }
+
+    private BidResponse publishAuctionEvent(BidResponse bidResponse, AuctionContext auctionContext) {
+        if (applicationEventService != null) {
+            applicationEventService.publishAuctionEvent(auctionContext);
+        }
+        return bidResponse;
     }
 
     /**
@@ -1099,12 +1117,5 @@ public class ExchangeService {
                 errorMetric = MetricName.unknown_error;
         }
         return errorMetric;
-    }
-
-    private BidResponse publishAuctionEvent(BidResponse bidResponse, AuctionContext auctionContext) {
-        if (applicationEventService != null) {
-            applicationEventService.publishAuctionEvent(auctionContext);
-        }
-        return bidResponse;
     }
 }
