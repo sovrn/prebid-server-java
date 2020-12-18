@@ -952,7 +952,6 @@ public class ExchangeService {
             }
 
             validBids.add(bid);
-            updateResponseWithWarnings(auctionContext, validationResult);
         }
 
         return errors.isEmpty()
@@ -962,12 +961,6 @@ public class ExchangeService {
 
     private void addAsBidderErrors(List<String> messages, List<BidderError> errors) {
         messages.stream().map(BidderError::generic).forEach(errors::add);
-    }
-
-    private void updateResponseWithWarnings(AuctionContext auctionContext, ValidationResult validationResult) {
-        if (validationResult.hasWarnings()) {
-            auctionContext.getPrebidErrors().addAll(validationResult.getWarnings());
-        }
     }
 
     private static void maybeRecordInTxnLog(String lineItemId, Supplier<Set<String>> metricSupplier) {
