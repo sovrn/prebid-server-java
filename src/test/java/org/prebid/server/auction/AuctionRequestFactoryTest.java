@@ -1406,8 +1406,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
                 .willReturn(Future.succeededFuture(BidRequest.builder().build()));
 
         given(requestValidator.validate(any()))
-                .willReturn(new ValidationResult(emptyList(), asList("error1", "error2"),
-                        emptyList()));
+                .willReturn(new ValidationResult(emptyList(), asList("error1", "error2")));
 
         // when
         final Future<?> future = factory.fromRequest(routingContext, 0L);

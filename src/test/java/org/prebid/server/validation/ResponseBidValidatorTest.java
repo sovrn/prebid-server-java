@@ -16,10 +16,15 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.auction.BidderAliases;
+import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.model.BidderBid;
+import org.prebid.server.metric.MetricName;
+import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
+import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountBidValidationConfig;
 import org.prebid.server.validation.model.ValidationResult;
 
 import java.math.BigDecimal;
@@ -34,13 +39,21 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.prebid.server.settings.model.BidValidationEnforcement.enforce;
+import static org.prebid.server.settings.model.BidValidationEnforcement.skip;
+import static org.prebid.server.settings.model.BidValidationEnforcement.warn;
 
 public class ResponseBidValidatorTest extends VertxTest {
 
-    private static final String BIDDER_NAME = "bidder1";
+    private static final String BIDDER_NAME = "bidder";
+    private static final String ACCOUNT_ID = "account";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
+
+    @Mock
+    private Metrics metrics;
 
     private ResponseBidValidator responseBidValidator;
 
@@ -49,7 +62,7 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Before
     public void setUp() {
-        responseBidValidator = new ResponseBidValidator(jacksonMapper, true);
+        responseBidValidator = new ResponseBidValidator(enforce, enforce, metrics, jacksonMapper, true);
 
         given(bidderAliases.resolveBidder(anyString())).willReturn(BIDDER_NAME);
     }
@@ -57,66 +70,81 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailedIfBidderBidCurrencyIsIncorrect() {
         assertThatIllegalArgumentException().isThrownBy(() ->
-                responseBidValidator.validate(BidderBid.of(
-                        Bid.builder()
-                                .id("bidId1")
-                                .impid("impId1")
-                                .crid("crid1")
-                                .price(BigDecimal.ONE).build(),
-                        null,
-                        "USDD"),
-                        givenRequest(identity()), BIDDER_NAME, bidderAliases));
+                responseBidValidator.validate(
+                        BidderBid.of(
+                                Bid.builder()
+                                        .id("bidId1")
+                                        .impid("impId1")
+                                        .crid("crid1")
+                                        .price(BigDecimal.ONE)
+                                        .build(),
+                                null,
+                                "USDD"),
+                        BIDDER_NAME,
+                        givenAuctionContext(),
+                        bidderAliases));
     }
 
     @Test
-    public void validateShouldFailedIfMissingBid() {
-        final ValidationResult result = responseBidValidator.validate(BidderBid.of(null, null, "USD"),
-                givenRequest(identity()), BIDDER_NAME, bidderAliases);
+    public void validateShouldFailIfMissingBid() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                BidderBid.of(null, null, "USD"), BIDDER_NAME, givenAuctionContext(), bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Empty bid object submitted.");
+        // then
+        assertThat(result.getErrors()).containsOnly("Empty bid object submitted.");
     }
 
     @Test
     public void validateShouldFailIfBidHasNoId() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.id(null)),
-                givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.id(null)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid missing required field 'id'");
+        // then
+        assertThat(result.getErrors()).containsOnly("Bid missing required field 'id'");
     }
 
     @Test
     public void validateShouldFailIfBidHasNoImpId() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.impid(null)),
-                givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.impid(null)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" missing required field 'impid'");
+        // then
+        assertThat(result.getErrors()).containsOnly("Bid \"bidId1\" missing required field 'impid'");
     }
 
     @Test
     public void validateShouldFailIfBidHasNoPrice() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(null)),
-                givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.price(null)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" does not contain a 'price'");
+        // then
+        assertThat(result.getErrors()).hasSize(1).containsOnly("Bid \"bidId1\" does not contain a 'price'");
     }
 
     @Test
     public void validateShouldFailIfBidHasNegativePrice() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
-                BigDecimal.valueOf(-1))), givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.price(BigDecimal.valueOf(-1))),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" `price `has negative value");
+        // then
+        assertThat(result.getErrors()).hasSize(1).containsOnly("Bid \"bidId1\" `price `has negative value");
     }
 
     @Test
     public void validateShouldFailedIfNonDealBidHasZeroPrice() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
-                BigDecimal.valueOf(0))), givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.price(BigDecimal.valueOf(0))),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Non deal bid \"bidId1\" has 0 price");
@@ -124,36 +152,299 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldSuccessForDealZeroPriceBid() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.price(
-                BigDecimal.valueOf(0)).dealid("dealId")), givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        final ValidationResult result = responseBidValidator.validate(
+                givenVideoBid(builder -> builder.price(BigDecimal.valueOf(0)).dealid("dealId")),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
     }
 
     @Test
     public void validateShouldFailIfBidHasNoCrid() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(builder -> builder.crid(null)),
-                givenRequest(identity()), BIDDER_NAME, bidderAliases);
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.crid(null)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" missing creative ID");
+        // then
+        assertThat(result.getErrors()).containsOnly("Bid \"bidId1\" missing creative ID");
+    }
+
+    @Test
+    public void validateShouldFailIfBannerBidHasNoWidthAndHeight() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.w(null).h(null)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
+
+        // then
+        assertThat(result.getErrors())
+                .containsOnly("Bid \"bidId1\" has 'w' and 'h' that are not valid. Bid dimensions: 'nullxnull'");
+    }
+
+    @Test
+    public void validateShouldFailIfBannerBidWidthIsGreaterThanImposedByImp() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.w(150).h(150)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
+
+        // then
+        assertThat(result.getErrors())
+                .containsOnly("Bid \"bidId1\" has 'w' and 'h' that are not valid. Bid dimensions: '150x150'");
+    }
+
+    @Test
+    public void validateShouldFailIfBannerBidHeightIsGreaterThanImposedByImp() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.w(50).h(250)), BIDDER_NAME, givenAuctionContext(), bidderAliases);
+
+        // then
+        assertThat(result.getErrors())
+                .containsOnly("Bid \"bidId1\" has 'w' and 'h' that are not valid. Bid dimensions: '50x250'");
+    }
+
+    @Test
+    public void validateShouldReturnSuccessIfNonBannerBidHasAnySize() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(BidType.video, builder -> builder.w(3).h(3)),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+    }
+
+    @Test
+    public void validateShouldReturnSuccessIfBannerBidHasInvalidSizeButAccountDoesNotEnforceValidation() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.w(150).h(150)),
+                BIDDER_NAME,
+                givenAuctionContext(
+                        givenAccount(builder -> builder.bidValidations(AccountBidValidationConfig.of(skip)))),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
     }
 
     @Test
     public void validateShouldFailIfBidHasNoCorrespondingImp() {
-        final ValidationResult result = responseBidValidator.validate(givenBid(identity()),
-                givenRequest(imp -> imp.id("non-existing")), BIDDER_NAME, bidderAliases);
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.impid("nonExistentsImpid")),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(1)
+        // then
+        assertThat(result.getErrors())
                 .containsOnly("Bid \"bidId1\" has no corresponding imp in request");
+    }
+
+    @Test
+    public void validateShouldFailIfBidHasInsecureMarkerInCreativeInSecureContext() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http://site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        assertThat(result.getErrors())
+                .containsOnly("Bid \"bidId1\" has insecure creative but should be in secure context");
+    }
+
+    @Test
+    public void validateShouldFailIfBidHasInsecureEncodedMarkerInCreativeInSecureContext() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http%3A//site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        assertThat(result.getErrors())
+                .containsOnly("Bid \"bidId1\" has insecure creative but should be in secure context");
+    }
+
+    @Test
+    public void validateShouldFailIfBidHasNoSecureMarkersInCreativeInSecureContext() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>//site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        assertThat(result.getErrors())
+                .containsOnly("Bid \"bidId1\" has insecure creative but should be in secure context");
+    }
+
+    @Test
+    public void validateShouldReturnSuccessIfBidHasInsecureCreativeInInsecureContext() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http://site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+    }
+
+    @Test
+    public void validateShouldReturnSuccessfulResultForValidBid() {
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(identity()),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+    }
+
+    @Test
+    public void validateShouldReturnSuccessIfBannerSizeValidationNotEnabled() {
+        // given
+        responseBidValidator = new ResponseBidValidator(skip, enforce, metrics, jacksonMapper, true);
+
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(identity()),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+    }
+
+    @Test
+    public void validateShouldReturnSuccessWithWarningIfBannerSizeEnforcementIsWarn() {
+        // given
+        responseBidValidator = new ResponseBidValidator(warn, enforce, metrics, jacksonMapper, true);
+
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.w(null).h(null)),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(result.getWarnings())
+                .containsOnly("Bid \"bidId1\" has 'w' and 'h' that are not valid. Bid dimensions: 'nullxnull'");
+    }
+
+    @Test
+    public void validateShouldReturnSuccessIfSecureMarkupValidationNotEnabled() {
+        // given
+        responseBidValidator = new ResponseBidValidator(enforce, skip, metrics, jacksonMapper, true);
+
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http://site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+    }
+
+    @Test
+    public void validateShouldReturnSuccessWithWarningIfSecureMarkupEnforcementIsWarn() {
+        // given
+        responseBidValidator = new ResponseBidValidator(enforce, warn, metrics, jacksonMapper, true);
+
+        // when
+        final ValidationResult result = responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http://site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(result.getWarnings())
+                .containsOnly("Bid \"bidId1\" has insecure creative but should be in secure context");
+    }
+
+    @Test
+    public void validateShouldIncrementSizeValidationErrMetrics() {
+        // when
+        responseBidValidator.validate(
+                givenBid(builder -> builder.w(150).h(200)),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
+
+        // then
+        verify(metrics).updateSizeValidationMetrics(BIDDER_NAME, ACCOUNT_ID, MetricName.err);
+    }
+
+    @Test
+    public void validateShouldIncrementSizeValidationWarnMetrics() {
+        // given
+        responseBidValidator = new ResponseBidValidator(warn, warn, metrics, jacksonMapper, true);
+
+        // when
+        responseBidValidator.validate(
+                givenBid(builder -> builder.w(150).h(200)),
+                BIDDER_NAME,
+                givenAuctionContext(),
+                bidderAliases);
+
+        // then
+        verify(metrics).updateSizeValidationMetrics(BIDDER_NAME, ACCOUNT_ID, MetricName.warn);
+    }
+
+    @Test
+    public void validateShouldIncrementSecureValidationErrMetrics() {
+        // when
+        responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http://site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        verify(metrics).updateSecureValidationMetrics(BIDDER_NAME, ACCOUNT_ID, MetricName.err);
+    }
+
+    @Test
+    public void validateShouldIncrementSecureValidationWarnMetrics() {
+        // given
+        responseBidValidator = new ResponseBidValidator(warn, warn, metrics, jacksonMapper, true);
+
+        // when
+        responseBidValidator.validate(
+                givenBid(builder -> builder.adm("<tag>http://site.com/creative.jpg</tag>")),
+                BIDDER_NAME,
+                givenAuctionContext(givenBidRequest(builder -> builder.secure(1))),
+                bidderAliases);
+
+        // then
+        verify(metrics).updateSecureValidationMetrics(BIDDER_NAME, ACCOUNT_ID, MetricName.warn);
     }
 
     @Test
     public void validateShouldReturnSuccessfulResultForValidNonDealBid() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(identity()),
-                givenRequest(imp -> imp.ext(mapper.createObjectNode().putNull(BIDDER_NAME))),
+                givenVideoBid(identity()),
                 BIDDER_NAME,
+                givenAuctionContext(),
                 bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
@@ -162,7 +453,10 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidHasNoDealid() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(identity()), givenRequest(identity()), BIDDER_NAME, bidderAliases);
+                givenVideoBid(identity()),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(identity())),
+                bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
                 .containsOnly("Bid \"bidId1\" missing required field 'dealid'");
@@ -171,10 +465,13 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldSuccessIfBidHasDealidAndImpHasNoDeals() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1")), givenRequest(identity()), BIDDER_NAME, bidderAliases);
+                givenVideoBid(bid -> bid.dealid("dealId1")),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(identity())),
+                bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(0);
-        assertThat(result.getWarnings()).hasSize(0);
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getWarnings()).isEmpty();
     }
 
     @Test
@@ -182,21 +479,21 @@ public class ResponseBidValidatorTest extends VertxTest {
         given(bidderAliases.resolveBidder(eq("anotherBidder"))).willReturn("anotherBidder");
 
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1")),
-                givenRequest(imp -> imp.pmp(pmp(asList(
-                        deal(d -> d
+                givenVideoBid(bid -> bid.dealid("dealId1")),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp.pmp(pmp(asList(
+                        deal(builder -> builder
                                 .id("dealId2")
                                 .ext(mapper.valueToTree(ExtDeal.of(
                                         ExtDealLine.of(null, null, null, BIDDER_NAME))))),
-                        deal(d -> d
+                        deal(builder -> builder
                                 .id("dealId3")
                                 .ext(mapper.valueToTree(ExtDeal.of(
                                         ExtDealLine.of(null, null, null, BIDDER_NAME))))),
-                        deal(d -> d
+                        deal(builder -> builder
                                 .id("dealId4")
                                 .ext(mapper.valueToTree(ExtDeal.of(
-                                        ExtDealLine.of(null, null, null, "anotherBidder"))))))))),
-                BIDDER_NAME,
+                                        ExtDealLine.of(null, null, null, "anotherBidder")))))))))),
                 bidderAliases);
 
         assertThat(result.getWarnings()).hasSize(1)
@@ -206,10 +503,13 @@ public class ResponseBidValidatorTest extends VertxTest {
 
     @Test
     public void validateShouldFailIfBidIsBannerAndImpHasNoBanner() {
+        responseBidValidator = new ResponseBidValidator(skip, enforce, metrics, jacksonMapper, true);
+
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1"), BidType.banner),
-                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))),
+                givenBid(bid -> bid.dealid("dealId1")),
                 BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp
+                        .pmp(pmp(singletonList(deal(builder -> builder.id("dealId1"))))))),
                 bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
@@ -220,12 +520,13 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidIsBannerAndSizeHasNoMatchInBannerFormats() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1").w(300).h(400), BidType.banner),
-                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))
+                givenBid(bid -> bid.dealid("dealId1").w(300).h(400)),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp
+                        .pmp(pmp(singletonList(deal(builder -> builder.id("dealId1")))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(400).h(500).build()))
-                                .build())),
-                BIDDER_NAME,
+                                .build()))),
                 bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
@@ -236,16 +537,16 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldFailIfBidIsBannerAndSizeHasNoMatchInLineItem() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1").w(300).h(400), BidType.banner),
-                givenRequest(imp -> imp
-                        .pmp(pmp(singletonList(deal(d -> d
+                givenBid(bid -> bid.dealid("dealId1").w(300).h(400)),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp
+                        .pmp(pmp(singletonList(deal(builder -> builder
                                 .id("dealId1")
                                 .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of("lineItemId", null,
                                         singletonList(Format.builder().w(500).h(600).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
-                                .build())),
-                BIDDER_NAME,
+                                .build()))),
                 bidderAliases);
 
         assertThat(result.getErrors()).hasSize(1)
@@ -256,28 +557,29 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldSuccessIfBidIsBannerAndSizeHasNoMatchInLineItemForNonPgDeal() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1").w(300).h(400), BidType.banner),
-                givenRequest(imp -> imp
-                        .pmp(pmp(singletonList(deal(d -> d
+                givenBid(bid -> bid.dealid("dealId1").w(300).h(400)),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp
+                        .pmp(pmp(singletonList(deal(builder -> builder
                                 .id("dealId1")
                                 .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of(null, null,
                                         singletonList(Format.builder().w(500).h(600).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
-                                .build())),
-                BIDDER_NAME,
+                                .build()))),
                 bidderAliases);
 
-        assertThat(result.getErrors()).hasSize(0);
-        assertThat(result.getWarnings()).hasSize(0);
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.getWarnings()).isEmpty();
     }
 
     @Test
     public void validateShouldReturnSuccessfulResultForValidDealNonBannerBid() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1")),
-                givenRequest(imp -> imp.pmp(pmp(singletonList(deal(d -> d.id("dealId1")))))),
+                givenVideoBid(bid -> bid.dealid("dealId1")),
                 BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp.pmp(pmp(singletonList(
+                        deal(builder -> builder.id("dealId1"))))))),
                 bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
@@ -286,24 +588,19 @@ public class ResponseBidValidatorTest extends VertxTest {
     @Test
     public void validateShouldReturnSuccessfulResultForValidDealBannerBid() {
         final ValidationResult result = responseBidValidator.validate(
-                givenBid(bid -> bid.dealid("dealId1").w(300).h(400), BidType.banner),
-                givenRequest(imp -> imp
-                        .pmp(pmp(singletonList(deal(d -> d
+                givenBid(bid -> bid.dealid("dealId1").w(300).h(400)),
+                BIDDER_NAME,
+                givenAuctionContext(givenRequest(imp -> imp
+                        .pmp(pmp(singletonList(deal(builder -> builder
                                 .id("dealId1")
                                 .ext(mapper.valueToTree(ExtDeal.of(ExtDealLine.of(null, null,
                                         singletonList(Format.builder().w(300).h(400).build()), null))))))))
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(300).h(400).build()))
-                                .build())),
-                BIDDER_NAME,
+                                .build()))),
                 bidderAliases);
 
         assertThat(result.hasErrors()).isFalse();
-    }
-
-    private Deal deal(Function<Deal.DealBuilder, Deal.DealBuilder> dealCustomizer) {
-        final Deal.DealBuilder builder = Deal.builder();
-        return dealCustomizer.apply(builder).build();
     }
 
     private BidRequest givenRequest(Function<Imp.ImpBuilder, Imp.ImpBuilder> impCustomizer) {
@@ -318,20 +615,72 @@ public class ResponseBidValidatorTest extends VertxTest {
         return BidRequest.builder().imp(singletonList(imp)).build();
     }
 
-    private static BidderBid givenBid(Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer, BidType mediaType) {
+    private static Pmp pmp(List<Deal> deals) {
+        return Pmp.builder().deals(deals).build();
+    }
+
+    private static Deal deal(Function<Deal.DealBuilder, Deal.DealBuilder> dealCustomizer) {
+        return dealCustomizer.apply(Deal.builder()).build();
+    }
+
+    private static BidderBid givenVideoBid(Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer) {
+        return givenBid(BidType.video, bidCustomizer);
+    }
+
+    private static BidderBid givenBid(Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer) {
+        return givenBid(BidType.banner, bidCustomizer);
+    }
+
+    private static BidderBid givenBid(BidType type, Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer) {
         final Bid.BidBuilder bidBuilder = Bid.builder()
                 .id("bidId1")
                 .impid("impId1")
                 .crid("crid1")
+                .w(1)
+                .h(1)
+                .adm("<tag>https://site.com/creative.jpg</tag>")
                 .price(BigDecimal.ONE);
-        return BidderBid.of(bidCustomizer.apply(bidBuilder).build(), mediaType, null);
+
+        return BidderBid.of(bidCustomizer.apply(bidBuilder).build(), type, "USD");
     }
 
-    private static BidderBid givenBid(Function<Bid.BidBuilder, Bid.BidBuilder> bidCustomizer) {
-        return givenBid(bidCustomizer, null);
+    private static AuctionContext givenAuctionContext(BidRequest bidRequest, Account account) {
+        return AuctionContext.builder()
+                .account(account)
+                .bidRequest(bidRequest)
+                .build();
     }
 
-    private static Pmp pmp(List<Deal> deals) {
-        return Pmp.builder().deals(deals).build();
+    private static AuctionContext givenAuctionContext(BidRequest bidRequest) {
+        return givenAuctionContext(bidRequest, givenAccount());
+    }
+
+    private static AuctionContext givenAuctionContext(Account account) {
+        return givenAuctionContext(givenBidRequest(identity()), account);
+    }
+
+    private static AuctionContext givenAuctionContext() {
+        return givenAuctionContext(givenBidRequest(identity()), givenAccount());
+    }
+
+    private static BidRequest givenBidRequest(Function<Imp.ImpBuilder, Imp.ImpBuilder> impCustomizer) {
+        final Imp.ImpBuilder impBuilder = Imp.builder()
+                .id("impId1")
+                .banner(Banner.builder()
+                        .format(singletonList(Format.builder().w(100).h(200).build()))
+                        .build())
+                .ext(mapper.createObjectNode().putNull(BIDDER_NAME));
+
+        return BidRequest.builder()
+                .imp(singletonList(impCustomizer.apply(impBuilder).build()))
+                .build();
+    }
+
+    private static Account givenAccount() {
+        return givenAccount(identity());
+    }
+
+    private static Account givenAccount(Function<Account.AccountBuilder, Account.AccountBuilder> accountCustomizer) {
+        return accountCustomizer.apply(Account.builder().id(ACCOUNT_ID)).build();
     }
 }
