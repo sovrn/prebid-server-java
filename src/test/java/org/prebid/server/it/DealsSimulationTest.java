@@ -91,12 +91,14 @@ public class DealsSimulationTest extends IntegrationTest {
     }
 
     @Test
-    public void openrtb2AuctionShouldRespondWithDealBids() throws IOException, JSONException {
+    public void openrtb2AuctionShouldRespondWithDealBids() throws IOException, JSONException, InterruptedException {
         // given
         given(SPEC)
                 .header("pg-sim-timestamp", NOW.plusSeconds(0).toString())
                 .when()
                 .post("/pbs-admin/e2eAdmin/planner/fetchLineItems");
+
+        TimeUnit.SECONDS.sleep(1); // no way to check that planner response handling is complete
 
         given(SPEC)
                 .when()
