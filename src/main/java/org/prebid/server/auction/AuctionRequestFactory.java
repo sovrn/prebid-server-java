@@ -60,6 +60,7 @@ import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountStatus;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.model.ValidationResult;
@@ -830,7 +831,7 @@ public class AuctionRequestFactory {
         return blankAccountId
                 ? responseForEmptyAccount(routingContext)
                 : applicationSettings.getAccountById(accountId, timeout)
-                .recover(exception -> accountFallback(exception, accountId, routingContext));
+                .compose(this::ensureAccountActive, exception -> accountFallback(exception, accountId, routingContext));
     }
 
     /**
@@ -1032,6 +1033,15 @@ public class AuctionRequestFactory {
                 ? Future.failedFuture(new UnauthorizedAccountException(
                 String.format("Unauthorized account id: %s", accountId), accountId))
                 : Future.succeededFuture(Account.empty(accountId));
+    }
+
+    private Future<Account> ensureAccountActive(Account account) {
+        final String accountId = account.getId();
+
+        return account.getStatus() == AccountStatus.inactive
+                ? Future.failedFuture(
+                new UnauthorizedAccountException(String.format("Account %s is inactive", accountId), accountId))
+                : Future.succeededFuture(account);
     }
 
     private BidRequest enrichBidRequestWithAccountAndPrivacyData(
