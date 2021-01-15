@@ -305,13 +305,13 @@ public class AuctionRequestFactoryTest extends VertxTest {
     public void shouldReturnFailedFutureIfAccountIsInactive() {
         // given
         given(applicationSettings.getAccountById(any(), any())).willReturn(Future.succeededFuture(Account.builder()
-                .id("accountId")
+                .id("1001")
                 .status(AccountStatus.inactive)
                 .build()));
 
         final BidRequest bidRequest = BidRequest.builder()
                 .app(App.builder()
-                        .publisher(Publisher.builder().id("accountId").build())
+                        .publisher(Publisher.builder().id("1001").build())
                         .build())
                 .build();
 
@@ -324,7 +324,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
         assertThat(future).isFailed();
         assertThat(future.cause())
                 .isInstanceOf(UnauthorizedAccountException.class)
-                .hasMessage("Account accountId is inactive");
+                .hasMessage("Account 1001 is inactive");
     }
 
     @Test
