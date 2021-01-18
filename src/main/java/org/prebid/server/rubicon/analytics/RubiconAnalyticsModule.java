@@ -43,6 +43,7 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.json.JacksonMapper;
+import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.model.PrivacyContext;
@@ -113,6 +114,7 @@ import java.util.stream.Collectors;
 public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
+    private static final ConditionalLogger conditionalLogger = new ConditionalLogger(logger);
 
     private static final String EVENT_PATH = "/event";
 
@@ -179,6 +181,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private final UidsAuditCookieService uidsAuditCookieService;
     private final CurrencyConversionService currencyService;
     private final HttpClient httpClient;
+    private final boolean logEmptyDimensions;
     private final JacksonMapper mapper;
 
     private final AtomicLong auctionEventCount = new AtomicLong();
@@ -198,6 +201,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                   UidsAuditCookieService uidsAuditCookieService,
                                   CurrencyConversionService currencyService,
                                   HttpClient httpClient,
+                                  boolean logEmptyDimensions,
                                   JacksonMapper mapper) {
 
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl) + EVENT_PATH);
@@ -210,6 +214,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
         this.currencyService = Objects.requireNonNull(currencyService);
         this.httpClient = Objects.requireNonNull(httpClient);
+        this.logEmptyDimensions = logEmptyDimensions;
         this.mapper = Objects.requireNonNull(mapper);
     }
 
@@ -239,14 +244,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
             return;
         }
 
-        final Integer accountId = parseId(account.getId());
+        final String requestAccountId = account.getId();
+        final Integer accountId = parseId(requestAccountId);
         final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
 
         if (shouldProcessEvent(
                 account, accountId, bidRequest, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
 
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
-            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse);
+            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, requestAccountId);
 
             postEvent(
                     toAuctionEvent(
@@ -285,7 +291,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 account, accountId, bidRequest, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
 
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
-            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, storedId);
+            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, storedId, requestAccountId);
 
             postEvent(
                     toAuctionEvent(
@@ -452,40 +458,54 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return Objects.equals(debug, 1);
     }
 
+    // AMP
     private List<AdUnit> toAdUnits(BidRequest bidRequest,
                                    UidsCookie uidsCookie,
                                    BidResponse bidResponse,
-                                   String storedId) {
+                                   String storedId,
+                                   String accountId) {
 
-        final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse);
+        final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse, accountId);
 
         return bidRequest.getImp().stream()
                 .map(imp -> toAdUnit(bidRequest, imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList()),
-                        storedId))
+                        storedId, accountId))
                 .collect(Collectors.toList());
     }
 
-    private List<AdUnit> toAdUnits(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse) {
-        final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse);
+    // Auction
+    private List<AdUnit> toAdUnits(BidRequest bidRequest,
+                                   UidsCookie uidsCookie,
+                                   BidResponse bidResponse,
+                                   String accountId) {
+
+        final Map<String, List<TwinBids>> impIdToBids = toBidsByImpId(bidRequest, uidsCookie, bidResponse, accountId);
 
         return bidRequest.getImp().stream()
-                .map(imp -> toAdUnit(bidRequest, imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList())))
+                .map(imp -> toAdUnit(bidRequest, imp, impIdToBids.getOrDefault(imp.getId(), Collections.emptyList()),
+                        accountId))
                 .collect(Collectors.toList());
     }
 
-    private Map<String, List<TwinBids>> toBidsByImpId(BidRequest bidRequest, UidsCookie uidsCookie,
-                                                      BidResponse bidResponse) {
+    private Map<String, List<TwinBids>> toBidsByImpId(BidRequest bidRequest,
+                                                      UidsCookie uidsCookie,
+                                                      BidResponse bidResponse,
+                                                      String accountId) {
         final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
         final Map<String, List<TwinBids>> impIdToBids = new HashMap<>();
 
-        populateSuccessfulBids(bidRequest, uidsCookie, bidResponse, extBidResponse, impIdToBids);
-        populateFailedBids(bidRequest, uidsCookie, extBidResponse, impIdToBids);
+        populateSuccessfulBids(bidRequest, uidsCookie, bidResponse, extBidResponse, impIdToBids, accountId);
+        populateFailedBids(bidRequest, uidsCookie, extBidResponse, impIdToBids, accountId);
 
         return impIdToBids;
     }
 
-    private void populateSuccessfulBids(BidRequest bidRequest, UidsCookie uidsCookie, BidResponse bidResponse,
-                                        ExtBidResponse extBidResponse, Map<String, List<TwinBids>> impIdToBids) {
+    private void populateSuccessfulBids(BidRequest bidRequest,
+                                        UidsCookie uidsCookie,
+                                        BidResponse bidResponse,
+                                        ExtBidResponse extBidResponse,
+                                        Map<String, List<TwinBids>> impIdToBids,
+                                        String accountId) {
 
         final String currency = bidRequest.getCur().get(0);
         final Map<String, Map<String, BigDecimal>> requestCurrencyRates = requestCurrencyRates(bidRequest.getExt());
@@ -502,13 +522,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
                         .add(toTwinBids(bidder, imp, bid, SUCCESS_STATUS, null, responseTime, serverHasUserId,
-                                currency, requestCurrencyRates, usepbsrates));
+                                currency, requestCurrencyRates, usepbsrates, accountId));
             }
         }
     }
 
-    private void populateFailedBids(BidRequest bidRequest, UidsCookie uidsCookie, ExtBidResponse extBidResponse,
-                                    Map<String, List<TwinBids>> impIdToBids) {
+    private void populateFailedBids(BidRequest bidRequest,
+                                    UidsCookie uidsCookie,
+                                    ExtBidResponse extBidResponse,
+                                    Map<String, List<TwinBids>> impIdToBids,
+                                    String accountId) {
+
         for (Imp imp : bidRequest.getImp()) {
             final ObjectNode impExt = imp.getExt();
             if (impExt == null) {
@@ -532,7 +556,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
                         .add(toTwinBids(bidder, imp, null, status, bidError, responseTime, serverHasUserId, null,
-                                null, null));
+                                null, null, accountId));
             }
         }
     }
@@ -617,13 +641,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return currency != null ? currency.getRates() : null;
     }
 
-    private TwinBids toTwinBids(String bidder, Imp imp, Bid bid, String status,
+    private TwinBids toTwinBids(String bidder,
+                                Imp imp,
+                                Bid bid,
+                                String status,
                                 BidError bidError,
                                 Integer serverLatencyMillis,
                                 Boolean serverHasUserId,
                                 String currency,
                                 Map<String, Map<String, BigDecimal>> requestCurrencyRates,
-                                Boolean usepbsrates) {
+                                Boolean usepbsrates,
+                                String accountId) {
 
         final ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid = bid != null ? readExtPrebid(bid.getExt()) : null;
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
@@ -637,7 +665,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                         .serverHasUserId(serverHasUserId)
                         .params(paramsFrom(imp, bidder))
                         .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(extPrebid)), currency,
-                                requestCurrencyRates, usepbsrates))
+                                requestCurrencyRates, usepbsrates, bidder, accountId))
                         .build();
 
         return new TwinBids(bid, analyticsBid);
@@ -695,15 +723,20 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     }
 
     private org.prebid.server.rubicon.analytics.proto.BidResponse analyticsBidResponse(
-            Bid bid, String mediaType, String currency, Map<String, Map<String, BigDecimal>> requestCurrencyRates,
-            Boolean usepbsrates) {
+            Bid bid,
+            String mediaType,
+            String currency,
+            Map<String, Map<String, BigDecimal>> requestCurrencyRates,
+            Boolean usepbsrates,
+            String bidder,
+            String accountId) {
 
         return bid != null
                 ? org.prebid.server.rubicon.analytics.proto.BidResponse.of(
                 parseId(bid.getDealid()),
                 convertToUSD(bid.getPrice(), currency, requestCurrencyRates, usepbsrates),
                 mediaType,
-                Dimensions.of(bid.getW(), bid.getH()))
+                validDimensions("bid", bid.getW(), bid.getH(), bidder, accountId))
                 : null;
     }
 
@@ -720,30 +753,48 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids) {
+    // Auction
+    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids, String accountId) {
         final ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebid = extPrebidFromImp(imp);
         final Params params = paramsFromPrebid(extPrebid.getBidder());
         final String storedImpId = storedRequestId(extPrebid.getPrebid());
 
-        return toAdUnit(bidRequest, imp, bids, params, storedImpId);
+        return toAdUnit(bidRequest, imp, bids, params, storedImpId, accountId);
 
     }
 
-    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids, String storedImpId) {
+    // AMP
+    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids, String storedImpId, String accountId) {
         final ExtPrebid<ExtImpPrebid, ExtImpRubicon> extPrebid = extPrebidFromImp(imp);
         final Params params = paramsFromPrebid(extPrebid.getBidder());
 
-        return toAdUnit(bidRequest, imp, bids, params, storedImpId);
+        return toAdUnit(bidRequest, imp, bids, params, storedImpId, accountId);
     }
 
-    private AdUnit toAdUnit(BidRequest bidRequest, Imp imp, List<TwinBids> bids, Params params, String storedId) {
+    private AdUnit toAdUnit(BidRequest bidRequest,
+                            Imp imp,
+                            List<TwinBids> bids,
+                            Params params,
+                            String storedId,
+                            String accountId) {
+
         final boolean openrtbBidsFound = bids.stream().map(TwinBids::getOpenrtbBid).anyMatch(Objects::nonNull);
 
-        final boolean errorsFound = bids.stream().map(TwinBids::getAnalyticsBid)
+        final boolean errorsFound = bids.stream()
+                .map(TwinBids::getAnalyticsBid)
                 .map(org.prebid.server.rubicon.analytics.proto.Bid::getError)
                 .anyMatch(Objects::nonNull);
 
         final ExtImp extImp = extImpFrom(imp);
+
+        final List<org.prebid.server.rubicon.analytics.proto.Bid> analyticBids = bids.stream()
+                .map(TwinBids::getAnalyticsBid)
+                .collect(Collectors.toList());
+
+        final String bidder = analyticBids.stream()
+                .map(org.prebid.server.rubicon.analytics.proto.Bid::getBidder)
+                .findAny()
+                .orElse(null);
 
         return AdUnit.builder()
                 .transactionId(transactionIdFrom(bidRequest.getId(), imp.getId()))
@@ -751,14 +802,14 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .error(openrtbBidsFound ? null : pickAdUnitError(bids))
                 .mediaTypes(mediaTypesFromImp(imp))
                 .videoAdFormat(imp.getVideo() != null ? videoAdFormatFromImp(imp, bids) : null)
-                .dimensions(dimensions(imp))
+                .dimensions(dimensions(imp, bidder, accountId))
                 .adUnitCode(storedId)
                 .pbAdSlot(pbAdSlotFromExtImp(extImp))
                 .gam(gamFromExtImp(extImp))
                 .siteId(params.getSiteId())
                 .zoneId(params.getZoneId())
                 .adserverTargeting(targetingForImp(bids))
-                .bids(bids.stream().map(TwinBids::getAnalyticsBid).collect(Collectors.toList()))
+                .bids(analyticBids)
                 .build();
     }
 
@@ -865,17 +916,45 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return null;
     }
 
-    private static List<Dimensions> dimensions(Imp imp) {
+    private List<Dimensions> dimensions(Imp imp, String bidder, String accountId) {
         final Banner banner = imp.getBanner();
         final List<Format> bannerFormat = banner != null ? banner.getFormat() : null;
         final Video video = imp.getVideo();
+        List<Dimensions> resultDimensions = null;
 
         if (bannerFormat != null) {
-            return bannerFormat.stream().map(f -> Dimensions.of(f.getW(), f.getH())).collect(Collectors.toList());
+            resultDimensions = bannerFormat.stream()
+                    .map(f -> validDimensions("imp.banner.format", f.getW(), f.getH(), bidder, accountId))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
         } else if (video != null) {
-            return Collections.singletonList(Dimensions.of(video.getW(), video.getH()));
-        } else {
+            final Dimensions validDimensions = validDimensions("imp.video", video.getW(), video.getH(), bidder,
+                    accountId);
+            resultDimensions = validDimensions != null
+                    ? Collections.singletonList(validDimensions)
+                    : Collections.emptyList();
+        }
+
+        return resultDimensions;
+    }
+
+    private Dimensions validDimensions(String placement, Integer w, Integer h, String bidder, String accountId) {
+        if (w == null || h == null) {
+            logInvalidDimension(placement, w, bidder, accountId);
             return null;
+        }
+
+        return Dimensions.of(w, h);
+    }
+
+    private void logInvalidDimension(String placement, Integer w, String bidder, String accountId) {
+        if (logEmptyDimensions) {
+            final String invalidParameter = w == null ? "h" : "w";
+            final String errorPlacement = String.format("%s%s", placement, invalidParameter);
+            final String message = String.format("Bid from bidder %s and with account id %s missing value %s. "
+                    + "This value is required for `dimensions` sizes.", bidder, accountId, errorPlacement);
+
+            conditionalLogger.errorWithKey(bidder, message, 100);
         }
     }
 

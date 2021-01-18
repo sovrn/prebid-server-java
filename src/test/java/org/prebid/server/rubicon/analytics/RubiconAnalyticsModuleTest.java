@@ -174,14 +174,15 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         httpContext = HttpContext.builder().cookies(emptyMap()).build();
 
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, jacksonMapper);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, false,
+                jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, null, null,
-                        null, null, null, null, null))
+                        null, null, null, null, false, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -369,7 +370,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname",
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, jacksonMapper);
+                httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -405,7 +406,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname",
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, jacksonMapper);
+                httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -744,7 +745,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, jacksonMapper);
+                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, false,
+                jacksonMapper);
 
         // when
         module.processEvent(event);

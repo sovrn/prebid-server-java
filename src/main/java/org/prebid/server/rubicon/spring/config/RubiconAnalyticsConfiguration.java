@@ -40,6 +40,9 @@ public class RubiconAnalyticsConfiguration {
                                                   HttpClient httpClient,
                                                   JacksonMapper mapper) {
 
+        final AnalyticsLogs analyticsLogs = properties.getLog();
+        final boolean logEmptyDimensions = analyticsLogs != null && analyticsLogs.emptyDimensions;
+
         return new RubiconAnalyticsModule(
                 properties.getHostUrl(),
                 properties.getSamplingFactor(),
@@ -51,6 +54,7 @@ public class RubiconAnalyticsConfiguration {
                 uidsAuditCookieService,
                 currencyConversionService,
                 httpClient,
+                logEmptyDimensions,
                 mapper);
     }
 
@@ -77,5 +81,13 @@ public class RubiconAnalyticsConfiguration {
         private String hostUrl;
 
         private Integer samplingFactor;
+
+        private AnalyticsLogs log;
+    }
+
+    @Data
+    private static class AnalyticsLogs {
+
+        private boolean emptyDimensions;
     }
 }

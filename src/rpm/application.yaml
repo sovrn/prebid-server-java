@@ -106,6 +106,8 @@ metrics:
 analytics:
   rp:
     enabled: true
+    log:
+      empty-dimensions: true
 cache:
   scheme: https
   path: /cache
