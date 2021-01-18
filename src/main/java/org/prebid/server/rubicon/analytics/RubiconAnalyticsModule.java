@@ -793,6 +793,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
         final String bidder = analyticBids.stream()
                 .map(org.prebid.server.rubicon.analytics.proto.Bid::getBidder)
+                .filter(Objects::nonNull)
                 .findAny()
                 .orElse(null);
 
