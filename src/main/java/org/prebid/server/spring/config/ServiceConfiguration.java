@@ -41,7 +41,6 @@ import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.events.EventsService;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.identity.IdGenerator;
-import org.prebid.server.identity.IdGeneratorType;
 import org.prebid.server.identity.NoneIdGenerator;
 import org.prebid.server.identity.UUIDIdGenerator;
 import org.prebid.server.json.JacksonMapper;
@@ -209,7 +208,7 @@ public class ServiceConfiguration {
             TimeoutFactory timeoutFactory,
             ApplicationSettings applicationSettings,
             PrivacyEnforcementService privacyEnforcementService,
-            IdGenerator idGenerator,
+            IdGenerator sourceIdGenerator,
             JacksonMapper mapper,
             Clock clock) {
 
@@ -236,14 +235,21 @@ public class ServiceConfiguration {
                 timeoutFactory,
                 applicationSettings,
                 clock,
-                idGenerator,
+                sourceIdGenerator,
                 privacyEnforcementService,
                 mapper);
     }
 
     @Bean
-    IdGenerator idGenerator(@Value("${auction.id-generator-type}") IdGeneratorType idGeneratorType) {
-        return idGeneratorType == IdGeneratorType.uuid
+    IdGenerator bidIdGenerator(@Value("${auction.generate-bid-id}") boolean generateBidId) {
+        return generateBidId
+                ? new UUIDIdGenerator()
+                : new NoneIdGenerator();
+    }
+
+    @Bean
+    IdGenerator sourceIdGenerator(@Value("${auction.generate-source-tid}") boolean generateSourceTid) {
+        return generateSourceTid
                 ? new UUIDIdGenerator()
                 : new NoneIdGenerator();
     }
@@ -480,8 +486,8 @@ public class ServiceConfiguration {
             BidderCatalog bidderCatalog,
             EventsService eventsService,
             StoredRequestProcessor storedRequestProcessor,
+            IdGenerator bidIdGenerator,
             BidResponseReducer bidResponseReducer,
-            @Value("${auction.generate-bid-id}") boolean generateBidId,
             @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
             @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
             Clock clock,
@@ -492,8 +498,8 @@ public class ServiceConfiguration {
                 bidderCatalog,
                 eventsService,
                 storedRequestProcessor,
+                bidIdGenerator,
                 bidResponseReducer,
-                generateBidId,
                 truncateAttrChars,
                 enforceRandomBidId,
                 clock,
