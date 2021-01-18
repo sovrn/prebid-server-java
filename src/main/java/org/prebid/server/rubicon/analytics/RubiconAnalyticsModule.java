@@ -625,9 +625,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                 Map<String, Map<String, BigDecimal>> requestCurrencyRates,
                                 Boolean usepbsrates) {
 
+        final ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid = bid != null ? readExtPrebid(bid.getExt()) : null;
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
-                        .bidId(getIfNotNull(bid, Bid::getId))
+                        .bidId(bidIdFromBid(getIfNotNull(bid, Bid::getId), extPrebid))
                         .bidder(bidder)
                         .status(status)
                         .error(bidError)
@@ -635,11 +636,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                         .serverLatencyMillis(serverLatencyMillis)
                         .serverHasUserId(serverHasUserId)
                         .params(paramsFrom(imp, bidder))
-                        .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(bid)), currency,
+                        .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(extPrebid)), currency,
                                 requestCurrencyRates, usepbsrates))
                         .build();
 
         return new TwinBids(bid, analyticsBid);
+    }
+
+    private String bidIdFromBid(String bidId, ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid) {
+        return ObjectUtils.firstNonNull(
+                getIfNotNull(getIfNotNull(extPrebid, ExtPrebid::getPrebid), ExtBidPrebid::getBidid),
+                bidId);
     }
 
     private Params paramsFrom(Imp imp, String bidder) {
@@ -652,8 +659,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return null;
     }
 
-    private BidType mediaTypeFromBid(Bid bid) {
-        final ExtPrebid<ExtBidPrebid, ObjectNode> extBid = bid != null ? readExtPrebid(bid.getExt()) : null;
+    private BidType mediaTypeFromBid(ExtPrebid<ExtBidPrebid, ObjectNode> extBid) {
         final ExtBidPrebid extBidPrebid = extBid != null ? extBid.getPrebid() : null;
         return extBidPrebid != null ? extBidPrebid.getType() : null;
     }

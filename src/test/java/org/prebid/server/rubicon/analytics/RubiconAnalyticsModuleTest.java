@@ -1,5 +1,6 @@
 package org.prebid.server.rubicon.analytics;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
@@ -315,6 +316,52 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // then
         verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processAuctionEventShouldPreferBidIdFromExtPrebidOverRootBidId() throws JsonProcessingException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(singletonList(Imp.builder().id("impId").build()))
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(singletonList(SeatBid.builder()
+                                .bid(singletonList(Bid.builder().impid("impId")
+                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder().bidid("generatedId")
+                                                .build(), null)))
+                                        .build()))
+                                .build()))
+                        .build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        final ArgumentCaptor<String> bodyArgumentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(anyString(), any(), bodyArgumentCaptor.capture(), anyLong());
+        final Event result = mapper.readValue(bodyArgumentCaptor.getValue(), Event.class);
+        assertThat(result.getAuctions())
+                .hasSize(1)
+                .flatExtracting(Auction::getAdUnits)
+                .flatExtracting(AdUnit::getBids)
+                .flatExtracting(org.prebid.server.rubicon.analytics.proto.Bid::getBidId)
+                .containsOnly("generatedId");
     }
 
     @Test
