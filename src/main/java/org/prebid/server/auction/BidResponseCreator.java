@@ -222,7 +222,7 @@ public class BidResponseCreator {
         final Set<Bid> winningBids = newOrEmptySet(targeting);
         final Set<Bid> winningBidsByBidder = newOrEmptySet(targeting);
 
-        final GeneratedBidIds generatedBidIds = GeneratedBidIds.of(bidderResponses,
+        final GeneratedBidIds generatedBidIds = GeneratedBidIds.of(updatedBidderResponses,
                 (ignored, bid) -> idGenerator.getType() != IdGeneratorType.none
                         ? idGenerator.generateId()
                         : bid.getId());

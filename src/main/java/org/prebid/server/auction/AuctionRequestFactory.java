@@ -828,7 +828,8 @@ public class AuctionRequestFactory {
         return blankAccountId
                 ? responseForEmptyAccount(routingContext)
                 : applicationSettings.getAccountById(accountId, timeout)
-                .compose(this::ensureAccountActive, exception -> accountFallback(exception, accountId, routingContext));
+                        .compose(this::ensureAccountActive,
+                                exception -> accountFallback(exception, accountId, routingContext));
     }
 
     /**
@@ -1036,8 +1037,8 @@ public class AuctionRequestFactory {
         final String accountId = account.getId();
 
         return account.getStatus() == AccountStatus.inactive
-                ? Future.failedFuture(
-                new UnauthorizedAccountException(String.format("Account %s is inactive", accountId), accountId))
+                ? Future.failedFuture(new UnauthorizedAccountException(
+                String.format("Account %s is inactive", accountId), accountId))
                 : Future.succeededFuture(account);
     }
 
