@@ -92,7 +92,6 @@ adapters:
 auction:
   ad-server-currency: USD
   enforce-random-bid-id: true
-  generate-bid-id: true
   validations:
     banner-creative-max-size: warn
     secure-markup: warn
