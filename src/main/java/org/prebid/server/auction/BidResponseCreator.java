@@ -334,25 +334,19 @@ public class BidResponseCreator {
     }
 
     /**
-     * If enforceRandomBidId is set, then bid adapters that return seatbid[].bid[].id less than 17 characters
-     * will have the bid.id overwritten with a decent ~40-char UUID.
+     * If enforceRandomBidId is set, then the bid.id will be overwritten with a decent ~40-char UUID.
      */
     private List<BidderResponse> checkAndGenerateBidIds(List<BidderResponse> bidderResponses) {
         if (enforceRandomBidId) {
-            bidderResponses.forEach(BidResponseCreator::checkAndGenerateBidIds);
+            bidderResponses.forEach(bidderResponse -> bidderResponse
+                    .getSeatBid()
+                    .getBids()
+                    .forEach(bidderBid -> bidderBid
+                            .getBid()
+                            .setId(UUID.randomUUID().toString())));
         }
+
         return bidderResponses;
-    }
-
-    private static void checkAndGenerateBidIds(BidderResponse bidderResponse) {
-        bidderResponse.getSeatBid().getBids().forEach(BidResponseCreator::checkAndGenerateBidId);
-    }
-
-    private static void checkAndGenerateBidId(BidderBid bidderBid) {
-        final Bid bid = bidderBid.getBid();
-        if (StringUtils.length(bid.getId()) < 17) {
-            bid.setId(UUID.randomUUID().toString());
-        }
     }
 
     private ExtResponseDebug toExtResponseDebug(List<BidderResponse> bidderResponses, AuctionContext auctionContext,
