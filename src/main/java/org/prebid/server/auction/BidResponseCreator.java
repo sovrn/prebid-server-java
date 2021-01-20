@@ -112,7 +112,7 @@ public class BidResponseCreator {
     private final EventsService eventsService;
     private final StoredRequestProcessor storedRequestProcessor;
     private final BidResponseReducer bidResponseReducer;
-    private final IdGenerator idGenerator;
+    private final IdGenerator bidIdGenerator;
     private final int truncateAttrChars;
     private final boolean enforceRandomBidId;
     private final Clock clock;
@@ -126,7 +126,7 @@ public class BidResponseCreator {
                               BidderCatalog bidderCatalog,
                               EventsService eventsService,
                               StoredRequestProcessor storedRequestProcessor,
-                              IdGenerator idGenerator,
+                              IdGenerator bidIdGenerator,
                               BidResponseReducer bidResponseReducer,
                               int truncateAttrChars,
                               boolean enforceRandomBidId,
@@ -138,7 +138,7 @@ public class BidResponseCreator {
         this.eventsService = Objects.requireNonNull(eventsService);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.bidResponseReducer = Objects.requireNonNull(bidResponseReducer);
-        this.idGenerator = Objects.requireNonNull(idGenerator);
+        this.bidIdGenerator = Objects.requireNonNull(bidIdGenerator);
         this.truncateAttrChars = validateTruncateAttrChars(truncateAttrChars);
         this.enforceRandomBidId = enforceRandomBidId;
         this.clock = Objects.requireNonNull(clock);
@@ -190,7 +190,6 @@ public class BidResponseCreator {
         if (truncateAttrChars < 0 || truncateAttrChars > 255) {
             throw new IllegalArgumentException("truncateAttrChars must be between 0 and 255");
         }
-
         return truncateAttrChars;
     }
 
@@ -223,8 +222,8 @@ public class BidResponseCreator {
         final Set<Bid> winningBidsByBidder = newOrEmptySet(targeting);
 
         final GeneratedBidIds generatedBidIds = GeneratedBidIds.of(updatedBidderResponses,
-                (ignored, bid) -> idGenerator.getType() != IdGeneratorType.none
-                        ? idGenerator.generateId()
+                (ignored, bid) -> bidIdGenerator.getType() != IdGeneratorType.none
+                        ? bidIdGenerator.generateId()
                         : bid.getId());
 
         final TxnLog txnLog = auctionContext.getTxnLog();
@@ -435,16 +434,16 @@ public class BidResponseCreator {
         return bid.getDealid() != null ? price.compareTo(BigDecimal.ZERO) >= 0 : price.compareTo(BigDecimal.ZERO) > 0;
     }
 
-    private GeneratedBidIds getGeneratedVideoBidIds(
-            List<BidderResponse> bidderResponses,
-            GeneratedBidIds generatedBidIds,
-            List<Imp> imps) {
+    private GeneratedBidIds getGeneratedVideoBidIds(List<BidderResponse> bidderResponses,
+                                                    GeneratedBidIds generatedBidIds,
+                                                    List<Imp> imps) {
 
         final List<BidderResponse> vastModifyAllowedResponses = bidderResponses.stream()
                 .filter(bidderResponse -> bidderCatalog.isModifyingVastXmlAllowed(bidderResponse.getBidder()))
                 .map(bidderResponse -> makeVideoBidsBidderResponse(bidderResponse, imps))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+
         return GeneratedBidIds.of(vastModifyAllowedResponses,
                 (bidder, bid) -> generatedBidIds.getGeneratedId(bidder, bid.getId(), bid.getImpid()));
     }
@@ -453,7 +452,9 @@ public class BidResponseCreator {
         final List<BidderBid> videoBidderBids = bidderResponse.getSeatBid().getBids().stream()
                 .filter(bidderBid -> isVideoBid(bidderBid, imps))
                 .collect(Collectors.toList());
+
         final BidderSeatBid bidderSeatBid = bidderResponse.getSeatBid();
+
         return CollectionUtils.isNotEmpty(videoBidderBids)
                 ? BidderResponse.of(
                 bidderResponse.getBidder(),
@@ -567,11 +568,10 @@ public class BidResponseCreator {
                                                                 CacheServiceResult cacheResult,
                                                                 VideoStoredDataResult videoStoredDataResult,
                                                                 Map<String, List<ExtBidderError>> bidErrors) {
-        final BidRequest bidRequest = auctionContext.getBidRequest();
         final Map<String, List<ExtBidderError>> errors = new HashMap<>();
 
         errors.putAll(extractBidderErrors(bidderResponses));
-        errors.putAll(extractDeprecatedBiddersErrors(bidRequest));
+        errors.putAll(extractDeprecatedBiddersErrors(auctionContext.getBidRequest()));
         errors.putAll(extractPrebidErrors(videoStoredDataResult, auctionContext));
         errors.putAll(extractCacheErrors(cacheResult));
         if (MapUtils.isNotEmpty(bidErrors)) {
@@ -1097,7 +1097,7 @@ public class BidResponseCreator {
         final ExtBidPrebidVideo extBidPrebidVideo = getExtBidPrebidVideo(bid.getExt());
 
         final ExtBidPrebid extBidPrebid = ExtBidPrebid.builder()
-                .bidid(idGenerator.getType() != IdGeneratorType.none ? generatedBidId : null)
+                .bidid(bidIdGenerator.getType() != IdGeneratorType.none ? generatedBidId : null)
                 .type(bidType)
                 .targeting(targetingKeywords)
                 .cache(cache)
@@ -1247,8 +1247,9 @@ public class BidResponseCreator {
                                                             boolean isApp,
                                                             BidRequest bidRequest,
                                                             Account account) {
-        final Map<BidType, TargetingKeywordsCreator> keywordsCreatorByBidType =
-                keywordsCreatorByBidType(targeting, isApp, bidRequest, account);
+
+        final Map<BidType, TargetingKeywordsCreator> keywordsCreatorByBidType = keywordsCreatorByBidType(targeting,
+                isApp, bidRequest, account);
 
         return keywordsCreatorByBidType.getOrDefault(bidType, keywordsCreator(targeting, isApp, bidRequest, account));
     }
@@ -1257,8 +1258,10 @@ public class BidResponseCreator {
      * Extracts targeting keywords settings from the bid request and creates {@link TargetingKeywordsCreator}
      * instance if it is present.
      */
-    private TargetingKeywordsCreator keywordsCreator(
-            ExtRequestTargeting targeting, boolean isApp, BidRequest bidRequest, Account account) {
+    private TargetingKeywordsCreator keywordsCreator(ExtRequestTargeting targeting,
+                                                     boolean isApp,
+                                                     BidRequest bidRequest,
+                                                     Account account) {
 
         final JsonNode priceGranularityNode = targeting.getPricegranularity();
         return priceGranularityNode == null || priceGranularityNode.isNull()
@@ -1276,7 +1279,6 @@ public class BidResponseCreator {
                                                                             Account account) {
 
         final ExtMediaTypePriceGranularity mediaTypePriceGranularity = targeting.getMediatypepricegranularity();
-
         if (mediaTypePriceGranularity == null) {
             return Collections.emptyMap();
         }
@@ -1360,7 +1362,6 @@ public class BidResponseCreator {
     private String integrationFrom(AuctionContext auctionContext) {
         final ExtRequest extRequest = auctionContext.getBidRequest().getExt();
         final ExtRequestPrebid prebid = extRequest == null ? null : extRequest.getPrebid();
-
         return prebid != null ? prebid.getIntegration() : null;
     }
 

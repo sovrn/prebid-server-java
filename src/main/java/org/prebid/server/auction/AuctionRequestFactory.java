@@ -90,8 +90,8 @@ public class AuctionRequestFactory {
     private static final ConditionalLogger EMPTY_ACCOUNT_LOGGER = new ConditionalLogger("empty_account", logger);
     private static final ConditionalLogger UNKNOWN_ACCOUNT_LOGGER = new ConditionalLogger("unknown_account", logger);
 
-    public static final String WEB_CHANNEL = "web";
-    public static final String APP_CHANNEL = "app";
+    private static final String WEB_CHANNEL = "web";
+    private static final String APP_CHANNEL = "app";
 
     private static final String RUBICON_BIDDER = "rubicon";
     private static final String PREBID = "prebid";
@@ -114,7 +114,7 @@ public class AuctionRequestFactory {
     private final TimeoutFactory timeoutFactory;
     private final ApplicationSettings applicationSettings;
     private final Clock clock;
-    private final IdGenerator idGenerator;
+    private final IdGenerator sourceIdGenerator;
     private final PrivacyEnforcementService privacyEnforcementService;
     private final JacksonMapper mapper;
     private final OrtbTypesResolver ortbTypesResolver;
@@ -138,7 +138,7 @@ public class AuctionRequestFactory {
                                  TimeoutFactory timeoutFactory,
                                  ApplicationSettings applicationSettings,
                                  Clock clock,
-                                 IdGenerator idGenerator,
+                                 IdGenerator sourceIdGenerator,
                                  PrivacyEnforcementService privacyEnforcementService,
                                  JacksonMapper mapper) {
 
@@ -161,7 +161,7 @@ public class AuctionRequestFactory {
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.clock = Objects.requireNonNull(clock);
-        this.idGenerator = Objects.requireNonNull(idGenerator);
+        this.sourceIdGenerator = Objects.requireNonNull(sourceIdGenerator);
         this.privacyEnforcementService = Objects.requireNonNull(privacyEnforcementService);
         this.mapper = Objects.requireNonNull(mapper);
     }
@@ -477,7 +477,7 @@ public class AuctionRequestFactory {
     private Source populateSource(Source source) {
         final String tid = source != null ? source.getTid() : null;
         if (StringUtils.isEmpty(tid)) {
-            final String generatedId = idGenerator.generateId();
+            final String generatedId = sourceIdGenerator.generateId();
             if (StringUtils.isNotEmpty(generatedId)) {
                 final Source.SourceBuilder builder = source != null ? source.toBuilder() : Source.builder();
                 return builder
@@ -589,22 +589,17 @@ public class AuctionRequestFactory {
         final boolean isIncludeWinnersNull = isTargetingNotNull && targeting.getIncludewinners() == null;
         final boolean isIncludeBidderKeysNull = isTargetingNotNull && targeting.getIncludebidderkeys() == null;
 
-        final ExtRequestTargeting result;
         if (isPriceGranularityNull || isPriceGranularityTextual || isIncludeWinnersNull || isIncludeBidderKeysNull) {
-            result = ExtRequestTargeting.builder()
-                    .pricegranularity(populatePriceGranularity(targeting, isPriceGranularityNull,
+            return targeting.toBuilder()
+                    .pricegranularity(resolvePriceGranularity(targeting, isPriceGranularityNull,
                             isPriceGranularityTextual, impMediaTypes))
-                    .mediatypepricegranularity(targeting.getMediatypepricegranularity())
                     .includewinners(isIncludeWinnersNull || targeting.getIncludewinners())
                     .includebidderkeys(isIncludeBidderKeysNull
                             ? !isWinningOnly(prebid.getCache())
                             : targeting.getIncludebidderkeys())
-                    .includeformat(targeting.getIncludeformat())
                     .build();
-        } else {
-            result = null;
         }
-        return result;
+        return null;
     }
 
     /**
@@ -622,9 +617,8 @@ public class AuctionRequestFactory {
      * In case of valid string price granularity replaced it with appropriate custom view.
      * In case of invalid string value throws {@link InvalidRequestException}.
      */
-    private JsonNode populatePriceGranularity(ExtRequestTargeting targeting, boolean isPriceGranularityNull,
-                                              boolean isPriceGranularityTextual, Set<BidType> impMediaTypes) {
-        final JsonNode priceGranularityNode = targeting.getPricegranularity();
+    private JsonNode resolvePriceGranularity(ExtRequestTargeting targeting, boolean isPriceGranularityNull,
+                                             boolean isPriceGranularityTextual, Set<BidType> impMediaTypes) {
 
         final boolean hasAllMediaTypes = checkExistingMediaTypes(targeting.getMediatypepricegranularity())
                 .containsAll(impMediaTypes);
@@ -632,6 +626,8 @@ public class AuctionRequestFactory {
         if (isPriceGranularityNull && !hasAllMediaTypes) {
             return mapper.mapper().valueToTree(ExtPriceGranularity.from(PriceGranularity.DEFAULT));
         }
+
+        final JsonNode priceGranularityNode = targeting.getPricegranularity();
         if (isPriceGranularityTextual) {
             final PriceGranularity priceGranularity;
             try {
@@ -641,6 +637,7 @@ public class AuctionRequestFactory {
             }
             return mapper.mapper().valueToTree(ExtPriceGranularity.from(priceGranularity));
         }
+
         return priceGranularityNode;
     }
 
@@ -828,8 +825,8 @@ public class AuctionRequestFactory {
         return blankAccountId
                 ? responseForEmptyAccount(routingContext)
                 : applicationSettings.getAccountById(accountId, timeout)
-                        .compose(this::ensureAccountActive,
-                                exception -> accountFallback(exception, accountId, routingContext));
+                .compose(this::ensureAccountActive,
+                        exception -> accountFallback(exception, accountId, routingContext));
     }
 
     /**
