@@ -81,6 +81,8 @@ adapters:
     enabled: true
   ttx:
     enabled: true
+  verizonmedia:
+    enabled: true
   vrtcal:
     enabled: true
   yieldlab:
