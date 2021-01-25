@@ -104,7 +104,9 @@ metrics:
     port: 3003
     interval: 60
   accounts:
-    default-verbosity: detailed
+    default-verbosity: none
+    basic-verbosity: 12272, 12154, 10306, 12954, 9619
+    detailed-verbosity: 9262, 9852, 12562
 analytics:
   rp:
     enabled: true
