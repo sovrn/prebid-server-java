@@ -33,8 +33,7 @@ public class BidResponseReducer {
      * Returns given list of {@link BidderResponse}s if {@link Bid}s have different impIds.
      */
     public BidderResponse removeRedundantBids(BidderResponse bidderResponse, List<Imp> imps) {
-        final BidderSeatBid seatBid = bidderResponse.getSeatBid();
-        final List<BidderBid> bidderBids = ListUtils.emptyIfNull(seatBid.getBids());
+        final List<BidderBid> bidderBids = ListUtils.emptyIfNull(bidderResponse.getSeatBid().getBids());
         final Map<String, Imp> idToImp = imps.stream().collect(Collectors.toMap(Imp::getId, Function.identity()));
         final Map<Imp, List<BidderBid>> impToBidderBids = bidderBids.stream()
                 .collect(Collectors.groupingBy(bidderBid -> idToImp.get(bidderBid.getBid().getImpid())));
@@ -44,37 +43,23 @@ public class BidResponseReducer {
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
 
-        final BidderResponse result;
         if (bidderBids.size() == updatedBidderBids.size()) {
-            result = bidderResponse;
-        } else {
-            final BidderSeatBid updatedSeatBid = BidderSeatBid.of(
-                    new ArrayList<>(updatedBidderBids),
-                    seatBid.getHttpCalls(),
-                    seatBid.getErrors());
-            result = BidderResponse.of(bidderResponse.getBidder(), updatedSeatBid, bidderResponse.getResponseTime());
+            return bidderResponse;
         }
-        return result;
+
+        return updateBidderResponse(bidderResponse, updatedBidderBids);
     }
 
     private static List<BidderBid> removeRedundantBidsForImp(List<BidderBid> bidderBids, Imp imp) {
         return bidderBids.size() > 1 ? reduceBidsByImpId(bidderBids, imp) : bidderBids;
     }
 
-    /**
-     * Returns list of {@link BidderBid}s filtered by top deal.
-     * <p>
-     * Note: this method assumes at least one {@link Bid} has deal.
-     */
     private static List<BidderBid> reduceBidsByImpId(List<BidderBid> bidderBids, Imp imp) {
         return bidderBids.stream().anyMatch(bidderBid -> bidderBid.getBid().getDealid() != null)
                 ? removeRedundantDealsBids(bidderBids, imp)
                 : removeRedundantForNonDealBids(bidderBids);
     }
 
-    /**
-     * Removes redundant bids from {@link BidderBid}.
-     */
     private static List<BidderBid> removeRedundantDealsBids(List<BidderBid> bidderBids, Imp imp) {
         final List<Deal> pgDeals = getPgDeals(imp);
         return CollectionUtils.isEmpty(pgDeals)
@@ -82,24 +67,33 @@ public class BidResponseReducer {
                 : removeRedundantForDealPgBids(bidderBids, pgDeals);
     }
 
-    /**
-     * Retrieves PG deals from {@link Imp}.
-     */
+    private static List<BidderBid> removeRedundantForNonDealBids(List<BidderBid> bidderBids) {
+        return Collections.singletonList(getHighestPriceBid(bidderBids, bidderBids));
+    }
+
+    private static BidderBid getHighestPriceBid(List<BidderBid> bidderBids, List<BidderBid> dealBidderBids) {
+        return dealBidderBids.stream()
+                .max(Comparator.comparing(bidderBid -> bidderBid.getBid().getPrice(), Comparator.naturalOrder()))
+                .orElse(bidderBids.get(0));
+    }
+
+    private static BidderResponse updateBidderResponse(BidderResponse bidderResponse,
+                                                       Set<BidderBid> updatedBidderBids) {
+
+        final BidderSeatBid seatBid = bidderResponse.getSeatBid();
+        final BidderSeatBid updatedSeatBid = BidderSeatBid.of(
+                new ArrayList<>(updatedBidderBids),
+                seatBid.getHttpCalls(),
+                seatBid.getErrors());
+
+        return BidderResponse.of(bidderResponse.getBidder(), updatedSeatBid, bidderResponse.getResponseTime());
+    }
+
     private static List<Deal> getPgDeals(Imp imp) {
         final Pmp pmp = imp != null ? imp.getPmp() : null;
         return pmp != null ? pmp.getDeals() : Collections.emptyList();
     }
 
-    /**
-     * Removes redundant bids from {@link BidderBid} for non deal bids.
-     */
-    private static List<BidderBid> removeRedundantForNonDealBids(List<BidderBid> bidderBids) {
-        return Collections.singletonList(getHighestPriceBid(bidderBids, bidderBids));
-    }
-
-    /**
-     * Removes redundant bids from {@link BidderBid} for deal bids not related to PG.
-     */
     private static List<BidderBid> removeRedundantForDealNonPgBids(List<BidderBid> bidderBids) {
         final List<BidderBid> dealBidderBids = bidderBids.stream()
                 .filter(bidderBid -> StringUtils.isNotBlank(bidderBid.getBid().getDealid()))
@@ -108,24 +102,12 @@ public class BidResponseReducer {
         return Collections.singletonList(getHighestPriceBid(bidderBids, dealBidderBids));
     }
 
-    /**
-     * Removes redundant bids from {@link BidderBid} for deal bids  related to PG.
-     */
     private static List<BidderBid> removeRedundantForDealPgBids(List<BidderBid> bidderBids, List<Deal> pgDeals) {
         final String topDealId = getTopDealId(pgDeals, bidderBids);
 
         return topDealId == null ? bidderBids : bidderBids.stream()
                 .filter(bidderBid -> Objects.equals(bidderBid.getBid().getDealid(), topDealId))
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * Returns {@link BidderBid} with highest price.
-     */
-    private static BidderBid getHighestPriceBid(List<BidderBid> bidderBids, List<BidderBid> dealBidderBids) {
-        return dealBidderBids.stream()
-                .max(Comparator.comparing(bidderBid -> bidderBid.getBid().getPrice(), Comparator.naturalOrder()))
-                .orElse(bidderBids.get(0));
     }
 
     /**

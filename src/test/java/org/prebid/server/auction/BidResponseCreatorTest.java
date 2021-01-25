@@ -131,10 +131,10 @@ public class BidResponseCreatorTest extends VertxTest {
     @Mock
     private StoredRequestProcessor storedRequestProcessor;
     @Mock
+    private BidResponseReducer bidResponseReducer;
+    @Mock
     private IdGenerator idGenerator;
 
-    @Mock
-    private BidResponseReducer bidResponseReducer;
     private Clock clock;
 
     private Timeout timeout;
@@ -160,8 +160,8 @@ public class BidResponseCreatorTest extends VertxTest {
                 bidderCatalog,
                 eventsService,
                 storedRequestProcessor,
-                idGenerator,
                 bidResponseReducer,
+                idGenerator,
                 0,
                 false,
                 clock,
@@ -517,8 +517,8 @@ public class BidResponseCreatorTest extends VertxTest {
                 bidderCatalog,
                 eventsService,
                 storedRequestProcessor,
-                idGenerator,
                 bidResponseReducer,
+                idGenerator,
                 0,
                 false,
                 clock,
@@ -584,8 +584,8 @@ public class BidResponseCreatorTest extends VertxTest {
                 bidderCatalog,
                 eventsService,
                 storedRequestProcessor,
-                idGenerator,
                 bidResponseReducer,
+                idGenerator,
                 0,
                 false,
                 clock,
@@ -657,8 +657,7 @@ public class BidResponseCreatorTest extends VertxTest {
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1", seatBidWithDeals, 100));
 
         given(bidResponseReducer.removeRedundantBids(any(), anyList()))
-                .willReturn(BidderResponse.of("bidder1",
-                        givenSeatBid(BidderBid.of(dealBid2Imp1, banner, null)), 100));
+                .willReturn(BidderResponse.of("bidder1", givenSeatBid(BidderBid.of(dealBid2Imp1, banner, null)), 100));
 
         // when
         final BidResponse bidResponse =
@@ -1010,8 +1009,8 @@ public class BidResponseCreatorTest extends VertxTest {
                 bidderCatalog,
                 eventsService,
                 storedRequestProcessor,
-                idGenerator,
                 bidResponseReducer,
+                idGenerator,
                 20,
                 false,
                 clock,
@@ -2351,15 +2350,6 @@ public class BidResponseCreatorTest extends VertxTest {
     private static String toTargetingByKey(Bid bid, String targetingKey) {
         final Map<String, String> targeting = toExtPrebid(bid.getExt()).getPrebid().getTargeting();
         return targeting != null ? targeting.get(targetingKey) : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <K, V> void assertMapWithUnorderedList(Map<K, List<V>> map, Map<K, List<V>> expectedMap) {
-        assertThat(map).hasSize(expectedMap.size());
-        for (Map.Entry<K, List<V>> keyToValues : expectedMap.entrySet()) {
-            final V[] values = (V[]) keyToValues.getValue().toArray();
-            assertThat(expectedMap.get(keyToValues.getKey())).containsOnly(values);
-        }
     }
 
     private <K, V> Map<K, V> doubleMap(K key1, V value1, K key2, V value2) {
