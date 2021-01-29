@@ -1,14 +1,11 @@
 package org.prebid.server.proto.openrtb.ext.request.rubicon;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
 import lombok.Value;
 
 /**
- * Defines the contract for bidrequest.imp[i].ext.rubicon.debug
+ * Defines the contract for bidrequest.imp[i].ext.prebid.bidder.rubicon.debug
  */
-@AllArgsConstructor(staticName = "of")
-@Value
+@Value(staticConstructor = "of")
 public class ExtImpRubiconDebug {
 
     /**
@@ -16,6 +13,5 @@ public class ExtImpRubiconDebug {
      * <p>
      * CPM for bid will be replaced with this value.
      */
-    @JsonProperty("cpmOverride")
-    Float cpmOverride;
+    Float cpmoverride;
 }

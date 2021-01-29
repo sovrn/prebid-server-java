@@ -42,8 +42,6 @@ import org.prebid.server.bidder.rubicon.proto.RubiconAppExt;
 import org.prebid.server.bidder.rubicon.proto.RubiconBannerExt;
 import org.prebid.server.bidder.rubicon.proto.RubiconBannerExtRp;
 import org.prebid.server.bidder.rubicon.proto.RubiconImpExt;
-import org.prebid.server.bidder.rubicon.proto.RubiconImpExtPrebidBidder;
-import org.prebid.server.bidder.rubicon.proto.RubiconImpExtPrebidRubiconDebug;
 import org.prebid.server.bidder.rubicon.proto.RubiconImpExtRp;
 import org.prebid.server.bidder.rubicon.proto.RubiconImpExtRpTrack;
 import org.prebid.server.bidder.rubicon.proto.RubiconPubExt;
@@ -76,6 +74,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtUserEidUid;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserEidUidExt;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon.ExtImpRubiconBuilder;
+import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubiconDebug;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtUserTpIdRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.util.HttpUtil;
@@ -2400,10 +2399,11 @@ public class RubiconBidderTest extends VertxTest {
                                 mapper.createObjectNode().put("cpmoverride", 5.55))))) // will be ignored
                 .build());
 
-        final ExtImp extImp = ExtImp.of(ExtImpPrebid.builder()
-                .bidder(mapper.valueToTree(
-                        RubiconImpExtPrebidBidder.of(RubiconImpExtPrebidRubiconDebug.of(4.44f))))
-                .build(), null);
+        final ExtPrebid<Void, ExtImpRubicon> extImp = ExtPrebid.of(
+                null,
+                ExtImpRubicon.builder()
+                        .debug(ExtImpRubiconDebug.of(4.44f))
+                        .build());
 
         // when
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, givenBidRequest(
