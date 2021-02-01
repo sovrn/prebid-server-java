@@ -52,6 +52,9 @@ public class ResponseBidValidator {
     private static final String[] INSECURE_MARKUP_MARKERS = {"http:", "http%3A"};
     private static final String[] SECURE_MARKUP_MARKERS = {"https:", "https%3A"};
 
+    private static final String PREBID_EXT = "prebid";
+    private static final String BIDDER_EXT = "bidder";
+
     private static final String DEALS_ONLY = "dealsonly";
 
     private final BidValidationEnforcement bannerMaxSizeEnforcement;
@@ -316,8 +319,12 @@ public class ResponseBidValidator {
     }
 
     private static boolean isDealsOnlyImp(Imp imp, String bidder) {
-        final JsonNode dealsOnlyNode = imp.getExt().get(bidder).get(DEALS_ONLY);
+        final JsonNode dealsOnlyNode = bidderParamsFromImp(imp).get(bidder).get(DEALS_ONLY);
         return dealsOnlyNode != null && dealsOnlyNode.isBoolean() && dealsOnlyNode.asBoolean();
+    }
+
+    private static JsonNode bidderParamsFromImp(Imp imp) {
+        return imp.getExt().get(PREBID_EXT).get(BIDDER_EXT);
     }
 
     private Set<String> getDealIdsFromImp(Imp imp, String bidder, BidderAliases aliases) {

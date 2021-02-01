@@ -279,6 +279,8 @@ public class RequestContext {
         private static final Set<Class<?>> SUPPORTED_PROPERTY_TYPES = new HashSet<>(Arrays.asList(
                 String.class, Integer.class, int.class));
 
+        private static final String EXT_PREBID = "prebid";
+        private static final String EXT_BIDDER = "bidder";
         private static final String EXT_DATA = "data";
         private static final String EXT_CONTEXT = "context";
 
@@ -321,7 +323,11 @@ public class RequestContext {
         public static AttributeReader<Imp> forImpBidder() {
             return new AttributeReader<>(
                     Imp.class,
-                    imp -> getIfNotNull(imp, Imp::getExt));
+                    imp -> getIfNotNull(getIfNotNull(getIfNotNull(
+                            imp,
+                            Imp::getExt),
+                            node -> node.get(EXT_PREBID)),
+                            node -> node.get(EXT_BIDDER)));
         }
 
         public <A> A read(

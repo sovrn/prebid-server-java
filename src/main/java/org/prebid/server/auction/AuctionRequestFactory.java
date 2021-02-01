@@ -80,6 +80,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Used in OpenRTB request processing.
@@ -966,32 +967,14 @@ public class AuctionRequestFactory {
     }
 
     /**
-     * Returns raw {@link JsonNode} of imp.ext.{rubicon|alias} or null.
-     */
-    private static JsonNode extNodeOrNull(ObjectNode ext, Set<String> nameAndAliases) {
-        for (String value : nameAndAliases) {
-            final JsonNode node = ext.get(value);
-            if (node != null) {
-                return node;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Checks request impression extensions whether they have a rubicon extension, picks first and
      * takes account ID from it. If none is present - returns null.
      */
     private String accountFromImpExtRubiconAccountId(BidRequest bidRequest) {
-        final Set<String> nameAndAliases = new HashSet<>();
-        nameAndAliases.add(RUBICON_BIDDER);
-        nameAndAliases.addAll(rubiconAliases(bidRequest.getExt()));
-
         final List<Imp> imps = bidRequest.getImp();
+
         return CollectionUtils.isEmpty(imps) ? null : imps.stream()
-                .map(Imp::getExt)
-                .filter(Objects::nonNull)
-                .map(ext -> extNodeOrNull(ext, nameAndAliases))
+                .map(imp -> rubiconParams(imp, rubiconAliases(bidRequest.getExt())))
                 .filter(Objects::nonNull)
                 .map(this::extImpRubiconOrNull)
                 .filter(Objects::nonNull)
@@ -1017,6 +1000,30 @@ public class AuctionRequestFactory {
     }
 
     /**
+     * Returns params {@link JsonNode} of rubicon or its aliases.
+     */
+    private JsonNode rubiconParams(Imp imp, Set<String> aliases) {
+        final ObjectNode ext = imp.getExt();
+        if (ext == null || ext.size() == 0) {
+            return null;
+        }
+
+        return Stream.concat(StreamUtil.asStream(ext.fields()), StreamUtil.asStream(bidderNodesFromImp(imp)))
+                .filter(bidderNode ->
+                        Objects.equals(bidderNode.getKey(), RUBICON_BIDDER) || aliases.contains(bidderNode.getKey()))
+                .findFirst()
+                .map(Map.Entry::getValue)
+                .orElse(null);
+    }
+
+    private Iterator<Map.Entry<String, JsonNode>> bidderNodesFromImp(Imp imp) {
+        final JsonNode extPrebid = imp.getExt().get(PREBID_EXT);
+        final JsonNode extPrebidBidder = isObjectNode(extPrebid) ? extPrebid.get(BIDDER_EXT) : null;
+
+        return isObjectNode(extPrebidBidder) ? extPrebidBidder.fields() : Collections.emptyIterator();
+    }
+
+    /**
      * Extracts {@link ExtImpRubicon} from the given {@link JsonNode}.
      */
     private ExtImpRubicon extImpRubiconOrNull(JsonNode extRubicon) {
@@ -1032,7 +1039,7 @@ public class AuctionRequestFactory {
         return CollectionUtils.isEmpty(imps) ? null : imps.stream()
                 .map(Imp::getExt)
                 .filter(Objects::nonNull)
-                .map(ext -> extNodeOrNull(ext, Collections.singleton(PREBID_EXT)))
+                .map(ext -> ext.get(PREBID_EXT))
                 .filter(Objects::nonNull)
                 .map(this::extImpPrebidOrNull)
                 .filter(Objects::nonNull)

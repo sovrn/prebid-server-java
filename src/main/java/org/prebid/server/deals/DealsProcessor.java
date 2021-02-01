@@ -46,6 +46,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtGeoVendor;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.request.ExtUserTime;
 import org.prebid.server.proto.openrtb.ext.response.ExtTraceDeal.Category;
+import org.prebid.server.util.StreamUtil;
 
 import java.time.Clock;
 import java.time.ZoneId;
@@ -55,12 +56,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * Role as a dispatcher between request factory and all other PG components.
@@ -70,7 +71,7 @@ public class DealsProcessor {
     private static final Logger logger = LoggerFactory.getLogger(DealsProcessor.class);
 
     private static final String PREBID_EXT = "prebid";
-    private static final String CONTEXT_EXT = "context";
+    private static final String BIDDER_EXT = "bidder";
     private static final String DEALS_ONLY = "dealsonly";
 
     private final LineItemService lineItemService;
@@ -143,7 +144,7 @@ public class DealsProcessor {
         if (CollectionUtils.isNotEmpty(dealsOnlyBiddersToRemove)) {
             final ObjectNode extImp = removeBidders(imp, dealsOnlyBiddersToRemove);
             resolvedImp = imp.toBuilder().ext(extImp).build();
-            if (hasBidder(extImp)) {
+            if (hasBidder(resolvedImp)) {
                 logBidderOrImpExclusion(auctionContext, imp, dealsOnlyBiddersToRemove, "No Line Items from "
                         + "bidders %s matching imp with id %s and ready to serve. Removing impression from request"
                         + " to these bidders because dealsonly flag is on for them.");
@@ -491,29 +492,31 @@ public class DealsProcessor {
         final Pmp pmp = imp.getPmp();
         final List<Deal> deals = pmp == null ? null : pmp.getDeals();
         return CollectionUtils.isEmpty(deals)
-                ? findDealsOnlyBidders(imp.getExt())
+                ? findDealsOnlyBidders(imp)
                 : Collections.emptySet();
     }
 
     /**
      * Returns {@link Set<String>} of valid bidder names, which has dealsOnly parameter with true value.
      */
-    private static Set<String> findDealsOnlyBidders(ObjectNode extImp) {
-        return asStream(extImp.fieldNames())
-                .filter(DealsProcessor::isNotPrebidSpecificField)
-                .filter(bidder -> isDealsOnlyBidder(extImp.get(bidder)))
+    private static Set<String> findDealsOnlyBidders(Imp imp) {
+        return StreamUtil.asStream(bidderNodesFromImp(imp))
+                .filter(bidderNode -> isDealsOnlyBidder(bidderNode.getValue()))
+                .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
     }
 
-    private static boolean isNotPrebidSpecificField(String fieldName) {
-        return !Objects.equals(fieldName, PREBID_EXT) && !Objects.equals(fieldName, CONTEXT_EXT);
+    private static Iterator<Map.Entry<String, JsonNode>> bidderNodesFromImp(Imp imp) {
+        final JsonNode extPrebidBidder = imp.getExt().get(PREBID_EXT).get(BIDDER_EXT);
+
+        return extPrebidBidder != null ? extPrebidBidder.fields() : Collections.emptyIterator();
     }
 
     /**
      * Checks if {@link Imp} has at least one valid bidder.
      */
-    private static boolean hasBidder(ObjectNode extImp) {
-        return asStream(extImp.fieldNames()).anyMatch(DealsProcessor::isNotPrebidSpecificField);
+    private static boolean hasBidder(Imp imp) {
+        return bidderNodesFromImp(imp).hasNext();
     }
 
     /**
@@ -528,23 +531,18 @@ public class DealsProcessor {
      * Removes bidders from {@link Imp}.
      */
     private static ObjectNode removeBidders(Imp imp, Set<String> bidders) {
-        final ObjectNode extImp = imp.getExt().deepCopy();
-        bidders.forEach(extImp::remove);
-        return extImp;
+        final ObjectNode modifiedExt = imp.getExt().deepCopy();
+        final ObjectNode extPrebidBidder = (ObjectNode) modifiedExt.get(PREBID_EXT).get(BIDDER_EXT);
+
+        bidders.forEach(extPrebidBidder::remove);
+
+        return modifiedExt;
     }
 
     private static void logBidderOrImpExclusion(AuctionContext auctionContext, Imp imp,
                                                 Set<String> dealsOnlyBiddersToRemove, String messageTemplate) {
         auctionContext.getDeepDebugLog().add(null, Category.cleanup, () ->
                 String.format(messageTemplate, String.join(", ", dealsOnlyBiddersToRemove), imp.getId()));
-    }
-
-    /**
-     * Creates {@link Stream} from {@link Iterator}.
-     */
-    private static <T> Stream<T> asStream(Iterator<T> iterator) {
-        final Iterable<T> iterable = () -> iterator;
-        return StreamSupport.stream(iterable.spliterator(), false);
     }
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {

@@ -2,6 +2,7 @@ package org.prebid.server.rubicon.analytics;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
@@ -119,6 +120,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static final String EVENT_PATH = "/event";
 
     private static final String PREBID_EXT = "prebid";
+    private static final String BIDDER_EXT = "bidder";
     private static final String CONTEXT_EXT = "context";
     private static final String PBADSLOT_EXT = "pbadslot";
     private static final String ADSERVER_EXT = "adserver";
@@ -540,11 +542,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
             }
 
             final String impId = imp.getId();
-            final Iterator<String> bidderIterator = impExt.fieldNames();
+
+            final JsonNode bidderParamsNode = impExt.get(PREBID_EXT).get(BIDDER_EXT);
+            final Iterator<String> bidderIterator =
+                    bidderParamsNode != null ? bidderParamsNode.fieldNames() : Collections.emptyIterator();
             while (bidderIterator.hasNext()) {
                 final String bidder = bidderIterator.next();
-                if (Objects.equals(bidder, PREBID_EXT) || Objects.equals(bidder, CONTEXT_EXT)
-                        || analyticsBidExists(impIdToBids, impId, bidder)) {
+                if (analyticsBidExists(impIdToBids, impId, bidder)) {
                     continue;
                 }
 
@@ -680,7 +684,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private Params paramsFrom(Imp imp, String bidder) {
         if (imp != null && Objects.equals(bidder, RUBICON_BIDDER)) {
             // it should be safe to cast since there wouldn't be rubicon bids if this imp had no "rubicon" field in ext
-            final ExtImpRubicon impExt = readExt((ObjectNode) imp.getExt().get(RUBICON_BIDDER), ExtImpRubicon.class);
+            final ExtImpRubicon impExt = readExt(
+                    (ObjectNode) imp.getExt().get(PREBID_EXT).get(BIDDER_EXT).get(RUBICON_BIDDER), ExtImpRubicon.class);
 
             return impExt != null ? Params.of(impExt.getAccountId(), impExt.getSiteId(), impExt.getZoneId()) : null;
         }
@@ -823,7 +828,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
             final ExtImpPrebid prebid =
                     mapper.mapper().convertValue(impExt, IMP_EXT_TYPE_REFERENCE).getPrebid();
 
-            final ObjectNode impExtRubicon = (ObjectNode) impExt.get(RUBICON_BIDDER);
+            final JsonNode impExtPrebidBidder = impExt.get(PREBID_EXT).get(BIDDER_EXT);
+            final ObjectNode impExtRubicon =
+                    impExtPrebidBidder != null ? (ObjectNode) impExtPrebidBidder.get(RUBICON_BIDDER) : null;
             final ExtImpRubicon impRubicon = impExtRubicon == null ? null : readExt(impExtRubicon, ExtImpRubicon.class);
             return ExtPrebid.of(prebid, impRubicon);
         } catch (IllegalArgumentException e) {
@@ -896,7 +903,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private String videoAdFormat(Imp imp, boolean hasRubiconBid) {
         if (hasRubiconBid) {
             // it should be safe to cast since there wouldn't be rubicon bids if this imp had no "rubicon" field in ext
-            final ExtImpRubicon impExt = readExt((ObjectNode) imp.getExt().get(RUBICON_BIDDER), ExtImpRubicon.class);
+            final ExtImpRubicon impExt = readExt(
+                    (ObjectNode) imp.getExt().get(PREBID_EXT).get(BIDDER_EXT).get(RUBICON_BIDDER), ExtImpRubicon.class);
             final RubiconVideoParams videoParams = impExt != null ? impExt.getVideo() : null;
             if (videoParams != null) {
                 return VIDEO_SIZE_AD_FORMATS.get(videoParams.getSizeId());

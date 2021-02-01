@@ -107,10 +107,14 @@
               ]
             },
             "ext": {
-              "rubicon": {
-                "accountId": 2001,
-                "siteId": 3001,
-                "zoneId": 4001
+              "prebid": {
+                "bidder": {
+                  "rubicon": {
+                    "accountId": 2001,
+                    "siteId": 3001,
+                    "zoneId": 4001
+                  }
+                }
               }
             }
           }

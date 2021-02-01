@@ -47,7 +47,6 @@ import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtApp;
 import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpContext;
-import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
@@ -1019,30 +1018,33 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     private static BidRequest sampleAuctionBidRequest(String integration, String wrappername) {
-        final ObjectNode multiBidderImpExt = mapper.createObjectNode();
-        multiBidderImpExt.set("appnexus", mapper.createObjectNode());
-        multiBidderImpExt.set("rubicon", mapper.createObjectNode());
-        multiBidderImpExt.set("pubmatic", mapper.createObjectNode());
-        multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
-        multiBidderImpExt.set("context", mapper.createObjectNode()); // should be ignored
+        final ObjectNode multiBidderImpExt = mapper.createObjectNode()
+                .<ObjectNode>set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set("appnexus", mapper.createObjectNode())
+                                .<ObjectNode>set("rubicon", mapper.createObjectNode())
+                                .<ObjectNode>set("pubmatic", mapper.createObjectNode())))
+                .set("context", mapper.createObjectNode()); // should be ignored
 
-        final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode();
-        rubiconExtWithStoredId.set("rubicon", mapper.valueToTree(
-                ExtImpRubicon.builder()
-                        .video(RubiconVideoParams.builder().sizeId(202).build())
-                        .accountId(321)
-                        .siteId(654)
-                        .zoneId(987)
-                        .build()));
-        rubiconExtWithStoredId.set("prebid", mapper.valueToTree(ExtImpPrebid.builder()
-                .storedrequest(ExtStoredRequest.of("storedId1"))
-                .build()));
-        rubiconExtWithStoredId.set("context", mapper.valueToTree(ExtImpContext.of(
-                null, null, mapper.createObjectNode()
-                        .put("pbadslot", "pbAdSlot1")
-                        .set("adserver", mapper.createObjectNode()
-                                .put("name", "gam")
-                                .put("adSlot", "adSlot1")))));
+        final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode()
+                .<ObjectNode>set("prebid", mapper.createObjectNode()
+                        .<ObjectNode>set("bidder", mapper.createObjectNode()
+                                .set("rubicon", mapper.valueToTree(
+                                        ExtImpRubicon.builder()
+                                                .video(RubiconVideoParams.builder().sizeId(202).build())
+                                                .accountId(321)
+                                                .siteId(654)
+                                                .zoneId(987)
+                                                .build())))
+                        .set("storedrequest", mapper.valueToTree(ExtStoredRequest.of("storedId1"))))
+                .set("context", mapper.valueToTree(ExtImpContext.of(
+                        null,
+                        null,
+                        mapper.createObjectNode()
+                                .put("pbadslot", "pbAdSlot1")
+                                .set("adserver", mapper.createObjectNode()
+                                        .put("name", "gam")
+                                        .put("adSlot", "adSlot1")))));
         return BidRequest.builder()
                 .id("bidRequestId")
                 .device(Device.builder()
@@ -1065,13 +1067,18 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 Format.builder().w(300).h(400).build()))
                                         .build())
                                 .video(Video.builder().build())
-                                .ext(mapper.createObjectNode().set("rubicon", mapper.valueToTree(
-                                        ExtImpRubicon.builder()
-                                                .video(RubiconVideoParams.builder().sizeId(202).build())
-                                                .accountId(123)
-                                                .siteId(456)
-                                                .zoneId(789)
-                                                .build())))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .set("bidder", mapper.createObjectNode()
+                                                        .set("rubicon", mapper.valueToTree(
+                                                                ExtImpRubicon.builder()
+                                                                        .video(RubiconVideoParams.builder()
+                                                                                .sizeId(202)
+                                                                                .build())
+                                                                        .accountId(123)
+                                                                        .siteId(456)
+                                                                        .zoneId(789)
+                                                                        .build())))))
                                 .build(),
                         Imp.builder().id("impId2")
                                 .video(Video.builder().startdelay(-1).w(100).h(200).build())
@@ -1087,19 +1094,28 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(500).h(600).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .set("bidder", mapper.createObjectNode()
+                                                        .set("appnexus", mapper.createObjectNode()))))
                                 .build(),
                         Imp.builder().id("impId5")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(600).h(700).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .set("bidder", mapper.createObjectNode()
+                                                        .set("unknown", mapper.createObjectNode()))))
                                 .build(),
                         Imp.builder().id("impId6")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(800).h(900).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .set("bidder", mapper.createObjectNode()
+                                                        .set("appnexus", mapper.createObjectNode()))))
                                 .build()))
                 .cur(singletonList("USD"))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
@@ -1115,24 +1131,25 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     private static BidRequest sampleAmpBidRequest() {
         final ObjectNode impContextDataNode = mapper.createObjectNode().put("pbadslot", "pbAdSlot1");
 
-        final ObjectNode multiBidderImpExt = mapper.createObjectNode();
-        multiBidderImpExt.set("appnexus", mapper.createObjectNode());
-        multiBidderImpExt.set("rubicon", mapper.createObjectNode());
-        multiBidderImpExt.set("prebid", mapper.createObjectNode()); // should be ignored
-        multiBidderImpExt.set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
+        final ObjectNode multiBidderImpExt = mapper.createObjectNode()
+                .<ObjectNode>set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set("appnexus", mapper.createObjectNode())
+                                .set("rubicon", mapper.createObjectNode())))
+                .set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
 
-        final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode();
-        rubiconExtWithStoredId.set("rubicon", mapper.valueToTree(
-                ExtImpRubicon.builder()
-                        .video(RubiconVideoParams.builder().sizeId(202).build())
-                        .accountId(321)
-                        .siteId(654)
-                        .zoneId(987)
-                        .build()));
-        rubiconExtWithStoredId.set("prebid", mapper.valueToTree(ExtImpPrebid.builder()
-                .storedrequest(ExtStoredRequest.of("storedId1"))
-                .build()));
-        rubiconExtWithStoredId.set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
+        final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode()
+                .<ObjectNode>set("prebid", mapper.createObjectNode()
+                        .<ObjectNode>set("bidder", mapper.createObjectNode()
+                                .set("rubicon", mapper.valueToTree(
+                                        ExtImpRubicon.builder()
+                                                .video(RubiconVideoParams.builder().sizeId(202).build())
+                                                .accountId(321)
+                                                .siteId(654)
+                                                .zoneId(987)
+                                                .build())))
+                        .set("storedrequest", mapper.valueToTree(ExtStoredRequest.of("storedId1"))))
+                .set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
 
         return BidRequest.builder()
                 .id("bidRequestId")
@@ -1153,13 +1170,17 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                         .build())
                                 .video(Video.builder().build())
                                 .ext(mapper.createObjectNode()
-                                        .<ObjectNode>set("rubicon", mapper.valueToTree(
-                                                ExtImpRubicon.builder()
-                                                        .video(RubiconVideoParams.builder().sizeId(202).build())
-                                                        .accountId(123)
-                                                        .siteId(456)
-                                                        .zoneId(789)
-                                                        .build()))
+                                        .<ObjectNode>set("prebid", mapper.createObjectNode()
+                                                .<ObjectNode>set("bidder", mapper.createObjectNode()
+                                                        .<ObjectNode>set("rubicon", mapper.valueToTree(
+                                                                ExtImpRubicon.builder()
+                                                                        .video(RubiconVideoParams.builder()
+                                                                                .sizeId(202)
+                                                                                .build())
+                                                                        .accountId(123)
+                                                                        .siteId(456)
+                                                                        .zoneId(789)
+                                                                        .build()))))
                                         .set("context", mapper.valueToTree(ExtImpContext.of(
                                                 null, null, impContextDataNode))))
                                 .build(),
@@ -1177,19 +1198,28 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(500).h(600).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .<ObjectNode>set("bidder", mapper.createObjectNode()
+                                                        .set("appnexus", mapper.createObjectNode()))))
                                 .build(),
                         Imp.builder().id("impId5")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(600).h(700).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("unknown", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .<ObjectNode>set("bidder", mapper.createObjectNode()
+                                                        .set("unknown", mapper.createObjectNode()))))
                                 .build(),
                         Imp.builder().id("impId6")
                                 .banner(Banner.builder()
                                         .format(singletonList(Format.builder().w(800).h(900).build()))
                                         .build())
-                                .ext(mapper.createObjectNode().set("appnexus", mapper.createObjectNode()))
+                                .ext(mapper.createObjectNode()
+                                        .set("prebid", mapper.createObjectNode()
+                                                .<ObjectNode>set("bidder", mapper.createObjectNode()
+                                                        .set("appnexus", mapper.createObjectNode()))))
                                 .build()))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .channel(ExtRequestPrebidChannel.of("amp"))

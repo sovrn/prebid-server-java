@@ -449,7 +449,10 @@ public class TargetingServiceTest extends VertxTest {
                                 Format.builder().w(400).h(500).build()))
                         .pos(3)
                         .build())
-                .ext(mapper.valueToTree(singletonMap("rubicon", singletonMap("siteId", 123))))
+                .ext(mapper.createObjectNode()
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.valueToTree(
+                                        singletonMap("rubicon", singletonMap("siteId", 123))))))
                 .build();
 
         // when and then
@@ -473,7 +476,10 @@ public class TargetingServiceTest extends VertxTest {
                 .build();
 
         final Imp imp = Imp.builder()
-                .ext(mapper.valueToTree(singletonMap("rubicon", singletonMap("siteId", 123))))
+                .ext(mapper.createObjectNode()
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.valueToTree(
+                                        singletonMap("rubicon", singletonMap("siteId", 123))))))
                 .build();
 
         // when and then
@@ -711,7 +717,10 @@ public class TargetingServiceTest extends VertxTest {
                 .build();
 
         final Imp imp = Imp.builder()
-                .ext(mapper.valueToTree(singletonMap("rubicon", singletonMap("siteId", 123))))
+                .ext(mapper.createObjectNode()
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.valueToTree(
+                                        singletonMap("rubicon", singletonMap("siteId", 123))))))
                 .build();
 
         // when and then

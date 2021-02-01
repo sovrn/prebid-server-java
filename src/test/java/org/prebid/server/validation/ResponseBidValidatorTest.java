@@ -604,8 +604,11 @@ public class ResponseBidValidatorTest extends VertxTest {
     }
 
     private BidRequest givenRequest(Function<Imp.ImpBuilder, Imp.ImpBuilder> impCustomizer) {
-        final ObjectNode ext = mapper.createObjectNode();
-        ext.putObject(BIDDER_NAME).put("dealsonly", true);
+        final ObjectNode ext = mapper.createObjectNode().set(
+                "prebid", mapper.createObjectNode().set(
+                        "bidder", mapper.createObjectNode().set(
+                                BIDDER_NAME, mapper.createObjectNode().put(
+                                        "dealsonly", true))));
 
         final Imp.ImpBuilder impBuilder = Imp.builder()
                 .id("impId1")
@@ -669,7 +672,10 @@ public class ResponseBidValidatorTest extends VertxTest {
                 .banner(Banner.builder()
                         .format(singletonList(Format.builder().w(100).h(200).build()))
                         .build())
-                .ext(mapper.createObjectNode().putNull(BIDDER_NAME));
+                .ext(mapper.createObjectNode().set(
+                        "prebid", mapper.createObjectNode().set(
+                                "bidder", mapper.createObjectNode()
+                                        .putNull(BIDDER_NAME))));
 
         return BidRequest.builder()
                 .imp(singletonList(impCustomizer.apply(impBuilder).build()))

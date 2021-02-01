@@ -1890,8 +1890,11 @@ public class LineItemServiceTest extends VertxTest {
     }
 
     private ObjectNode givenImpExt(String... bidders) {
-        final ObjectNode ext = mapper.createObjectNode();
-        Arrays.stream(bidders).forEach(bidder -> ext.set(bidder, null));
-        return ext;
+        final ObjectNode extPrebidBidder = mapper.createObjectNode();
+        Arrays.stream(bidders).forEach(extPrebidBidder::putNull);
+
+        return mapper.createObjectNode().set(
+                "prebid", mapper.createObjectNode().set(
+                        "bidder", extPrebidBidder));
     }
 }

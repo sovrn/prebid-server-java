@@ -481,9 +481,13 @@ public class DealsProcessorTest extends VertxTest {
         // given
         givenResultForLineItemDeviceGeoUserServices();
 
-        final ObjectNode extImp = mapper.createObjectNode();
-        extImp.set("rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE));
-        extImp.set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
+        final ObjectNode extImp = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set(
+                                        "rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE))
+                                .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))));
+
         final Imp imp = Imp.builder().pmp(null).ext(extImp).build();
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .device(Device.builder().ip("ip").ua("ua").build()));
@@ -495,7 +499,9 @@ public class DealsProcessorTest extends VertxTest {
         // then
         assertThat(result).isEqualTo(Imp.builder()
                 .ext(mapper.createObjectNode()
-                        .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode().set(
+                                        "appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))))
                 .build());
     }
 
@@ -504,9 +510,12 @@ public class DealsProcessorTest extends VertxTest {
         // given
         givenResultForLineItemDeviceGeoUserServices();
 
-        final ObjectNode extImp = mapper.createObjectNode();
-        extImp.set("rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE));
-        extImp.set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
+        final ObjectNode extImp = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set(
+                                        "rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE))
+                                .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))));
 
         final Imp imp = Imp.builder()
                 .pmp(Pmp.builder().deals(emptyList()).build())
@@ -523,7 +532,9 @@ public class DealsProcessorTest extends VertxTest {
         assertThat(result).isEqualTo(Imp.builder()
                 .pmp(Pmp.builder().deals(emptyList()).build())
                 .ext(mapper.createObjectNode()
-                        .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode().set(
+                                        "appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))))
                 .build());
     }
 
@@ -532,9 +543,12 @@ public class DealsProcessorTest extends VertxTest {
         // given
         givenResultForLineItemDeviceGeoUserServices();
 
-        final ObjectNode extImp = mapper.createObjectNode();
-        extImp.set("rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE));
-        extImp.set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
+        final ObjectNode extImp = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set(
+                                        "rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE))
+                                .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))));
 
         final Imp imp = Imp.builder().ext(extImp).build();
         final BidRequest bidRequest = givenBidRequest(builder -> builder
@@ -548,7 +562,9 @@ public class DealsProcessorTest extends VertxTest {
         // then
         assertThat(result).isEqualTo(Imp.builder()
                 .ext(mapper.createObjectNode()
-                        .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode().set(
+                                        "appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))))
                 .build());
     }
 
@@ -608,9 +624,12 @@ public class DealsProcessorTest extends VertxTest {
         // given
         givenResultForLineItemDeviceGeoUserServices();
 
-        final ObjectNode impExt = mapper.createObjectNode();
-        impExt.set("appnexusAlias", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE));
-        impExt.set("rubiconAlias", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
+        final ObjectNode impExt = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set(
+                                        "appnexusAlias", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE))
+                                .set("rubiconAlias", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))));
 
         final Imp imp = Imp.builder().ext(impExt).build();
 
@@ -629,7 +648,10 @@ public class DealsProcessorTest extends VertxTest {
         // then
         assertThat(result).isEqualTo(Imp.builder()
                 .ext(mapper.createObjectNode()
-                        .set("rubiconAlias", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode().set(
+                                        "rubiconAlias",
+                                        mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE)))))
                 .build());
     }
 
@@ -638,9 +660,12 @@ public class DealsProcessorTest extends VertxTest {
         // given
         givenResultForLineItemDeviceGeoUserServices();
 
-        final ObjectNode extImp = mapper.createObjectNode();
-        extImp.set("rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
-        extImp.set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
+        final ObjectNode extImp = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set(
+                                        "rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))
+                                .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))));
 
         final Imp imp = Imp.builder().ext(extImp).build();
         final BidRequest bidRequest = givenBidRequest(builder -> builder
@@ -683,12 +708,18 @@ public class DealsProcessorTest extends VertxTest {
         // given
         givenResultForLineItemDeviceGeoUserServices();
 
-        final ObjectNode extImp = mapper.createObjectNode();
-        extImp.set("rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE));
-        extImp.set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE));
+        final ObjectNode extImp = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set(
+                                        "rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE))
+                                .set("appnexus", mapper.createObjectNode().set("dealsonly", BooleanNode.FALSE))));
 
-        final Imp imp = Imp.builder().id("impId").pmp(Pmp.builder().deals(emptyList()).build())
-                .ext(extImp).build();
+        final Imp imp = Imp.builder()
+                .id("impId")
+                .pmp(Pmp.builder().deals(emptyList()).build())
+                .ext(extImp)
+                .build();
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .device(Device.builder().ip("ip").ua("ua").build()));
         final AuctionContext auctionContext = givenAuctionContext(bidRequest, givenAccount(identity()));
@@ -711,8 +742,10 @@ public class DealsProcessorTest extends VertxTest {
 
         final Imp imp = Imp.builder()
                 .id("impId1")
-                .ext(mapper.createObjectNode().set("rubicon",
-                        mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE)))
+                .ext(mapper.createObjectNode()
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode()
+                                        .set("rubicon", mapper.createObjectNode().set("dealsonly", BooleanNode.TRUE)))))
                 .build();
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .device(Device.builder().ip("ip").ua("ua").build()));

@@ -1,5 +1,6 @@
 package org.prebid.server.deals;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.User;
@@ -26,6 +27,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
 import org.prebid.server.proto.openrtb.ext.response.ExtTraceDeal.Category;
+import org.prebid.server.util.StreamUtil;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -37,7 +39,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,8 +46,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * Works with {@link LineItem} related information.
@@ -60,7 +59,7 @@ public class LineItemService {
             .toFormatter();
 
     private static final String PREBID_EXT = "prebid";
-    private static final String CONTEXT_EXT = "context";
+    private static final String BIDDER_EXT = "bidder";
     private static final String ACTIVE = "active";
 
     private final Comparator<LineItem> lineItemComparator = Comparator
@@ -301,8 +300,7 @@ public class LineItemService {
             return Collections.emptyList();
         }
 
-        final List<String> bidders = asStream(imp.getExt().fieldNames())
-                .filter(bidder -> !Objects.equals(bidder, PREBID_EXT) && !Objects.equals(bidder, CONTEXT_EXT))
+        final List<String> bidders = StreamUtil.asStream(bidderParamsFromImp(imp).fieldNames())
                 .filter(bidder -> isValidActiveBidder(bidder, aliases))
                 .distinct()
                 .collect(Collectors.toList());
@@ -312,12 +310,8 @@ public class LineItemService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Creates {@link Stream} from {@link Iterator}
-     */
-    private static <T> Stream<T> asStream(Iterator<T> iterator) {
-        final Iterable<T> iterable = () -> iterator;
-        return StreamSupport.stream(iterable.spliterator(), false);
+    private static JsonNode bidderParamsFromImp(Imp imp) {
+        return imp.getExt().get(PREBID_EXT).get(BIDDER_EXT);
     }
 
     /**

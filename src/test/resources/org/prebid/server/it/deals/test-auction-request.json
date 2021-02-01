@@ -12,10 +12,14 @@
         ]
       },
       "ext": {
-        "rubicon": {
-          "accountId": 2001,
-          "siteId": 3001,
-          "zoneId": 4001
+        "prebid": {
+          "bidder": {
+            "rubicon": {
+              "accountId": 2001,
+              "siteId": 3001,
+              "zoneId": 4001
+            }
+          }
         }
       }
     },
@@ -30,10 +34,14 @@
         ]
       },
       "ext": {
-        "rubicon": {
-          "accountId": 2001,
-          "siteId": 3001,
-          "zoneId": 4001
+        "prebid": {
+          "bidder": {
+            "rubicon": {
+              "accountId": 2001,
+              "siteId": 3001,
+              "zoneId": 4001
+            }
+          }
         }
       }
     },
@@ -48,11 +56,15 @@
         ]
       },
       "ext": {
-        "rubicon": {
-          "accountId": 2001,
-          "siteId": 3001,
-          "zoneId": 4001,
-          "dealsonly": true
+        "prebid": {
+          "bidder": {
+            "rubicon": {
+              "accountId": 2001,
+              "siteId": 3001,
+              "zoneId": 4001,
+              "dealsonly": true
+            }
+          }
         }
       }
     },
@@ -67,10 +79,14 @@
         ]
       },
       "ext": {
-        "rubicon": {
-          "accountId": 2001,
-          "siteId": 3001,
-          "zoneId": 4001
+        "prebid": {
+          "bidder": {
+            "rubicon": {
+              "accountId": 2001,
+              "siteId": 3001,
+              "zoneId": 4001
+            }
+          }
         }
       }
     }
