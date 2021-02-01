@@ -39,6 +39,8 @@ adapters:
     enabled: true
   adhese:
     enabled: true
+  adot:
+    enabled: true
   appnexus:
     enabled: true
   brightroll:
