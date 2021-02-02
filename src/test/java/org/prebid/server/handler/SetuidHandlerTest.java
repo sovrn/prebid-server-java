@@ -17,7 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
-import org.prebid.server.analytics.AnalyticsReporter;
+import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.SetuidEvent;
 import org.prebid.server.auction.PrivacyEnforcementService;
 import org.prebid.server.bidder.BidderCatalog;
@@ -32,6 +32,7 @@ import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.privacy.gdpr.model.PrivacyEnforcementAction;
+import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.gdpr.model.TcfResponse;
 import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -87,7 +88,7 @@ public class SetuidHandlerTest extends VertxTest {
     @Mock
     private TcfDefinerService tcfDefinerService;
     @Mock
-    private AnalyticsReporter analyticsReporter;
+    private AnalyticsReporterDelegator analyticsReporterDelegator;
     @Mock
     private Metrics metrics;
 
@@ -101,13 +102,16 @@ public class SetuidHandlerTest extends VertxTest {
     @Mock
     private MultiMap responseHeaders;
 
+    private TcfContext tcfContext;
+
     @Before
     public void setUp() {
         final Map<Integer, PrivacyEnforcementAction> vendorIdToGdpr = singletonMap(1,
                 PrivacyEnforcementAction.allowAll());
 
+        tcfContext = TcfContext.builder().gdpr("GDPR").build();
         given(privacyEnforcementService.contextFromSetuidRequest(any(), any(), any(), any()))
-                .willReturn(Future.succeededFuture(PrivacyContext.of(null, null)));
+                .willReturn(Future.succeededFuture(PrivacyContext.of(null, tcfContext)));
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, vendorIdToGdpr, null)));
 
@@ -142,7 +146,7 @@ public class SetuidHandlerTest extends VertxTest {
                 privacyEnforcementService,
                 tcfDefinerService,
                 1,
-                analyticsReporter,
+                analyticsReporterDelegator,
                 metrics,
                 timeoutFactory,
                 true,
@@ -158,7 +162,7 @@ public class SetuidHandlerTest extends VertxTest {
                 privacyEnforcementService,
                 tcfDefinerService,
                 null,
-                analyticsReporter,
+                analyticsReporterDelegator,
                 metrics,
                 timeoutFactory, false,
                 uidsAuditCookieService);
@@ -173,11 +177,12 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldRespondWithErrorIfOptedOut() {
+    public void shouldRespondWithErrorAndTriggerMetricsAndAnalyticsWhenOptedOut() {
         // given
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).optout(true).build(), jacksonMapper));
 
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -185,7 +190,11 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         verify(httpResponse).setStatusCode(eq(401));
-        verify(httpResponse).end();
+        verify(httpResponse).end("Unauthorized: Sync is not allowed for this uids");
+        verify(metrics).updateUserSyncOptoutMetric();
+
+        final SetuidEvent setuidEvent = captureSetuidEvent();
+        assertThat(setuidEvent).isEqualTo(SetuidEvent.error(401));
     }
 
     @Test
@@ -201,7 +210,11 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end(eq("\"bidder\" query param is required"));
+        verify(httpResponse).end(eq("Invalid request format: \"bidder\" query param is required"));
+        verify(metrics).updateUserSyncBadRequestMetric();
+
+        final SetuidEvent setuidEvent = captureSetuidEvent();
+        assertThat(setuidEvent).isEqualTo(SetuidEvent.error(400));
     }
 
     @Test
@@ -227,7 +240,8 @@ public class SetuidHandlerTest extends VertxTest {
         // given
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
-        given(httpRequest.getParam(any())).willReturn("invalid_or_disabled");
+
+        given(httpRequest.getParam(eq("bidder"))).willReturn("invalid_or_disabled");
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -235,7 +249,28 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end(eq("\"bidder\" query param is invalid"));
+        verify(httpResponse).end(eq("Invalid request format: \"bidder\" query param is invalid"));
+        verify(metrics).updateUserSyncBadRequestMetric();
+    }
+
+    @Test
+    public void shouldPassUnsuccessfulEventToAnalyticsReporterIfUidMissingInRequest() {
+        // given
+        given(uidsCookieService.parseFromRequest(any()))
+                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
+
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        final SetuidEvent setuidEvent = captureSetuidEvent();
+        assertThat(setuidEvent).isEqualTo(SetuidEvent.builder()
+                .status(200)
+                .bidder(RUBICON)
+                .success(false)
+                .build());
     }
 
     @Test
@@ -250,7 +285,7 @@ public class SetuidHandlerTest extends VertxTest {
                 privacyEnforcementService,
                 tcfDefinerService,
                 1,
-                analyticsReporter,
+                analyticsReporterDelegator,
                 metrics,
                 new TimeoutFactory(clock),
                 true,
@@ -264,7 +299,6 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -274,6 +308,10 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).setStatusCode(eq(200));
         verify(httpResponse).end(eq("The gdpr_consent param prevents cookies from being saved"));
+        verify(metrics).updateUserSyncTcfBlockedMetric(RUBICON);
+
+        final SetuidEvent setuidEvent = captureSetuidEvent();
+        assertThat(setuidEvent).isEqualTo(SetuidEvent.builder().status(200).build());
     }
 
     @Test
@@ -286,7 +324,6 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -295,20 +332,22 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).setStatusCode(eq(400));
-        verify(httpResponse).end(eq("GDPR processing failed with error: gdpr exception"));
+        verify(httpResponse).end(eq("Invalid request format: gdpr exception"));
+
+        final SetuidEvent setuidEvent = captureSetuidEvent();
+        assertThat(setuidEvent).isEqualTo(SetuidEvent.error(400));
     }
 
     @Test
     public void shouldRespondWithInternalServerErrorStatusIfGdprProcessingFailsWithUnexpectedException() {
         // given
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
-                .willReturn(Future.failedFuture("unexpected error"));
+                .willReturn(Future.failedFuture("unexpected error TCF"));
 
         given(uidsCookieService.parseFromRequest(any()))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -318,7 +357,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(httpResponse, never()).sendFile(any());
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).setStatusCode(eq(500));
-        verify(httpResponse).end(eq("Unexpected GDPR processing error"));
+        verify(httpResponse).end(eq("Unexpected setuid processing error: unexpected error TCF"));
     }
 
     @Test
@@ -427,7 +466,7 @@ public class SetuidHandlerTest extends VertxTest {
                 privacyEnforcementService,
                 tcfDefinerService,
                 1,
-                analyticsReporter,
+                analyticsReporterDelegator,
                 metrics,
                 timeoutFactory, true,
                 uidsAuditCookieService);
@@ -518,7 +557,7 @@ public class SetuidHandlerTest extends VertxTest {
                 privacyEnforcementService,
                 tcfDefinerService,
                 1,
-                analyticsReporter,
+                analyticsReporterDelegator,
                 metrics,
                 new TimeoutFactory(clock),
                 true,
@@ -556,7 +595,7 @@ public class SetuidHandlerTest extends VertxTest {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
-                bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporter, metrics,
+                bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
                 new TimeoutFactory(clock), true, uidsAuditCookieService);
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(false, emptyMap(), null)));
@@ -592,7 +631,7 @@ public class SetuidHandlerTest extends VertxTest {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
-                bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporter, metrics,
+                bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
                 new TimeoutFactory(clock), true, uidsAuditCookieService);
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, emptyMap(), null)));
@@ -781,37 +820,6 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldUpdateOptOutsMetricIfOptedOut() {
-        // given
-        // this uids cookie value stands for {"optout": true}
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).optout(true).build(), jacksonMapper));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        verify(metrics).updateUserSyncOptoutMetric();
-    }
-
-    @Test
-    public void shouldUpdateBadRequestsMetricIfBidderParamIsMissing() {
-        // given
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        verify(metrics).updateUserSyncBadRequestMetric();
-    }
-
-    @Test
     public void shouldNotSendResponseIfClientClosedConnection() {
         // given
         given(uidsCookieService.parseFromRequest(any()))
@@ -846,58 +854,6 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
-    public void shouldPassUnauthorizedEventToAnalyticsReporterIfOptedOut() {
-        // given
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).optout(true).build(), jacksonMapper));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        final SetuidEvent setuidEvent = captureSetuidEvent();
-        assertThat(setuidEvent).isEqualTo(SetuidEvent.builder().status(401).build());
-    }
-
-    @Test
-    public void shouldPassBadRequestEventToAnalyticsReporterIfBidderParamIsMissing() {
-        // given
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        final SetuidEvent setuidEvent = captureSetuidEvent();
-        assertThat(setuidEvent).isEqualTo(SetuidEvent.builder().status(400).build());
-    }
-
-    @Test
-    public void shouldPassUnsuccessfulEventToAnalyticsReporterIfUidMissingInRequest() {
-        // given
-        given(uidsCookieService.parseFromRequest(any()))
-                .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
-
-        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-
-        // when
-        setuidHandler.handle(routingContext);
-
-        // then
-        final SetuidEvent setuidEvent = captureSetuidEvent();
-        assertThat(setuidEvent).isEqualTo(SetuidEvent.builder()
-                .status(200)
-                .bidder(RUBICON)
-                .success(false)
-                .build());
-    }
-
-    @Test
     public void shouldPassUnsuccessfulEventToAnalyticsReporterIfFacebookSentinel() {
         // given
         given(uidsCookieService.parseFromRequest(any()))
@@ -922,9 +878,10 @@ public class SetuidHandlerTest extends VertxTest {
                 privacyEnforcementService,
                 tcfDefinerService,
                 null,
-                analyticsReporter,
+                analyticsReporterDelegator,
                 metrics,
-                timeoutFactory, true,
+                timeoutFactory,
+                true,
                 uidsAuditCookieService);
 
         // when
@@ -982,7 +939,7 @@ public class SetuidHandlerTest extends VertxTest {
 
     private SetuidEvent captureSetuidEvent() {
         final ArgumentCaptor<SetuidEvent> setuidEventCaptor = ArgumentCaptor.forClass(SetuidEvent.class);
-        verify(analyticsReporter).processEvent(setuidEventCaptor.capture());
+        verify(analyticsReporterDelegator).processEvent(setuidEventCaptor.capture(), eq(tcfContext));
         return setuidEventCaptor.getValue();
     }
 }

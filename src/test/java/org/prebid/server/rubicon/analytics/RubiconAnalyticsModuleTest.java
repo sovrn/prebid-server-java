@@ -111,6 +111,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 public class RubiconAnalyticsModuleTest extends VertxTest {
 
     private static final String HOST_URL = "http://host-url";
+    private static final int PBS_HOST_VENDOR_ID = 52;
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -172,17 +173,23 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         httpContext = HttpContext.builder().cookies(emptyMap()).build();
 
-        module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, false,
-                jacksonMapper);
+        module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
+                httpClient, false, jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, null, null,
-                        null, null, null, null, false, null))
+                .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, PBS_HOST_VENDOR_ID, null,
+                        null, null, null, null, null, false, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
+    }
+
+    @Test
+    public void vendorIdShouldReturnPassedVendorId() {
+        // expected
+        assertThat(module.vendorId()).isEqualTo(PBS_HOST_VENDOR_ID);
     }
 
     @Test
@@ -370,9 +377,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processAuctionEventShouldUseGlobalSamplingFactor() {
         // given
-        module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, false, jacksonMapper);
+        module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
+                currencyService, httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -406,9 +413,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processAuctionEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
-        module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname",
-                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, false, jacksonMapper);
+        module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
+                currencyService, httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -746,9 +753,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .httpContext(httpContext)
                 .build();
 
-        module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", "dataCenterRegion",
-                bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService, httpClient, false,
-                jacksonMapper);
+        module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", PBS_HOST_VENDOR_ID,
+                "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
+                httpClient, false, jacksonMapper);
 
         // when
         module.processEvent(event);

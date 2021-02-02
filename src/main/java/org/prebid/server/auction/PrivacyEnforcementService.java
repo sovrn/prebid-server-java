@@ -104,12 +104,9 @@ public class PrivacyEnforcementService {
         final Geo geo = device != null ? device.getGeo() : null;
         final String country = getFromRsidCookieIfNull(geo != null ? geo.getCountry() : null, context);
 
-        if (isCoppaMaskingRequired(privacy)) {
-            return Future.succeededFuture(PrivacyContext.of(
-                    privacy, TcfContext.empty(), ipAddressHelper.maskIpv4(ipAddress)));
-        }
-
-        final String effectiveIpAddress = isLmtEnabled(device) ? ipAddressHelper.maskIpv4(ipAddress) : ipAddress;
+        final String effectiveIpAddress = isCoppaMaskingRequired(privacy) || isLmtEnabled(device)
+                ? ipAddressHelper.maskIpv4(ipAddress)
+                : ipAddress;
 
         final AccountGdprConfig accountGdpr = account.getGdpr();
         final String accountId = account.getId();
@@ -120,9 +117,9 @@ public class PrivacyEnforcementService {
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext, tcfContext.getIpAddress()));
     }
 
-    public Future<PrivacyContext> contextFromLegacyRequest(
-            PreBidRequestContext preBidRequestContext, Account account,
-            RoutingContext routingContext) {
+    public Future<PrivacyContext> contextFromLegacyRequest(PreBidRequestContext preBidRequestContext,
+                                                           Account account,
+                                                           RoutingContext routingContext) {
 
         final Privacy privacy = privacyExtractor.validPrivacyFrom(preBidRequestContext.getPreBidRequest());
         final String country = getFromRsidCookieIfNull(null, routingContext);
@@ -213,6 +210,12 @@ public class PrivacyEnforcementService {
                 .map(gdprResult -> merge(ccpaResult, gdprResult));
     }
 
+    public Future<Map<Integer, PrivacyEnforcementAction>> resultForVendorIds(Set<Integer> vendorIds,
+                                                                             TcfContext tcfContext) {
+        return tcfDefinerService.resultForVendorIds(vendorIds, tcfContext)
+                .map(TcfResponse::getActions);
+    }
+
     private Map<String, BidderPrivacyResult> ccpaResult(BidRequest bidRequest,
                                                         Account account,
                                                         List<String> bidders,
@@ -234,8 +237,9 @@ public class PrivacyEnforcementService {
         return shouldEnforceCcpa && ccpa.isEnforced();
     }
 
-    private Map<String, BidderPrivacyResult> maskCcpa(
-            Set<String> biddersToMask, Device device, Map<String, User> bidderToUser) {
+    private Map<String, BidderPrivacyResult> maskCcpa(Set<String> biddersToMask,
+                                                      Device device,
+                                                      Map<String, User> bidderToUser) {
 
         return biddersToMask.stream()
                 .collect(Collectors.toMap(Function.identity(),
@@ -359,8 +363,8 @@ public class PrivacyEnforcementService {
         return ccpaEnforcedBidders;
     }
 
-    private static Map<String, PrivacyEnforcementAction> mapTcfResponseToEachBidder(
-            TcfResponse<String> tcfResponse, Set<String> bidders) {
+    private static Map<String, PrivacyEnforcementAction> mapTcfResponseToEachBidder(TcfResponse<String> tcfResponse,
+                                                                             Set<String> bidders) {
 
         final Map<String, PrivacyEnforcementAction> bidderNameToAction = tcfResponse.getActions();
         return bidders.stream().collect(Collectors.toMap(Function.identity(), bidderNameToAction::get));
@@ -460,12 +464,11 @@ public class PrivacyEnforcementService {
     /**
      * Returns {@link BidderPrivacyResult} with GDPR masking.
      */
-    private BidderPrivacyResult createBidderPrivacyResult(
-            User user,
-            Device device,
-            String bidder,
-            boolean isLmtEnabled,
-            Map<String, PrivacyEnforcementAction> bidderToEnforcement) {
+    private BidderPrivacyResult createBidderPrivacyResult(User user,
+                                                          Device device,
+                                                          String bidder,
+                                                          boolean isLmtEnabled,
+                                                          Map<String, PrivacyEnforcementAction> bidderToEnforcement) {
 
         final PrivacyEnforcementAction privacyEnforcementAction = bidderToEnforcement.get(bidder);
         final boolean blockBidderRequest = privacyEnforcementAction.isBlockBidderRequest();

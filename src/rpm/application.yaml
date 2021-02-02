@@ -112,6 +112,7 @@ metrics:
 analytics:
   rp:
     enabled: true
+    host-vendor-id: 52
     log:
       empty-dimensions: true
 cache:

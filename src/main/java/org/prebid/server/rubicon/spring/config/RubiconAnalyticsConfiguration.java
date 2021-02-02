@@ -48,6 +48,7 @@ public class RubiconAnalyticsConfiguration {
                 properties.getSamplingFactor(),
                 versionInfo.getVersion(),
                 HttpUtil.getDomainFromUrl(externalUrl),
+                properties.getHostVendorId(),
                 dataCenterRegion,
                 bidderCatalog,
                 uidsCookieService,
@@ -79,6 +80,8 @@ public class RubiconAnalyticsConfiguration {
 
         @NotBlank
         private String hostUrl;
+
+        private Integer hostVendorId;
 
         private Integer samplingFactor;
 

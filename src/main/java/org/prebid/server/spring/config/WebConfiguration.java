@@ -13,7 +13,7 @@ import io.vertx.ext.web.handler.CorsHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.prebid.server.analytics.CompositeAnalyticsReporter;
+import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.auction.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.AuctionRequestFactory;
@@ -246,7 +246,7 @@ public class WebConfiguration {
     org.prebid.server.handler.openrtb2.AuctionHandler openrtbAuctionHandler(
             ExchangeService exchangeService,
             AuctionRequestFactory auctionRequestFactory,
-            CompositeAnalyticsReporter analyticsReporter,
+            AnalyticsReporterDelegator analyticsReporter,
             Metrics metrics,
             Clock clock,
             HttpInteractionLogger httpInteractionLogger,
@@ -266,7 +266,7 @@ public class WebConfiguration {
     AmpHandler openrtbAmpHandler(
             AmpRequestFactory ampRequestFactory,
             ExchangeService exchangeService,
-            CompositeAnalyticsReporter analyticsReporter,
+            AnalyticsReporterDelegator analyticsReporter,
             Metrics metrics,
             Clock clock,
             BidderCatalog bidderCatalog,
@@ -293,7 +293,7 @@ public class WebConfiguration {
             VideoRequestFactory videoRequestFactory,
             VideoResponseFactory videoResponseFactory,
             ExchangeService exchangeService,
-            CompositeAnalyticsReporter analyticsReporter,
+            AnalyticsReporterDelegator analyticsReporter,
             Metrics metrics,
             Clock clock,
             JacksonMapper mapper) {
@@ -325,14 +325,15 @@ public class WebConfiguration {
             PrivacyEnforcementService privacyEnforcementService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
             @Value("${cookie-sync.coop-sync.default}") boolean defaultCoopSync,
-            CompositeAnalyticsReporter analyticsReporter,
+            AnalyticsReporterDelegator analyticsReporterDelegator,
             Metrics metrics,
             TimeoutFactory timeoutFactory,
             JacksonMapper mapper) {
         return new CookieSyncHandler(enableCookie, uidsAuditCookieService, externalUrl, defaultTimeoutMs,
                 uidsCookieService, applicationSettings, bidderCatalog, tcfDefinerService, privacyEnforcementService,
-                hostVendorId, defaultCoopSync, coopSyncPriorities.getPri(), analyticsReporter, metrics,
-                timeoutFactory, mapper);
+                hostVendorId, defaultCoopSync, coopSyncPriorities.getPri(), analyticsReporterDelegator, metrics,
+                timeoutFactory,
+                mapper);
     }
 
     @Bean
@@ -344,7 +345,7 @@ public class WebConfiguration {
             PrivacyEnforcementService privacyEnforcementService,
             TcfDefinerService tcfDefinerService,
             @Value("${gdpr.host-vendor-id:#{null}}") Integer hostVendorId,
-            CompositeAnalyticsReporter analyticsReporter,
+            AnalyticsReporterDelegator analyticsReporter,
             Metrics metrics,
             TimeoutFactory timeoutFactory,
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
@@ -426,7 +427,7 @@ public class WebConfiguration {
             UidsCookieService uidsCookieService,
             @Autowired(required = false) ApplicationEventService applicationEventService,
             @Autowired(required = false) UserService userService,
-            CompositeAnalyticsReporter compositeAnalyticsReporter,
+            AnalyticsReporterDelegator analyticsReporterDelegator,
             TimeoutFactory timeoutFactory,
             ApplicationSettings applicationSettings,
             @Value("${deals.enabled}") boolean dealsEnabled) {
@@ -435,7 +436,7 @@ public class WebConfiguration {
                 uidsCookieService,
                 applicationEventService,
                 userService,
-                compositeAnalyticsReporter,
+                analyticsReporterDelegator,
                 timeoutFactory,
                 applicationSettings,
                 dealsEnabled);

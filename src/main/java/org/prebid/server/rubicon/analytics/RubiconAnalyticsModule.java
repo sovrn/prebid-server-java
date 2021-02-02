@@ -177,6 +177,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private final String pbsVersion;
     private final Integer globalSamplingFactor;
     private final String pbsHostname;
+    private final Integer pbsHostVendorId;
     private final String dataCenterRegion;
     private final BidderCatalog bidderCatalog;
     private final UidsCookieService uidsCookieService;
@@ -197,6 +198,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                   Integer globalSamplingFactor,
                                   String pbsVersion,
                                   String pbsHostname,
+                                  Integer pbsHostVendorId,
                                   String dataCenterRegion,
                                   BidderCatalog bidderCatalog,
                                   UidsCookieService uidsCookieService,
@@ -210,6 +212,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         this.globalSamplingFactor = globalSamplingFactor;
         this.pbsVersion = pbsVersion;
         this.pbsHostname = Objects.requireNonNull(pbsHostname);
+        this.pbsHostVendorId = Objects.requireNonNull(pbsHostVendorId);
         this.dataCenterRegion = Objects.requireNonNull(dataCenterRegion);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
@@ -229,6 +232,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         } else if (event instanceof NotificationEvent) {
             processNotificationEvent((NotificationEvent) event);
         }
+    }
+
+    @Override
+    public int vendorId() {
+        return pbsHostVendorId;
     }
 
     private void processAuctionEvent(AuctionEvent auctionEvent) {

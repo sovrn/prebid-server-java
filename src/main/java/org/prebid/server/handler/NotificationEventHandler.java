@@ -12,6 +12,7 @@ import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.prebid.server.analytics.AnalyticsReporter;
+import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.cookie.UidsCookieService;
@@ -44,7 +45,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
     private final UidsCookieService uidsCookieService;
     private final ApplicationEventService applicationEventService;
     private final UserService userService;
-    private final AnalyticsReporter analyticsReporter;
+    private final AnalyticsReporterDelegator analyticsDelegator;
     private final TimeoutFactory timeoutFactory;
     private final ApplicationSettings applicationSettings;
     private final boolean dealsEnabled;
@@ -53,7 +54,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
     public NotificationEventHandler(UidsCookieService uidsCookieService,
                                     ApplicationEventService applicationEventService,
                                     UserService userService,
-                                    AnalyticsReporter analyticsReporter,
+                                    AnalyticsReporterDelegator analyticsDelegator,
                                     TimeoutFactory timeoutFactory,
                                     ApplicationSettings applicationSettings,
                                     boolean dealsEnabled) {
@@ -61,7 +62,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.applicationEventService = applicationEventService;
         this.userService = userService;
-        this.analyticsReporter = Objects.requireNonNull(analyticsReporter);
+        this.analyticsDelegator = Objects.requireNonNull(analyticsDelegator);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.dealsEnabled = dealsEnabled;
@@ -160,7 +161,7 @@ public class NotificationEventHandler implements Handler<RoutingContext> {
                         .lineItemId(lineItemId)
                         .build();
 
-                analyticsReporter.processEvent(notificationEvent);
+                analyticsDelegator.processEvent(notificationEvent);
 
             }
             respondWithOkStatus(context, eventRequest.getFormat() == EventRequest.Format.image);
