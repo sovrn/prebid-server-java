@@ -57,6 +57,8 @@ adapters:
     enabled: true
   ix:
     enabled: true
+  nobid:
+    enabled: true
   openx:
     enabled: true
   pubmatic:
