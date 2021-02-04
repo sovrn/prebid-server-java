@@ -127,29 +127,77 @@ public class RequestContextTest extends VertxTest {
     }
 
     @Test
-    public void lookupStringShouldReturnAdslot() {
+    public void lookupStringShouldReturnAdslotFromContextDataPbadslot() {
         // given
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
-        final RequestContext context =
-                new RequestContext(request(identity()),
-                        imp(i -> i.ext(obj("context", obj("data", obj("adslot", "/123/456"))))), txnLog,
-                        jacksonMapper);
+        final RequestContext context = new RequestContext(
+                request(identity()),
+                imp(i -> i.ext(mapper.createObjectNode()
+                        .<ObjectNode>set("context", mapper.createObjectNode()
+                                .set("data", mapper.createObjectNode()
+                                        .put("pbadslot", "/123/456")
+                                        .set("adserver", obj("adslot", "/234/567"))))
+                        .set("data", mapper.createObjectNode()
+                                .put("pbadslot", "/345/678")
+                                .set("adserver", obj("adslot", "/456/789"))))),
+                txnLog,
+                jacksonMapper);
 
         // when and then
         assertThat(context.lookupString(category)).isEqualTo("/123/456");
     }
 
     @Test
-    public void lookupStringShouldReturnAdslotFromAlternativePbadslotPath() {
+    public void lookupStringShouldReturnAdslotFromContextDataAdserverAdslot() {
         // given
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
-        final RequestContext context =
-                new RequestContext(request(identity()),
-                        imp(i -> i.ext(obj("context", obj("data", obj("pbadslot", "/123/456"))))), txnLog,
-                        jacksonMapper);
+        final RequestContext context = new RequestContext(
+                request(identity()),
+                imp(i -> i.ext(mapper.createObjectNode()
+                        .<ObjectNode>set("context", mapper.createObjectNode()
+                                .set("data", mapper.createObjectNode()
+                                        .set("adserver", obj("adslot", "/234/567"))))
+                        .set("data", mapper.createObjectNode()
+                                .put("pbadslot", "/345/678")
+                                .set("adserver", obj("adslot", "/456/789"))))),
+                txnLog,
+                jacksonMapper);
 
         // when and then
-        assertThat(context.lookupString(category)).isEqualTo("/123/456");
+        assertThat(context.lookupString(category)).isEqualTo("/234/567");
+    }
+
+    @Test
+    public void lookupStringShouldReturnAdslotFromDataPbadslot() {
+        // given
+        final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
+        final RequestContext context = new RequestContext(
+                request(identity()),
+                imp(i -> i.ext(mapper.createObjectNode()
+                        .set("data", mapper.createObjectNode()
+                                .put("pbadslot", "/345/678")
+                                .set("adserver", obj("adslot", "/456/789"))))),
+                txnLog,
+                jacksonMapper);
+
+        // when and then
+        assertThat(context.lookupString(category)).isEqualTo("/345/678");
+    }
+
+    @Test
+    public void lookupStringShouldReturnAdslotFromDataAdserverAdslot() {
+        // given
+        final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
+        final RequestContext context = new RequestContext(
+                request(identity()),
+                imp(i -> i.ext(mapper.createObjectNode()
+                        .set("data", mapper.createObjectNode()
+                                .set("adserver", obj("adslot", "/456/789"))))),
+                txnLog,
+                jacksonMapper);
+
+        // when and then
+        assertThat(context.lookupString(category)).isEqualTo("/456/789");
     }
 
     @Test
@@ -169,9 +217,11 @@ public class RequestContextTest extends VertxTest {
     public void lookupStringShouldReturnNullWhenAdslotIsMissing() {
         // given
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.adslot);
-        final RequestContext context =
-                new RequestContext(request(identity()),
-                        imp(i -> i.ext(obj("context", obj("data", mapper.createObjectNode())))), txnLog, jacksonMapper);
+        final RequestContext context = new RequestContext(
+                request(identity()),
+                imp(i -> i.ext(obj("context", obj("data", mapper.createObjectNode())))),
+                txnLog,
+                jacksonMapper);
 
         // when and then
         assertThat(context.lookupString(category)).isNull();
@@ -1056,6 +1106,6 @@ public class RequestContextTest extends VertxTest {
     }
 
     private static ObjectNode obj(String field, JsonNode value) {
-        return (ObjectNode) mapper.createObjectNode().set(field, value);
+        return mapper.createObjectNode().set(field, value);
     }
 }

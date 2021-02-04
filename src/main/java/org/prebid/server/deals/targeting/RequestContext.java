@@ -85,8 +85,11 @@ public class RequestContext {
             case appBundle:
                 return getIfNotNull(bidRequest.getApp(), App::getBundle);
             case adslot:
-                return getFirstNonNullStringFromImpExt("context.data.pbadslot",
-                        "context.data.adserver.adslot", "context.data.adslot");
+                return getFirstNonNullStringFromImpExt(
+                        "context.data.pbadslot",
+                        "context.data.adserver.adslot",
+                        "data.pbadslot",
+                        "data.adserver.adslot");
             case deviceGeoExt:
                 return getValueFrom(geoExt, category, RequestContext::nodeToString);
             case deviceExt:
