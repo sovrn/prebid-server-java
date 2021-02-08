@@ -142,7 +142,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         return StringUtils.isBlank(accountId)
                 ? Future.succeededFuture(Account.empty(accountId))
                 : applicationSettings.getAccountById(accountId, timeout)
-                        .otherwise(Account.empty(accountId));
+                .otherwise(Account.empty(accountId));
     }
 
     private void handleSetuidContextResult(AsyncResult<SetuidContext> setuidContextResult,
@@ -187,7 +187,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
         return gdprHostVendorId == null
                 ? Future.succeededFuture(HostVendorTcfResponse.allowedVendor())
                 : tcfDefinerService.resultForVendorIds(Collections.singleton(gdprHostVendorId), tcfContext)
-                        .map(this::toHostVendorTcfResponse);
+                .map(this::toHostVendorTcfResponse);
     }
 
     private HostVendorTcfResponse toHostVendorTcfResponse(TcfResponse<Integer> tcfResponse) {
