@@ -57,6 +57,9 @@ adapters:
     enabled: true
   ix:
     enabled: true
+    usersync:
+      url: https://ssum.casalemedia.com/usermatchredir?s=189517&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&cb=
+      redirect-url: /setuid?bidder=ix&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&uid=
   nobid:
     enabled: true
   openx:
