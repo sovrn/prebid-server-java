@@ -49,7 +49,7 @@ import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.proto.openrtb.ext.ExtPrebidBidders;
 import org.prebid.server.proto.openrtb.ext.request.ExtApp;
-import org.prebid.server.proto.openrtb.ext.request.ExtBidderConfigFpd;
+import org.prebid.server.proto.openrtb.ext.request.ExtBidderConfigOrtb;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
@@ -366,7 +366,7 @@ public class ExchangeService {
         final Map<String, String> uidsBody = uidsFromBody(extUser);
 
         final ExtRequest requestExt = bidRequest.getExt();
-        final Map<String, ExtBidderConfigFpd> biddersToConfigs = getBiddersToConfigs(requestExt);
+        final Map<String, ExtBidderConfigOrtb> biddersToConfigs = getBiddersToConfigs(requestExt);
 
         final Map<String, User> bidderToUser =
                 prepareUsers(bidders, context, aliases, bidRequest, extUser, uidsBody, biddersToConfigs);
@@ -377,7 +377,7 @@ public class ExchangeService {
                         getBidderRequests(bidderToPrivacyResult, bidRequest, imps, biddersToConfigs, aliases));
     }
 
-    private Map<String, ExtBidderConfigFpd> getBiddersToConfigs(ExtRequest requestExt) {
+    private Map<String, ExtBidderConfigOrtb> getBiddersToConfigs(ExtRequest requestExt) {
         final ExtRequestPrebid prebid = requestExt == null ? null : requestExt.getPrebid();
         final List<ExtRequestPrebidBidderConfig> bidderConfigs = prebid == null ? null : prebid.getBidderconfig();
 
@@ -385,17 +385,17 @@ public class ExchangeService {
             return Collections.emptyMap();
         }
 
-        final Map<String, ExtBidderConfigFpd> bidderToConfig = new HashMap<>();
+        final Map<String, ExtBidderConfigOrtb> bidderToConfig = new HashMap<>();
 
         bidderConfigs.stream()
                 .filter(prebidBidderConfig -> prebidBidderConfig.getBidders().contains(ALL_BIDDERS_CONFIG))
-                .map(prebidBidderConfig -> prebidBidderConfig.getConfig().getFpd())
+                .map(prebidBidderConfig -> prebidBidderConfig.getConfig().getOrtb2())
                 .findFirst()
                 .ifPresent(extBidderConfigFpd -> bidderToConfig.put(ALL_BIDDERS_CONFIG, extBidderConfigFpd));
 
         for (ExtRequestPrebidBidderConfig config : bidderConfigs) {
             for (String bidder : config.getBidders()) {
-                final ExtBidderConfigFpd concreteFpd = config.getConfig().getFpd();
+                final ExtBidderConfigOrtb concreteFpd = config.getConfig().getOrtb2();
                 bidderToConfig.putIfAbsent(bidder, concreteFpd);
             }
         }
@@ -427,13 +427,13 @@ public class ExchangeService {
                                            BidRequest bidRequest,
                                            ExtUser extUser,
                                            Map<String, String> uidsBody,
-                                           Map<String, ExtBidderConfigFpd> biddersToConfigs) {
+                                           Map<String, ExtBidderConfigOrtb> biddersToConfigs) {
 
         final List<String> firstPartyDataBidders = firstPartyDataBidders(bidRequest.getExt());
 
         final Map<String, User> bidderToUser = new HashMap<>();
         for (String bidder : bidders) {
-            final ExtBidderConfigFpd fpdConfig = ObjectUtils.defaultIfNull(biddersToConfigs.get(bidder),
+            final ExtBidderConfigOrtb fpdConfig = ObjectUtils.defaultIfNull(biddersToConfigs.get(bidder),
                     biddersToConfigs.get(ALL_BIDDERS_CONFIG));
 
             final boolean useFirstPartyData = firstPartyDataBidders == null || firstPartyDataBidders.contains(bidder);
@@ -458,7 +458,7 @@ public class ExchangeService {
                              Map<String, String> uidsBody,
                              UidsCookie uidsCookie,
                              boolean useFirstPartyData,
-                             ExtBidderConfigFpd fpdConfig) {
+                             ExtBidderConfigOrtb fpdConfig) {
 
         final String updatedBuyerUid = updateUserBuyerUid(user, bidder, aliases, uidsBody, uidsCookie);
         final boolean shouldCleanExtPrebid = extUser != null && extUser.getPrebid() != null;
@@ -527,7 +527,7 @@ public class ExchangeService {
     private List<BidderRequest> getBidderRequests(List<BidderPrivacyResult> bidderPrivacyResults,
                                                   BidRequest bidRequest,
                                                   List<Imp> imps,
-                                                  Map<String, ExtBidderConfigFpd> biddersToConfigs,
+                                                  Map<String, ExtBidderConfigOrtb> biddersToConfigs,
                                                   BidderAliases aliases) {
 
         final Map<String, JsonNode> bidderToPrebidBidders = bidderToPrebidBidders(bidRequest);
@@ -578,7 +578,7 @@ public class ExchangeService {
     private BidderRequest createBidderRequest(BidderPrivacyResult bidderPrivacyResult,
                                               BidRequest bidRequest,
                                               List<Imp> imps,
-                                              Map<String, ExtBidderConfigFpd> biddersToConfigs,
+                                              Map<String, ExtBidderConfigOrtb> biddersToConfigs,
                                               Map<String, JsonNode> bidderToPrebidBidders,
                                               BidderAliases bidderAliases) {
 
@@ -590,7 +590,7 @@ public class ExchangeService {
         final List<String> firstPartyDataBidders = firstPartyDataBidders(bidRequest.getExt());
         final boolean useFirstPartyData = firstPartyDataBidders == null || firstPartyDataBidders.contains(bidder);
 
-        final ExtBidderConfigFpd fpdConfig = ObjectUtils.defaultIfNull(biddersToConfigs.get(bidder),
+        final ExtBidderConfigOrtb fpdConfig = ObjectUtils.defaultIfNull(biddersToConfigs.get(bidder),
                 biddersToConfigs.get(ALL_BIDDERS_CONFIG));
 
         final Site bidRequestSite = bidRequest.getSite();
