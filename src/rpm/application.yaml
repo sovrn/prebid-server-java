@@ -55,6 +55,8 @@ adapters:
     enabled: true
   gumgum:
     enabled: true
+  improvedigital:
+    enabled: true
   ix:
     enabled: true
     usersync:
