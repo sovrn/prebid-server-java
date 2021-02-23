@@ -64,6 +64,7 @@ import org.prebid.server.validation.BidderParamValidator;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.ResponseBidValidator;
 import org.prebid.server.validation.VideoRequestValidator;
+import org.prebid.server.vast.VastModifier;
 import org.prebid.server.vertx.http.BasicHttpClient;
 import org.prebid.server.vertx.http.CircuitBreakerSecuredHttpClient;
 import org.prebid.server.vertx.http.HttpClient;
@@ -98,6 +99,7 @@ public class ServiceConfiguration {
             @Value("${cache.query}") String query,
             @Value("${cache.banner-ttl-seconds:#{null}}") Integer bannerCacheTtl,
             @Value("${cache.video-ttl-seconds:#{null}}") Integer videoCacheTtl,
+            VastModifier vastModifier,
             EventsService eventsService,
             HttpClient httpClient,
             Metrics metrics,
@@ -109,10 +111,16 @@ public class ServiceConfiguration {
                 httpClient,
                 CacheService.getCacheEndpointUrl(scheme, host, path),
                 CacheService.composeCachedAssetUrlTemplate(scheme, host, path, query),
+                vastModifier,
                 eventsService,
                 metrics,
                 clock,
                 mapper);
+    }
+
+    @Bean
+    VastModifier vastModifier(BidderCatalog bidderCatalog, EventsService eventsService) {
+        return new VastModifier(bidderCatalog, eventsService);
     }
 
     @Bean
@@ -471,6 +479,7 @@ public class ServiceConfiguration {
     BidResponseCreator bidResponseCreator(
             CacheService cacheService,
             BidderCatalog bidderCatalog,
+            VastModifier vastModifier,
             EventsService eventsService,
             StoredRequestProcessor storedRequestProcessor,
             BidResponseReducer bidResponseReducer,
@@ -483,6 +492,7 @@ public class ServiceConfiguration {
         return new BidResponseCreator(
                 cacheService,
                 bidderCatalog,
+                vastModifier,
                 eventsService,
                 storedRequestProcessor,
                 bidResponseReducer,

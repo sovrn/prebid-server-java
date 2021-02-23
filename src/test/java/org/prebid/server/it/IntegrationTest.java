@@ -22,6 +22,7 @@ import org.prebid.server.cache.proto.request.BidCacheRequest;
 import org.prebid.server.cache.proto.request.PutObject;
 import org.prebid.server.cache.proto.response.BidCacheResponse;
 import org.prebid.server.cache.proto.response.CacheObject;
+import org.prebid.server.it.util.BidCacheRequestPattern;
 import org.skyscreamer.jsonassert.ArrayValueMatcher;
 import org.skyscreamer.jsonassert.Customization;
 import org.skyscreamer.jsonassert.JSONCompare;
@@ -107,7 +108,8 @@ public abstract class IntegrationTest extends VertxTest {
                 .replaceAll("\\{\\{ cache.resource_url }}", cacheEndpoint + "?uuid=")
                 .replaceAll("\\{\\{ cache.host }}", hostAndPort)
                 .replaceAll("\\{\\{ cache.path }}", cachePath)
-                .replaceAll("\\{\\{ userservice_uri }}", userServiceEndpoint);
+                .replaceAll("\\{\\{ userservice_uri }}", userServiceEndpoint)
+                .replaceAll("\\{\\{ event.url }}", "http://localhost:8080/event?");
 
         for (final String bidder : bidders) {
             result = result.replaceAll("\\{\\{ " + bidder + "\\.exchange_uri }}",
@@ -210,6 +212,10 @@ public abstract class IntegrationTest extends VertxTest {
                 new Customization("ext.debug.httpcalls.cache", arrayValueMatcher));
     }
 
+    static BidCacheRequestPattern equalToBidCacheRequest(String json) {
+        return new BidCacheRequestPattern(json);
+    }
+
     public static class CacheResponseTransformer extends ResponseTransformer {
 
         @Override
@@ -219,7 +225,8 @@ public abstract class IntegrationTest extends VertxTest {
 
             final String newResponse;
             try {
-                newResponse = cacheResponseFromRequestJson(request.getBodyAsString(),
+                newResponse = cacheResponseFromRequestJson(
+                        request.getBodyAsString(),
                         parameters.getString("matcherName"));
             } catch (IOException e) {
                 return com.github.tomakehurst.wiremock.http.Response.response()

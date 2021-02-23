@@ -9,12 +9,12 @@ import com.iab.openrtb.request.Pmp;
 import com.iab.openrtb.response.Bid;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -36,34 +36,33 @@ public class LineItemUtil {
         return extDealLine != null ? extDealLine.getLineItemId() : null;
     }
 
-    /**
-     * Extracts line item source from the given {@link Bid}.
-     */
-    public static String lineItemSourceFrom(Bid bid, List<Imp> imps, JacksonMapper mapper) {
+    private static ExtDealLine extDealLineFrom(Bid bid, List<Imp> imps, JacksonMapper mapper) {
+        final Imp correspondingImp = imps.stream()
+                .filter(imp -> Objects.equals(imp.getId(), bid.getImpid()))
+                .findFirst()
+                .orElse(null);
+        return correspondingImp != null ? extDealLineFrom(bid, correspondingImp, mapper) : null;
+    }
+
+    public static ExtDealLine extDealLineFrom(Bid bid, Imp imp, JacksonMapper mapper) {
         if (StringUtils.isEmpty(bid.getDealid())) {
             return null;
         }
-        final ExtDealLine extDealLine = extDealLineFrom(bid, imps, mapper);
-        return extDealLine != null ? extDealLine.getBidder() : null;
-    }
 
-    private static ExtDealLine extDealLineFrom(Bid bid, List<Imp> imps, JacksonMapper mapper) {
-        return imps.stream()
-                .filter(imp -> Objects.equals(imp.getId(), bid.getImpid())) // find imp by ID
-                .map(Imp::getPmp)
-                .filter(Objects::nonNull)
-                .map(Pmp::getDeals)
-                .filter(Objects::nonNull)
-                .flatMap(Collection::stream)
-                .filter(Objects::nonNull)
-                .filter(deal -> Objects.equals(deal.getId(), bid.getDealid())) // find deal by ID
-                .map(Deal::getExt)
-                .filter(Objects::nonNull)
-                .map((ObjectNode ext) -> dealExt(ext, mapper))
-                .filter(Objects::nonNull)
-                .map(ExtDeal::getLine)
-                .findFirst()
-                .orElse(null);
+        final Pmp pmp = imp.getPmp();
+        final List<Deal> deals = pmp != null ? pmp.getDeals() : null;
+        return CollectionUtils.isEmpty(deals)
+                ? null
+                : deals.stream()
+                        .filter(Objects::nonNull)
+                        .filter(deal -> Objects.equals(deal.getId(), bid.getDealid())) // find deal by ID
+                        .map(Deal::getExt)
+                        .filter(Objects::nonNull)
+                        .map((ObjectNode ext) -> dealExt(ext, mapper))
+                        .filter(Objects::nonNull)
+                        .map(ExtDeal::getLine)
+                        .findFirst()
+                        .orElse(null);
     }
 
     private static ExtDeal dealExt(JsonNode ext, JacksonMapper mapper) {

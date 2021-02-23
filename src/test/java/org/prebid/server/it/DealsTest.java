@@ -17,6 +17,7 @@ import org.prebid.server.deals.proto.report.LineItemStatus;
 import org.skyscreamer.jsonassert.ArrayValueMatcher;
 import org.skyscreamer.jsonassert.Customization;
 import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompare;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.skyscreamer.jsonassert.ValueMatcher;
 import org.skyscreamer.jsonassert.comparator.CustomComparator;
@@ -88,8 +89,7 @@ public class DealsTest extends IntegrationTest {
 
         // pre-bid cache
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/cache"))
-                .withRequestBody(equalToJson(jsonFrom(
-                        "deals/test-cache-deals-request.json"), true, false))
+                .withRequestBody(equalToBidCacheRequest(jsonFrom("deals/test-cache-deals-request.json")))
                 .willReturn(aResponse()
                         .withTransformers("cache-response-transformer")
                         .withTransformerParameter("matcherName", "deals/test-cache-matcher.json")));
@@ -220,6 +220,20 @@ public class DealsTest extends IntegrationTest {
                 JSONCompareMode.NON_EXTENSIBLE,
                 new Customization("ext.debug.trace.deals[*].time", timeValueMatcher)));
 
+        final ValueMatcher<Object> jsonStringValueMatcher = (actual, expected) -> {
+            try {
+                return !JSONCompare.compareJSON(actual.toString(), expected.toString(), JSONCompareMode.NON_EXTENSIBLE)
+                        .failed();
+            } catch (JSONException e) {
+                throw new RuntimeException("Unexpected json exception", e);
+            }
+        };
+
+        final ArrayValueMatcher<Object> cacheArrayValueMatcher = new ArrayValueMatcher<>(new CustomComparator(
+                JSONCompareMode.NON_EXTENSIBLE,
+                new Customization("ext.debug.httpcalls.cache[*].requestbody", jsonStringValueMatcher),
+                new Customization("ext.debug.httpcalls.cache[*].responsebody", jsonStringValueMatcher)));
+
         final List<Customization> arrayValueMatchers = IntStream.range(1, 5)
                 .mapToObj(i -> new Customization("ext.debug.trace.lineitems.lineItem" + i,
                         new ArrayValueMatcher<>(new CustomComparator(
@@ -229,8 +243,8 @@ public class DealsTest extends IntegrationTest {
                 .collect(Collectors.toList());
 
         arrayValueMatchers.add(new Customization("ext.debug.trace.deals", arrayValueMatcher));
-        return new CustomComparator(JSONCompareMode.NON_EXTENSIBLE,
-                arrayValueMatchers.toArray(new Customization[0]));
+        arrayValueMatchers.add(new Customization("ext.debug.httpcalls.cache", cacheArrayValueMatcher));
+        return new CustomComparator(JSONCompareMode.NON_EXTENSIBLE, arrayValueMatchers.toArray(new Customization[0]));
     }
 
     private static boolean verify(Runnable verify) {
