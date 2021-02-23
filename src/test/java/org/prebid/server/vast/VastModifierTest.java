@@ -193,7 +193,7 @@ public class VastModifierTest {
         assertThat(result).isEqualTo(admWithNoImpression);
     }
 
-    public static PutObject givenPutObject(TextNode adm) {
+    private static PutObject givenPutObject(TextNode adm) {
         return PutObject.builder()
                 .type("xml")
                 .bidid("bidId2")
@@ -203,11 +203,11 @@ public class VastModifierTest {
                 .build();
     }
 
-    public static PutObject putObject() {
+    private static PutObject putObject() {
         return givenPutObject(nodeAdm());
     }
 
-    public static TextNode nodeAdm() {
+    private static TextNode nodeAdm() {
         return new TextNode(adm());
     }
 
@@ -219,7 +219,7 @@ public class VastModifierTest {
                 + "</Wrapper></Ad></VAST>";
     }
 
-    public static String modifiedAdm(String bidNurl) {
+    private static String modifiedAdm(String bidNurl) {
         return "<VAST version=\"3.0\"><Ad><Wrapper>"
                 + "<AdSystem>prebid.org wrapper</AdSystem>"
                 + "<VASTAdTagURI><![CDATA[" + bidNurl + "]]></VASTAdTagURI>"
@@ -227,7 +227,7 @@ public class VastModifierTest {
                 + "</Wrapper></Ad></VAST>";
     }
 
-    public static EventsContext givenEventsContext(boolean accountEnabled) {
+    private static EventsContext givenEventsContext(boolean accountEnabled) {
         return EventsContext.builder()
                 .enabledForAccount(accountEnabled)
                 .auctionTimestamp(AUCTION_TIMESTAMP)
@@ -235,7 +235,7 @@ public class VastModifierTest {
                 .build();
     }
 
-    public static EventsContext eventsContext() {
+    private static EventsContext eventsContext() {
         return givenEventsContext(true);
     }
 }

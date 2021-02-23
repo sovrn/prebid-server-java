@@ -301,40 +301,6 @@ public class ResponseBidValidatorTest extends VertxTest {
     }
 
     @Test
-    public void validateShouldFailedIfVideoBidHasNoNurlAndAdm() {
-        final ValidationResult result = responseBidValidator.validate(
-                givenBid(BidType.video, builder -> builder.adm(null).nurl(null)),
-                BIDDER_NAME,
-                givenAuctionContext(),
-                bidderAliases);
-
-        assertThat(result.getErrors()).hasSize(1)
-                .containsOnly("Bid \"bidId1\" with video type missing adm and nurl");
-    }
-
-    @Test
-    public void validateShouldReturnSuccessfulResultForValidVideoBidWithNurl() {
-        final ValidationResult result = responseBidValidator.validate(
-                givenBid(BidType.video, builder -> builder.adm(null)),
-                BIDDER_NAME,
-                givenAuctionContext(),
-                bidderAliases);
-
-        assertThat(result.hasErrors()).isFalse();
-    }
-
-    @Test
-    public void validateShouldReturnSuccessfulResultForValidVideoBidWithAdm() {
-        final ValidationResult result = responseBidValidator.validate(
-                givenBid(BidType.video, builder -> builder.nurl(null)),
-                BIDDER_NAME,
-                givenAuctionContext(),
-                bidderAliases);
-
-        assertThat(result.hasErrors()).isFalse();
-    }
-
-    @Test
     public void validateShouldReturnSuccessfulResultForValidBid() {
         // when
         final ValidationResult result = responseBidValidator.validate(
