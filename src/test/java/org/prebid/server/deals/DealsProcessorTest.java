@@ -140,7 +140,7 @@ public class DealsProcessorTest extends VertxTest {
                 .device(Device.builder()
                         .ip("ip")
                         .ua("ua")
-                        .ext(ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(640, 480))))
+                        .ext(ExtDevice.of(null, ExtDevicePrebid.of(ExtDeviceInt.of(640, 480))))
                         .build()));
         final AuctionContext auctionContext = givenAuctionContext(bidRequest, givenAccount(identity()));
 
@@ -148,7 +148,7 @@ public class DealsProcessorTest extends VertxTest {
         final AuctionContext result = dealsProcessor.populateDealsInfo(auctionContext).result();
 
         // then
-        final ExtDevice expectedExtDevice = ExtDevice.of(ExtDevicePrebid.of(ExtDeviceInt.of(640, 480)));
+        final ExtDevice expectedExtDevice = ExtDevice.of(null, ExtDevicePrebid.of(ExtDeviceInt.of(640, 480)));
         expectedExtDevice.addProperty("vendor", mapper.valueToTree(ExtDeviceVendor.builder()
                 .type("mobile")
                 .os("os")
@@ -208,7 +208,7 @@ public class DealsProcessorTest extends VertxTest {
                 .city("city")
                 .zip("12345")
                 .build()));
-        final ExtDevice expectedDevice = ExtDevice.of(null);
+        final ExtDevice expectedDevice = ExtDevice.of(null, null);
         expectedDevice.addProperty("vendor", mapper.valueToTree(ExtDeviceVendor.builder()
                 .connspeed("broadband")
                 .build()));
@@ -810,7 +810,7 @@ public class DealsProcessorTest extends VertxTest {
 
         // when
         final AuctionContext result = dealsProcessor.populateDealsInfo(auctionContext).result();
-        final ExtDevice expectedExtDevice = ExtDevice.of(null);
+        final ExtDevice expectedExtDevice = ExtDevice.of(null, null);
         expectedExtDevice.addProperty("deviceVendor",
                 mapper.valueToTree(ExtDeviceVendor.builder().browser("browser").build()));
         // then
@@ -843,7 +843,7 @@ public class DealsProcessorTest extends VertxTest {
         final AuctionContext result = dealsProcessor.populateDealsInfo(auctionContext).result();
 
         // then
-        final ExtDevice expectedExtDevice = ExtDevice.of(null);
+        final ExtDevice expectedExtDevice = ExtDevice.of(null, null);
         expectedExtDevice.addProperty("geoVendor",
                 mapper.valueToTree(ExtDeviceVendor.builder().connspeed("100").build()));
         assertThat(result.getBidRequest().getDevice().getExt())

@@ -262,7 +262,7 @@ public class RequestContextTest extends VertxTest {
         // given
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.deviceExt,
                 "vendor.attribute");
-        final ExtDevice extDevice = ExtDevice.of(null);
+        final ExtDevice extDevice = ExtDevice.of(null, null);
         extDevice.addProperty("vendor", obj("attribute", "value"));
 
         final RequestContext context = new RequestContext(
@@ -280,7 +280,7 @@ public class RequestContextTest extends VertxTest {
         // given
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.deviceExt,
                 "vendor.nested.attribute");
-        final ExtDevice extDevice = ExtDevice.of(null);
+        final ExtDevice extDevice = ExtDevice.of(null, null);
         extDevice.addProperty("vendor", obj("nested", obj("attribute", "value")));
         final RequestContext context = new RequestContext(
                 request(r -> r.device(device(d -> d.ext(
