@@ -375,6 +375,57 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
+    public void processAuctionEventShouldPreferTargetbiddercodeOverSeatValue() throws JsonProcessingException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(singletonList(Imp.builder().id("impId").build()))
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(singletonList(SeatBid.builder()
+                                .seat("seatValue")
+                                .bid(singletonList(Bid.builder()
+                                        .impid("impId")
+                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder()
+                                                        .targetBidderCode("targetCode")
+                                                        .bidid("generatedId")
+                                                        .build(),
+                                                null)))
+                                        .build()))
+                                .build()))
+                        .build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        final ArgumentCaptor<String> bodyArgumentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(anyString(), any(), bodyArgumentCaptor.capture(), anyLong());
+        final Event result = mapper.readValue(bodyArgumentCaptor.getValue(), Event.class);
+        assertThat(result.getAuctions())
+                .hasSize(1)
+                .flatExtracting(Auction::getAdUnits)
+                .flatExtracting(AdUnit::getBids)
+                .flatExtracting(org.prebid.server.rubicon.analytics.proto.Bid::getBidder)
+                .containsOnly("targetCode");
+    }
+
+    @Test
     public void processAuctionEventShouldUseGlobalSamplingFactor() {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,

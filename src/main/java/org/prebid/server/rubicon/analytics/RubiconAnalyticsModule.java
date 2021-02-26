@@ -664,12 +664,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                 Map<String, Map<String, BigDecimal>> requestCurrencyRates,
                                 Boolean usepbsrates,
                                 String accountId) {
-
         final ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid = bid != null ? readExtPrebid(bid.getExt()) : null;
+        final ExtBidPrebid extBidPrebid = extPrebid != null ? extPrebid.getPrebid() : null;
+        final String targetBidderCode = extBidPrebid != null ? extBidPrebid.getTargetBidderCode() : null;
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                         .bidId(bidIdFromBid(getIfNotNull(bid, Bid::getId), extPrebid))
-                        .bidder(bidder)
+                        .bidder(targetBidderCode != null ? targetBidderCode : bidder)
                         .status(status)
                         .error(bidError)
                         .source(SERVER_SOURCE)
