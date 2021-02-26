@@ -83,6 +83,21 @@
   },
   "user": {
     "buyeruid": "J5VLCWQP-26-CWFT",
+    "data": [
+      {
+        "ext": {
+          "taxonomyname": "Iab"
+        },
+        "segment": [
+          {
+            "id": "segmentId1"
+          },
+          {
+            "id": "segmentId2"
+          }
+        ]
+      }
+    ],
     "ext": {
       "consent": "BOEFEAyOEFEAyAHABDENAIgAAAB9vABAASA",
       "eids": [
@@ -137,6 +152,10 @@
           "LIseg": [
             "999",
             "888"
+          ],
+          "iab": [
+            "segmentId1",
+            "segmentId2"
           ]
         }
       }
