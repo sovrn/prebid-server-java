@@ -235,10 +235,10 @@ public class BidResponseCreator {
         final Set<BidInfo> winningBidInfos = targeting == null
                 ? null
                 : bidderResponseToTargetingBidInfos.values().stream()
-                        .flatMap(Collection::stream)
-                        .filter(TargetingBidInfo::isWinningBid)
-                        .map(TargetingBidInfo::getBidInfo)
-                        .collect(Collectors.toSet());
+                .flatMap(Collection::stream)
+                .filter(TargetingBidInfo::isWinningBid)
+                .map(TargetingBidInfo::getBidInfo)
+                .collect(Collectors.toSet());
 
         updateSentToClientTxnLog(txnLog, bidInfos);
 
