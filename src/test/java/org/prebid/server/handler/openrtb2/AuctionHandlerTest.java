@@ -317,7 +317,7 @@ public class AuctionHandlerTest extends VertxTest {
                 .willReturn(Future.succeededFuture(BidResponse.builder()
                         .ext(mapper.valueToTree(ExtBidResponse.of(
                                 ExtResponseDebug.of(null, resolvedRequest, null, null),
-                                null, null, null, null, null)))
+                                null, null, null, null, null, null)))
                         .build()));
 
         // when
@@ -651,7 +651,8 @@ public class AuctionHandlerTest extends VertxTest {
                 .willReturn(Future.succeededFuture(BidResponse.builder()
                         .ext(mapper.valueToTree(
                                 ExtBidResponse.of(null, singletonMap("rubicon", singletonList(
-                                        ExtBidderError.of(1, "msg", singleton("impId1")))), null, null, null, null)))
+                                        ExtBidderError.of(1, "msg", singleton("impId1")))), null, null, null, null,
+                                        null)))
                         .build()));
 
         // when
@@ -663,7 +664,7 @@ public class AuctionHandlerTest extends VertxTest {
         final AuctionEvent auctionEvent = captureAuctionEvent();
         assertThat(auctionEvent.getBidResponse().getExt())
                 .isEqualTo(mapper.valueToTree(ExtBidResponse.of(null, singletonMap("rubicon", singletonList(
-                        ExtBidderError.of(1, "msg", singleton("impId1")))), null, null, null, null)));
+                        ExtBidderError.of(1, "msg", singleton("impId1")))), null, null, null, null, null)));
     }
 
     @Test

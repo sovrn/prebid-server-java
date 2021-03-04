@@ -35,6 +35,8 @@ public class AuctionContext {
 
     List<String> prebidErrors;
 
+    List<String> debugWarnings;
+
     Map<String, List<DebugHttpCall>> debugHttpCalls;
 
     PrivacyContext privacyContext;
