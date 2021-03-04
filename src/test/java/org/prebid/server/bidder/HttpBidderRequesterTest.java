@@ -13,15 +13,19 @@ import io.vertx.core.http.HttpMethod;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.BDDMockito;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
+import org.prebid.server.auction.model.BidderRequest;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
+import org.prebid.server.bidder.model.HttpCall;
 import org.prebid.server.bidder.model.HttpRequest;
+import org.prebid.server.bidder.model.HttpResponse;
 import org.prebid.server.bidder.model.Result;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
@@ -87,11 +91,11 @@ public class HttpBidderRequesterTest extends VertxTest {
     public void shouldReturnFailedToRequestBidsErrorWhenBidderReturnsEmptyHttpRequestAndErrorLists() {
         // given
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(emptyList(), emptyList()));
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
 
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout, false)
-                        .result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false).result();
 
         // then
         assertThat(bidderSeatBid.getBids()).isEmpty();
@@ -106,11 +110,11 @@ public class HttpBidderRequesterTest extends VertxTest {
         // given
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(emptyList(),
                 asList(BidderError.badInput("error1"), BidderError.badInput("error2"))));
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
 
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout, false)
-                        .result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false).result();
 
         // then
         assertThat(bidderSeatBid.getBids()).isEmpty();
@@ -136,11 +140,77 @@ public class HttpBidderRequesterTest extends VertxTest {
         headers.add("header1", "value1");
         headers.add("header2", "value2");
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
         // when
-        httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout, false);
+        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false);
 
         // then
         verify(httpClient).request(eq(HttpMethod.POST), eq("uri"), eq(headers), eq("requestBody"), eq(500L));
+    }
+
+    @Test
+    public void shouldPassStoredResponseToBidderMakeBidsMethodAndReturnSeatBids() {
+        // given
+        final MultiMap headers = new CaseInsensitiveHeaders();
+        given(bidder.makeHttpRequests(any())).willReturn(Result.of(singletonList(
+                HttpRequest.<BidRequest>builder()
+                        .method(HttpMethod.POST)
+                        .uri("uri")
+                        .body("requestBody")
+                        .headers(headers)
+                        .build()),
+                emptyList()));
+        headers.add("header1", "value1");
+        headers.add("header2", "value2");
+
+        final List<BidderBid> bids = asList(BidderBid.of(null, null, null), BidderBid.of(null, null, null));
+        given(bidder.makeBids(any(), any())).willReturn(Result.of(bids, emptyList()));
+
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", "storedResponse", givenBidRequest());
+
+        // when
+        final BidderSeatBid bidderSeatBid = httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false)
+                .result();
+
+        // then
+        verifyZeroInteractions(httpClient);
+        final ArgumentCaptor<HttpCall<BidRequest>> httpCallArgumentCaptor = ArgumentCaptor.forClass(HttpCall.class);
+        verify(bidder).makeBids(httpCallArgumentCaptor.capture(), any());
+        assertThat(httpCallArgumentCaptor.getValue().getResponse())
+                .extracting(HttpResponse::getBody)
+                .containsOnly("storedResponse");
+        assertThat(bidderSeatBid.getBids()).containsOnlyElementsOf(bids);
+    }
+
+    @Test
+    public void shouldMakeRequestToBidderWhenStoredResponseDefinedButBidderCreatesMoreThanOneRequest() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+        final MultiMap headers = new CaseInsensitiveHeaders();
+        given(bidder.makeHttpRequests(any())).willReturn(Result.of(asList(
+                HttpRequest.<BidRequest>builder()
+                        .method(HttpMethod.POST)
+                        .uri("uri")
+                        .body("requestBody")
+                        .headers(headers)
+                        .build(),
+                HttpRequest.<BidRequest>builder()
+                        .method(HttpMethod.POST)
+                        .uri("uri")
+                        .body("requestBody2")
+                        .headers(headers)
+                        .build()),
+                emptyList()));
+        headers.add("header1", "value1");
+        headers.add("header2", "value2");
+
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", "storedResponse", givenBidRequest());
+
+        // when
+        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false).result();
+
+        // then
+        verify(httpClient, times(2)).request(any(), anyString(), any(), anyString(), anyLong());
     }
 
     @Test
@@ -155,8 +225,10 @@ public class HttpBidderRequesterTest extends VertxTest {
                         .build()),
                 emptyList()));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
-        httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout, false);
+        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false);
 
         // then
         verify(httpClient).request(any(), anyString(), any(), (String) isNull(), anyLong());
@@ -182,8 +254,9 @@ public class HttpBidderRequesterTest extends VertxTest {
                         .build()),
                 emptyList()));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
         // when
-        httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout, false);
+        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false);
 
         // then
         verify(httpClient, times(2)).request(any(), anyString(), any(), anyString(), anyLong());
@@ -208,10 +281,11 @@ public class HttpBidderRequesterTest extends VertxTest {
                 BidderBid.of(Bid.builder().impid("456").build(), null, null));
         given(bidder.makeBids(any(), any())).willReturn(Result.of(bids, emptyList()));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout,
-                        false).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false).result();
 
         // then
         assertThat(bidderSeatBid.getBids()).containsOnlyElementsOf(bids);
@@ -224,6 +298,8 @@ public class HttpBidderRequesterTest extends VertxTest {
                 bidderErrorNotifier);
 
         final BidRequest bidRequest = bidRequestWithDeals("deal1", "deal2");
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
+
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(Arrays.asList(
                 HttpRequest.<BidRequest>builder()
                         .method(HttpMethod.POST)
@@ -277,7 +353,7 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, bidRequest, timeout, false).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false).result();
 
         // then
         verify(bidder, times(1)).makeHttpRequests(any());
@@ -291,6 +367,8 @@ public class HttpBidderRequesterTest extends VertxTest {
     public void shouldFinishWhenAllDealRequestsAreFinishedAndNoDealsProvided() {
         // given
         final BidRequest bidRequest = bidRequestWithDeals("deal1", "deal2", "deal2");
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
+
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(Arrays.asList(
                 HttpRequest.<BidRequest>builder()
                         .method(HttpMethod.POST)
@@ -329,7 +407,7 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, bidRequest, timeout, false).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false).result();
 
         // then
         verify(bidder, times(1)).makeHttpRequests(any());
@@ -363,10 +441,11 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         given(bidder.makeBids(any(), any())).willReturn(Result.of(emptyList(), emptyList()));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout,
-                        true).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, true).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(2).containsOnly(
@@ -388,10 +467,11 @@ public class HttpBidderRequesterTest extends VertxTest {
                         .build()),
                 emptyList()));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), expiredTimeout,
-                        true).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, expiredTimeout, true).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(1).containsOnly(
@@ -412,10 +492,11 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         givenHttpClientProducesException(new RuntimeException("Request exception"));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout,
-                        true).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, true).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(1).containsOnly(
@@ -436,10 +517,11 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         givenHttpClientReturnsResponses(HttpClientResponse.of(500, null, "responseBody1"));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), timeout,
-                        true).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, timeout, true).result();
 
         // then
         assertThat(bidderSeatBid.getHttpCalls()).hasSize(1).containsOnly(
@@ -462,10 +544,11 @@ public class HttpBidderRequesterTest extends VertxTest {
                         .build()),
                 emptyList()));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid =
-                httpBidderRequester.requestBids(bidder, BidRequest.builder().imp(emptyList()).build(), expiredTimeout,
-                        false).result();
+                httpBidderRequester.requestBids(bidder, bidderRequest, expiredTimeout, false).result();
 
         // then
         assertThat(bidderSeatBid.getErrors()).hasSize(1)
@@ -489,8 +572,10 @@ public class HttpBidderRequesterTest extends VertxTest {
                 // bidder request
                 .willReturn(Future.failedFuture(new TimeoutException("Timeout exception")));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
-        httpBidderRequester.requestBids(bidder, BidRequest.builder().build(), timeout, false);
+        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false);
 
         // then
         verify(bidderErrorNotifier).processTimeout(any(), same(bidder));
@@ -562,9 +647,11 @@ public class HttpBidderRequesterTest extends VertxTest {
                 Result.of(singletonList(BidderBid.of(Bid.builder().impid("123").build(), null, null)),
                         singletonList(BidderError.badServerResponse("makeBidsError"))));
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
+
         // when
         final BidderSeatBid bidderSeatBid = httpBidderRequester
-                .requestBids(bidder, BidRequest.builder().imp(emptyList()).test(1).build(), timeout, false)
+                .requestBids(bidder, bidderRequest, timeout, false)
                 .result();
 
         // then
@@ -594,11 +681,17 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         givenHttpClientReturnsResponse(204, EMPTY);
 
+        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, BidRequest.builder().test(1).build());
+
         // when
-        httpBidderRequester.requestBids(bidder, BidRequest.builder().test(1).build(), timeout, false);
+        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, false);
 
         // then
         verify(bidder, never()).makeBids(any(), any());
+    }
+
+    private static BidRequest givenBidRequest() {
+        return BidRequest.builder().imp(emptyList()).build();
     }
 
     private static BidRequest bidRequestWithDeals(String... ids) {

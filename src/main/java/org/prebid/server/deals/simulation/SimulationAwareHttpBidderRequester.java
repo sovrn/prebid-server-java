@@ -2,7 +2,6 @@ package org.prebid.server.deals.simulation;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Deal;
 import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Imp;
@@ -11,6 +10,7 @@ import io.vertx.core.Future;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
+import org.prebid.server.auction.model.BidderRequest;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
@@ -64,14 +64,14 @@ public class SimulationAwareHttpBidderRequester extends HttpBidderRequester {
         this.bidRates = new HashMap<>();
     }
 
-    public void setBidRates(Map<String, Double> bidRates) {
+    void setBidRates(Map<String, Double> bidRates) {
         this.bidRates.putAll(bidRates);
     }
 
     @Override
-    public <T> Future<BidderSeatBid> requestBids(Bidder<T> bidder, BidRequest bidRequest, Timeout timeout,
+    public <T> Future<BidderSeatBid> requestBids(Bidder<T> bidder, BidderRequest bidderRequest, Timeout timeout,
                                                  boolean debugEnabled) {
-        final List<Imp> imps = bidRequest.getImp();
+        final List<Imp> imps = bidderRequest.getBidRequest().getImp();
         final Map<String, Imp> idToImps = imps.stream().collect(Collectors.toMap(Imp::getId, Function.identity()));
         final Map<String, Set<DealInfo>> impsToDealInfo = imps.stream()
                 .filter(imp -> imp.getPmp() != null)
