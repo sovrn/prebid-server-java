@@ -670,7 +670,8 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final org.prebid.server.rubicon.analytics.proto.Bid analyticsBid =
                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                         .bidId(bidIdFromBid(getIfNotNull(bid, Bid::getId), extPrebid))
-                        .bidder(targetBidderCode != null ? targetBidderCode : bidder)
+                        .bidder(bidder)
+                        .bidderDetail(StringUtils.isNotBlank(targetBidderCode) ? targetBidderCode : null)
                         .status(status)
                         .error(bidError)
                         .source(SERVER_SOURCE)

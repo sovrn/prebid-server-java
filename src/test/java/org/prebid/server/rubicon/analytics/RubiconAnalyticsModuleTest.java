@@ -375,7 +375,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     }
 
     @Test
-    public void processAuctionEventShouldPreferTargetbiddercodeOverSeatValue() throws JsonProcessingException {
+    public void processAuctionEventShouldSetBidderDetailIfTargetBidderCodeIsPresent() throws JsonProcessingException {
         // given
         givenHttpClientReturnsResponse(200, null);
 
@@ -421,8 +421,59 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .hasSize(1)
                 .flatExtracting(Auction::getAdUnits)
                 .flatExtracting(AdUnit::getBids)
-                .flatExtracting(org.prebid.server.rubicon.analytics.proto.Bid::getBidder)
+                .flatExtracting(org.prebid.server.rubicon.analytics.proto.Bid::getBidderDetail)
                 .containsOnly("targetCode");
+    }
+
+    @Test
+    public void processAuctionEventShouldNotUpdateBidderDetailsIfTargetCodeIsBlank() throws JsonProcessingException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(singletonList(Imp.builder().id("impId").build()))
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(singletonList(SeatBid.builder()
+                                .seat("seatValue")
+                                .bid(singletonList(Bid.builder()
+                                        .impid("impId")
+                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder()
+                                                        .targetBidderCode("  ")
+                                                        .bidid("generatedId")
+                                                        .build(),
+                                                null)))
+                                        .build()))
+                                .build()))
+                        .build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        final ArgumentCaptor<String> bodyArgumentCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(anyString(), any(), bodyArgumentCaptor.capture(), anyLong());
+        final Event result = mapper.readValue(bodyArgumentCaptor.getValue(), Event.class);
+        assertThat(result.getAuctions())
+                .hasSize(1)
+                .flatExtracting(Auction::getAdUnits)
+                .flatExtracting(AdUnit::getBids)
+                .flatExtracting(org.prebid.server.rubicon.analytics.proto.Bid::getBidderDetail)
+                .containsNull();
     }
 
     @Test

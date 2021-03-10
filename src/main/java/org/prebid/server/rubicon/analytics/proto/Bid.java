@@ -13,6 +13,9 @@ public class Bid {
 
     String bidder;
 
+    @JsonProperty("bidderDetail")
+    String bidderDetail;
+
     String status;
 
     BidError error;
