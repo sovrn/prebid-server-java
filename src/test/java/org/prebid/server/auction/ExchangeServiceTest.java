@@ -80,6 +80,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheBids;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCacheVastxml;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidData;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidDataEidPermissions;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidMultiBid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidSchain;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidSchainSchain;
@@ -1033,7 +1034,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(
                 givenSingleImp(singletonMap("someBidder", 1)),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .data(ExtRequestPrebidData.of(singletonList("someBidder")))
+                        .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
                         .auctiontimestamp(1000L).build())));
 
         // when
@@ -1369,7 +1370,7 @@ public class ExchangeServiceTest extends VertxTest {
                         .ext(impExt)
                         .build()),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .data(ExtRequestPrebidData.of(singletonList("someBidder")))
+                        .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
                         .build())));
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
@@ -1409,15 +1410,16 @@ public class ExchangeServiceTest extends VertxTest {
                         .<ObjectNode>set("bidder", mapper.createObjectNode()
                                 .put("someBidder", 1)))
                 .put("all", "allValue");
+
         final BidRequest bidRequest = givenBidRequest(
                 singletonList(Imp.builder()
                         .id("impId")
                         .banner(Banner.builder()
                                 .format(singletonList(Format.builder().w(400).h(300).build()))
-                                .build())
-                        .ext(impExt)
-                        .build()),
-                identity());
+                                .build()).ext(impExt).build()),
+                builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
+                        .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
+                        .build())));
         given(httpBidderRequester.requestBids(any(), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().price(TEN).build())))));
@@ -1486,7 +1488,7 @@ public class ExchangeServiceTest extends VertxTest {
                                         .build())
                                 .build())
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .data(ExtRequestPrebidData.of(singletonList("someBidder")))
+                                .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
                                 .build())));
 
         // when
@@ -1504,7 +1506,7 @@ public class ExchangeServiceTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(singletonMap("someBidder", 1)),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .data(ExtRequestPrebidData.of(asList("someBidder", "should_be_removed")))
+                        .data(ExtRequestPrebidData.of(asList("someBidder", "should_be_removed"), null))
                         .aliases(singletonMap("someBidder", "alias_should_stay"))
                         .auctiontimestamp(1000L)
                         .build())));
@@ -1537,7 +1539,7 @@ public class ExchangeServiceTest extends VertxTest {
                 builder -> builder
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .auctiontimestamp(1000L)
-                                .data(ExtRequestPrebidData.of(singletonList("someBidder")))
+                                .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
                                 .build()))
                         .user(User.builder()
                                 .keywords("keyword")
@@ -1567,6 +1569,104 @@ public class ExchangeServiceTest extends VertxTest {
     }
 
     @Test
+    public void shouldFilterUserExtEidsWhenBidderIsNotAllowedForSource() {
+        testUserEidsPermissionFiltering(
+                // given
+                asList(
+                        ExtUserEid.of("source1", null, null, null),
+                        ExtUserEid.of("source2", null, null, null)),
+                singletonList(ExtRequestPrebidDataEidPermissions.of("source1", singletonList("otherBidder"))),
+                emptyMap(),
+                // expected
+                singletonList(ExtUserEid.of("source2", null, null, null))
+        );
+    }
+
+    @Test
+    public void shouldNotFilterUserExtEidsWhenEidsPermissionDoesNotContainSource() {
+        testUserEidsPermissionFiltering(
+                // given
+                singletonList(ExtUserEid.of("source1", null, null, null)),
+                singletonList(ExtRequestPrebidDataEidPermissions.of("source2", singletonList("otherBidder"))),
+                emptyMap(),
+                // expected
+                singletonList(ExtUserEid.of("source1", null, null, null))
+        );
+    }
+
+    @Test
+    public void shouldNotFilterUserExtEidsWhenSourceAllowedForAllBidders() {
+        testUserEidsPermissionFiltering(
+                // given
+                singletonList(ExtUserEid.of("source1", null, null, null)),
+                singletonList(ExtRequestPrebidDataEidPermissions.of("source1", singletonList("*"))),
+                emptyMap(),
+                // expected
+                singletonList(ExtUserEid.of("source1", null, null, null))
+        );
+    }
+
+    @Test
+    public void shouldNotFilterUserExtEidsWhenSourceAllowedForBidder() {
+        testUserEidsPermissionFiltering(
+                // given
+                singletonList(ExtUserEid.of("source1", null, null, null)),
+                singletonList(ExtRequestPrebidDataEidPermissions.of("source1", singletonList("someBidder"))),
+                emptyMap(),
+                // expected
+                singletonList(ExtUserEid.of("source1", null, null, null))
+        );
+    }
+
+    @Test
+    public void shouldNotFilterUserExtEidsWhenSourceAllowedForBidderAlias() {
+        testUserEidsPermissionFiltering(
+                // given
+                singletonList(ExtUserEid.of("source1", null, null, null)),
+                singletonList(ExtRequestPrebidDataEidPermissions.of("source1", singletonList("someBidderAlias"))),
+                singletonMap("someBidder", "someBidderAlias"),
+                // expected
+                singletonList(ExtUserEid.of("source1", null, null, null))
+        );
+    }
+
+    @Test
+    public void shouldFilterUserExtEidsWhenBidderIsNotAllowedForSourceAndSetNullIfNoEidsLeft() {
+        // given
+        final Bidder<?> bidder = mock(Bidder.class);
+        givenBidder("someBidder", bidder, givenEmptySeatBid());
+        final Map<String, Integer> bidderToGdpr = singletonMap("someBidder", 1);
+        final ExtUser extUser = ExtUser.builder().data(mapper.createObjectNode())
+                .eids(singletonList(ExtUserEid.of("source1", null, null, null))).build();
+
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(bidderToGdpr),
+                builder -> builder
+                        .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                .data(ExtRequestPrebidData.of(null, singletonList(
+                                        ExtRequestPrebidDataEidPermissions.of("source1",
+                                                singletonList("otherBidder")))))
+                                .build()))
+                        .user(User.builder()
+                                .ext(extUser)
+                                .build()));
+
+        // when
+        exchangeService.holdAuction(givenRequestContext(bidRequest));
+
+        // then
+        final ArgumentCaptor<BidderRequest> bidderRequestCaptor = ArgumentCaptor.forClass(BidderRequest.class);
+        verify(httpBidderRequester).requestBids(any(), bidderRequestCaptor.capture(), any(), anyBoolean());
+        final List<BidderRequest> capturedBidRequests = bidderRequestCaptor.getAllValues();
+        assertThat(capturedBidRequests)
+                .extracting(BidderRequest::getBidRequest)
+                .extracting(BidRequest::getUser)
+                .extracting(User::getExt)
+                .extracting(ExtUser::getEids)
+                .element(0)
+                .isNull();
+    }
+
+    @Test
     public void shouldNotCleanRequestExtPrebidDataWhenFpdAllowedAndPrebidIsNotNull() {
         // given
         final Bidder<?> bidder = mock(Bidder.class);
@@ -1580,7 +1680,7 @@ public class ExchangeServiceTest extends VertxTest {
                 builder -> builder
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .auctiontimestamp(1000L)
-                                .data(ExtRequestPrebidData.of(singletonList("someBidder")))
+                                .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
                                 .build()))
                         .user(User.builder()
                                 .ext(extUser)
@@ -1615,7 +1715,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(bidderToGdpr),
                 builder -> builder
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .data(ExtRequestPrebidData.of(emptyList())).build()))
+                                .data(ExtRequestPrebidData.of(emptyList(), null)).build()))
                         .user(User.builder()
                                 .keywords("keyword")
                                 .gender("male")
@@ -1656,7 +1756,7 @@ public class ExchangeServiceTest extends VertxTest {
                 builder -> builder
                         .ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .auctiontimestamp(1000L)
-                                .data(ExtRequestPrebidData.of(null)).build()))
+                                .data(ExtRequestPrebidData.of(null, null)).build()))
                         .user(User.builder()
                                 .keywords("keyword")
                                 .gender("male")
@@ -1701,7 +1801,7 @@ public class ExchangeServiceTest extends VertxTest {
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(bidderToGdpr),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .auctiontimestamp(1000L)
-                        .data(ExtRequestPrebidData.of(singletonList("someBidder"))).build()))
+                        .data(ExtRequestPrebidData.of(singletonList("someBidder"), null)).build()))
                         .site(Site.builder()
                                 .keywords("keyword")
                                 .search("search")
@@ -1748,7 +1848,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(bidderToGdpr),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .data(ExtRequestPrebidData.of(null))
+                        .data(ExtRequestPrebidData.of(null, null))
                         .auctiontimestamp(1000L).build()))
                         .app(App.builder()
                                 .keywords("keyword")
@@ -1788,7 +1888,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         final BidRequest bidRequest = givenBidRequest(givenSingleImp(bidderToGdpr),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
-                        .data(ExtRequestPrebidData.of(singletonList("someBidder")))
+                        .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
                         .auctiontimestamp(1000L).build()))
                         .app(App.builder()
                                 .keywords("keyword")
@@ -2865,5 +2965,40 @@ public class ExchangeServiceTest extends VertxTest {
                 .seatbid(emptyList())
                 .ext(mapper.valueToTree(ExtBidResponse.of(null, errors, null, null, null, null, null)))
                 .build();
+    }
+
+    private void testUserEidsPermissionFiltering(List<ExtUserEid> givenExtUserEids,
+                                                 List<ExtRequestPrebidDataEidPermissions> givenEidPermissions,
+                                                 Map<String, String> givenAlises,
+                                                 List<ExtUserEid> expectedExtUserEids) {
+        // given
+        final Bidder<?> bidder = mock(Bidder.class);
+        givenBidder("someBidder", bidder, givenEmptySeatBid());
+        final Map<String, Integer> bidderToGdpr = singletonMap("someBidder", 1);
+        final ExtUser extUser = ExtUser.builder().eids(givenExtUserEids).build();
+
+        final BidRequest bidRequest = givenBidRequest(givenSingleImp(bidderToGdpr),
+                builder -> builder
+                        .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                .aliases(givenAlises)
+                                .data(ExtRequestPrebidData.of(null, givenEidPermissions))
+                                .build()))
+                        .user(User.builder()
+                                .ext(extUser)
+                                .build()));
+
+        // when
+        exchangeService.holdAuction(givenRequestContext(bidRequest));
+
+        // then
+        final ArgumentCaptor<BidderRequest> bidderRequestCaptor = ArgumentCaptor.forClass(BidderRequest.class);
+        verify(httpBidderRequester).requestBids(any(), bidderRequestCaptor.capture(), any(), anyBoolean());
+        final List<BidderRequest> capturedBidRequests = bidderRequestCaptor.getAllValues();
+        assertThat(capturedBidRequests)
+                .extracting(BidderRequest::getBidRequest)
+                .extracting(BidRequest::getUser)
+                .extracting(User::getExt)
+                .flatExtracting(ExtUser::getEids)
+                .isEqualTo(expectedExtUserEids);
     }
 }
