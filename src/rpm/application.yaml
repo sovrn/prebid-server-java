@@ -132,7 +132,7 @@ settings:
   enforce-valid-account: true
   database:
     type: mysql
-    account-query: SELECT uuid, price_granularity, banner_cache_ttl, video_cache_ttl, events_enabled, enforce_ccpa, tcf_config, analytics_sampling_factor, truncate_target_attr, default_integration, analytics_config, bid_validations, status FROM accounts_account where uuid = ? LIMIT 1
+    account-query: SELECT uuid, price_granularity, banner_cache_ttl, video_cache_ttl, events_enabled, enforce_ccpa, tcf_config, analytics_sampling_factor, truncate_target_attr, default_integration, analytics_config, bid_validations, status, config FROM accounts_account where uuid = ? LIMIT 1
     stored-requests-query: SELECT accountId, uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%) UNION ALL SELECT accountId, uuid, config, 'imp' as dataType FROM stored_requests WHERE uuid IN (%IMP_ID_LIST%)
     amp-stored-requests-query: SELECT accountId, uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%)
     stored-responses-query: SELECT resid, responseData FROM stored_responses WHERE resid IN (%RESPONSE_ID_LIST%)
