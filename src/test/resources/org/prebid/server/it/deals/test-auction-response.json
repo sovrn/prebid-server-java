@@ -16,7 +16,7 @@
             "prebid": {
               "type": "banner",
               "targeting": {
-                "hb_deal_rubicon": "rubicon-dealId1",
+                "hb_deal_rubicon": "dealId1",
                 "hb_cache_id": "3f37ff80-b395-449f-a80e-c21a38bb6eec",
                 "hb_cache_path_rubicon": "/cache",
                 "hb_cache_host_rubicon": "{{ cache.host }}",
@@ -29,7 +29,7 @@
                 "hb_size_rubicon": "300x250",
                 "hb_bidder_rubicon": "rubicon",
                 "hb_cache_host": "{{ cache.host }}",
-                "hb_deal": "rubicon-dealId1"
+                "hb_deal": "dealId1"
               },
               "cache": {
                 "bids": {
@@ -57,7 +57,7 @@
             "prebid": {
               "type": "banner",
               "targeting": {
-                "hb_deal_rubicon": "rubicon-dealId2",
+                "hb_deal_rubicon": "dealId2",
                 "hb_size_rubicon": "320x320",
                 "hb_cache_id": "13e78248-7339-4e35-b297-874d0031bc1a",
                 "hb_cache_path_rubicon": "/cache",
@@ -70,7 +70,7 @@
                 "hb_bidder": "rubicon",
                 "hb_bidder_rubicon": "rubicon",
                 "hb_cache_host": "{{ cache.host }}",
-                "hb_deal": "rubicon-dealId2"
+                "hb_deal": "dealId2"
               },
               "cache": {
                 "bids": {
@@ -98,7 +98,7 @@
             "prebid": {
               "type": "banner",
               "targeting": {
-                "hb_deal_rubicon": "rubicon-dealId3",
+                "hb_deal_rubicon": "dealId3",
                 "hb_size_rubicon": "300x250",
                 "hb_cache_id": "1cdcf339-e59b-4e2c-8382-1fb845d4961c",
                 "hb_cache_path_rubicon": "/cache",
@@ -111,7 +111,7 @@
                 "hb_bidder": "rubicon",
                 "hb_bidder_rubicon": "rubicon",
                 "hb_cache_host": "{{ cache.host }}",
-                "hb_deal": "rubicon-dealId3"
+                "hb_deal": "dealId3"
               },
               "cache": {
                 "bids": {

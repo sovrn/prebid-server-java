@@ -210,9 +210,7 @@ public class TargetingKeywordsCreator {
 
         // get Line Item by dealId
         if (StringUtils.isNotBlank(dealId)) {
-            keywordMap.put(HB_DEAL_KEY, StringUtils.isNotBlank(lineItemSource)
-                    ? String.format("%s-%s", lineItemSource, dealId)
-                    : dealId);
+            keywordMap.put(HB_DEAL_KEY, dealId);
         }
         if (isApp) {
             keywordMap.put(HB_ENV_KEY, HB_ENV_APP_VALUE);

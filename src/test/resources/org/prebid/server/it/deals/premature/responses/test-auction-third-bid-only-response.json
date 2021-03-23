@@ -18,12 +18,12 @@
               "targeting": {
                 "hb_pb": "8.60",
                 "hb_pb_rubicon": "8.60",
-                "hb_deal_rubicon": "rubicon-dealId3",
+                "hb_deal_rubicon": "dealId3",
                 "hb_size": "300x250",
                 "hb_bidder": "rubicon",
                 "hb_size_rubicon": "300x250",
                 "hb_bidder_rubicon": "rubicon",
-                "hb_deal": "rubicon-dealId3"
+                "hb_deal": "dealId3"
               },
               "events": {
                 "win": "http://localhost:8080/event?t=win&b=bidId3&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3",
