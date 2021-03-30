@@ -130,6 +130,7 @@ cache:
   video-ttl-seconds: 900
 settings:
   enforce-valid-account: true
+  generate-storedrequest-bidrequest-id: true
   database:
     type: mysql
     account-query: SELECT uuid, price_granularity, banner_cache_ttl, video_cache_ttl, events_enabled, enforce_ccpa, tcf_config, analytics_sampling_factor, truncate_target_attr, default_integration, analytics_config, bid_validations, status, config FROM accounts_account where uuid = ? LIMIT 1
