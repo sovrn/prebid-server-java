@@ -1147,8 +1147,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .build())))
                         .set("storedrequest", mapper.valueToTree(ExtStoredRequest.of("storedId1"))))
                 .set("context", mapper.valueToTree(ExtImpContext.of(
-                        null,
-                        null,
                         mapper.createObjectNode()
                                 .put("pbadslot", "pbAdSlot1")
                                 .set("adserver", mapper.createObjectNode()
@@ -1245,7 +1243,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .set("bidder", mapper.createObjectNode()
                                 .<ObjectNode>set("appnexus", mapper.createObjectNode())
                                 .set("rubicon", mapper.createObjectNode())))
-                .set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
+                .set("context", mapper.valueToTree(ExtImpContext.of(impContextDataNode)));
 
         final ObjectNode rubiconExtWithStoredId = mapper.createObjectNode()
                 .<ObjectNode>set("prebid", mapper.createObjectNode()
@@ -1258,7 +1256,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                 .zoneId(987)
                                                 .build())))
                         .set("storedrequest", mapper.valueToTree(ExtStoredRequest.of("storedId1"))))
-                .set("context", mapper.valueToTree(ExtImpContext.of(null, null, impContextDataNode)));
+                .set("context", mapper.valueToTree(ExtImpContext.of(impContextDataNode)));
 
         return BidRequest.builder()
                 .id("bidRequestId")
@@ -1290,8 +1288,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                                                         .siteId(456)
                                                                         .zoneId(789)
                                                                         .build()))))
-                                        .set("context", mapper.valueToTree(ExtImpContext.of(
-                                                null, null, impContextDataNode))))
+                                        .set("context", mapper.valueToTree(ExtImpContext.of(impContextDataNode))))
                                 .build(),
                         Imp.builder().id("impId2")
                                 .video(Video.builder().startdelay(-1).w(100).h(200).build())
