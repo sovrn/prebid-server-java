@@ -51,6 +51,8 @@ adapters:
     enabled: true
   deepintent:
     enabled: true
+  emxdigital:
+    enabled: true
   grid:
     enabled: true
   gumgum:
