@@ -43,6 +43,9 @@ adapters:
     enabled: true
   appnexus:
     enabled: true
+    aliases:
+      districtm:
+        enabled: true
   brightroll:
     enabled: true
   consumable:
@@ -92,6 +95,9 @@ adapters:
     enabled: true
   ttx:
     enabled: true
+    aliases:
+      '33across':
+        enabled: true
   verizonmedia:
     enabled: true
   vrtcal:
