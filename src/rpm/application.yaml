@@ -58,6 +58,13 @@ adapters:
     enabled: true
   grid:
     enabled: true
+    aliases:
+      trustx:
+        enabled: true
+        endpoint: https://grid.bidswitch.net/sp_bid?sp=trustx
+        usersync:
+          redirect-url: /setuid?bidder=trustx&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&uid=${BSW_UUID}?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}
+          cookie-family-name: trustx
   gumgum:
     enabled: true
   improvedigital:
