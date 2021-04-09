@@ -405,18 +405,11 @@ public class CacheServiceTest extends VertxTest {
     public void cacheBidsOpenrtbShouldPerformHttpRequestWithExpectedBody() throws IOException {
         // given
         final String receivedBid2Adm = "adm2";
-        final String lineItemId2 = "lineItemId2";
-        final String generatedId = "generatedId";
-        final String bidder = "bidder2";
-        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), null, BidType.banner, "bidder1",
-                "lineItemId1");
-        final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2").adm(receivedBid2Adm), generatedId,
-                BidType.video, bidder, lineItemId2);
+        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), null, BidType.banner, "bidder1");
+        final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2").adm(receivedBid2Adm), "generatedId",
+                BidType.video, "bidder2");
 
         final EventsContext eventsContext = EventsContext.builder().auctionTimestamp(1000L).build();
-
-        given(vastModifier.createBidVastXml(any(), any(), any(), any(), any(), any(), any())).willReturn(
-                receivedBid2Adm);
 
         // when
         cacheService.cacheBidsOpenrtb(
@@ -435,15 +428,13 @@ public class CacheServiceTest extends VertxTest {
 
         final Bid bid1 = bidInfo1.getBid();
         final Bid bid2 = bidInfo2.getBid();
-        verify(vastModifier).createBidVastXml(bidder, receivedBid2Adm, null, generatedId, ACCOUNT_ID, eventsContext,
-                lineItemId2);
 
         final BidCacheRequest bidCacheRequest = captureBidCacheRequest();
         assertThat(bidCacheRequest.getPuts()).hasSize(3)
                 .containsOnly(
                         PutObject.builder().type("json").value(mapper.valueToTree(bid1)).build(),
                         PutObject.builder().type("json").value(mapper.valueToTree(bid2)).build(),
-                        PutObject.builder().type("xml").value(new TextNode(bid2.getAdm())).build());
+                        PutObject.builder().type("xml").value(new TextNode(receivedBid2Adm)).build());
     }
 
     @Test
@@ -679,16 +670,8 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cacheBidsOpenrtbShouldReturnExpectedResultForVideoBids() {
         // given
-        final String receivedAdm = "adm1";
-        final String bidId = "bidId1";
-        final String bidder = "bidder";
-        final String lineItemId = "lineItemId1";
-        final BidInfo bidInfo = givenBidInfo(bidBuilder -> bidBuilder.id(bidId).adm(receivedAdm), null,
-                BidType.video, bidder, lineItemId);
-
-        given(vastModifier.createBidVastXml(anyString(), anyString(), anyString(), anyString(), anyString(), any(),
-                anyString()))
-                .willReturn(receivedAdm);
+        final BidInfo bidInfo = givenBidInfo(bidBuilder -> bidBuilder.id("bidId1").adm("adm1"), null,
+                BidType.video, "bidder");
 
         // when
         final Future<CacheServiceResult> future = cacheService.cacheBidsOpenrtb(
@@ -700,8 +683,6 @@ public class CacheServiceTest extends VertxTest {
                 eventsContext);
 
         // then
-        verify(vastModifier).createBidVastXml(bidder, receivedAdm, null, bidId, ACCOUNT_ID, eventsContext, lineItemId);
-
         assertThat(future.result().getCacheBids()).hasSize(1)
                 .containsEntry(bidInfo.getBid(), CacheInfo.of(null, "uuid1", null, null));
     }
@@ -715,13 +696,8 @@ public class CacheServiceTest extends VertxTest {
                         CacheObject.of("uuid2"),
                         CacheObject.of("videoUuid1")))));
 
-        final String bidder1 = "bidder1";
-        final String bidId1 = "bidId1";
-        final String lineItemId = "lineItemId1";
-        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id(bidId1), null, BidType.video, bidder1, lineItemId);
+        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), null, BidType.video, "bidder1");
         final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2"), null, BidType.banner, "bidder2");
-
-        given(vastModifier.createBidVastXml(any(), any(), any(), any(), any(), any(), any())).willReturn("modifiedAdm");
 
         // when
         final Future<CacheServiceResult> future = cacheService.cacheBidsOpenrtb(
@@ -734,44 +710,10 @@ public class CacheServiceTest extends VertxTest {
                 eventsContext);
 
         // then
-        verify(vastModifier).createBidVastXml(bidder1, null, null, bidId1, ACCOUNT_ID, eventsContext, lineItemId);
-
         assertThat(future.result().getCacheBids()).hasSize(2)
                 .containsOnly(
                         entry(bidInfo1.getBid(), CacheInfo.of("uuid1", "videoUuid1", null, null)),
                         entry(bidInfo2.getBid(), CacheInfo.of("uuid2", null, null, null)));
-    }
-
-    @Test
-    public void cacheBidsOpenrtbShouldModifyVastXmlWhenVastModifierReturnAdm() throws IOException {
-        // given
-        final String generatedId = "generatedId";
-        final String bidder = "bidder1";
-        final String adm = "adm1";
-        final String lineItemId = "lineItemId1";
-        final BidInfo bidInfo = givenBidInfo(builder -> builder.id("bidId1").adm(adm), generatedId, BidType.video,
-                bidder, lineItemId);
-
-        given(vastModifier.createBidVastXml(any(), any(), any(), any(), any(), any(), any())).willReturn("modifiedAdm");
-
-        // when
-        cacheService.cacheBidsOpenrtb(
-                singletonList(bidInfo),
-                givenAuctionContext(),
-                CacheContext.builder()
-                        .shouldCacheBids(true)
-                        .shouldCacheVideoBids(true)
-                        .build(),
-                eventsContext);
-
-        // then
-        verify(vastModifier).createBidVastXml(bidder, adm, null, generatedId, ACCOUNT_ID, eventsContext, lineItemId);
-
-        final BidCacheRequest bidCacheRequest = captureBidCacheRequest();
-        assertThat(bidCacheRequest.getPuts()).hasSize(2)
-                .containsOnly(
-                        PutObject.builder().type("json").value(mapper.valueToTree(bidInfo.getBid())).build(),
-                        PutObject.builder().type("xml").value(new TextNode("modifiedAdm")).build());
     }
 
     @Test
