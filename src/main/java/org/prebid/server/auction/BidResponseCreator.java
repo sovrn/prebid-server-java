@@ -220,6 +220,12 @@ public class BidResponseCreator {
                 final String generatedBidId = bidIdGenerator.getType() != IdGeneratorType.none
                         ? bidIdGenerator.generateId()
                         : null;
+
+                // If enforceRandomBidId is set, then the bid.id will be overwritten with a decent ~40-char UUID.
+                if (enforceRandomBidId) {
+                    bid.setId(UUID.randomUUID().toString());
+                }
+
                 final String bidId = bid.getId();
                 bidIdToGeneratedBidId.put(bidId, generatedBidId);
 
@@ -270,12 +276,10 @@ public class BidResponseCreator {
                                                            boolean debugEnabled) {
         final BidRequest bidRequest = auctionContext.getBidRequest();
 
-        final List<BidderResponse> updatedBidderResponses = checkAndGenerateBidIds(bidderResponses);
-
         final List<Imp> imps = bidRequest.getImp();
         final TxnLog txnLog = auctionContext.getTxnLog();
         final Map<BidderResponse, List<TargetingBidInfo>> bidderResponseToTargetingBidInfos =
-                toBidderResponseWithTargetingBidInfos(updatedBidderResponses, imps, bidderToMultiBids,
+                toBidderResponseWithTargetingBidInfos(bidderResponses, imps, bidderToMultiBids,
                         bidIdToGeneratedBidId, txnLog);
 
         final Set<BidInfo> bidInfos = bidderResponseToTargetingBidInfos.values().stream()
@@ -559,22 +563,6 @@ public class BidResponseCreator {
 
         return ExtBidResponse.of(extResponseDebug, errors, warnings, responseTimeMillis, bidRequest.getTmax(), null,
                 ExtBidResponsePrebid.of(auctionTimestamp));
-    }
-
-    /**
-     * If enforceRandomBidId is set, then the bid.id will be overwritten with a decent ~40-char UUID.
-     */
-    private List<BidderResponse> checkAndGenerateBidIds(List<BidderResponse> bidderResponses) {
-        if (enforceRandomBidId) {
-            bidderResponses.forEach(bidderResponse -> bidderResponse
-                    .getSeatBid()
-                    .getBids()
-                    .forEach(bidderBid -> bidderBid
-                            .getBid()
-                            .setId(UUID.randomUUID().toString())));
-        }
-
-        return bidderResponses;
     }
 
     private ExtResponseDebug toExtResponseDebug(Collection<BidderResponse> bidderResponses,
