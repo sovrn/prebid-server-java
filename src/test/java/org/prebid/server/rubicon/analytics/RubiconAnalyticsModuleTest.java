@@ -119,10 +119,6 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Mock
     private BidderCatalog bidderCatalog;
     @Mock
-    private Usersyncer rubiconUsersyncer;
-    @Mock
-    private Usersyncer appnexusUsersyncer;
-    @Mock
     private UidsCookieService uidsCookieService;
     @Mock
     private UidsAuditCookieService uidsAuditCookieService;
@@ -145,11 +141,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void setUp() {
         given(bidderCatalog.isValidName("rubicon")).willReturn(true);
         given(bidderCatalog.isValidName("appnexus")).willReturn(true);
-        given(bidderCatalog.usersyncerByName("rubicon")).willReturn(rubiconUsersyncer);
-        given(bidderCatalog.usersyncerByName("appnexus")).willReturn(appnexusUsersyncer);
-
-        given(rubiconUsersyncer.getCookieFamilyName()).willReturn("rubicon");
-        given(appnexusUsersyncer.getCookieFamilyName()).willReturn("appnexus");
+        given(bidderCatalog.usersyncerByName("rubicon")).willReturn(Usersyncer.of("rubicon", null, null));
+        given(bidderCatalog.usersyncerByName("appnexus")).willReturn(Usersyncer.of("appnexus", null, null));
 
         given(uidsCookie.hasLiveUidFrom("rubicon")).willReturn(true);
         given(uidsCookie.hasLiveUidFrom("appnexus")).willReturn(false);

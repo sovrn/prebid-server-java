@@ -352,6 +352,7 @@ public class ApplicationTest extends IntegrationTest {
                                                 + "&gdpr=1&gdpr_consent=" + gdprConsent
                                                 + "&us_privacy=1YNN"
                                                 + "&uid=host-cookie-uid"
+                                                + "&f=i"
                                                 + "&account=",
                                         "redirect", false))
                                 .build(),
