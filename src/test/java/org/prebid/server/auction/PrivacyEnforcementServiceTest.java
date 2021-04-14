@@ -140,9 +140,14 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
 
+        final AuctionContext auctionContext = AuctionContext.builder()
+                .bidRequest(bidRequest)
+                .account(Account.empty("account"))
+                .prebidErrors(new ArrayList<>())
+                .build();
+
         // when
-        final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(
-                bidRequest, Account.empty("account"), null, null, new ArrayList<>(), null);
+        final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(auctionContext);
 
         // then
         FutureAssertion.assertThat(privacyContext).succeededWith(
@@ -174,9 +179,15 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         final String accountId = "account";
         final MetricName requestType = MetricName.openrtb2web;
 
+        final AuctionContext auctionContext = AuctionContext.builder()
+                .bidRequest(bidRequest)
+                .account(Account.empty(accountId))
+                .requestTypeMetric(requestType)
+                .prebidErrors(new ArrayList<>())
+                .build();
+
         // when
-        final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(
-                bidRequest, Account.empty(accountId), requestType, null, new ArrayList<>(), null);
+        final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(auctionContext);
 
         // then
         final Privacy privacy = Privacy.of("1", "consent", Ccpa.of("1YYY"), 0);
@@ -216,9 +227,15 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         given(tcfDefinerService.resolveTcfContext(any(), any(), any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(tcfContext));
 
+        final AuctionContext auctionContext = AuctionContext.builder()
+                .bidRequest(bidRequest)
+                .account(Account.empty("account"))
+                .requestTypeMetric(MetricName.openrtb2web)
+                .prebidErrors(new ArrayList<>())
+                .build();
+
         // when
-        final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(
-                bidRequest, Account.empty("account"), MetricName.openrtb2web, null, new ArrayList<>(), null);
+        final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(auctionContext);
 
         // then
         final Privacy privacy = Privacy.of("1", "consent", Ccpa.of("1YYY"), 0);

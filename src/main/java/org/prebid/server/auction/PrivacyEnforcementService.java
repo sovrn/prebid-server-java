@@ -91,9 +91,13 @@ public class PrivacyEnforcementService {
         this.lmtEnforce = lmtEnforce;
     }
 
-    Future<PrivacyContext> contextFromBidRequest(
-            BidRequest bidRequest, Account account, MetricName requestType, Timeout timeout, List<String> errors,
-            RoutingContext context) {
+    public Future<PrivacyContext> contextFromBidRequest(AuctionContext auctionContext) {
+        final BidRequest bidRequest = auctionContext.getBidRequest();
+        final RoutingContext routingContext = auctionContext.getRoutingContext();
+        final List<String> errors = auctionContext.getPrebidErrors();
+        final Account account = auctionContext.getAccount();
+        final MetricName requestType = auctionContext.getRequestTypeMetric();
+        final Timeout timeout = auctionContext.getTimeout();
 
         final Privacy privacy = privacyExtractor.validPrivacyFrom(bidRequest, errors);
 
@@ -101,7 +105,7 @@ public class PrivacyEnforcementService {
         final String ipAddress = device != null ? device.getIp() : null;
 
         final Geo geo = device != null ? device.getGeo() : null;
-        final String country = getFromRsidCookieIfNull(geo != null ? geo.getCountry() : null, context);
+        final String country = getFromRsidCookieIfNull(geo != null ? geo.getCountry() : null, routingContext);
 
         final String effectiveIpAddress = isCoppaMaskingRequired(privacy) || isLmtEnabled(device)
                 ? ipAddressHelper.maskIpv4(ipAddress)
