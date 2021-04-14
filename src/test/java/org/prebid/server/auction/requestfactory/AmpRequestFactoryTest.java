@@ -78,6 +78,8 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class AmpRequestFactoryTest extends VertxTest {
 
+    private static final String ACCOUNT_ID = "acc_id";
+
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 

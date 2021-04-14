@@ -202,8 +202,8 @@ public class Ortb2RequestFactory {
         return isAccountIdBlank
                 ? responseForEmptyAccount(routingContext)
                 : applicationSettings.getAccountById(accountId, timeout)
-                        .compose(this::ensureAccountActive,
-                                exception -> accountFallback(exception, accountId, routingContext));
+                .compose(this::ensureAccountActive,
+                        exception -> accountFallback(exception, accountId, routingContext));
     }
 
     /**
