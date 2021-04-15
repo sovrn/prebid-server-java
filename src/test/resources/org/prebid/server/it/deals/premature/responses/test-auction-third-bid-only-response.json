@@ -29,7 +29,8 @@
                 "win": "http://localhost:8080/event?t=win&b=bidId3&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3",
                 "imp": "http://localhost:8080/event?t=imp&b=bidId3&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3"
               }
-            }
+            },
+            "origbidcpm": 8.6
           }
         }
       ],
