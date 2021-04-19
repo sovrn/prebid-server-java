@@ -680,9 +680,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
         verifyZeroInteractions(applicationSettings);
 
         assertThat(result.failed()).isTrue();
-        assertThat(result.cause())
-                .isInstanceOf(UnauthorizedAccountException.class)
-                .hasMessage("Unauthorized account id: ");
+        assertThat(result.cause()).hasMessage("error");
     }
 
     @Test
@@ -700,7 +698,8 @@ public class Ortb2RequestFactoryTest extends VertxTest {
         verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
         verifyZeroInteractions(applicationSettings);
 
-        assertThat(result.result().getAccount()).isEqualTo(Account.empty(""));
+        assertThat(result.failed()).isTrue();
+        assertThat(result.cause()).hasMessage("error");
     }
 
     @Test
