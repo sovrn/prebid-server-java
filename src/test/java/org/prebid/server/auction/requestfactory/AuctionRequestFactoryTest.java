@@ -47,6 +47,7 @@ import static java.util.Collections.singletonMap;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -294,8 +295,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
     public void shouldReturnFailedFutureIfOrtb2RequestFactoryReturnedFailedFuture() {
         // given
         givenBidRequest(BidRequest.builder().build());
-        given(ortb2RequestFactory.fetchAccountAndCreateAuctionContext(any(), any(), any(), anyLong(), any()))
-                .willReturn(Future.failedFuture("error"));
+        given(ortb2RequestFactory.fetchAccountAndCreateAuctionContext(any(), any(), any(), anyBoolean(), anyLong(),
+                any())).willReturn(Future.failedFuture("error"));
 
         // when
         final Future<?> future = target.fromRequest(routingContext, 0L);
@@ -317,7 +318,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
         // then
         verify(ortb2RequestFactory).fetchAccountAndCreateAuctionContext(eq(routingContext), eq(bidRequest),
-                eq(MetricName.openrtb2web), anyLong(), any());
+                eq(MetricName.openrtb2web), eq(true), anyLong(), any());
     }
 
     @Test
@@ -332,7 +333,7 @@ public class AuctionRequestFactoryTest extends VertxTest {
 
         // then
         verify(ortb2RequestFactory).fetchAccountAndCreateAuctionContext(eq(routingContext), eq(bidRequest),
-                eq(MetricName.openrtb2app), anyLong(), any());
+                eq(MetricName.openrtb2app), eq(true), anyLong(), any());
     }
 
     @Test
@@ -435,7 +436,8 @@ public class AuctionRequestFactoryTest extends VertxTest {
     }
 
     private void givenAuctionContext(BidRequest bidRequest, Account account) {
-        given(ortb2RequestFactory.fetchAccountAndCreateAuctionContext(any(), any(), any(), anyLong(), any()))
+        given(ortb2RequestFactory.fetchAccountAndCreateAuctionContext(any(), any(), any(), anyBoolean(), anyLong(),
+                any()))
                 .willReturn(Future.succeededFuture(defaultActionContext.toBuilder()
                         .bidRequest(bidRequest)
                         .account(account)
