@@ -251,6 +251,11 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
             return new InvalidRequestException("gdpr_consent is required if gdpr is 1");
         }
 
+        final TcfContext tcfContext = cookieSyncContext.getPrivacyContext().getTcfContext();
+        if (StringUtils.equals(tcfContext.getGdpr(), "1") && BooleanUtils.isFalse(tcfContext.getIsConsentValid())) {
+            return new InvalidRequestException("Consent string is invalid");
+        }
+
         return null;
     }
 
