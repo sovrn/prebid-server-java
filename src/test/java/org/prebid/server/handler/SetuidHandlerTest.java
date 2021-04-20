@@ -267,7 +267,7 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         tcfContext = TcfContext.builder().gdpr("1").isConsentValid(false).build();
-        given(privacyEnforcementService.contextFromSetuidRequest(any(), any(), any()))
+        given(privacyEnforcementService.contextFromSetuidRequest(any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(PrivacyContext.of(null, tcfContext)));
 
         // when

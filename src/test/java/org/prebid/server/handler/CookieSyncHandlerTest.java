@@ -279,7 +279,7 @@ public class CookieSyncHandlerTest extends VertxTest {
                         .gdprConsent("invalid")
                         .build()));
 
-        given(privacyEnforcementService.contextFromCookieSyncRequest(any(), any(), any(), any()))
+        given(privacyEnforcementService.contextFromCookieSyncRequest(any(), any(), any(), any(), any()))
                 .willReturn(Future.succeededFuture(PrivacyContext.of(null,
                         TcfContext.builder().gdpr("1").isConsentValid(false).build())));
 
