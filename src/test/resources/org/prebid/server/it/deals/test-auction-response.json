@@ -41,8 +41,7 @@
                 "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1",
                 "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1"
               }
-            },
-            "origbidcpm": 8.43
+            }
           }
         },
         {
@@ -83,8 +82,7 @@
                 "win": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2",
                 "imp": "http://localhost:8080/event?t=imp&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2"
               }
-            },
-            "origbidcpm": 8.43
+            }
           }
         },
         {
@@ -125,8 +123,7 @@
                 "win": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3",
                 "imp": "http://localhost:8080/event?t=imp&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3"
               }
-            },
-            "origbidcpm": 8.43
+            }
           }
         }
       ],
