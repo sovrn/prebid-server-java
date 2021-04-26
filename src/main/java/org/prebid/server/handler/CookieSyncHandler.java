@@ -685,8 +685,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
             final Privacy privacy = cookieSyncContext.getPrivacyContext().getPrivacy();
             updatedBidderStatuses.add(bidderStatusBuilder(RUBICON_BIDDER) // first item in list
                     .noCookie(true)
-                    .usersync(UsersyncInfoAssembler.from(cookieSyncContext.getUsersyncMethodChooser()
-                            .choose(usersyncer, RUBICON_BIDDER))
+                    .usersync(UsersyncInfoAssembler.from(usersyncer.getPrimaryMethod())
                             .withPrivacy(privacy)
                             .withAccount(accountId)
                             .assemble())
