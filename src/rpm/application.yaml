@@ -94,6 +94,8 @@ adapters:
     enabled: true
   smartadserver:
     enabled: true
+  smartyads:
+    enabled: true
   sovrn:
     enabled: true
   synacormedia:
