@@ -15,7 +15,10 @@ public class BidInfo {
 
     Bid bid;
 
+    // Can be null
     Imp correspondingImp;
+
+    String bidCurrency;
 
     String bidder;
 
@@ -26,6 +29,8 @@ public class BidInfo {
     String lineItemId;
 
     String lineItemSource;
+
+    TargetingInfo targetingInfo;
 
     public String getBidId() {
         return generatedBidId != null ? generatedBidId : bid.getId();
