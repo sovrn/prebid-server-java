@@ -550,8 +550,9 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         assertThat(captor.getValue().entries())
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
                 .containsOnly(
+                        tuple("Content-Type", "application/json;charset=utf-8"),
                         tuple("User-Agent", "userAgent"),
-                        tuple("Content-Type", "application/json;charset=utf-8"));
+                        tuple("X-Forwarded-For", "104.22.41.73"));
     }
 
     @SuppressWarnings("checkstyle:methodlength")
@@ -1151,6 +1152,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                         .connectiontype(17)
                         .lmt(1)
                         .ua("userAgent")
+                        .ip("104.22.41.73")
+                        .ipv6("2606:4700:10::6816:2849")
                         .geo(Geo.builder().country("countryFromRequest").build())
                         .build())
                 .app(App.builder()

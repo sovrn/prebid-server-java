@@ -121,7 +121,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static final String PREBID_EXT = "prebid";
     private static final String BIDDER_EXT = "bidder";
-    private static final String CONTEXT_EXT = "context";
     private static final String PBADSLOT_EXT = "pbadslot";
     private static final String ADSERVER_EXT = "adserver";
     private static final String ADSLOT_EXT = "adSlot";
@@ -262,17 +261,16 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 account, accountId, bidRequest, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
 
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
-            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, requestAccountId);
 
-            postEvent(
-                    toAuctionEvent(
-                            httpContext,
-                            auctionContext,
-                            adUnits,
-                            accountId,
-                            accountSamplingFactor,
-                            this::eventBuilderBase),
-                    isDebugEnabled(bidRequest));
+            final Event event = toAuctionEvent(
+                    httpContext,
+                    auctionContext,
+                    toAdUnits(bidRequest, uidsCookie, bidResponse, requestAccountId),
+                    accountId,
+                    accountSamplingFactor,
+                    this::eventBuilderBase);
+
+            postEvent(event, headers(event, bidRequest), isDebugEnabled(bidRequest));
         }
     }
 
@@ -301,17 +299,16 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 account, accountId, bidRequest, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
 
             final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
-            final List<AdUnit> adUnits = toAdUnits(bidRequest, uidsCookie, bidResponse, storedId, requestAccountId);
 
-            postEvent(
-                    toAuctionEvent(
-                            httpContext,
-                            auctionContext,
-                            adUnits,
-                            accountId,
-                            accountSamplingFactor,
-                            this::eventBuilderBase),
-                    isDebugEnabled(bidRequest));
+            final Event event = toAuctionEvent(
+                    httpContext,
+                    auctionContext,
+                    toAdUnits(bidRequest, uidsCookie, bidResponse, storedId, requestAccountId),
+                    accountId,
+                    accountSamplingFactor,
+                    this::eventBuilderBase);
+
+            postEvent(event, headers(event, bidRequest), isDebugEnabled(bidRequest));
         }
     }
 
@@ -349,7 +346,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 ? makeWinEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration)
                 : makeImpEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration);
 
-        postEvent(event, false);
+        postEvent(event, headers(event), false);
     }
 
     private boolean shouldProcessEvent(Account account,
@@ -1149,7 +1146,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return target != null ? getter.apply(target) : null;
     }
 
-    public static String integrationFrom(BidRequest bidRequest) {
+    private static String integrationFrom(BidRequest bidRequest) {
         final ExtRequest requestExt = bidRequest.getExt();
         final ExtRequestPrebid prebidExt = requestExt != null ? requestExt.getPrebid() : null;
 
@@ -1211,14 +1208,29 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     /**
      * Sends event to analytics service.
      */
-    private void postEvent(Event event, boolean isDebugEnabled) {
+    private void postEvent(Event event, MultiMap headers, boolean isDebugEnabled) {
         final String eventBody = mapper.encode(event);
         if (isDebugEnabled) {
             logger.warn(String.format("Sending analytic event: %s", eventBody));
         }
-        httpClient.post(endpointUrl, headers(event), eventBody, 2000L)
+        httpClient.post(endpointUrl, headers, eventBody, 2000L)
                 .compose(RubiconAnalyticsModule::processResponse)
                 .recover(RubiconAnalyticsModule::failResponse);
+    }
+
+    /**
+     * Returns headers needed for analytic request including headers fetched from {@link BidRequest}.
+     */
+    private static MultiMap headers(Event event, BidRequest bidRequest) {
+        final MultiMap headers = headers(event);
+
+        final Device device = bidRequest.getDevice();
+        if (device != null) {
+            HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.X_FORWARDED_FOR_HEADER,
+                    ObjectUtils.defaultIfNull(device.getIp(), device.getIpv6()));
+        }
+
+        return headers;
     }
 
     /**
