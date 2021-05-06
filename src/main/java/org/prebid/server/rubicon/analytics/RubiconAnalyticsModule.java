@@ -1129,12 +1129,12 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
         final String extIntegration = integrationFrom(bidRequest);
-        final String extWrappername = parseExtParameters(bidRequest).getWrappername();
+        final String extWrapperName = parseExtParameters(bidRequest).getWrappername();
         final String referrerUri = getIfNotNull(bidRequest.getSite(), Site::getPage);
 
         return Event.builder()
                 .integration(StringUtils.isBlank(extIntegration) ? PBS_INTEGRATION : extIntegration)
-                .wrapperName(extWrappername)
+                .wrapperName(extWrapperName)
                 .version(pbsVersion)
                 .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
                 .eventCreator(EventCreator.of(pbsHostname, dataCenterRegion))
@@ -1153,7 +1153,6 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static String integrationFrom(BidRequest bidRequest) {
         final ExtRequest requestExt = bidRequest.getExt();
         final ExtRequestPrebid prebidExt = requestExt != null ? requestExt.getPrebid() : null;
-
         return prebidExt != null ? prebidExt.getIntegration() : null;
     }
 
@@ -1201,12 +1200,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private static String channel(BidRequest bidRequest) {
         final String channel = StringUtils.lowerCase(channelFromRequest(bidRequest));
-
-        if (SUPPORTED_CHANNELS.contains(channel)) {
-            return channel;
-        }
-
-        return OTHER_CHANNEL;
+        return SUPPORTED_CHANNELS.contains(channel) ? channel : OTHER_CHANNEL;
     }
 
     /**
@@ -1250,16 +1244,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
 
     private String resolveIp(Device device) {
         final String ipv4 = getIfNotNull(device, Device::getIp);
-        if (StringUtils.isNotBlank(ipv4)) {
-            return ipAddressHelper.maskIpv4(ipv4);
-        }
-
         final String ipv6 = getIfNotNull(device, Device::getIpv6);
-        if (StringUtils.isNotBlank(ipv6)) {
-            return ipAddressHelper.anonymizeIpv6(ipv6);
-        }
 
-        return null;
+        final String result;
+        if (StringUtils.isNotBlank(ipv4)) {
+            result = ipAddressHelper.maskIpv4(ipv4);
+        } else if (StringUtils.isNotBlank(ipv6)) {
+            result = ipv6;
+        } else {
+            result = null;
+        }
+        return result;
     }
 
     /**

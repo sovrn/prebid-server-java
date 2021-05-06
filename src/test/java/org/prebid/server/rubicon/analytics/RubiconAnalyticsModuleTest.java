@@ -549,6 +549,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         module.processEvent(auctionEvent);
 
         // then
+        verify(ipAddressHelper).maskIpv4(eq("104.22.41.73"));
         final ArgumentCaptor<MultiMap> captor = ArgumentCaptor.forClass(MultiMap.class);
         verify(httpClient).post(anyString(), captor.capture(), any(), anyLong());
 
