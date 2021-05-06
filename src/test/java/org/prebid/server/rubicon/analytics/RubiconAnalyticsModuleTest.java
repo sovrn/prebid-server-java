@@ -32,6 +32,7 @@ import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
@@ -125,6 +126,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Mock
     private CurrencyConversionService currencyService;
     @Mock
+    private IpAddressHelper ipAddressHelper;
+    @Mock
     private UidsCookie uidsCookie;
     @Mock
     private HttpClient httpClient;
@@ -168,14 +171,14 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, false, jacksonMapper);
+                ipAddressHelper, httpClient, false, jacksonMapper);
     }
 
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, PBS_HOST_VENDOR_ID, null,
-                        null, null, null, null, null, false, null))
+                        null, null, null, null, null, null, false, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -474,7 +477,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
-                currencyService, httpClient, false, jacksonMapper);
+                currencyService, ipAddressHelper, httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -510,7 +513,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
-                currencyService, httpClient, false, jacksonMapper);
+                currencyService, ipAddressHelper, httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -534,6 +537,8 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
+        given(ipAddressHelper.maskIpv4(anyString())).willReturn("masked-ip");
+
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .httpContext(httpContext)
                 .auctionContext(givenAuctionContext(sampleAuctionBidRequest(null, null)))
@@ -552,7 +557,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .containsOnly(
                         tuple("Content-Type", "application/json;charset=utf-8"),
                         tuple("User-Agent", "userAgent"),
-                        tuple("X-Forwarded-For", "104.22.41.73"));
+                        tuple("X-Forwarded-For", "masked-ip"));
     }
 
     @SuppressWarnings("checkstyle:methodlength")
@@ -851,7 +856,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                httpClient, false, jacksonMapper);
+                ipAddressHelper, httpClient, false, jacksonMapper);
 
         // when
         module.processEvent(event);

@@ -35,6 +35,7 @@ import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.model.BidderError;
@@ -182,6 +183,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private final UidsCookieService uidsCookieService;
     private final UidsAuditCookieService uidsAuditCookieService;
     private final CurrencyConversionService currencyService;
+    private final IpAddressHelper ipAddressHelper;
     private final HttpClient httpClient;
     private final boolean logEmptyDimensions;
     private final JacksonMapper mapper;
@@ -203,6 +205,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                   UidsCookieService uidsCookieService,
                                   UidsAuditCookieService uidsAuditCookieService,
                                   CurrencyConversionService currencyService,
+                                  IpAddressHelper ipAddressHelper,
                                   HttpClient httpClient,
                                   boolean logEmptyDimensions,
                                   JacksonMapper mapper) {
@@ -217,6 +220,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
         this.currencyService = Objects.requireNonNull(currencyService);
+        this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.httpClient = Objects.requireNonNull(httpClient);
         this.logEmptyDimensions = logEmptyDimensions;
         this.mapper = Objects.requireNonNull(mapper);
@@ -1221,14 +1225,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     /**
      * Returns headers needed for analytic request including headers fetched from {@link BidRequest}.
      */
-    private static MultiMap headers(Event event, BidRequest bidRequest) {
+    private MultiMap headers(Event event, BidRequest bidRequest) {
         final MultiMap headers = headers(event);
 
-        final Device device = bidRequest.getDevice();
-        if (device != null) {
-            HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.X_FORWARDED_FOR_HEADER,
-                    ObjectUtils.defaultIfNull(device.getIp(), device.getIpv6()));
-        }
+        HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.X_FORWARDED_FOR_HEADER,
+                resolveIp(bidRequest.getDevice()));
 
         return headers;
     }
@@ -1245,6 +1246,20 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
             headers.add(HttpUtil.USER_AGENT_HEADER, userAgent);
         }
         return headers;
+    }
+
+    private String resolveIp(Device device) {
+        final String ipv4 = getIfNotNull(device, Device::getIp);
+        if (StringUtils.isNotBlank(ipv4)) {
+            return ipAddressHelper.maskIpv4(ipv4);
+        }
+
+        final String ipv6 = getIfNotNull(device, Device::getIpv6);
+        if (StringUtils.isNotBlank(ipv6)) {
+            return ipAddressHelper.anonymizeIpv6(ipv6);
+        }
+
+        return null;
     }
 
     /**

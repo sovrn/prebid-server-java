@@ -3,6 +3,7 @@ package org.prebid.server.rubicon.spring.config;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
@@ -37,6 +38,7 @@ public class RubiconAnalyticsConfiguration {
                                                   UidsCookieService uidsCookieService,
                                                   UidsAuditCookieService uidsAuditCookieService,
                                                   CurrencyConversionService currencyConversionService,
+                                                  IpAddressHelper ipAddressHelper,
                                                   HttpClient httpClient,
                                                   JacksonMapper mapper) {
 
@@ -54,6 +56,7 @@ public class RubiconAnalyticsConfiguration {
                 uidsCookieService,
                 uidsAuditCookieService,
                 currencyConversionService,
+                ipAddressHelper,
                 httpClient,
                 logEmptyDimensions,
                 mapper);
