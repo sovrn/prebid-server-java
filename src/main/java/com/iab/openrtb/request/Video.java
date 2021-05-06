@@ -1,5 +1,7 @@
 package com.iab.openrtb.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Builder;
 import lombok.Value;
@@ -183,4 +185,10 @@ public class Video {
      * Placeholder for exchange-specific extensions to OpenRTB.
      */
     ObjectNode ext;
+
+    /**
+     * FIXME: This field is very hack for Synacor video issue and should be removed ASAP, details in HB-12166
+     */
+    @JsonProperty("playerSize")
+    JsonNode playerSize;
 }

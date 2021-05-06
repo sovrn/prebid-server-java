@@ -1739,6 +1739,53 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 .withMessage("Prebid-server does not process requests from App ID: bad_app");
     }
 
+    @Test
+    public void shouldUpdateImpVideoSizes() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(singletonList(Imp.builder().video(Video.builder()
+                        .w(640)
+                        .h(480)
+                        .playerSize(mapper.createArrayNode().add(mapper.createArrayNode().add(123).add(456)))
+                        .build()).ext(mapper.createObjectNode()).build()))
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().targeting(ExtRequestTargeting.builder().build()).build()))
+                .build();
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, routingContext, timeoutResolver);
+
+        // then
+        assertThat(singletonList(result))
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getVideo)
+                .extracting(Video::getW, Video::getH, Video::getPlayerSize)
+                .containsOnly(tuple(123, 456, null));
+    }
+
+    @Test
+    public void shouldNotUpdateImpVideoSizesIfPlayerSizeIsInvalid() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .imp(singletonList(Imp.builder().video(Video.builder()
+                        .w(640)
+                        .h(480)
+                        .playerSize(mapper.createArrayNode().add(mapper.createArrayNode()
+                                .add("not_integer").add("not_integer")))
+                        .build()).ext(mapper.createObjectNode()).build()))
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().targeting(ExtRequestTargeting.builder().build()).build()))
+                .build();
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, routingContext, timeoutResolver);
+
+        // then
+        assertThat(singletonList(result))
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getVideo)
+                .extracting(Video::getW, Video::getH, Video::getPlayerSize)
+                .containsOnly(tuple(640, 480, null));
+    }
+
     private void givenImplicitParams(String referer, String domain, String ip, IpAddress.IP ipVersion, String ua) {
         given(paramsExtractor.refererFrom(any())).willReturn(referer);
         given(paramsExtractor.domainFrom(anyString())).willReturn(domain);

@@ -8,6 +8,7 @@ import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.Source;
+import com.iab.openrtb.request.Video;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -15,11 +16,13 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.PriceGranularity;
 import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.auction.model.IpAddress;
+import org.prebid.server.auction.model.Tuple2;
 import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
@@ -410,7 +413,8 @@ public class Ortb2ImplicitParametersResolver {
 
     private boolean shouldModifyImps(List<Imp> imps, Integer secureFromRequest) {
         return imps.stream()
-                .anyMatch(imp -> shouldSetImpSecure(imp, secureFromRequest) || shouldMoveBidderParams(imp));
+                .anyMatch(imp -> shouldUpdateImpVideoSizes(imp) || shouldSetImpSecure(imp, secureFromRequest)
+                        || shouldMoveBidderParams(imp));
     }
 
     private boolean shouldSetImpSecure(Imp imp, Integer secureFromRequest) {
@@ -427,13 +431,16 @@ public class Ortb2ImplicitParametersResolver {
     }
 
     private Imp populateImp(Imp imp, Integer secureFromRequest) {
+        final boolean shouldUpdateImpVideoSizes = shouldUpdateImpVideoSizes(imp);
         final boolean shouldSetSecure = shouldSetImpSecure(imp, secureFromRequest);
         final boolean shouldMoveBidderParams = shouldMoveBidderParams(imp);
 
-        if (shouldSetSecure || shouldMoveBidderParams) {
+        if (shouldUpdateImpVideoSizes || shouldSetSecure || shouldMoveBidderParams) {
+            final Video impVideo = imp.getVideo();
             final ObjectNode impExt = imp.getExt();
 
             return imp.toBuilder()
+                    .video(shouldUpdateImpVideoSizes ? updateImpVideoSizes(impVideo) : impVideo)
                     .secure(shouldSetSecure ? Integer.valueOf(1) : imp.getSecure())
                     .ext(shouldMoveBidderParams ? populateImpExt(impExt) : impExt)
                     .build();
@@ -723,5 +730,62 @@ public class Ortb2ImplicitParametersResolver {
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
         return target != null ? getter.apply(target) : null;
+    }
+
+    private static boolean shouldUpdateImpVideoSizes(Imp imp) {
+        final Video video = imp.getVideo();
+        final JsonNode playerSizeNode = video != null ? video.getPlayerSize() : null;
+        return playerSizeNode != null && !playerSizeNode.isNull();
+    }
+
+    private Video updateImpVideoSizes(Video video) {
+        final Video.VideoBuilder builder = video.toBuilder()
+                .playerSize(null);
+
+        final Tuple2<Integer, Integer> tuple2 = getImpVideoPlayerSizes(video);
+        if (tuple2 != null) {
+            builder
+                    .w(tuple2.getLeft())
+                    .h(tuple2.getRight());
+        }
+
+        return builder.build();
+    }
+
+    private Tuple2<Integer, Integer> getImpVideoPlayerSizes(Video video) {
+        final List<List<Object>> playerSizes = parseImpVideoPlayerSizes(video.getPlayerSize());
+
+        for (List<Object> playerSize : CollectionUtils.emptyIfNull(playerSizes)) {
+
+            if (CollectionUtils.isNotEmpty(playerSize) && playerSize.size() > 1) {
+                final Integer width = toPositiveIntegerOrNull(playerSize.get(0));
+                final Integer height = toPositiveIntegerOrNull(playerSize.get(1));
+
+                if (width != null && height != null) {
+                    //noinspection SuspiciousNameCombination
+                    return Tuple2.of(width, height);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private List<List<Object>> parseImpVideoPlayerSizes(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return null;
+        }
+        try {
+            return mapper.mapper().convertValue(
+                    node, mapper.mapper().getTypeFactory().constructCollectionType(List.class, List.class));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static Integer toPositiveIntegerOrNull(Object o) {
+        final String valueAsString = String.valueOf(o);
+        final int value = NumberUtils.toInt(valueAsString);
+        return value > 0 ? value : null;
     }
 }
