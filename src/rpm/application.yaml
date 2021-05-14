@@ -148,6 +148,7 @@ cache:
   banner-ttl-seconds: 300
   video-ttl-seconds: 900
 settings:
+  generate-storedrequest-bidrequest-id: true
   enforce-valid-account: true
   database:
     type: mysql
