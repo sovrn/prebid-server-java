@@ -20,6 +20,8 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.SetuidEvent;
+import org.prebid.server.auction.ImplicitParametersExtractor;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.PrivacyEnforcementService;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.Usersyncer;
@@ -81,6 +83,10 @@ public class SetuidHandlerTest extends VertxTest {
     private UidsCookieService uidsCookieService;
     @Mock
     private UidsAuditCookieService uidsAuditCookieService;
+    @Mock
+    private ImplicitParametersExtractor implicitParametersExtractor;
+    @Mock
+    private IpAddressHelper ipAddressHelper;
     @Mock
     private ApplicationSettings applicationSettings;
     @Mock
@@ -156,7 +162,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 timeoutFactory,
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
     }
 
     @Test
@@ -171,7 +179,9 @@ public class SetuidHandlerTest extends VertxTest {
                 analyticsReporterDelegator,
                 metrics,
                 timeoutFactory, false,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -315,7 +325,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 new TimeoutFactory(clock),
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
         final PrivacyEnforcementAction privacyEnforcementAction = PrivacyEnforcementAction.restrictAll();
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(
@@ -496,7 +508,9 @@ public class SetuidHandlerTest extends VertxTest {
                 analyticsReporterDelegator,
                 metrics,
                 timeoutFactory, true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
 
         // when
         setuidHandler.handle(routingContext);
@@ -591,7 +605,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())),
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
 
         // when
         setuidHandler.handle(routingContext);
@@ -633,7 +649,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())),
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
 
         // when
         setuidHandler.handle(routingContext);
@@ -674,7 +692,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 new TimeoutFactory(Clock.fixed(Instant.now(), ZoneId.systemDefault())),
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
 
         // when
         setuidHandler.handle(routingContext);
@@ -732,7 +752,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 new TimeoutFactory(clock),
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(false, emptyMap(), null)));
 
@@ -767,7 +789,7 @@ public class SetuidHandlerTest extends VertxTest {
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
                 bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
-                new TimeoutFactory(clock), true, uidsAuditCookieService);
+                new TimeoutFactory(clock), true, uidsAuditCookieService, implicitParametersExtractor, ipAddressHelper);
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(false, emptyMap(), null)));
 
@@ -803,7 +825,7 @@ public class SetuidHandlerTest extends VertxTest {
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
         setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
                 bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
-                new TimeoutFactory(clock), true, uidsAuditCookieService);
+                new TimeoutFactory(clock), true, uidsAuditCookieService, implicitParametersExtractor, ipAddressHelper);
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, emptyMap(), null)));
 
@@ -1055,7 +1077,9 @@ public class SetuidHandlerTest extends VertxTest {
                 metrics,
                 timeoutFactory,
                 true,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
 
         // when
         setuidHandler.handle(routingContext);

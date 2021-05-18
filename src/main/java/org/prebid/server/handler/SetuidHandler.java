@@ -14,7 +14,10 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.SetuidEvent;
+import org.prebid.server.auction.ImplicitParametersExtractor;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.PrivacyEnforcementService;
+import org.prebid.server.auction.model.IpAddress;
 import org.prebid.server.auction.model.SetuidContext;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.UsersyncUtil;
@@ -39,6 +42,7 @@ import org.prebid.server.settings.model.Account;
 import org.prebid.server.util.HttpUtil;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -66,6 +70,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
     private final TimeoutFactory timeoutFactory;
     private final boolean enableCookie;
     private final UidsAuditCookieService uidsAuditCookieService;
+    private final ImplicitParametersExtractor implicitParametersExtractor;
+    private final IpAddressHelper ipAddressHelper;
     private final Map<String, String> cookieNameToSyncType;
 
     public SetuidHandler(long defaultTimeout,
@@ -79,7 +85,9 @@ public class SetuidHandler implements Handler<RoutingContext> {
                          Metrics metrics,
                          TimeoutFactory timeoutFactory,
                          boolean enableCookie,
-                         UidsAuditCookieService uidsAuditCookieService) {
+                         UidsAuditCookieService uidsAuditCookieService,
+                         ImplicitParametersExtractor implicitParametersExtractor,
+                         IpAddressHelper ipAddressHelper) {
 
         this.defaultTimeout = defaultTimeout;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
@@ -92,6 +100,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
         this.enableCookie = enableCookie;
         this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
+        this.implicitParametersExtractor = Objects.requireNonNull(implicitParametersExtractor);
+        this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
 
         cookieNameToSyncType = bidderCatalog.names().stream()
                 .filter(bidderCatalog::isActive)
@@ -271,7 +281,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 final HttpServerRequest request = routingContext.request();
                 final String uid = request.getParam(UID_PARAM);
                 final String gdprConsent = request.getParam(GDPR_CONSENT_PARAM);
-                final String ip = HttpUtil.ipFrom(request);
+                final String ip = resolveIpFromRequest(request);
                 final String country = hostTcfResponse.getCountry();
                 uidsAuditCookie = uidsAuditCookieService
                         .createUidsAuditCookie(routingContext, uid, account, gdprConsent, country, ip);
@@ -284,6 +294,16 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
 
         respondWithCookie(setuidContext, uidsAuditCookie);
+    }
+
+    private String resolveIpFromRequest(HttpServerRequest request) {
+        final List<String> requestIps = implicitParametersExtractor.ipFrom(request);
+        return requestIps.stream()
+                .map(ipAddressHelper::toIpAddress)
+                .filter(Objects::nonNull)
+                .map(IpAddress::getIp)
+                .findFirst()
+                .orElse(null);
     }
 
     private void respondForOtherBidder(SetuidContext setuidContext, HostVendorTcfResponse hostTcfResponse) {
@@ -317,7 +337,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 final HttpServerRequest request = routingContext.request();
                 final String uid = request.getParam(UID_PARAM);
                 final String gdprConsent = request.getParam(GDPR_CONSENT_PARAM);
-                final String ip = HttpUtil.ipFrom(request);
+                final String ip = resolveIpFromRequest(request);
                 final String initiatorId = uidsAudit.getInitiatorId();
                 final String country = hostTcfResponse.getCountry();
                 uidsAuditCookie = uidsAuditCookieService

@@ -14,6 +14,8 @@ import io.vertx.ext.web.handler.StaticHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
+import org.prebid.server.auction.ImplicitParametersExtractor;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.requestfactory.AmpRequestFactory;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
@@ -315,7 +317,9 @@ public class WebConfiguration {
             Metrics metrics,
             TimeoutFactory timeoutFactory,
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
-            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService) {
+            @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
+            ImplicitParametersExtractor implicitParametersExtractor,
+            IpAddressHelper ipAddressHelper) {
 
         return new SetuidHandler(
                 defaultTimeoutMs,
@@ -329,7 +333,9 @@ public class WebConfiguration {
                 metrics,
                 timeoutFactory,
                 enableCookie,
-                uidsAuditCookieService);
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
     }
 
     @Bean
