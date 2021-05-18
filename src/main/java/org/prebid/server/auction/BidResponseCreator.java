@@ -286,11 +286,12 @@ public class BidResponseCreator {
     }
 
     private ObjectNode updateBidExt(Bid bid, String generatedBidId) {
+        final ObjectNode bidExt = bid.getExt();
         if (generatedBidId == null) {
-            return bid.getExt();
+            return bidExt;
         }
 
-        final ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid = getExtPrebid(bid.getExt());
+        final ExtPrebid<ExtBidPrebid, ObjectNode> extPrebid = getExtPrebid(bidExt);
         final ExtBidPrebid extBidPrebid = extPrebid != null ? extPrebid.getPrebid() : null;
         final ExtBidPrebid.ExtBidPrebidBuilder extBidPrebidBuilder = extBidPrebid != null
                 ? extBidPrebid.toBuilder()
@@ -300,8 +301,8 @@ public class BidResponseCreator {
                 .bidid(generatedBidId)
                 .build();
 
-        final ObjectNode extPrebidBidder = extPrebid != null ? extPrebid.getBidder() : null;
-        return mapper.mapper().valueToTree(ExtPrebid.of(modifiedExtBidPrebid, extPrebidBidder));
+        final ObjectNode existingBidExt = bidExt != null ? bidExt : mapper.mapper().createObjectNode();
+        return existingBidExt.set(PREBID_EXT, mapper.mapper().valueToTree(modifiedExtBidPrebid));
     }
 
     /**
