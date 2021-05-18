@@ -161,7 +161,7 @@ public class DealsProcessor {
 
     private Future<GeoInfo> lookupGeoInfo(Device device, Timeout timeout) {
         return geoLocationService != null
-                ? geoLocationService.lookup(device.getIp(), timeout)
+                ? geoLocationService.lookup(ObjectUtils.defaultIfNull(device.getIp(), device.getIpv6()), timeout)
                 : Future.failedFuture("Geo location is disabled by configuration");
     }
 

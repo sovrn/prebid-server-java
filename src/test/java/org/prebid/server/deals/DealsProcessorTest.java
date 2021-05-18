@@ -64,7 +64,9 @@ import static java.util.Collections.singletonList;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class DealsProcessorTest extends VertxTest {
@@ -256,6 +258,23 @@ public class DealsProcessorTest extends VertxTest {
                         .time(ExtUserTime.of(5, 0))
                         .build())
                 .build());
+    }
+
+    @Test
+    public void populateDealsInfoShouldUseForGeoLocationIpV6IfIpV4IsNotDefined() {
+        // given
+        givenResultForLineItemDeviceGeoUserServices();
+
+        final BidRequest bidRequest = givenBidRequest(builder -> builder
+                .imp(singletonList(Imp.builder().ext(mapper.createObjectNode()).build()))
+                .device(Device.builder().ipv6("ipv6").build()));
+        final AuctionContext auctionContext = givenAuctionContext(bidRequest, givenAccount(identity()));
+
+        // when
+        dealsProcessor.populateDealsInfo(auctionContext).result();
+
+        // then
+        verify(geoLocationService).lookup(eq("ipv6"), any());
     }
 
     @Test
