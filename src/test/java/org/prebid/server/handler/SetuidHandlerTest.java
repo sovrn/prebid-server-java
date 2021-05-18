@@ -274,6 +274,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
+        verify(metrics).updateUserSyncTcfInvalidMetric(RUBICON);
         verify(httpResponse).setStatusCode(eq(400));
         verify(httpResponse).end(eq("Invalid request format: Consent string is invalid"));
     }
