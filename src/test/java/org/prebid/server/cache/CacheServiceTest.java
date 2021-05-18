@@ -1,6 +1,7 @@
 package org.prebid.server.cache;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Imp;
@@ -32,7 +33,9 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.proto.openrtb.ext.ExtPrebid;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidPrebid;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.vast.VastModifier;
 import org.prebid.server.vertx.http.HttpClient;
@@ -50,6 +53,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
@@ -211,7 +215,7 @@ public class CacheServiceTest extends VertxTest {
     public void cacheBidsOpenrtbShouldStoreWinUrl() {
         // when
         cacheService.cacheBidsOpenrtb(
-                singletonList(givenBidInfo(builder -> builder.id("bidId1"), null, BidType.banner, "bidder",
+                singletonList(givenBidInfo(builder -> builder.id("bidId1"), BidType.banner, "bidder",
                         "lineItemId")),
                 givenAuctionContext(),
                 CacheContext.builder()
@@ -404,9 +408,12 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cacheBidsOpenrtbShouldPerformHttpRequestWithExpectedBody() throws IOException {
         // given
+        final ObjectNode bidExt2 = mapper.valueToTree(
+                ExtPrebid.of(ExtBidPrebid.builder().bidid("generatedId").build(),
+                        emptyMap()));
         final String receivedBid2Adm = "adm2";
-        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), null, BidType.banner, "bidder1");
-        final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2").adm(receivedBid2Adm), "generatedId",
+        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), BidType.banner, "bidder1");
+        final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2").adm(receivedBid2Adm).ext(bidExt2),
                 BidType.video, "bidder2");
 
         final EventsContext eventsContext = EventsContext.builder().auctionTimestamp(1000L).build();
@@ -670,8 +677,8 @@ public class CacheServiceTest extends VertxTest {
     @Test
     public void cacheBidsOpenrtbShouldReturnExpectedResultForVideoBids() {
         // given
-        final BidInfo bidInfo = givenBidInfo(bidBuilder -> bidBuilder.id("bidId1").adm("adm1"), null,
-                BidType.video, "bidder");
+        final BidInfo bidInfo = givenBidInfo(bidBuilder -> bidBuilder.id("bidId1").adm("adm1"), BidType.video,
+                "bidder");
 
         // when
         final Future<CacheServiceResult> future = cacheService.cacheBidsOpenrtb(
@@ -696,8 +703,8 @@ public class CacheServiceTest extends VertxTest {
                         CacheObject.of("uuid2"),
                         CacheObject.of("videoUuid1")))));
 
-        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), null, BidType.video, "bidder1");
-        final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2"), null, BidType.banner, "bidder2");
+        final BidInfo bidInfo1 = givenBidInfo(builder -> builder.id("bidId1"), BidType.video, "bidder1");
+        final BidInfo bidInfo2 = givenBidInfo(builder -> builder.id("bidId2"), BidType.banner, "bidder2");
 
         // when
         final Future<CacheServiceResult> future = cacheService.cacheBidsOpenrtb(
@@ -825,12 +832,10 @@ public class CacheServiceTest extends VertxTest {
     }
 
     private static BidInfo givenBidInfo(UnaryOperator<Bid.BidBuilder> bidCustomizer,
-                                        String generatedBidId,
                                         BidType bidType,
                                         String bidder) {
         return BidInfo.builder()
                 .bid(bidCustomizer.apply(Bid.builder()).build())
-                .generatedBidId(generatedBidId)
                 .correspondingImp(givenImp(UnaryOperator.identity()))
                 .bidder(bidder)
                 .bidType(bidType)
@@ -838,11 +843,10 @@ public class CacheServiceTest extends VertxTest {
     }
 
     private static BidInfo givenBidInfo(UnaryOperator<Bid.BidBuilder> bidCustomizer,
-                                        String generatedBidId,
                                         BidType bidType,
                                         String bidder,
                                         String lineItemId) {
-        return givenBidInfo(bidCustomizer, generatedBidId, bidType, bidder).toBuilder()
+        return givenBidInfo(bidCustomizer, bidType, bidder).toBuilder()
                 .lineItemId(lineItemId)
                 .build();
     }
