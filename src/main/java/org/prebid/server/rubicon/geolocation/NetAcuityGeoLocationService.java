@@ -88,27 +88,46 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
             return;
         }
 
-        final DbAccessor dbAccessor = DbAccessorFactory.getAccessor(serverAddress, API_ID,
-                Math.toIntExact(remainingTimeout));
         try {
+            final DbAccessor dbAccessor = DbAccessorFactory.getAccessor(serverAddress, API_ID,
+                    Math.toIntExact(remainingTimeout));
+
             final PulseQuery query = dbAccessor.query(PulseQuery.class, lookupAddress);
-            promise.complete(GeoInfo.builder()
-                    .vendor(VENDOR)
-                    .country(query.getTwoLetterCountry())
-                    .region(query.getRegion())
-                    .regionCode(query.getRegionCode())
-                    .city(query.getCity())
-                    .metroNielsen(query.getMetroCode())
-                    .zip(query.getPostalCode())
-                    .connectionSpeed(query.getConnectionSpeed())
-                    .lat(query.getLatitude())
-                    .lon(query.getLongitude())
-                    .timeZone(getTimeZone(query))
-                    .build());
-        } catch (IllegalArgumentException | IOException e) {
+            if (!isResponseValid(query)) {
+                throw new IllegalArgumentException(String.format("Cannot determine geo info for IP: %s", ip));
+            }
+
+            successWith(query, startTime).setHandler(promise);
+        } catch (ArithmeticException | IllegalArgumentException | IOException e) {
             failWith(new PreBidException("Geo location lookup failed", e), startTime).setHandler(promise);
         }
+    }
+
+    /**
+     * In case NAC cannot determine geo info by IP it responds with strange result where country = **.
+     * So, this method guarantees result is valid.
+     */
+    private static boolean isResponseValid(PulseQuery query) {
+        final String country = query.getTwoLetterCountry();
+        return !Objects.equals(country, "**");
+    }
+
+    private Future<GeoInfo> successWith(PulseQuery query, long startTime) {
         metrics.updateRequestTimeMetric(MetricName.geolocation_request_time, responseTime(startTime));
+
+        return Future.succeededFuture(GeoInfo.builder()
+                .vendor(VENDOR)
+                .country(query.getTwoLetterCountry())
+                .region(query.getRegion())
+                .regionCode(query.getRegionCode())
+                .city(query.getCity())
+                .metroNielsen(query.getMetroCode())
+                .zip(query.getPostalCode())
+                .connectionSpeed(query.getConnectionSpeed())
+                .lat(query.getLatitude())
+                .lon(query.getLongitude())
+                .timeZone(getTimeZone(query))
+                .build());
     }
 
     private static ZoneId getTimeZone(PulseQuery query) {
@@ -117,19 +136,17 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
         try {
             return Objects.equals("?", originalTimeZone) ? null : ZoneId.of(capitalizedTimeZone);
         } catch (DateTimeException e) {
-            logger.info(
-                    "Unrecognized time zone from NetAcuity. "
+            logger.info("Unrecognized time zone from NetAcuity. "
                             + "Original designation: [{0}], capitalized designation: [{1}]",
-                    originalTimeZone,
-                    capitalizedTimeZone);
-
+                    originalTimeZone, capitalizedTimeZone);
             return null;
         }
     }
 
     private Future<GeoInfo> failWith(Throwable exception, long startTime) {
-        logger.warn("NetAcuity geo location service error", exception);
         metrics.updateRequestTimeMetric(MetricName.geolocation_request_time, responseTime(startTime));
+
+        logger.warn("NetAcuity geo location service error", exception);
         return Future.failedFuture(exception);
     }
 
@@ -139,5 +156,4 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
     private int responseTime(long startTime) {
         return Math.toIntExact(clock.millis() - startTime);
     }
-
 }
