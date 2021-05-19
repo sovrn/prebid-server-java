@@ -8,6 +8,7 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Pmp;
 import com.iab.openrtb.response.Bid;
 import io.vertx.core.Future;
+import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -59,6 +60,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
     @Mock
     private BidderErrorNotifier bidderErrorNotifier;
     @Mock
+    private RoutingContext routingContext;
+    @Mock
     private LineItemService lineItemService;
 
     @Before
@@ -96,7 +99,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, false);
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+                false);
 
         // then
         assertThat(result.succeeded()).isTrue();
@@ -126,7 +130,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, false);
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+                false);
 
         // then
         assertThat(result.succeeded()).isTrue();
@@ -155,7 +160,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, false);
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+                false);
 
         // then
         assertThat(result.succeeded()).isTrue();
@@ -184,7 +190,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when and then
-        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, false))
+        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, routingContext, false))
                 .isInstanceOf(PreBidException.class)
                 .hasMessageStartingWith("Error decoding bidRequest.imp.pmp.deal.ext:");
     }
@@ -201,7 +207,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, false);
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+                false);
 
         // then
         assertThat(result.succeeded()).isTrue();
@@ -224,7 +231,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, false))
+        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, routingContext, false))
                 .isInstanceOf(PreBidException.class)
                 .hasMessage("Bid rate for line item with id lineItemId2 was not found");
     }

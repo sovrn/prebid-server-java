@@ -7,6 +7,7 @@ import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.Bid;
 import io.vertx.core.Future;
+import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
@@ -69,8 +70,12 @@ public class SimulationAwareHttpBidderRequester extends HttpBidderRequester {
     }
 
     @Override
-    public <T> Future<BidderSeatBid> requestBids(Bidder<T> bidder, BidderRequest bidderRequest, Timeout timeout,
+    public <T> Future<BidderSeatBid> requestBids(Bidder<T> bidder,
+                                                 BidderRequest bidderRequest,
+                                                 Timeout timeout,
+                                                 RoutingContext routingContext,
                                                  boolean debugEnabled) {
+
         final List<Imp> imps = bidderRequest.getBidRequest().getImp();
         final Map<String, Imp> idToImps = imps.stream().collect(Collectors.toMap(Imp::getId, Function.identity()));
         final Map<String, Set<DealInfo>> impsToDealInfo = imps.stream()
@@ -146,15 +151,17 @@ public class SimulationAwareHttpBidderRequester extends HttpBidderRequester {
         try {
             return mapper.mapper().treeToValue(extDeal, ExtDeal.class);
         } catch (JsonProcessingException e) {
-            throw new PreBidException(String.format("Error decoding bidRequest.imp.pmp.deal.ext: %s", e.getMessage()),
-                    e);
+            throw new PreBidException(
+                    String.format("Error decoding bidRequest.imp.pmp.deal.ext: %s", e.getMessage()), e);
         }
     }
 
     @Value
     @AllArgsConstructor(staticName = "of")
     private static class DealInfo {
+
         String dealId;
+
         String lineItemId;
     }
 }
