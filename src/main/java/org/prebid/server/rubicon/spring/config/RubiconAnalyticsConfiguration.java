@@ -49,7 +49,7 @@ public class RubiconAnalyticsConfiguration {
                 properties.getHostUrl(),
                 properties.getSamplingFactor(),
                 versionInfo.getVersion(),
-                HttpUtil.getDomainFromUrl(externalUrl),
+                HttpUtil.getHostFromUrl(externalUrl),
                 properties.getHostVendorId(),
                 dataCenterRegion,
                 bidderCatalog,

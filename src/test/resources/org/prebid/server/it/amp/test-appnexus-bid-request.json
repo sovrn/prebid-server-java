@@ -29,7 +29,8 @@
     "domain": "google.com",
     "page": "https://google.com",
     "publisher": {
-      "id": "888"
+      "id": "888",
+      "domain": "google.com"
     },
     "ext": {
       "amp": 1
