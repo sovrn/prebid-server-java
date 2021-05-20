@@ -366,7 +366,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                                        Map<Integer, Long> accountToEventCount,
                                        AtomicLong globalEventCount) {
 
-        if (!isChannelSupported(bidRequest, account)) {
+        if (!isChannelSupported(bidRequest, account) || isClientAnalytics(bidRequest)) {
             return false;
         }
 
@@ -381,7 +381,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private boolean isChannelSupported(BidRequest bidRequest, Account account) {
+    private static boolean isChannelSupported(BidRequest bidRequest, Account account) {
         final AccountAnalyticsConfig analyticsConfig = ObjectUtils.defaultIfNull(
                 account.getAnalyticsConfig(), AccountAnalyticsConfig.fallback());
         final Map<String, Boolean> channelConfig = analyticsConfig.getAuctionEvents();
@@ -393,6 +393,23 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .findFirst()
                 .map(entry -> BooleanUtils.isTrue(entry.getValue()))
                 .orElse(Boolean.FALSE);
+    }
+
+    private boolean isClientAnalytics(BidRequest bidRequest) {
+        final ExtRequest extRequest = bidRequest.getExt();
+        final ExtRequestPrebid extPrebid = extRequest != null ? extRequest.getPrebid() : null;
+        final ObjectNode analytics = extPrebid != null ? extPrebid.getAnalytics() : null;
+        final JsonNode rubiconAnalyticsNode = isNotEmptyNode(analytics) ? analytics.get(name()) : null;
+        final JsonNode clientAnalyticNode = isNotEmptyNode(rubiconAnalyticsNode)
+                ? rubiconAnalyticsNode.get("client-analytics") : null;
+
+        return clientAnalyticNode != null
+                && clientAnalyticNode.isBoolean()
+                && clientAnalyticNode.booleanValue();
+    }
+
+    private static boolean isNotEmptyNode(JsonNode node) {
+        return node != null && !node.isEmpty();
     }
 
     private static String channelFromRequest(BidRequest bidRequest) {
@@ -468,7 +485,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private boolean isDebugEnabled(BidRequest bidRequest) {
+    private static boolean isDebugEnabled(BidRequest bidRequest) {
         final ExtRequest ext = bidRequest.getExt();
         final ExtRequestPrebid prebid = ext != null ? ext.getPrebid() : null;
         final Integer debug = prebid != null ? prebid.getDebug() : null;
@@ -651,7 +668,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 .orElse(null);
     }
 
-    private Map<String, Map<String, BigDecimal>> requestCurrencyRates(ExtRequest extRequest) {
+    private static Map<String, Map<String, BigDecimal>> requestCurrencyRates(ExtRequest extRequest) {
         final ExtRequestPrebid prebid = extRequest != null
                 ? extRequest.getPrebid()
                 : null;
@@ -856,13 +873,13 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private Params paramsFromPrebid(ExtImpRubicon impExt) {
+    private static Params paramsFromPrebid(ExtImpRubicon impExt) {
         return impExt != null
                 ? Params.of(impExt.getAccountId(), impExt.getSiteId(), impExt.getZoneId())
                 : Params.empty();
     }
 
-    private String storedRequestId(ExtImpPrebid impPrebid) {
+    private static String storedRequestId(ExtImpPrebid impPrebid) {
         final ExtStoredRequest storedRequest = impPrebid != null ? impPrebid.getStoredrequest() : null;
         return storedRequest != null ? storedRequest.getId() : null;
     }
@@ -992,7 +1009,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         }
     }
 
-    private String pbAdSlotFromExtImp(ExtImp extImp) {
+    private static String pbAdSlotFromExtImp(ExtImp extImp) {
         return getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
                 ExtImp::getContext),
                 ExtImpContext::getData),
@@ -1000,7 +1017,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 pbadslotNode -> pbadslotNode.isTextual() ? pbadslotNode.textValue() : null);
     }
 
-    private Gam gamFromExtImp(ExtImp extImp) {
+    private static Gam gamFromExtImp(ExtImp extImp) {
         final ObjectNode adserverNode = getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
                 ExtImp::getContext),
                 ExtImpContext::getData),
@@ -1074,7 +1091,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 : globalSamplingFactor;
     }
 
-    private Gdpr gdpr(AuctionContext auctionContext) {
+    private static Gdpr gdpr(AuctionContext auctionContext) {
         final PrivacyContext privacyContext = auctionContext.getPrivacyContext();
         final TcfContext tcfContext = privacyContext.getTcfContext();
         final BidRequest bidRequest = auctionContext.getBidRequest();
@@ -1194,7 +1211,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 : null;
     }
 
-    private String countryFrom(Device device) {
+    private static String countryFrom(Device device) {
         final Geo geo = device != null ? device.getGeo() : null;
         return geo != null ? geo.getCountry() : null;
     }

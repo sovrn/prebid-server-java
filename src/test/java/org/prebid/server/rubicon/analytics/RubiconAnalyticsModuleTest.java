@@ -1,6 +1,7 @@
 package org.prebid.server.rubicon.analytics;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.App;
 import com.iab.openrtb.request.Banner;
@@ -106,6 +107,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
@@ -113,6 +115,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
     private static final String HOST_URL = "http://host-url";
     private static final int PBS_HOST_VENDOR_ID = 52;
+    private static final String ADAPTER_NAME = "rubicon";
 
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
@@ -186,6 +189,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     public void vendorIdShouldReturnPassedVendorId() {
         // expected
         assertThat(module.vendorId()).isEqualTo(PBS_HOST_VENDOR_ID);
+    }
+
+    @Test
+    public void nameShouldReturnAnalyticCode() {
+        // expected
+        assertThat(module.name()).isEqualTo(ADAPTER_NAME);
     }
 
     @Test
@@ -301,6 +310,84 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                                 .site(Site.builder().build())
                                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                                         .channel(ExtRequestPrebidChannel.of("web"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(emptyList())
+                        .build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processAuctionEventShouldNotProcessClientAnalyticsRequest() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final ObjectNode analyticNode = mapper.createObjectNode();
+        final ObjectNode rubiconNode = mapper.createObjectNode();
+        rubiconNode.set("client-analytics", BooleanNode.valueOf(true));
+        analyticNode.set(module.name(), rubiconNode);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(emptyList())
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .analytics(analyticNode)
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(emptyList())
+                        .build())
+                .build();
+
+        // when
+        module.processEvent(auctionEvent);
+
+        // then
+        verify(httpClient, never()).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processAuctionEventShouldProcessNotClientAnalyticsRequest() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final ObjectNode analyticNode = mapper.createObjectNode();
+        final ObjectNode rubiconNode = mapper.createObjectNode();
+        rubiconNode.set("client-analytics", BooleanNode.valueOf(false));
+        analyticNode.set(module.name(), rubiconNode);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(emptyList())
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .analytics(analyticNode)
                                         .build()))
                                 .build())
                         .account(Account.builder()
