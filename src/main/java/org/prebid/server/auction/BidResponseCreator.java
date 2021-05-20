@@ -250,13 +250,13 @@ public class BidResponseCreator {
                 ? bidIdGenerator.generateId()
                 : null;
 
-        final String enforcedRandomBidId = generatedBidId == null && enforceRandomBidId
-                ? UUID.randomUUID().toString()
-                : generatedBidId;
+        final String enforcedRandomBidId = enforceRandomBidId ? UUID.randomUUID().toString() : bid.getId();
+        final String eventBidId = ObjectUtils.defaultIfNull(generatedBidId, enforcedRandomBidId);
 
         return bid.toBuilder()
-                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, enforcedRandomBidId, imps))
-                .ext(updateBidExt(bid, enforcedRandomBidId))
+                .id(enforcedRandomBidId)
+                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, eventBidId, imps))
+                .ext(updateBidExt(bid, generatedBidId))
                 .build();
     }
 
@@ -265,7 +265,7 @@ public class BidResponseCreator {
                                 String bidder,
                                 Account account,
                                 EventsContext eventsContext,
-                                String generatedBidId,
+                                String eventBidId,
                                 List<Imp> imps) {
 
         final Imp correspondingImp = correspondingImp(bid, imps);
@@ -278,7 +278,7 @@ public class BidResponseCreator {
                 bidder,
                 bidAdm,
                 bid.getNurl(),
-                ObjectUtils.defaultIfNull(generatedBidId, bid.getId()),
+                eventBidId,
                 account.getId(),
                 eventsContext,
                 lineItemId)
