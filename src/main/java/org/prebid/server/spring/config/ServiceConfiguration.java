@@ -217,6 +217,7 @@ public class ServiceConfiguration {
             TimeoutFactory timeoutFactory,
             StoredRequestProcessor storedRequestProcessor,
             ApplicationSettings applicationSettings,
+            IpAddressHelper ipAddressHelper,
             @Autowired(required = false) DealsProcessor dealsProcessor,
             Clock clock,
             JacksonMapper mapper) {
@@ -232,6 +233,7 @@ public class ServiceConfiguration {
                 timeoutFactory,
                 storedRequestProcessor,
                 applicationSettings,
+                ipAddressHelper,
                 dealsProcessor,
                 clock,
                 mapper);

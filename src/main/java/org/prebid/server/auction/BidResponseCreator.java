@@ -345,7 +345,6 @@ public class BidResponseCreator {
         final ExtDealLine extDealLine = LineItemUtil.extDealLineFrom(bid, correspondingImp, mapper);
         final String lineItemId = extDealLine != null ? extDealLine.getLineItemId() : null;
         final String lineItemSource = extDealLine != null ? extDealLine.getBidder() : null;
-
         return BidInfo.builder()
                 .bid(bid)
                 .bidType(type)

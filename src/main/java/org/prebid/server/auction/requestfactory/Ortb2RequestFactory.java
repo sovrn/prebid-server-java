@@ -17,9 +17,11 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.StoredRequestProcessor;
 import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.auction.model.AuctionContext;
+import org.prebid.server.auction.model.IpAddress;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.deals.DealsProcessor;
 import org.prebid.server.deals.model.DeepDebugLog;
@@ -78,11 +80,12 @@ public class Ortb2RequestFactory {
     private final List<String> blacklistedAccounts;
     private final UidsCookieService uidsCookieService;
     private final RequestValidator requestValidator;
+    private final TimeoutResolver timeoutResolver;
     private final TimeoutFactory timeoutFactory;
     private final StoredRequestProcessor storedRequestProcessor;
     private final ApplicationSettings applicationSettings;
     private final DealsProcessor dealsProcessor;
-    private final TimeoutResolver timeoutResolver;
+    private final IpAddressHelper ipAddressHelper;
     private final Clock clock;
     private final JacksonMapper mapper;
 
@@ -94,6 +97,7 @@ public class Ortb2RequestFactory {
                                TimeoutFactory timeoutFactory,
                                StoredRequestProcessor storedRequestProcessor,
                                ApplicationSettings applicationSettings,
+                               IpAddressHelper ipAddressHelper,
                                DealsProcessor dealsProcessor,
                                Clock clock,
                                JacksonMapper mapper) {
@@ -104,8 +108,9 @@ public class Ortb2RequestFactory {
         this.requestValidator = Objects.requireNonNull(requestValidator);
         this.timeoutResolver = Objects.requireNonNull(timeoutResolver);
         this.timeoutFactory = Objects.requireNonNull(timeoutFactory);
-        this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
+        this.applicationSettings = Objects.requireNonNull(applicationSettings);
+        this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.dealsProcessor = dealsProcessor;
         this.clock = Objects.requireNonNull(clock);
         this.mapper = Objects.requireNonNull(mapper);
@@ -474,21 +479,30 @@ public class Ortb2RequestFactory {
 
     private Device enrichDevice(Device device, PrivacyContext privacyContext) {
         final String ipAddress = privacyContext.getIpAddress();
-        final String country = getIfNotNull(privacyContext.getTcfContext().getGeoInfo(), GeoInfo::getCountry);
+        final IpAddress ip = ipAddressHelper.toIpAddress(ipAddress);
 
-        final String ipAddressInRequest = getIfNotNull(device, Device::getIp);
+        final String ipV4InRequest = getIfNotNull(device, Device::getIp);
+        final String ipV4 = ip != null && ip.getVersion() == IpAddress.IP.v4 ? ipAddress : null;
+        final boolean shouldUpdateIpV4 = ipV4 != null && !Objects.equals(ipV4InRequest, ipV4);
+
+        final String ipV6InRequest = getIfNotNull(device, Device::getIpv6);
+        final String ipV6 = ip != null && ip.getVersion() == IpAddress.IP.v6 ? ipAddress : null;
+        final boolean shouldUpdateIpV6 = ipV6 != null && !Objects.equals(ipV6InRequest, ipV6);
 
         final Geo geo = getIfNotNull(device, Device::getGeo);
-        final String countryFromRequest = getIfNotNull(geo, Geo::getCountry);
+        final String countryInRequest = getIfNotNull(geo, Geo::getCountry);
+        final String country = getIfNotNull(privacyContext.getTcfContext().getGeoInfo(), GeoInfo::getCountry);
+        final boolean shouldUpdateCountry = country != null && !Objects.equals(countryInRequest, country);
 
-        final boolean shouldUpdateIp = ipAddress != null && !Objects.equals(ipAddressInRequest, ipAddress);
-        final boolean shouldUpdateCountry = country != null && !Objects.equals(countryFromRequest, country);
-
-        if (shouldUpdateIp || shouldUpdateCountry) {
+        if (shouldUpdateIpV4 || shouldUpdateIpV6 || shouldUpdateCountry) {
             final Device.DeviceBuilder deviceBuilder = device != null ? device.toBuilder() : Device.builder();
 
-            if (shouldUpdateIp) {
-                deviceBuilder.ip(ipAddress);
+            if (shouldUpdateIpV4) {
+                deviceBuilder.ip(ipV4);
+            }
+
+            if (shouldUpdateIpV6) {
+                deviceBuilder.ipv6(ipV6);
             }
 
             if (shouldUpdateCountry) {
