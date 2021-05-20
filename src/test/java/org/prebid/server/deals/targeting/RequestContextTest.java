@@ -11,6 +11,7 @@ import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Native;
+import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Segment;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
@@ -47,11 +48,31 @@ public class RequestContextTest extends VertxTest {
     }
 
     @Test
-    public void lookupStringShouldReturnDomain() {
+    public void lookupStringShouldReturnDomainFromSite() {
         // given
         final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.domain);
         final RequestContext context =
-                new RequestContext(request(r -> r.site(site(s -> s.domain("domain.com")))), imp(identity()), txnLog,
+                new RequestContext(
+                        request(r -> r.site(site(s -> s
+                                .domain("domain.com")
+                                .publisher(Publisher.builder().domain("anotherdomain.com").build())))),
+                        imp(identity()),
+                        txnLog,
+                        jacksonMapper);
+
+        // when and then
+        assertThat(context.lookupString(category)).isEqualTo("domain.com");
+    }
+
+    @Test
+    public void lookupStringShouldReturnDomainFromSitePublisher() {
+        // given
+        final TargetingCategory category = new TargetingCategory(TargetingCategory.Type.domain);
+        final RequestContext context =
+                new RequestContext(
+                        request(r -> r.site(site(s -> s.publisher(Publisher.builder().domain("domain.com").build())))),
+                        imp(identity()),
+                        txnLog,
                         jacksonMapper);
 
         // when and then

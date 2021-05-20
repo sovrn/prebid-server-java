@@ -8,6 +8,7 @@ import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Device;
 import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Imp;
+import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Segment;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
@@ -79,7 +80,9 @@ public class RequestContext {
         final TargetingCategory.Type type = category.type();
         switch (type) {
             case domain:
-                return getIfNotNull(bidRequest.getSite(), Site::getDomain);
+                return org.apache.commons.lang3.ObjectUtils.firstNonNull(
+                        getIfNotNull(bidRequest.getSite(), Site::getDomain),
+                        getIfNotNull(getIfNotNull(bidRequest.getSite(), Site::getPublisher), Publisher::getDomain));
             case referrer:
                 return getIfNotNull(bidRequest.getSite(), Site::getPage);
             case appBundle:
