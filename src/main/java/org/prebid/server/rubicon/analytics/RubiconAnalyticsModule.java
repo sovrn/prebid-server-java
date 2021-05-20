@@ -118,6 +118,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
     private static final ConditionalLogger conditionalLogger = new ConditionalLogger(logger);
 
+    private static final String ADAPTER_NAME = "rubicon";
     private static final String EVENT_PATH = "/event";
 
     private static final String PREBID_EXT = "prebid";
@@ -240,6 +241,11 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     @Override
     public int vendorId() {
         return pbsHostVendorId;
+    }
+
+    @Override
+    public String name() {
+        return ADAPTER_NAME;
     }
 
     private void processAuctionEvent(AuctionEvent auctionEvent) {
