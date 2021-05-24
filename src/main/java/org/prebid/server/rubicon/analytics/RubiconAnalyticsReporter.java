@@ -113,9 +113,9 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class RubiconAnalyticsModule implements AnalyticsReporter {
+public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
-    private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsModule.class);
+    private static final Logger logger = LoggerFactory.getLogger(RubiconAnalyticsReporter.class);
     private static final ConditionalLogger conditionalLogger = new ConditionalLogger(logger);
 
     private static final String ADAPTER_NAME = "rubicon";
@@ -196,20 +196,20 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private final Map<Integer, Long> accountToAmpEventCount = new ConcurrentHashMap<>();
     private final Map<Integer, Long> accountToNotificationEventCount = new ConcurrentHashMap<>();
 
-    public RubiconAnalyticsModule(String endpointUrl,
-                                  Integer globalSamplingFactor,
-                                  String pbsVersion,
-                                  String pbsHostname,
-                                  Integer pbsHostVendorId,
-                                  String dataCenterRegion,
-                                  BidderCatalog bidderCatalog,
-                                  UidsCookieService uidsCookieService,
-                                  UidsAuditCookieService uidsAuditCookieService,
-                                  CurrencyConversionService currencyService,
-                                  IpAddressHelper ipAddressHelper,
-                                  HttpClient httpClient,
-                                  boolean logEmptyDimensions,
-                                  JacksonMapper mapper) {
+    public RubiconAnalyticsReporter(String endpointUrl,
+                                    Integer globalSamplingFactor,
+                                    String pbsVersion,
+                                    String pbsHostname,
+                                    Integer pbsHostVendorId,
+                                    String dataCenterRegion,
+                                    BidderCatalog bidderCatalog,
+                                    UidsCookieService uidsCookieService,
+                                    UidsAuditCookieService uidsAuditCookieService,
+                                    CurrencyConversionService currencyService,
+                                    IpAddressHelper ipAddressHelper,
+                                    HttpClient httpClient,
+                                    boolean logEmptyDimensions,
+                                    JacksonMapper mapper) {
 
         this.endpointUrl = HttpUtil.validateUrl(Objects.requireNonNull(endpointUrl) + EVENT_PATH);
         this.globalSamplingFactor = globalSamplingFactor;
@@ -228,13 +228,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     }
 
     @Override
-    public <T> void processEvent(T event) {
+    public <T> Future<Void> processEvent(T event) {
         if (event instanceof AuctionEvent) {
-            processAuctionEvent((AuctionEvent) event);
+            return processAuctionEvent((AuctionEvent) event);
         } else if (event instanceof AmpEvent) {
-            processAmpEvent((AmpEvent) event);
+            return processAmpEvent((AmpEvent) event);
         } else if (event instanceof NotificationEvent) {
-            processNotificationEvent((NotificationEvent) event);
+            return processNotificationEvent((NotificationEvent) event);
+        } else {
+            return Future.succeededFuture(); // adapter doesn't need to care of all event types
         }
     }
 
@@ -248,10 +250,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         return ADAPTER_NAME;
     }
 
-    private void processAuctionEvent(AuctionEvent auctionEvent) {
+    private Future<Void> processAuctionEvent(AuctionEvent auctionEvent) {
         final AuctionContext auctionContext = auctionEvent.getAuctionContext();
         if (auctionContext == null) { // this can happen when exception is thrown while processing
-            return;
+            return Future.failedFuture("Exception is thrown while auction processing");
         }
 
         final HttpContext httpContext = auctionEvent.getHttpContext();
@@ -260,7 +262,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final BidResponse bidResponse = auctionEvent.getBidResponse();
 
         if (httpContext == null || bidRequest == null || account == null || bidResponse == null) {
-            return;
+            return Future.failedFuture("Necessary data is missing while auction processing");
         }
 
         final String requestAccountId = account.getId();
@@ -280,14 +282,15 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                     accountSamplingFactor,
                     this::eventBuilderBase);
 
-            postEvent(event, headers(event, bidRequest), isDebugEnabled(bidRequest));
+            return postEvent(event, headers(event, bidRequest), isDebugEnabled(bidRequest));
         }
+        return Future.succeededFuture();
     }
 
-    private void processAmpEvent(AmpEvent ampEvent) {
+    private Future<Void> processAmpEvent(AmpEvent ampEvent) {
         final AuctionContext auctionContext = ampEvent.getAuctionContext();
         if (auctionContext == null) { // this can happen when exception is thrown while processing
-            return;
+            return Future.failedFuture("Exception is thrown while amp processing");
         }
 
         final HttpContext httpContext = ampEvent.getHttpContext();
@@ -296,7 +299,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
         final BidResponse bidResponse = ampEvent.getBidResponse();
 
         if (httpContext == null || bidRequest == null || account == null || bidResponse == null) {
-            return;
+            return Future.failedFuture("Necessary data is missing while amp processing");
         }
 
         final String requestAccountId = account.getId();
@@ -318,16 +321,17 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                     accountSamplingFactor,
                     this::eventBuilderBase);
 
-            postEvent(event, headers(event, bidRequest), isDebugEnabled(bidRequest));
+            return postEvent(event, headers(event, bidRequest), isDebugEnabled(bidRequest));
         }
+        return Future.succeededFuture();
     }
 
-    private void processNotificationEvent(NotificationEvent notificationEvent) {
+    private Future<Void> processNotificationEvent(NotificationEvent notificationEvent) {
         final String bidId = notificationEvent.getBidId();
         final Account account = notificationEvent.getAccount();
         final HttpContext httpContext = notificationEvent.getHttpContext();
         if (bidId == null || account == null || httpContext == null) {
-            return;
+            return Future.failedFuture("Necessary data is missing while event processing");
         }
 
         final Integer accountId = parseId(account.getId());
@@ -340,10 +344,10 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
             final long eventCount = accountToNotificationEventCount.compute(accountId,
                     (ignored, oldValue) -> oldValue == null ? 1L : oldValue + 1);
             if (eventCount % samplingFactor != 0) {
-                return;
+                return Future.succeededFuture();
             }
         } else {
-            return;
+            return Future.succeededFuture();
         }
 
         final String bidder = notificationEvent.getBidder();
@@ -356,7 +360,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
                 ? makeWinEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration)
                 : makeImpEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration);
 
-        postEvent(event, headers(event), false);
+        return postEvent(event, headers(event), false);
     }
 
     private boolean shouldProcessEvent(Account account,
@@ -923,7 +927,7 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     private String videoAdFormatFromImp(Imp imp, List<TwinBids> bids) {
         final boolean hasRubiconBid = bids.stream()
                 .map(TwinBids::getAnalyticsBid)
-                .anyMatch(RubiconAnalyticsModule::isRubiconVideoBid);
+                .anyMatch(RubiconAnalyticsReporter::isRubiconVideoBid);
 
         return videoAdFormat(imp, hasRubiconBid);
     }
@@ -1229,14 +1233,14 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
     /**
      * Sends event to analytics service.
      */
-    private void postEvent(Event event, MultiMap headers, boolean isDebugEnabled) {
+    private Future<Void> postEvent(Event event, MultiMap headers, boolean isDebugEnabled) {
         final String eventBody = mapper.encode(event);
         if (isDebugEnabled) {
             logger.warn(String.format("Sending analytic event: %s", eventBody));
         }
-        httpClient.post(endpointUrl, headers, eventBody, 2000L)
-                .compose(RubiconAnalyticsModule::processResponse)
-                .recover(RubiconAnalyticsModule::failResponse);
+        return httpClient.post(endpointUrl, headers, eventBody, 2000L)
+                .compose(RubiconAnalyticsReporter::processResponse)
+                .recover(RubiconAnalyticsReporter::failResponse);
     }
 
     /**
@@ -1287,10 +1291,9 @@ public class RubiconAnalyticsModule implements AnalyticsReporter {
      */
     private static Future<Void> processResponse(HttpClientResponse response) {
         final int statusCode = response.getStatusCode();
-        if (statusCode < 200 || statusCode > 299) {
-            throw new PreBidException(String.format("HTTP status code %d", statusCode));
-        }
-        return Future.succeededFuture();
+        return statusCode < 200 || statusCode > 299
+                ? Future.failedFuture(new PreBidException(String.format("HTTP status code %d", statusCode)))
+                : Future.succeededFuture();
     }
 
     /**

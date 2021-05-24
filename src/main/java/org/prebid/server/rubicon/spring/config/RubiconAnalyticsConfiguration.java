@@ -8,7 +8,7 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.json.JacksonMapper;
-import org.prebid.server.rubicon.analytics.RubiconAnalyticsModule;
+import org.prebid.server.rubicon.analytics.RubiconAnalyticsReporter;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.util.VersionInfo;
@@ -30,22 +30,22 @@ public class RubiconAnalyticsConfiguration {
 
     @Bean
     @Primary
-    RubiconAnalyticsModule rubiconAnalyticsModule(@Value("${external-url}") String externalUrl,
-                                                  @Value("${datacenter-region}") String dataCenterRegion,
-                                                  RubiconAnalyticsModuleProperties properties,
-                                                  VersionInfo versionInfo,
-                                                  BidderCatalog bidderCatalog,
-                                                  UidsCookieService uidsCookieService,
-                                                  UidsAuditCookieService uidsAuditCookieService,
-                                                  CurrencyConversionService currencyConversionService,
-                                                  IpAddressHelper ipAddressHelper,
-                                                  HttpClient httpClient,
-                                                  JacksonMapper mapper) {
+    RubiconAnalyticsReporter rubiconAnalyticsReporter(@Value("${external-url}") String externalUrl,
+                                                      @Value("${datacenter-region}") String dataCenterRegion,
+                                                      RubiconAnalyticsReporterProperties properties,
+                                                      VersionInfo versionInfo,
+                                                      BidderCatalog bidderCatalog,
+                                                      UidsCookieService uidsCookieService,
+                                                      UidsAuditCookieService uidsAuditCookieService,
+                                                      CurrencyConversionService currencyConversionService,
+                                                      IpAddressHelper ipAddressHelper,
+                                                      HttpClient httpClient,
+                                                      JacksonMapper mapper) {
 
         final AnalyticsLogs analyticsLogs = properties.getLog();
         final boolean logEmptyDimensions = analyticsLogs != null && analyticsLogs.emptyDimensions;
 
-        return new RubiconAnalyticsModule(
+        return new RubiconAnalyticsReporter(
                 properties.getHostUrl(),
                 properties.getSamplingFactor(),
                 versionInfo.getVersion(),
@@ -79,7 +79,7 @@ public class RubiconAnalyticsConfiguration {
     @Validated
     @Data
     @NoArgsConstructor
-    private static class RubiconAnalyticsModuleProperties {
+    private static class RubiconAnalyticsReporterProperties {
 
         @NotBlank
         private String hostUrl;

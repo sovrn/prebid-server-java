@@ -111,7 +111,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
-public class RubiconAnalyticsModuleTest extends VertxTest {
+public class RubiconAnalyticsReporterTest extends VertxTest {
 
     private static final String HOST_URL = "http://host-url";
     private static final int PBS_HOST_VENDOR_ID = 52;
@@ -135,7 +135,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Mock
     private HttpClient httpClient;
 
-    private RubiconAnalyticsModule module;
+    private RubiconAnalyticsReporter reporter;
     @Mock
     private RoutingContext routingContext;
     @Mock
@@ -172,7 +172,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         httpContext = HttpContext.builder().cookies(emptyMap()).build();
 
-        module = new RubiconAnalyticsModule(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
+        reporter = new RubiconAnalyticsReporter(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
                 ipAddressHelper, httpClient, false, jacksonMapper);
     }
@@ -180,21 +180,22 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void creationShouldFailOnInvalidEndpointUrl() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> new RubiconAnalyticsModule("invalid_url", null, null, null, PBS_HOST_VENDOR_ID, null,
-                        null, null, null, null, null, null, false, null))
+                .isThrownBy(
+                        () -> new RubiconAnalyticsReporter("invalid_url", null, null, null, PBS_HOST_VENDOR_ID, null,
+                                null, null, null, null, null, null, false, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
     @Test
     public void vendorIdShouldReturnPassedVendorId() {
         // expected
-        assertThat(module.vendorId()).isEqualTo(PBS_HOST_VENDOR_ID);
+        assertThat(reporter.vendorId()).isEqualTo(PBS_HOST_VENDOR_ID);
     }
 
     @Test
     public void nameShouldReturnAnalyticCode() {
         // expected
-        assertThat(module.name()).isEqualTo(ADAPTER_NAME);
+        assertThat(reporter.name()).isEqualTo(ADAPTER_NAME);
     }
 
     @Test
@@ -205,9 +206,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        final Future<Void> future = reporter.processEvent(auctionEvent);
 
         // then
+        assertThat(future.failed()).isTrue();
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -220,9 +222,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        final Future<Void> future = reporter.processEvent(auctionEvent);
 
         // then
+        assertThat(future.failed()).isTrue();
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -237,9 +240,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        final Future<Void> future = reporter.processEvent(auctionEvent);
 
         // then
+        assertThat(future.failed()).isTrue();
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -255,9 +259,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        final Future<Void> future = reporter.processEvent(auctionEvent);
 
         // then
+        assertThat(future.failed()).isTrue();
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -274,9 +279,10 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        final Future<Void> future = reporter.processEvent(auctionEvent);
 
         // then
+        assertThat(future.failed()).isTrue();
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -291,10 +297,49 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        final Future<Void> future = reporter.processEvent(auctionEvent);
 
         // then
+        assertThat(future.failed()).isTrue();
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+    }
+
+    @Test
+    public void processEventShouldRespondWithErrorIfHttpClientFails() {
+        // given
+        givenHttpClientProducesException(new RuntimeException("error"));
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .httpContext(httpContext)
+                .auctionContext(givenAuctionContext(sampleAuctionBidRequest(null, null)))
+                .bidResponse(sampleBidResponse())
+                .build();
+
+        // when
+        final Future<Void> future = reporter.processEvent(auctionEvent);
+
+        // then
+        assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).hasMessage("error");
+    }
+
+    @Test
+    public void processEventShouldRespondWithErrorIfHttpClientRespondsWithNot200Status() {
+        // given
+        givenHttpClientReturnsResponse(500, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .httpContext(httpContext)
+                .auctionContext(givenAuctionContext(sampleAuctionBidRequest(null, null)))
+                .bidResponse(sampleBidResponse())
+                .build();
+
+        // when
+        final Future<Void> future = reporter.processEvent(auctionEvent);
+
+        // then
+        assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).hasMessage("HTTP status code 500");
     }
 
     @Test
@@ -324,7 +369,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         verify(httpClient).post(anyString(), any(), any(), anyLong());
@@ -338,7 +383,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final ObjectNode analyticNode = mapper.createObjectNode();
         final ObjectNode rubiconNode = mapper.createObjectNode();
         rubiconNode.set("client-analytics", BooleanNode.valueOf(true));
-        analyticNode.set(module.name(), rubiconNode);
+        analyticNode.set(reporter.name(), rubiconNode);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
@@ -363,7 +408,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         verify(httpClient, never()).post(anyString(), any(), any(), anyLong());
@@ -377,7 +422,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final ObjectNode analyticNode = mapper.createObjectNode();
         final ObjectNode rubiconNode = mapper.createObjectNode();
         rubiconNode.set("client-analytics", BooleanNode.valueOf(false));
-        analyticNode.set(module.name(), rubiconNode);
+        analyticNode.set(reporter.name(), rubiconNode);
 
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
@@ -402,7 +447,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         verify(httpClient).post(anyString(), any(), any(), anyLong());
@@ -443,7 +488,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         final ArgumentCaptor<String> bodyArgumentCaptor = ArgumentCaptor.forClass(String.class);
@@ -494,7 +539,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         final ArgumentCaptor<String> bodyArgumentCaptor = ArgumentCaptor.forClass(String.class);
@@ -545,7 +590,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         final ArgumentCaptor<String> bodyArgumentCaptor = ArgumentCaptor.forClass(String.class);
@@ -562,7 +607,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processAuctionEventShouldUseGlobalSamplingFactor() {
         // given
-        module = new RubiconAnalyticsModule(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
+        reporter = new RubiconAnalyticsReporter(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
                 currencyService, ipAddressHelper, httpClient, false, jacksonMapper);
 
@@ -588,7 +633,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         for (int i = 0; i < 10; i++) {
-            module.processEvent(auctionEvent);
+            reporter.processEvent(auctionEvent);
         }
 
         // then
@@ -598,7 +643,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
     @Test
     public void processAuctionEventShouldUseAccountSamplingFactorOverGlobal() {
         // given
-        module = new RubiconAnalyticsModule(HOST_URL, 100, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
+        reporter = new RubiconAnalyticsReporter(HOST_URL, 100, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
                 currencyService, ipAddressHelper, httpClient, false, jacksonMapper);
 
@@ -612,7 +657,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         for (int i = 0; i < 10; i++) {
-            module.processEvent(auctionEvent);
+            reporter.processEvent(auctionEvent);
         }
 
         // then
@@ -633,7 +678,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(auctionEvent);
+        reporter.processEvent(auctionEvent);
 
         // then
         verify(ipAddressHelper).maskIpv4(eq("104.22.41.73"));
@@ -664,7 +709,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(event);
+        reporter.processEvent(event);
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
@@ -830,7 +875,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(event);
+        reporter.processEvent(event);
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
@@ -879,7 +924,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(event);
+        reporter.processEvent(event);
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
@@ -924,7 +969,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
 
         // when
         for (int i = 0; i < 10; i++) {
-            module.processEvent(event);
+            reporter.processEvent(event);
         }
 
         // then
@@ -942,12 +987,12 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .httpContext(httpContext)
                 .build();
 
-        module = new RubiconAnalyticsModule(HOST_URL, null, null, "pbsHostname", PBS_HOST_VENDOR_ID,
+        reporter = new RubiconAnalyticsReporter(HOST_URL, null, null, "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
                 ipAddressHelper, httpClient, false, jacksonMapper);
 
         // when
-        module.processEvent(event);
+        reporter.processEvent(event);
 
         // then
         verifyZeroInteractions(httpClient);
@@ -961,7 +1006,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(ampEvent);
+        reporter.processEvent(ampEvent);
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -976,7 +1021,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(ampEvent);
+        reporter.processEvent(ampEvent);
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -993,7 +1038,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(ampEvent);
+        reporter.processEvent(ampEvent);
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -1011,7 +1056,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(ampEvent);
+        reporter.processEvent(ampEvent);
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -1030,7 +1075,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(ampEvent);
+        reporter.processEvent(ampEvent);
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -1047,7 +1092,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(ampEvent);
+        reporter.processEvent(ampEvent);
 
         // then
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
@@ -1068,7 +1113,7 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
                 .build();
 
         // when
-        module.processEvent(event);
+        reporter.processEvent(event);
 
         // then
         final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
@@ -1529,6 +1574,11 @@ public class RubiconAnalyticsModuleTest extends VertxTest {
         final HttpClientResponse httpClientResponse = HttpClientResponse.of(statusCode, null, response);
         given(httpClient.post(anyString(), any(), any(), anyLong()))
                 .willReturn(Future.succeededFuture(httpClientResponse));
+    }
+
+    private void givenHttpClientProducesException(Throwable throwable) {
+        given(httpClient.post(anyString(), any(), any(), anyLong()))
+                .willReturn(Future.failedFuture(throwable));
     }
 
     private AuctionContext givenAuctionContext(BidRequest bidRequest, Integer samplingFactor) {
