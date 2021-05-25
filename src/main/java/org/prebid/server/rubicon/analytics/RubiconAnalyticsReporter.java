@@ -402,9 +402,9 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private boolean isClientAnalytics(BidRequest bidRequest) {
         final ExtRequest extRequest = bidRequest.getExt();
         final ExtRequestPrebid extPrebid = extRequest != null ? extRequest.getPrebid() : null;
-        final ObjectNode analytics = extPrebid != null ? extPrebid.getAnalytics() : null;
-        final JsonNode rubiconAnalyticsNode = isNotEmptyNode(analytics) ? analytics.get(name()) : null;
-        final JsonNode clientAnalyticNode = isNotEmptyNode(rubiconAnalyticsNode)
+        final JsonNode analytics = extPrebid != null ? extPrebid.getAnalytics() : null;
+        final JsonNode rubiconAnalyticsNode = isNotEmptyObjectNode(analytics) ? analytics.get(name()) : null;
+        final JsonNode clientAnalyticNode = isNotEmptyObjectNode(rubiconAnalyticsNode)
                 ? rubiconAnalyticsNode.get("client-analytics") : null;
 
         return clientAnalyticNode != null
@@ -412,8 +412,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                 && clientAnalyticNode.booleanValue();
     }
 
-    private static boolean isNotEmptyNode(JsonNode node) {
-        return node != null && !node.isEmpty();
+    private static boolean isNotEmptyObjectNode(JsonNode analytics) {
+        return analytics != null && analytics.isObject() && !analytics.isEmpty();
     }
 
     private static String channelFromRequest(BidRequest bidRequest) {
