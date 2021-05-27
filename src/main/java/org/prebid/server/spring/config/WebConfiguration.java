@@ -14,15 +14,15 @@ import io.vertx.ext.web.handler.StaticHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
+import org.prebid.server.auction.AmpResponsePostProcessor;
+import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.ImplicitParametersExtractor;
 import org.prebid.server.auction.IpAddressHelper;
-import org.prebid.server.auction.requestfactory.AmpRequestFactory;
-import org.prebid.server.auction.AmpResponsePostProcessor;
-import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
-import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.PrivacyEnforcementService;
-import org.prebid.server.auction.requestfactory.VideoRequestFactory;
 import org.prebid.server.auction.VideoResponseFactory;
+import org.prebid.server.auction.requestfactory.AmpRequestFactory;
+import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
+import org.prebid.server.auction.requestfactory.VideoRequestFactory;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cache.CacheService;
 import org.prebid.server.cookie.UidsCookieService;
@@ -123,6 +123,7 @@ public class WebConfiguration {
                 .setHandle100ContinueAutomatically(true)
                 .setMaxHeaderSize(maxHeaderSize)
                 .setCompressionSupported(true)
+                .setDecompressionSupported(true)
                 .setIdleTimeout(10); // kick off long processing requests
 
         if (ssl) {
