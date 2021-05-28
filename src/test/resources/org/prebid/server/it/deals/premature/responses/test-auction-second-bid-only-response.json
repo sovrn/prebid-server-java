@@ -213,7 +213,7 @@
           "prebid": {
             "auctiontimestamp": 1000,
             "debug": 1,
-            "trace": 1,
+            "trace": "verbose",
             "targeting": {
               "pricegranularity": {
                 "precision": 2,

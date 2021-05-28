@@ -416,7 +416,7 @@
         "ext": {
           "prebid": {
             "debug": 1,
-            "trace": 1,
+            "trace": "verbose",
             "targeting": {
               "pricegranularity": {
                 "precision": 2,

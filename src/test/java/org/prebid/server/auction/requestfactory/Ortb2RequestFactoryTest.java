@@ -48,6 +48,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtPublisherPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
+import org.prebid.server.proto.openrtb.ext.request.TraceLevel;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
@@ -743,7 +744,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 .imp(emptyList())
                 .site(Site.builder().publisher(Publisher.builder().id(ACCOUNT_ID).build()).build())
                 .ext(ExtRequest.of(
-                        ExtRequestPrebid.builder().trace(1).build()))
+                        ExtRequestPrebid.builder().trace(TraceLevel.verbose).build()))
                 .build();
 
         // when

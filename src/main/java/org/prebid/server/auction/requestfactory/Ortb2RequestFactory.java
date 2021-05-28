@@ -43,6 +43,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtPublisherPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
+import org.prebid.server.proto.openrtb.ext.request.TraceLevel;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.Account;
@@ -571,7 +572,7 @@ public class Ortb2RequestFactory {
      */
     private static boolean isDeepDebugEnabled(ExtRequest extRequest) {
         final ExtRequestPrebid extRequestPrebid = extRequest != null ? extRequest.getPrebid() : null;
-        return extRequestPrebid != null && Objects.equals(extRequestPrebid.getTrace(), 1);
+        return extRequestPrebid != null && extRequestPrebid.getTrace() == TraceLevel.verbose;
     }
 
     private static boolean isObjectNode(JsonNode node) {
