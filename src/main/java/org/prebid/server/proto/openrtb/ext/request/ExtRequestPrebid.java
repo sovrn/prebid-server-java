@@ -26,7 +26,7 @@ public class ExtRequestPrebid {
     /**
      * Defines the contract for bidrequest.ext.prebid.trace
      */
-    Integer trace;
+    TraceLevel trace;
 
     /**
      * Defines the contract for bidrequest.ext.prebid.aliases
