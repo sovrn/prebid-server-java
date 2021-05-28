@@ -22,7 +22,7 @@ import org.prebid.server.auction.StoredResponseProcessor;
 import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.auction.VideoResponseFactory;
 import org.prebid.server.auction.VideoStoredRequestProcessor;
-import org.prebid.server.auction.WinningBidComparator;
+import org.prebid.server.auction.WinningBidComparatorFactory;
 import org.prebid.server.auction.requestfactory.AmpRequestFactory;
 import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
 import org.prebid.server.auction.requestfactory.Ortb2ImplicitParametersResolver;
@@ -519,7 +519,7 @@ public class ServiceConfiguration {
             VastModifier vastModifier,
             EventsService eventsService,
             StoredRequestProcessor storedRequestProcessor,
-            WinningBidComparator winningBidComparator,
+            WinningBidComparatorFactory winningBidComparatorFactory,
             IdGenerator bidIdGenerator,
             @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
             @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
@@ -532,7 +532,7 @@ public class ServiceConfiguration {
                 vastModifier,
                 eventsService,
                 storedRequestProcessor,
-                winningBidComparator,
+                winningBidComparatorFactory,
                 bidIdGenerator,
                 truncateAttrChars,
                 enforceRandomBidId,
@@ -604,8 +604,8 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    WinningBidComparator winningBidComparator() {
-        return new WinningBidComparator();
+    WinningBidComparatorFactory winningBidComparatorFactory() {
+        return new WinningBidComparatorFactory();
     }
 
     @Bean
