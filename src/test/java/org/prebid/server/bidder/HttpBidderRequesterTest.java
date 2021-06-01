@@ -636,7 +636,7 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(singletonList(httpRequest), null));
 
-        given(httpClient.request(any(), anyString(), any(), (String) any(), anyLong()))
+        given(httpClient.request(any(), anyString(), any(), anyString(), anyLong()))
                 // bidder request
                 .willReturn(Future.failedFuture(new TimeoutException("Timeout exception")));
 

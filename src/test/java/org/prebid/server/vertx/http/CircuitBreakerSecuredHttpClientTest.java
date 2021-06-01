@@ -197,7 +197,7 @@ public class CircuitBreakerSecuredHttpClientTest {
     @Test
     public void circuitBreakerNumberGaugeShouldReportActualNumber(TestContext context) {
         // when
-        doRequest("http://www.some-host-1.com:80/path", context);
+        doRequest(context);
 
         // then
         final ArgumentCaptor<LongSupplier> gaugeValueProviderCaptor = ArgumentCaptor.forClass(LongSupplier.class);
@@ -213,12 +213,12 @@ public class CircuitBreakerSecuredHttpClientTest {
         givenHttpClientReturning(new RuntimeException("exception"));
 
         // when
-        doRequest("http://www.some-host-1.com:80/path", context);
+        doRequest(context);
 
         // then
         final ArgumentCaptor<BooleanSupplier> gaugeValueProviderCaptor = ArgumentCaptor.forClass(BooleanSupplier.class);
         verify(metrics).createHttpClientCircuitBreakerGauge(
-                eq("http_www_some_host_1_com_80"),
+                eq("http_url"),
                 gaugeValueProviderCaptor.capture());
         final BooleanSupplier gaugeValueProvider = gaugeValueProviderCaptor.getValue();
 
@@ -231,15 +231,15 @@ public class CircuitBreakerSecuredHttpClientTest {
         givenHttpClientReturning(new RuntimeException("exception"), HttpClientResponse.of(200, null, null));
 
         // when
-        doRequest("http://www.some-host-1.com:80/path", context); // 1 call
-        doRequest("http://www.some-host-1.com:80/path", context); // 2 call
+        doRequest(context); // 1 call
+        doRequest(context); // 2 call
         doWaitForClosingInterval(context);
-        doRequest("http://www.some-host-1.com:80/path", context); // 3 call
+        doRequest(context); // 3 call
 
         // then
         final ArgumentCaptor<BooleanSupplier> gaugeValueProviderCaptor = ArgumentCaptor.forClass(BooleanSupplier.class);
         verify(metrics).createHttpClientCircuitBreakerGauge(
-                eq("http_www_some_host_1_com_80"),
+                eq("http_url"),
                 gaugeValueProviderCaptor.capture());
         final BooleanSupplier gaugeValueProvider = gaugeValueProviderCaptor.getValue();
 
@@ -259,8 +259,8 @@ public class CircuitBreakerSecuredHttpClientTest {
         }
     }
 
-    private Future<HttpClientResponse> doRequest(String url, TestContext context) {
-        final Future<HttpClientResponse> future = httpClient.request(HttpMethod.GET, url, null, (String) null,
+    private Future<HttpClientResponse> doRequest(TestContext context) {
+        final Future<HttpClientResponse> future = httpClient.request(HttpMethod.GET, "http://url", null, (String) null,
                 0L);
 
         final Async async = context.async();
@@ -268,10 +268,6 @@ public class CircuitBreakerSecuredHttpClientTest {
         async.await();
 
         return future;
-    }
-
-    private Future<HttpClientResponse> doRequest(TestContext context) {
-        return doRequest("http://url", context);
     }
 
     private void doWaitForOpeningInterval(TestContext context) {
