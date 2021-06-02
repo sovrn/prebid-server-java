@@ -81,8 +81,8 @@ public class RequestContext {
         switch (type) {
             case domain:
                 return org.apache.commons.lang3.ObjectUtils.firstNonNull(
-                        getIfNotNull(bidRequest.getSite(), Site::getDomain),
-                        getIfNotNull(getIfNotNull(bidRequest.getSite(), Site::getPublisher), Publisher::getDomain));
+                        getIfNotNull(getIfNotNull(bidRequest.getSite(), Site::getPublisher), Publisher::getDomain),
+                        getIfNotNull(bidRequest.getSite(), Site::getDomain));
             case referrer:
                 return getIfNotNull(bidRequest.getSite(), Site::getPage);
             case appBundle:

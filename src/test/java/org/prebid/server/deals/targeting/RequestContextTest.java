@@ -54,8 +54,8 @@ public class RequestContextTest extends VertxTest {
         final RequestContext context =
                 new RequestContext(
                         request(r -> r.site(site(s -> s
-                                .domain("domain.com")
-                                .publisher(Publisher.builder().domain("anotherdomain.com").build())))),
+                                .domain("anotherdomain.com")
+                                .publisher(Publisher.builder().domain("domain.com").build())))),
                         imp(identity()),
                         txnLog,
                         jacksonMapper);
