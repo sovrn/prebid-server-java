@@ -8,6 +8,7 @@ import io.vertx.core.logging.LoggerFactory;
 import net.digitalenvoy.netacuity.api.DbAccessor;
 import net.digitalenvoy.netacuity.api.DbAccessorFactory;
 import net.digitalenvoy.netacuity.api.PulseQuery;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.WordUtils;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
@@ -83,8 +84,8 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
         try {
             lookupAddress = InetAddress.getByName(ip);
         } catch (UnknownHostException e) {
-            failWith(new PreBidException(String.format("Invalid IP address to lookup: %s", ip), e), startTime)
-                    .setHandler(promise);
+            final String message = String.format("Invalid IP address to lookup: %s", ip);
+            failWith(new PreBidException(message, e), startTime).setHandler(promise);
             return;
         }
 
@@ -93,23 +94,23 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
                     Math.toIntExact(remainingTimeout));
 
             final PulseQuery query = dbAccessor.query(PulseQuery.class, lookupAddress);
-            if (!isResponseValid(query)) {
-                throw new IllegalArgumentException(String.format("Cannot determine geo info for IP: %s", ip));
+            if (isValidResponse(query)) {
+                successWith(query, startTime).setHandler(promise);
+            } else {
+                fallbackWithEmpty(ip, startTime).setHandler(promise);
             }
-
-            successWith(query, startTime).setHandler(promise);
         } catch (ArithmeticException | IllegalArgumentException | IOException e) {
             failWith(new PreBidException("Geo location lookup failed", e), startTime).setHandler(promise);
         }
     }
 
     /**
-     * In case NAC cannot determine geo info by IP it responds with strange result where country = **.
+     * In case NAC cannot determine geo info by IP it responds with strange result where country = ** or similar.
      * So, this method guarantees result is valid.
      */
-    private static boolean isResponseValid(PulseQuery query) {
+    private static boolean isValidResponse(PulseQuery query) {
         final String country = query.getTwoLetterCountry();
-        return !Objects.equals(country, "**");
+        return StringUtils.length(country) == 2 && StringUtils.isAlpha(country);
     }
 
     private Future<GeoInfo> successWith(PulseQuery query, long startTime) {
@@ -143,10 +144,17 @@ public class NetAcuityGeoLocationService implements GeoLocationService {
         }
     }
 
+    private Future<GeoInfo> fallbackWithEmpty(String ip, long startTime) {
+        metrics.updateRequestTimeMetric(MetricName.geolocation_request_time, responseTime(startTime));
+        logger.warn("Cannot determine geo info for IP: {0}", ip);
+
+        return Future.succeededFuture(GeoInfo.builder().vendor(VENDOR).build());
+    }
+
     private Future<GeoInfo> failWith(Throwable exception, long startTime) {
         metrics.updateRequestTimeMetric(MetricName.geolocation_request_time, responseTime(startTime));
+        logger.warn("NetAcuity geo location service error: {0}", exception.getMessage());
 
-        logger.warn("NetAcuity geo location service error", exception);
         return Future.failedFuture(exception);
     }
 
