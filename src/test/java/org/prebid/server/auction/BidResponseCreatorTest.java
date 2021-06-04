@@ -403,7 +403,8 @@ public class BidResponseCreatorTest extends VertxTest {
                 .build();
 
         final String modifiedAdm = "modifiedAdm";
-        given(vastModifier.createBidVastXml(any(), any(), any(), any(), any(), any(), any())).willReturn(modifiedAdm);
+        given(vastModifier.createBidVastXml(any(), any(), any(), any(), any(), any(), any(), any())).willReturn(
+                modifiedAdm);
 
         // just a stub to get through method call chain
         givenCacheServiceResult(singletonMap(bid1, CacheInfo.empty()));
@@ -418,7 +419,9 @@ public class BidResponseCreatorTest extends VertxTest {
                 .auctionTimestamp(1000L)
                 .build();
 
-        verify(vastModifier).createBidVastXml(bidder1, null, BID_NURL, bidId1, accountId, expectedEventContext, null);
+        verify(vastModifier)
+                .createBidVastXml(eq(bidder1), eq(null), eq(BID_NURL), eq(bidId1),
+                        eq(accountId), eq(expectedEventContext), eq(emptyList()), eq(null));
 
         final ArgumentCaptor<List<BidInfo>> bidInfoCaptor = ArgumentCaptor.forClass(List.class);
         verify(cacheService).cacheBidsOpenrtb(
@@ -455,13 +458,15 @@ public class BidResponseCreatorTest extends VertxTest {
                 BidderResponse.of(bidder, givenSeatBid(BidderBid.of(bid, video, "USD")), 100));
 
         final String modifiedVast = "modifiedVast";
-        given(vastModifier.createBidVastXml(anyString(), anyString(), anyString(), anyString(), anyString(), any(),
-                any()))
+        given(vastModifier
+                .createBidVastXml(anyString(), anyString(), anyString(), anyString(), anyString(), any(),
+                        any(), any()))
                 .willReturn(modifiedVast);
 
         // when
         final BidResponse bidResponse =
-                bidResponseCreator.create(bidderResponses, auctionContext, CACHE_INFO, MULTI_BIDS, false).result();
+                bidResponseCreator
+                        .create(bidderResponses, auctionContext, CACHE_INFO, MULTI_BIDS, false).result();
 
         // then
         assertThat(bidResponse.getSeatbid())
@@ -469,8 +474,9 @@ public class BidResponseCreatorTest extends VertxTest {
                 .extracting(Bid::getAdm)
                 .containsOnly(modifiedVast);
 
-        verify(vastModifier).createBidVastXml(eq(bidder), eq(BID_ADM), eq(BID_NURL), eq(bidId), eq("accountId"), any(),
-                any());
+        verify(vastModifier)
+                .createBidVastXml(eq(bidder), eq(BID_ADM), eq(BID_NURL), eq(bidId), eq("accountId"), any(),
+                        any(), any());
     }
 
     @Test
@@ -532,8 +538,8 @@ public class BidResponseCreatorTest extends VertxTest {
         final AuctionContext auctionContext = givenAuctionContext(givenBidRequest(givenImp()));
 
         // when
-        final BidResponse bidResponse = bidResponseCreator.create(emptyList(), auctionContext, null, MULTI_BIDS,
-                false).result();
+        final BidResponse bidResponse = bidResponseCreator
+                .create(emptyList(), auctionContext, null, MULTI_BIDS, false).result();
 
         // then
         assertThat(bidResponse).returns(0, BidResponse::getNbr);

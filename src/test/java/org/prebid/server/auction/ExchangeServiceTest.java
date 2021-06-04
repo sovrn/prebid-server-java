@@ -1083,7 +1083,8 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         final ArgumentCaptor<List<BidderResponse>> bidderResponsesCaptor = ArgumentCaptor.forClass(List.class);
-        verify(bidResponseCreator).create(bidderResponsesCaptor.capture(), any(), any(), any(), anyBoolean());
+        verify(bidResponseCreator)
+                .create(bidderResponsesCaptor.capture(), any(), any(), any(), anyBoolean());
         final List<BidderResponse> bidderResponses = bidderResponsesCaptor.getValue();
 
         assertThat(bidderResponses)
@@ -1122,7 +1123,8 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         final ArgumentCaptor<List<BidderResponse>> bidderResponsesCaptor = ArgumentCaptor.forClass(List.class);
-        verify(bidResponseCreator).create(bidderResponsesCaptor.capture(), any(), any(), any(), anyBoolean());
+        verify(bidResponseCreator)
+                .create(bidderResponsesCaptor.capture(), any(), any(), any(), anyBoolean());
         final List<BidderResponse> bidderResponses = bidderResponsesCaptor.getValue();
 
         assertThat(bidderResponses)

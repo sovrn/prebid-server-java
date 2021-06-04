@@ -180,6 +180,7 @@ public class BidResponseCreator {
         final List<Imp> imps = bidRequest.getImp();
         final long auctionTimestamp = auctionTimestamp(auctionContext);
         final Account account = auctionContext.getAccount();
+        final List<String> debugWarnings = auctionContext.getDebugWarnings();
 
         final EventsContext eventsContext = EventsContext.builder()
                 .enabledForAccount(eventsEnabledForAccount(auctionContext))
@@ -188,7 +189,8 @@ public class BidResponseCreator {
                 .integration(integrationFrom(auctionContext))
                 .build();
 
-        final List<BidderResponse> modifiedBidderResponses = updateBids(bidderResponses, account, eventsContext, imps);
+        final List<BidderResponse> modifiedBidderResponses =
+                updateBids(bidderResponses, account, eventsContext, debugWarnings, imps);
 
         final List<BidderResponseInfo> bidderResponseInfos = toBidderResponseInfos(modifiedBidderResponses, imps);
 
@@ -221,6 +223,7 @@ public class BidResponseCreator {
     private List<BidderResponse> updateBids(List<BidderResponse> bidderResponses,
                                             Account account,
                                             EventsContext eventsContext,
+                                            List<String> debugWarnings,
                                             List<Imp> imps) {
         final List<BidderResponse> result = new ArrayList<>();
         for (BidderResponse bidderResponse : bidderResponses) {
@@ -231,7 +234,8 @@ public class BidResponseCreator {
             for (BidderBid bidderBid : seatBid.getBids()) {
                 final Bid receivedBid = bidderBid.getBid();
                 final BidType bidType = bidderBid.getType();
-                final Bid modifiedBid = updateBid(receivedBid, bidType, bidder, account, eventsContext, imps);
+                final Bid modifiedBid = updateBid(receivedBid, bidType, bidder, account, eventsContext, debugWarnings,
+                        imps);
                 modifiedBidderBids.add(bidderBid.with(modifiedBid));
             }
 
@@ -246,6 +250,7 @@ public class BidResponseCreator {
                           String bidder,
                           Account account,
                           EventsContext eventsContext,
+                          List<String> debugWarnings,
                           List<Imp> imps) {
         final String generatedBidId = bidIdGenerator.getType() != IdGeneratorType.none
                 ? bidIdGenerator.generateId()
@@ -256,7 +261,7 @@ public class BidResponseCreator {
 
         return bid.toBuilder()
                 .id(enforcedRandomBidId)
-                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, eventBidId, imps))
+                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, eventBidId, debugWarnings, imps))
                 .ext(updateBidExt(bid, generatedBidId))
                 .build();
     }
@@ -266,7 +271,8 @@ public class BidResponseCreator {
                                 String bidder,
                                 Account account,
                                 EventsContext eventsContext,
-                                String eventBidId,
+                                String generatedBidId,
+                                List<String> debugWarnings,
                                 List<Imp> imps) {
 
         final Imp correspondingImp = correspondingImp(bid, imps);
@@ -279,9 +285,10 @@ public class BidResponseCreator {
                 bidder,
                 bidAdm,
                 bid.getNurl(),
-                eventBidId,
+                generatedBidId,
                 account.getId(),
                 eventsContext,
+                debugWarnings,
                 lineItemId)
                 : bidAdm;
     }
