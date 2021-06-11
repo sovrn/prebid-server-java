@@ -8,6 +8,7 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
 import org.prebid.server.bidder.DealsBidderRequestCompletionTrackerFactory;
+import org.prebid.server.bidder.HttpBidderRequestEnricher;
 import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.deals.AdminCentralService;
@@ -365,11 +366,13 @@ public class DealsConfiguration {
                 HttpClient httpClient,
                 BidderRequestCompletionTrackerFactory completionTrackerFactory,
                 BidderErrorNotifier bidderErrorNotifier,
+                HttpBidderRequestEnricher requestEnricher,
                 LineItemService lineItemService,
                 JacksonMapper mapper) {
 
             return new SimulationAwareHttpBidderRequester(
-                    httpClient, completionTrackerFactory, bidderErrorNotifier, lineItemService, mapper);
+                    httpClient, completionTrackerFactory, bidderErrorNotifier, requestEnricher, lineItemService,
+                    mapper);
         }
 
         @Bean

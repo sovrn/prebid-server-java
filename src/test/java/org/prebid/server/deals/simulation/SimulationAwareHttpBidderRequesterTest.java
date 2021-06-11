@@ -19,6 +19,7 @@ import org.prebid.server.VertxTest;
 import org.prebid.server.auction.model.BidderRequest;
 import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
+import org.prebid.server.bidder.HttpBidderRequestEnricher;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.bidder.model.BidderSeatBid;
@@ -60,6 +61,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
     @Mock
     private BidderErrorNotifier bidderErrorNotifier;
     @Mock
+    private HttpBidderRequestEnricher requestEnricher;
+    @Mock
     private RoutingContext routingContext;
     @Mock
     private LineItemService lineItemService;
@@ -67,7 +70,8 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
     @Before
     public void setUp() {
         bidderRequester = new SimulationAwareHttpBidderRequester(
-                httpClient, bidderRequestCompletionTrackerFactory, bidderErrorNotifier, lineItemService, jacksonMapper);
+                httpClient, bidderRequestCompletionTrackerFactory, bidderErrorNotifier, requestEnricher,
+                lineItemService, jacksonMapper);
     }
 
     @Test

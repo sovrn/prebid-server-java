@@ -15,6 +15,7 @@ import org.prebid.server.auction.model.BidderRequest;
 import org.prebid.server.bidder.Bidder;
 import org.prebid.server.bidder.BidderErrorNotifier;
 import org.prebid.server.bidder.BidderRequestCompletionTrackerFactory;
+import org.prebid.server.bidder.HttpBidderRequestEnricher;
 import org.prebid.server.bidder.HttpBidderRequester;
 import org.prebid.server.bidder.model.BidderBid;
 import org.prebid.server.bidder.model.BidderError;
@@ -55,10 +56,12 @@ public class SimulationAwareHttpBidderRequester extends HttpBidderRequester {
     public SimulationAwareHttpBidderRequester(
             HttpClient httpClient,
             BidderRequestCompletionTrackerFactory bidderRequestCompletionTrackerFactory,
-            BidderErrorNotifier bidderErrorNotifier, LineItemService lineItemService,
+            BidderErrorNotifier bidderErrorNotifier,
+            HttpBidderRequestEnricher requestEnricher,
+            LineItemService lineItemService,
             JacksonMapper mapper) {
 
-        super(httpClient, bidderRequestCompletionTrackerFactory, bidderErrorNotifier);
+        super(httpClient, bidderRequestCompletionTrackerFactory, bidderErrorNotifier, requestEnricher);
 
         this.lineItemService = Objects.requireNonNull(lineItemService);
         this.mapper = Objects.requireNonNull(mapper);
