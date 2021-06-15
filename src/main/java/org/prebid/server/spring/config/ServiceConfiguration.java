@@ -762,8 +762,8 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    HttpInteractionLogger httpInteractionLogger() {
-        return new HttpInteractionLogger();
+    HttpInteractionLogger httpInteractionLogger(JacksonMapper mapper) {
+        return new HttpInteractionLogger(mapper);
     }
 
     @Bean
