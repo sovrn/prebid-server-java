@@ -82,6 +82,11 @@ adapters:
     enabled: true
   openx:
     enabled: true
+  outbrain:
+    enabled: true
+    endpoint: http://b1h.zemanta.com/api/bidder/prebid/bid/
+    usersync:
+      url: https://b1h.zemanta.com/usersync/prebid?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&cb=
   pubmatic:
     enabled: true
   pubnative:
