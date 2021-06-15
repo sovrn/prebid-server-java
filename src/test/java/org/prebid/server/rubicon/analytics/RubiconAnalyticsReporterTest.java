@@ -42,6 +42,8 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.cookie.model.UidWithExpiry;
 import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.exception.InvalidRequestException;
+import org.prebid.server.exception.PreBidException;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.model.PrivacyContext;
@@ -210,6 +212,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Exception is thrown while auction processing");
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -226,6 +230,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Necessary data is missing while auction processing");
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -244,6 +250,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Necessary data is missing while auction processing");
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -263,6 +271,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Necessary data is missing while auction processing");
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -283,6 +293,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Necessary data is missing while auction processing");
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -301,6 +313,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
+        assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
+                .hasMessage("Necessary data is missing while auction processing");
         verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
@@ -320,7 +334,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
-        assertThat(future.cause()).hasMessage("error");
+        assertThat(future.cause()).isInstanceOf(RuntimeException.class).hasMessage("error");
     }
 
     @Test
@@ -339,7 +353,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         assertThat(future.failed()).isTrue();
-        assertThat(future.cause()).hasMessage("HTTP status code 500");
+        assertThat(future.cause()).isInstanceOf(PreBidException.class).hasMessage("HTTP status code 500");
     }
 
     @Test

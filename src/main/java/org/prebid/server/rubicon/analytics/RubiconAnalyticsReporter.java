@@ -42,6 +42,7 @@ import org.prebid.server.bidder.model.BidderError;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.json.JacksonMapper;
@@ -253,7 +254,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private Future<Void> processAuctionEvent(AuctionEvent auctionEvent) {
         final AuctionContext auctionContext = auctionEvent.getAuctionContext();
         if (auctionContext == null) { // this can happen when exception is thrown while processing
-            return Future.failedFuture("Exception is thrown while auction processing");
+            return Future.failedFuture(new InvalidRequestException("Exception is thrown while auction processing"));
         }
 
         final HttpContext httpContext = auctionEvent.getHttpContext();
@@ -262,7 +263,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final BidResponse bidResponse = auctionEvent.getBidResponse();
 
         if (httpContext == null || bidRequest == null || account == null || bidResponse == null) {
-            return Future.failedFuture("Necessary data is missing while auction processing");
+            return Future.failedFuture(
+                    new InvalidRequestException("Necessary data is missing while auction processing"));
         }
 
         final String requestAccountId = account.getId();
@@ -290,7 +292,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private Future<Void> processAmpEvent(AmpEvent ampEvent) {
         final AuctionContext auctionContext = ampEvent.getAuctionContext();
         if (auctionContext == null) { // this can happen when exception is thrown while processing
-            return Future.failedFuture("Exception is thrown while amp processing");
+            return Future.failedFuture(new InvalidRequestException("Exception is thrown while amp processing"));
         }
 
         final HttpContext httpContext = ampEvent.getHttpContext();
@@ -299,7 +301,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final BidResponse bidResponse = ampEvent.getBidResponse();
 
         if (httpContext == null || bidRequest == null || account == null || bidResponse == null) {
-            return Future.failedFuture("Necessary data is missing while amp processing");
+            return Future.failedFuture(new InvalidRequestException("Necessary data is missing while amp processing"));
         }
 
         final String requestAccountId = account.getId();
@@ -331,7 +333,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final Account account = notificationEvent.getAccount();
         final HttpContext httpContext = notificationEvent.getHttpContext();
         if (bidId == null || account == null || httpContext == null) {
-            return Future.failedFuture("Necessary data is missing while event processing");
+            return Future.failedFuture(new InvalidRequestException("Necessary data is missing while event processing"));
         }
 
         final Integer accountId = parseId(account.getId());
