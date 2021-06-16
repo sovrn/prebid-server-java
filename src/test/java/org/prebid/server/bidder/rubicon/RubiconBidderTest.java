@@ -2616,7 +2616,6 @@ public class RubiconBidderTest extends VertxTest {
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, givenBidRequest(identity()));
 
         // then
-
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.getValue()).hasSize(1)
                 .extracting(BidderBid::getBid)
@@ -2641,7 +2640,6 @@ public class RubiconBidderTest extends VertxTest {
         final Result<List<BidderBid>> result = rubiconBidder.makeBids(httpCall, givenBidRequest(identity()));
 
         // then
-
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.getValue()).hasSize(1)
                 .extracting(BidderBid::getBid)
