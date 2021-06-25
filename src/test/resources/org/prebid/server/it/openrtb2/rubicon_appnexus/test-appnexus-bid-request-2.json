@@ -42,7 +42,7 @@
   "device": {
     "ua": "userAgent",
     "dnt": 2,
-    "ip": "80.215.195.122",
+    "ip": "80.215.195.0",
     "pxratio": 4.2,
     "language": "en",
     "ifa": "ifaId",
@@ -73,7 +73,7 @@
       }
     ],
     "ext": {
-      "consent": "BOEFEAyOEFEAyAHABDENAIgAAAB9vABAASA",
+      "consent": "CPBCa-mPBCa-mAAAAAENA0CAAEAAAAAAACiQAaQAwAAgAgABoAAAAAA",
       "eids": [
         {
           "source": "adserver.org",
@@ -130,21 +130,20 @@
   "ext": {
     "prebid": {
       "debug": 1,
+      "aliases": {
+        "appnexusAlias": "appnexus"
+      },
       "currency": {
         "rates": {
           "EUR": {
             "USD": 1.2406
           },
           "USD": {
-            "EUR": 0.8110
+            "EUR": 0.811
           }
         },
         "usepbsrates": false
       },
-      "aliases": {
-        "appnexusAlias": "appnexus"
-      },
-      "events": {},
       "targeting": {
         "pricegranularity": {
           "precision": 2,
@@ -159,11 +158,13 @@
         "includebidderkeys": true
       },
       "cache": {
-        "bids": {},
+        "bids": {
+        },
         "vastxml": {
           "ttlseconds": 120
         }
       },
+      "events": {},
       "auctiontimestamp": 1000,
       "integration": "dmbjs",
       "channel": {

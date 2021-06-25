@@ -55,8 +55,6 @@ settings:
     stored-responses-dir:
 gdpr:
   vendorlist:
-    v1:
-      cache-dir: /var/tmp/vendor1
     v2:
       cache-dir: /var/tmp/vendor2
 deals:
