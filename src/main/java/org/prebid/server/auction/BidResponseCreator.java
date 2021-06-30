@@ -254,14 +254,13 @@ public class BidResponseCreator {
         final String generatedBidId = bidIdGenerator.getType() != IdGeneratorType.none
                 ? bidIdGenerator.generateId()
                 : null;
-        final String effectiveBidId = ObjectUtils.defaultIfNull(generatedBidId, bid.getId());
-
         final String enforcedRandomBidId = enforceRandomBidId ? UUID.randomUUID().toString() : bid.getId();
-        final String eventBidId = ObjectUtils.defaultIfNull(generatedBidId, enforcedRandomBidId);
+        final String effectiveBidId = ObjectUtils.defaultIfNull(generatedBidId, enforcedRandomBidId);
 
         return bid.toBuilder()
                 .id(enforcedRandomBidId)
-                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, eventBidId, debugWarnings, lineItemId))
+                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, effectiveBidId, debugWarnings,
+                        lineItemId))
                 .ext(updateBidExt(
                         bid,
                         bidType,
