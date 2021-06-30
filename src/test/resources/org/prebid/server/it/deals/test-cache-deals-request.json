@@ -12,6 +12,13 @@
         "w": 320,
         "h": 320,
         "ext": {
+          "prebid": {
+            "type": "banner",
+            "events": {
+              "win": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2",
+              "imp": "http://localhost:8080/event?t=imp&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2"
+            }
+          },
           "origbidcpm": 8.43
         },
         "wurl": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2"
@@ -29,6 +36,13 @@
         "w": 300,
         "h": 250,
         "ext": {
+          "prebid": {
+            "type": "banner",
+            "events": {
+              "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1",
+              "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1"
+            }
+          },
           "origbidcpm": 8.43
         },
         "wurl": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1"
@@ -46,6 +60,13 @@
         "w": 300,
         "h": 250,
         "ext": {
+          "prebid": {
+            "type": "banner",
+            "events": {
+              "win": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3",
+              "imp": "http://localhost:8080/event?t=imp&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3"
+            }
+          },
           "origbidcpm": 8.43
         },
         "wurl": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3"
