@@ -63,8 +63,8 @@ public class DeliveryProgress {
     /**
      * Updates delivery progress from {@link TxnLog}.
      */
-    public void recordTransactionLog(TxnLog txnLog, Map<String, Integer> planIdToTokenPriority) {
-        accountRequests(txnLog.accountId()).increment();
+    public void recordTransactionLog(TxnLog txnLog, Map<String, Integer> planIdToTokenPriority, String accountId) {
+        accountRequests(accountId).increment();
         requests.increment();
 
         txnLog.lineItemSentToClientAsTopMatch()

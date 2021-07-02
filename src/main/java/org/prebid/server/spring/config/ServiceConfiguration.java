@@ -42,6 +42,7 @@ import org.prebid.server.deals.DealsProcessor;
 import org.prebid.server.deals.events.ApplicationEventService;
 import org.prebid.server.events.EventsService;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.hooks.execution.HookStageExecutor;
 import org.prebid.server.identity.IdGenerator;
 import org.prebid.server.identity.NoneIdGenerator;
 import org.prebid.server.identity.UUIDIdGenerator;
@@ -219,6 +220,7 @@ public class ServiceConfiguration {
             StoredRequestProcessor storedRequestProcessor,
             ApplicationSettings applicationSettings,
             IpAddressHelper ipAddressHelper,
+            HookStageExecutor hookStageExecutor,
             @Autowired(required = false) DealsProcessor dealsProcessor,
             Clock clock,
             JacksonMapper mapper) {
@@ -235,6 +237,7 @@ public class ServiceConfiguration {
                 storedRequestProcessor,
                 applicationSettings,
                 ipAddressHelper,
+                hookStageExecutor,
                 dealsProcessor,
                 clock,
                 mapper);
@@ -532,6 +535,7 @@ public class ServiceConfiguration {
             StoredRequestProcessor storedRequestProcessor,
             WinningBidComparatorFactory winningBidComparatorFactory,
             IdGenerator bidIdGenerator,
+            HookStageExecutor hookStageExecutor,
             @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
             @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
             Clock clock,
@@ -545,6 +549,7 @@ public class ServiceConfiguration {
                 storedRequestProcessor,
                 winningBidComparatorFactory,
                 bidIdGenerator,
+                hookStageExecutor,
                 truncateAttrChars,
                 enforceRandomBidId,
                 clock,
@@ -564,6 +569,7 @@ public class ServiceConfiguration {
             CurrencyConversionService currencyConversionService,
             BidResponseCreator bidResponseCreator,
             BidResponsePostProcessor bidResponsePostProcessor,
+            HookStageExecutor hookStageExecutor,
             @Autowired(required = false) ApplicationEventService applicationEventService,
             Metrics metrics,
             Clock clock,
@@ -582,6 +588,7 @@ public class ServiceConfiguration {
                 currencyConversionService,
                 bidResponseCreator,
                 bidResponsePostProcessor,
+                hookStageExecutor,
                 applicationEventService,
                 metrics,
                 clock,

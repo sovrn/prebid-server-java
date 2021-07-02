@@ -1,6 +1,7 @@
 package org.prebid.server.rubicon.rsid;
 
 import io.vertx.core.http.Cookie;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
@@ -8,14 +9,16 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.rubicon.rsid.model.Rsid;
 
 import java.util.Arrays;
 import java.util.List;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 
 public class RsidCookieServiceTest {
@@ -36,7 +39,7 @@ public class RsidCookieServiceTest {
     @Test
     public void shouldReturnNullIfNoCookieInRequest() {
         // given
-        given(context.getCookie(anyString())).willReturn(null);
+        given(context.cookieMap()).willReturn(emptyMap());
 
         // when
         final Rsid rsid = rsidCookieService.parseFromRequest(context);
@@ -96,5 +99,26 @@ public class RsidCookieServiceTest {
         // then
         final Rsid expected = Rsid.of("us");
         assertThat(rsids).containsOnly(expected, expected, expected);
+    }
+
+    @Test
+    public void parseFromRequestShouldReturnExpectedResult() {
+        // given
+        final CaseInsensitiveMultiMap headers = CaseInsensitiveMultiMap.builder()
+                .add(
+                        HttpHeaders.COOKIE,
+                        Cookie.cookie(
+                                "rsid",
+                                "B9qWECXyvoJUFeX6MlUI0rdsb6KO+1hVre/oD1mN/CN4VoLIUnj4T/IHduc/n6k03bYgvBh7oB3JHI"
+                                        + "xCI7JZAa8E5oMBeRSWa9qr15frXLoJaNEy0hbrXDlIwC9iqGWqIrmhaA==")
+                                .encode())
+                .build();
+        final HttpRequestContext httpRequest = HttpRequestContext.builder().headers(headers).build();
+
+        // when
+        final Rsid rsid = rsidCookieService.parseFromRequest(httpRequest);
+
+        // then
+        assertThat(rsid).isEqualTo(Rsid.of("us"));
     }
 }

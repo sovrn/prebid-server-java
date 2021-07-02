@@ -1,8 +1,6 @@
 package org.prebid.server.handler.openrtb2;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iab.openrtb.request.BidRequest;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.BidResponse;
@@ -13,13 +11,14 @@ import io.vertx.core.Handler;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.commons.collections4.MapUtils;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.AuctionEvent;
 import org.prebid.server.analytics.model.HttpContext;
-import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.Tuple2;
+import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
 import org.prebid.server.cookie.UidsCookie;
 import org.prebid.server.exception.BlacklistedAccountException;
 import org.prebid.server.exception.BlacklistedAppException;
@@ -31,15 +30,16 @@ import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.log.HttpInteractionLogger;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
-import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.model.PrivacyContext;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
+import org.prebid.server.proto.openrtb.ext.response.ExtBidderError;
 import org.prebid.server.util.HttpUtil;
 
 import java.time.Clock;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -106,14 +106,18 @@ public class AuctionHandler implements Handler<RoutingContext> {
     }
 
     private AuctionContext updateAppAndNoCookieAndImpsMetrics(AuctionContext context) {
-        final BidRequest bidRequest = context.getBidRequest();
-        final UidsCookie uidsCookie = context.getUidsCookie();
+        if (!context.isRequestRejected()) {
+            final BidRequest bidRequest = context.getBidRequest();
+            final UidsCookie uidsCookie = context.getUidsCookie();
 
-        final List<Imp> imps = bidRequest.getImp();
-        metrics.updateAppAndNoCookieAndImpsRequestedMetrics(bidRequest.getApp() != null, uidsCookie.hasLiveUids(),
-                imps.size());
+            final List<Imp> imps = bidRequest.getImp();
+            metrics.updateAppAndNoCookieAndImpsRequestedMetrics(
+                    bidRequest.getApp() != null,
+                    uidsCookie.hasLiveUids(),
+                    imps.size());
 
-        metrics.updateImpTypesMetrics(imps);
+            metrics.updateImpTypesMetrics(imps);
+        }
 
         return context;
     }
@@ -242,28 +246,28 @@ public class AuctionHandler implements Handler<RoutingContext> {
     }
 
     private static BidResponse cleanImpIdsFromErrors(BidResponse bidResponse) {
-        final ObjectNode objectNode = bidResponse.getExt();
-        if (objectNode == null) {
+        final ExtBidResponse extBidResponse = bidResponse.getExt();
+        if (extBidResponse == null) {
             return bidResponse;
         }
 
-        final JsonNode errorNodes = objectNode.get("errors");
-        if (errorNodes == null) {
+        final Map<String, List<ExtBidderError>> errors = extBidResponse.getErrors();
+        if (MapUtils.isEmpty(errors)) {
             return bidResponse;
         }
 
-        final Iterator<JsonNode> errorNodesIterator = errorNodes.elements();
-        while (errorNodesIterator.hasNext()) {
-            final JsonNode errorNode = errorNodesIterator.next();
+        final Map<String, List<ExtBidderError>> cleanErrors = errors.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .map(error -> ExtBidderError.of(error.getCode(), error.getMessage()))
+                                .collect(Collectors.toList())));
 
-            final Iterator<JsonNode> errorsIterator = errorNode.elements();
-            while (errorsIterator.hasNext()) {
-                final ObjectNode error = (ObjectNode) errorsIterator.next();
-                error.remove("imp_ids");
-            }
-        }
-
-        return bidResponse;
+        return bidResponse.toBuilder()
+                .ext(extBidResponse.toBuilder()
+                        .errors(cleanErrors)
+                        .build())
+                .build();
     }
 
     private void addBidResponseToEvent(BidResponse bidResponse, ExtBidResponse extBidResponse,
@@ -276,7 +280,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
                     .cur(bidResponse.getCur())
                     .nbr(bidResponse.getNbr())
                     .seatbid(bidResponse.getSeatbid())
-                    .ext(mapper.mapper().valueToTree(extBidResponse))
+                    .ext(extBidResponse)
                     .build();
         } else {
             updatedBidResponse = bidResponse;

@@ -7,7 +7,6 @@ import com.iab.openrtb.request.Format;
 import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.response.Bid;
 import io.vertx.core.Future;
-import io.vertx.ext.web.RoutingContext;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.apache.commons.collections4.CollectionUtils;
@@ -25,6 +24,7 @@ import org.prebid.server.deals.lineitem.LineItem;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.json.JacksonMapper;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -76,7 +76,7 @@ public class SimulationAwareHttpBidderRequester extends HttpBidderRequester {
     public <T> Future<BidderSeatBid> requestBids(Bidder<T> bidder,
                                                  BidderRequest bidderRequest,
                                                  Timeout timeout,
-                                                 RoutingContext routingContext,
+                                                 CaseInsensitiveMultiMap requestHeaders,
                                                  boolean debugEnabled) {
 
         final List<Imp> imps = bidderRequest.getBidRequest().getImp();

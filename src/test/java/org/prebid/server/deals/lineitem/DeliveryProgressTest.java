@@ -58,13 +58,13 @@ public class DeliveryProgressTest extends VertxTest {
     public void cleanLineItemStatusesShouldRemoveOldestCachedPlans() {
         // given
         final TxnLog txnLog1 = TxnLog.create();
-        txnLog1.accountId("1001").lineItemSentToClientAsTopMatch().add("lineItemId1");
+        txnLog1.lineItemSentToClientAsTopMatch().add("lineItemId1");
 
         final TxnLog txnLog2 = TxnLog.create();
-        txnLog2.accountId("1001").lineItemSentToClientAsTopMatch().add("lineItemId1");
+        txnLog2.lineItemSentToClientAsTopMatch().add("lineItemId1");
 
         final TxnLog txnLog3 = TxnLog.create();
-        txnLog3.accountId("1001").lineItemSentToClientAsTopMatch().add("lineItemId1");
+        txnLog3.lineItemSentToClientAsTopMatch().add("lineItemId1");
 
         final LineItem lineItem1 = Mockito.mock(LineItem.class);
         final DeliveryPlan deliveryPlan1 = Mockito.mock(DeliveryPlan.class);
@@ -89,9 +89,9 @@ public class DeliveryProgressTest extends VertxTest {
         given(lineItemService.getLineItemById(eq("lineItemId1"))).willReturn(lineItem1);
 
         // when and then
-        deliveryProgress.recordTransactionLog(txnLog1, singletonMap("lineItemId1Plan", 1));
-        deliveryProgress.recordTransactionLog(txnLog2, singletonMap("lineItemId2Plan", 1));
-        deliveryProgress.recordTransactionLog(txnLog3, singletonMap("lineItemId3Plan", 1));
+        deliveryProgress.recordTransactionLog(txnLog1, singletonMap("lineItemId1Plan", 1), "1001");
+        deliveryProgress.recordTransactionLog(txnLog2, singletonMap("lineItemId2Plan", 1), "1001");
+        deliveryProgress.recordTransactionLog(txnLog3, singletonMap("lineItemId3Plan", 1), "1001");
 
         // check that 3 lineItemStatuses
         assertThat(deliveryProgress.getLineItemStatuses().get("lineItemId1").getDeliveryPlans())
@@ -111,7 +111,6 @@ public class DeliveryProgressTest extends VertxTest {
     public void cleanLineItemStatusesShouldRemoveExpiredLineItemStatuses() {
         // given
         final TxnLog txnLog = TxnLog.create();
-        txnLog.accountId("1001");
         txnLog.lineItemsSentToClient().add("lineItemId1");
         txnLog.lineItemsSentToClient().add("lineItemId2");
         final Map<String, Integer> planIdToTokenPriority = new HashMap<>();
@@ -128,7 +127,7 @@ public class DeliveryProgressTest extends VertxTest {
         given(lineItemService.getLineItemById(eq("lineItemId2"))).willReturn(lineItem2);
 
         // when and then
-        deliveryProgress.recordTransactionLog(txnLog, planIdToTokenPriority);
+        deliveryProgress.recordTransactionLog(txnLog, planIdToTokenPriority, "1001");
 
         // check that 2 lineItemStatuses
         assertThat(deliveryProgress.getLineItemStatuses().keySet()).hasSize(2)
@@ -145,7 +144,6 @@ public class DeliveryProgressTest extends VertxTest {
         // given
         final DeliveryProgress deliveryProgress = DeliveryProgress.of(now, lineItemService);
         final TxnLog txnLog = TxnLog.create();
-        txnLog.accountId("1001");
         txnLog.lineItemsMatchedWholeTargeting().add("lineItemId1");
         txnLog.lineItemsMatchedDomainTargeting().add("lineItemId1");
         txnLog.lineItemsReadyToServe().add("lineItemId1");
@@ -165,7 +163,7 @@ public class DeliveryProgressTest extends VertxTest {
         given(lineItem.getLineItemId()).willReturn("lineItemId1");
         given(lineItem.getActiveDeliveryPlan()).willReturn(DeliveryPlan.of(givenDeliverySchedule(now, "planId1")));
 
-        deliveryProgress.recordTransactionLog(txnLog, singletonMap("planId1", 1));
+        deliveryProgress.recordTransactionLog(txnLog, singletonMap("planId1", 1), "1001");
 
         // when
         final DeliveryProgress copiedDeliveryProgress = deliveryProgress.copyWithOriginalPlans();

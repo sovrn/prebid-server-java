@@ -4,10 +4,8 @@ import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.apache.commons.collections4.Factory;
 import org.apache.commons.collections4.MapUtils;
 
@@ -22,10 +20,6 @@ import java.util.Set;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @EqualsAndHashCode
 public class TxnLog {
-
-    @Setter
-    @NonFinal
-    String accountId;
 
     Set<String> lineItemsMatchedDomainTargeting = new HashSet<>();
 

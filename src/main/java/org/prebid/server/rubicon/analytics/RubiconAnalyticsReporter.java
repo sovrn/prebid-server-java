@@ -531,7 +531,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                                                       UidsCookie uidsCookie,
                                                       BidResponse bidResponse,
                                                       String accountId) {
-        final ExtBidResponse extBidResponse = readExt(bidResponse.getExt(), ExtBidResponse.class);
+        final ExtBidResponse extBidResponse = bidResponse.getExt();
         final Map<String, List<TwinBids>> impIdToBids = new HashMap<>();
 
         populateSuccessfulBids(bidRequest, uidsCookie, bidResponse, extBidResponse, impIdToBids, accountId);

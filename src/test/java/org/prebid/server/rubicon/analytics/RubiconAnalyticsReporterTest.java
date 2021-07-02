@@ -1538,9 +1538,10 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         null)))
                                                 .build()))
                                 .build()))
-                .ext(mapper.valueToTree(
-                        ExtBidResponse.of(null, errors, null, doubleMap("rubicon", 101, "appnexus", 202), null, null,
-                                null)))
+                .ext(ExtBidResponse.builder()
+                        .errors(errors)
+                        .responsetimemillis(doubleMap("rubicon", 101, "appnexus", 202))
+                        .build())
                 .build();
     }
 

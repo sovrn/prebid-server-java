@@ -5,7 +5,9 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.lang3.StringUtils;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.rubicon.rsid.model.Rsid;
+import org.prebid.server.util.HttpUtil;
 
 import java.util.Base64;
 import java.util.Objects;
@@ -33,6 +35,12 @@ public class RsidCookieService {
         final String rsidRawValue = rsidCookie != null ? rsidCookie.getValue() : null;
 
         return rsidRawValue != null ? toRsid(rsidRawValue) : null;
+    }
+
+    public Rsid parseFromRequest(HttpRequestContext httpRequest) {
+        final String rsidCookieValue = HttpUtil.cookiesAsMap(httpRequest).get(COOKIE_NAME);
+
+        return rsidCookieValue != null ? toRsid(rsidCookieValue) : null;
     }
 
     /**

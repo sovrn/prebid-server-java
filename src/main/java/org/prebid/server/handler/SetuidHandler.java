@@ -297,7 +297,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
     }
 
     private String resolveIpFromRequest(HttpServerRequest request) {
-        final List<String> requestIps = implicitParametersExtractor.ipFrom(request);
+        final List<String> requestIps =
+                implicitParametersExtractor.ipFrom(request.headers(), request.remoteAddress().host());
         return requestIps.stream()
                 .map(ipAddressHelper::toIpAddress)
                 .filter(Objects::nonNull)

@@ -25,6 +25,7 @@ import org.prebid.server.deals.proto.Token;
 import org.prebid.server.deals.proto.report.Event;
 import org.prebid.server.deals.proto.report.LineItemStatusReport;
 import org.prebid.server.log.CriteriaLogManager;
+import org.prebid.server.settings.model.Account;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -177,7 +178,6 @@ public class DeliveryProgressServiceTest extends VertxTest {
         recordLineItemsServed(150, lineItemId1);
 
         final TxnLog txnLog = TxnLog.create();
-        txnLog.accountId("1001");
         txnLog.lineItemSentToClientAsTopMatch().addAll(asList(lineItemId1, lineItemId2));
         txnLog.lineItemsSentToClient().addAll(asList(lineItemId1, lineItemId2));
         txnLog.lineItemsMatchedDomainTargeting().addAll(asList(lineItemId1, lineItemId2));
@@ -192,7 +192,10 @@ public class DeliveryProgressServiceTest extends VertxTest {
         txnLog.lostMatchingToLineItems().put(lineItemId1, singleton(lineItemId2));
 
         // when and then
-        deliveryProgressService.processAuctionEvent(AuctionContext.builder().txnLog(txnLog).build());
+        deliveryProgressService.processAuctionEvent(AuctionContext.builder()
+                .account(Account.empty("1001"))
+                .txnLog(txnLog)
+                .build());
         deliveryProgressService.createDeliveryProgressReports(now);
 
         final ArgumentCaptor<DeliveryProgress> deliveryProgressReportCaptor =
@@ -347,8 +350,10 @@ public class DeliveryProgressServiceTest extends VertxTest {
 
     private void recordLineItemsServed(int times, String... lineItemIds) {
         final TxnLog txnLog = TxnLog.create();
-        AuctionContext auctionContext = AuctionContext.builder().txnLog(txnLog).build();
-        txnLog.accountId("1001");
+        AuctionContext auctionContext = AuctionContext.builder()
+                .account(Account.empty("1001"))
+                .txnLog(txnLog)
+                .build();
         txnLog.lineItemSentToClientAsTopMatch().addAll(asList(lineItemIds));
         IntStream.range(0, times).forEach(i -> deliveryProgressService.processAuctionEvent(auctionContext));
 

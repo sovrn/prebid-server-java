@@ -1,6 +1,7 @@
 package org.prebid.server.it;
 
 import com.github.tomakehurst.wiremock.client.VerificationException;
+import com.github.tomakehurst.wiremock.junit.WireMockClassRule;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import io.restassured.response.Response;
@@ -8,8 +9,10 @@ import io.restassured.specification.RequestSpecification;
 import org.apache.commons.collections4.CollectionUtils;
 import org.json.JSONException;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.prebid.server.VertxTest;
 import org.prebid.server.deals.LineItemService;
 import org.prebid.server.deals.proto.report.DeliveryProgressReport;
 import org.prebid.server.deals.proto.report.Event;
@@ -22,6 +25,7 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.skyscreamer.jsonassert.ValueMatcher;
 import org.skyscreamer.jsonassert.comparator.CustomComparator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -43,21 +47,32 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static io.restassured.RestAssured.given;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @RunWith(SpringRunner.class)
 @TestPropertySource(locations = {"test-application.properties", "deals/test-deals-application.properties"})
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-public class DealsTest extends IntegrationTest {
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+public class DealsTest extends VertxTest {
 
     private static final int APP_PORT = 9080;
+    private static final int WIREMOCK_PORT = 8090;
+
+    private static final RequestSpecification SPEC = IntegrationTest.spec(APP_PORT);
+
+    @SuppressWarnings("unchecked")
+    @ClassRule
+    public static final WireMockClassRule WIRE_MOCK_RULE = new WireMockClassRule(options()
+            .port(WIREMOCK_PORT)
+            .extensions(
+                    IntegrationTest.CacheResponseTransformer.class,
+                    IntegrationTest.ResponseOrderTransformer.class));
 
     private static final String RUBICON = "rubicon";
-
-    private static final RequestSpecification SPEC = spec(APP_PORT);
 
     @Autowired
     private LineItemService lineItemService;
@@ -84,12 +99,15 @@ public class DealsTest extends IntegrationTest {
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/planner-register"))
                 .withBasicAuth("username", "password")
                 .withHeader("pg-trx-id", new AnythingPattern())
-                .withRequestBody(equalToJson(jsonFrom("deals/test-planner-register-request-1.json"), false, true))
-                .willReturn(aResponse().withBody(jsonFrom("deals/test-planner-register-response.json"))));
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-planner-register-request-1.json"), false, true))
+                .willReturn(aResponse().withBody(IntegrationTest.jsonFrom(
+                        "deals/test-planner-register-response.json"))));
 
         // pre-bid cache
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/cache"))
-                .withRequestBody(equalToBidCacheRequest(jsonFrom("deals/test-cache-deals-request.json")))
+                .withRequestBody(IntegrationTest.equalToBidCacheRequest(
+                        IntegrationTest.jsonFrom("deals/test-cache-deals-request.json")))
                 .willReturn(aResponse()
                         .withTransformers("cache-response-transformer")
                         .withTransformerParameter("matcherName", "deals/test-cache-matcher.json")));
@@ -101,36 +119,45 @@ public class DealsTest extends IntegrationTest {
         awaitForLineItemMetadata();
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/user-data-win-event"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-user-data-win-event-request-1.json"), false, true))
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-user-data-win-event-request-1.json"), false, true))
                 .willReturn(aResponse()));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/user-data-details"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-user-data-details-request-1.json"), false, true))
-                .willReturn(aResponse().withBody(jsonFrom("deals/test-user-data-details-response-1.json"))));
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-user-data-details-request-1.json"), false, true))
+                .willReturn(aResponse().withBody(IntegrationTest.jsonFrom(
+                        "deals/test-user-data-details-response-1.json"))));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/rubicon-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-rubicon-bid-request-1.json"), false, true))
-                .willReturn(aResponse().withBody(jsonFrom("deals/test-rubicon-bid-response-1.json"))));
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-rubicon-bid-request-1.json"), false, true))
+                .willReturn(aResponse().withBody(IntegrationTest.jsonFrom(
+                        "deals/test-rubicon-bid-response-1.json"))));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/rubicon-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-rubicon-bid-request-2.json"), false, true))
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-rubicon-bid-request-2.json"), false, true))
                 .willReturn(aResponse()
                         .withFixedDelay(300)
-                        .withBody(jsonFrom("deals/test-rubicon-bid-response-2.json"))));
+                        .withBody(IntegrationTest.jsonFrom("deals/test-rubicon-bid-response-2.json"))));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/rubicon-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-rubicon-bid-request-3.json"), false, true))
-                .willReturn(aResponse().withBody(jsonFrom("deals/test-rubicon-bid-response-3.json"))));
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-rubicon-bid-request-3.json"), false, true))
+                .willReturn(aResponse().withBody(IntegrationTest.jsonFrom("deals/test-rubicon-bid-response-3.json"))));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/rubicon-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-rubicon-bid-request-4.json"), false, true))
-                .willReturn(aResponse().withBody(jsonFrom("deals/test-rubicon-bid-response-4.json"))));
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-rubicon-bid-request-4.json"), false, true))
+                .willReturn(aResponse().withBody(IntegrationTest.jsonFrom("deals/test-rubicon-bid-response-4.json"))));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/rubicon-exchange"))
-                .withRequestBody(equalToJson(jsonFrom("deals/test-rubicon-bid-request-5.json"), false, true))
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/test-rubicon-bid-request-5.json"), false, true))
                 .willReturn(aResponse()
                         .withFixedDelay(600)
-                        .withBody(jsonFrom("deals/test-rubicon-bid-response-5.json"))));
+                        .withBody(IntegrationTest.jsonFrom("deals/test-rubicon-bid-response-5.json"))));
 
         // when
         final Response response = given(SPEC)
@@ -139,11 +166,11 @@ public class DealsTest extends IntegrationTest {
                 .header("X-Forwarded-For", "185.199.110.153")
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")
-                .body(jsonFrom("deals/test-auction-request.json"))
+                .body(IntegrationTest.jsonFrom("deals/test-auction-request.json"))
                 .post("/openrtb2/auction");
 
         // then
-        final String expectedAuctionResponse = withTemporalFields(openrtbAuctionResponseFrom(
+        final String expectedAuctionResponse = withTemporalFields(IntegrationTest.openrtbAuctionResponseFrom(
                 "deals/test-auction-response.json", response, singletonList(RUBICON)));
         JSONAssert.assertEquals(expectedAuctionResponse, response.asString(), openrtbDeepDebugTimeComparator());
 
@@ -168,7 +195,8 @@ public class DealsTest extends IntegrationTest {
         await().atMost(10, TimeUnit.SECONDS).pollInterval(1, TimeUnit.SECONDS).until(() ->
                 verify(() -> WIRE_MOCK_RULE.verify(2, postRequestedFor(urlPathEqualTo("/delivery-stats-progress")))));
 
-        final String expectedRequestBody = jsonFrom("deals/test-delivery-stats-progress-request-1.json");
+        final String expectedRequestBody = IntegrationTest.jsonFrom(
+                "deals/test-delivery-stats-progress-request-1.json");
 
         final List<LoggedRequest> requestList = WIRE_MOCK_RULE.findAll(
                 postRequestedFor(urlPathEqualTo("/delivery-stats-progress")));
@@ -181,7 +209,7 @@ public class DealsTest extends IntegrationTest {
     private static String plannerResponseFrom(String templatePath) throws IOException {
         final ZonedDateTime now = ZonedDateTime.now().withFixedOffsetZone();
 
-        return jsonFrom(templatePath)
+        return IntegrationTest.jsonFrom(templatePath)
                 .replaceAll("\\{\\{ now }}", now.toString())
                 .replaceAll("\\{\\{ lineItem.startTime }}", now.minusDays(5).toString())
                 .replaceAll("\\{\\{ lineItem.endTime }}", now.plusDays(5).toString())

@@ -124,6 +124,16 @@ public enum MetricName {
     hit,
     miss,
 
+    // hooks
+    call,
+    success,
+    noop,
+    reject,
+    unknown,
+    failure,
+    execution_error("execution-error"),
+    duration,
+
     // win notifications
     win_notifications,
     win_requests,

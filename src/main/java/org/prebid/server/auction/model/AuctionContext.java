@@ -1,7 +1,6 @@
 package org.prebid.server.auction.model;
 
 import com.iab.openrtb.request.BidRequest;
-import io.vertx.ext.web.RoutingContext;
 import lombok.Builder;
 import lombok.Value;
 import org.prebid.server.cache.model.DebugHttpCall;
@@ -10,7 +9,9 @@ import org.prebid.server.deals.model.DeepDebugLog;
 import org.prebid.server.deals.model.TxnLog;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.hooks.execution.model.HookExecutionContext;
 import org.prebid.server.metric.MetricName;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.settings.model.Account;
 
@@ -21,7 +22,7 @@ import java.util.Map;
 @Value
 public class AuctionContext {
 
-    RoutingContext routingContext;
+    HttpRequestContext httpRequest;
 
     UidsCookie uidsCookie;
 
@@ -43,9 +44,19 @@ public class AuctionContext {
 
     GeoInfo geoInfo;
 
+    HookExecutionContext hookExecutionContext;
+
+    DebugContext debugContext;
+
+    boolean requestRejected;
+
     TxnLog txnLog;
 
     DeepDebugLog deepDebugLog;
+
+    public AuctionContext with(Account account) {
+        return this.toBuilder().account(account).build();
+    }
 
     public AuctionContext with(BidRequest bidRequest) {
         return this.toBuilder().bidRequest(bidRequest).build();
@@ -59,6 +70,18 @@ public class AuctionContext {
         return this.toBuilder()
                 .privacyContext(privacyContext)
                 .geoInfo(privacyContext.getTcfContext().getGeoInfo())
+                .build();
+    }
+
+    public AuctionContext with(MetricName requestTypeMetric) {
+        return this.toBuilder()
+                .requestTypeMetric(requestTypeMetric)
+                .build();
+    }
+
+    public AuctionContext withRequestRejected() {
+        return this.toBuilder()
+                .requestRejected(true)
                 .build();
     }
 }

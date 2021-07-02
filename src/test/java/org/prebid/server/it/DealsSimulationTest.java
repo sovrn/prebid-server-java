@@ -1,14 +1,17 @@
 package org.prebid.server.it;
 
 import com.github.tomakehurst.wiremock.client.VerificationException;
+import com.github.tomakehurst.wiremock.junit.WireMockClassRule;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.json.JSONException;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.prebid.server.VertxTest;
 import org.prebid.server.deals.LineItemService;
 import org.skyscreamer.jsonassert.ArrayValueMatcher;
 import org.skyscreamer.jsonassert.Customization;
@@ -17,6 +20,8 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.skyscreamer.jsonassert.ValueMatcher;
 import org.skyscreamer.jsonassert.comparator.CustomComparator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 
@@ -40,34 +45,42 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 import static io.restassured.RestAssured.given;
 import static java.util.Collections.singletonList;
 import static org.awaitility.Awaitility.await;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @RunWith(SpringRunner.class)
 @TestPropertySource(locations = {
+        "test-application.properties",
         "deals/test-deals-application.properties",
         "deals/test-deals-simulation-application.properties"})
-public class DealsSimulationTest extends IntegrationTest {
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+public class DealsSimulationTest extends VertxTest {
 
-    @Autowired
-    private Clock clock;
+    private static final int APP_PORT = 10080;
+    private static final int WIREMOCK_PORT = 8090;
+
+    private static final RequestSpecification SPEC = IntegrationTest.spec(APP_PORT);
+
+    @ClassRule
+    public static final WireMockClassRule WIRE_MOCK_RULE = new WireMockClassRule(options().port(WIREMOCK_PORT));
+
+    private static final ZonedDateTime NOW = ZonedDateTime.now(
+            Clock.fixed(Instant.parse("2019-10-10T00:00:00Z"), ZoneOffset.UTC));
 
     private static final DateTimeFormatter UTC_MILLIS_FORMATTER = new DateTimeFormatterBuilder()
             .appendPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
             .toFormatter();
 
-    private static final int APP_PORT = 10080;
-
     private static final String RUBICON = "rubicon";
-
-    private static final RequestSpecification SPEC = spec(APP_PORT);
-
-    private static final ZonedDateTime NOW = ZonedDateTime.now(
-            Clock.fixed(Instant.parse("2019-10-10T00:00:00Z"), ZoneOffset.UTC));
 
     @Autowired
     private LineItemService lineItemService;
+
+    @Autowired
+    private Clock clock;
 
     @BeforeClass
     public static void setUpInner() throws IOException {
@@ -80,13 +93,14 @@ public class DealsSimulationTest extends IntegrationTest {
                 .withHeader("pg-trx-id", new AnythingPattern())
                 .withHeader("pg-sim-timestamp", equalTo(UTC_MILLIS_FORMATTER.format(NOW)))
                 .willReturn(aResponse()
-                        .withBody(jsonFrom("deals/simulation/test-planner-plan-response-1.json"))));
+                        .withBody(IntegrationTest.jsonFrom("deals/simulation/test-planner-plan-response-1.json"))));
 
         WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/planner-register"))
                 .withBasicAuth("username", "password")
                 .withHeader("pg-trx-id", new AnythingPattern())
                 .withHeader("pg-sim-timestamp", equalTo(NOW.toString()))
-                .withRequestBody(equalToJson(jsonFrom("deals/simulation/test-planner-register-request-1.json")))
+                .withRequestBody(equalToJson(IntegrationTest.jsonFrom(
+                        "deals/simulation/test-planner-register-request-1.json")))
                 .willReturn(aResponse()));
     }
 
@@ -109,7 +123,7 @@ public class DealsSimulationTest extends IntegrationTest {
 
         given(SPEC)
                 .when()
-                .body(jsonFrom("deals/simulation/test-bid-rates.json"))
+                .body(IntegrationTest.jsonFrom("deals/simulation/test-bid-rates.json"))
                 .post("/pbs-admin/e2eAdmin/bidRate");
 
         final Response beforePlansUpdateResponse = given(SPEC)
@@ -119,7 +133,7 @@ public class DealsSimulationTest extends IntegrationTest {
                 .header("pg-sim-timestamp", NOW.plusSeconds(2).toString())
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")
-                .body(jsonFrom("deals/simulation/test-auction-request.json"))
+                .body(IntegrationTest.jsonFrom("deals/simulation/test-auction-request.json"))
                 .post("/openrtb2/auction");
 
         assertResponse("deals/simulation/test-auction-response-1.json", beforePlansUpdateResponse,
@@ -149,7 +163,7 @@ public class DealsSimulationTest extends IntegrationTest {
                 .header("pg-sim-timestamp", NOW.plusMinutes(16).toString())
                 // this uids cookie value stands for {"uids":{"rubicon":"J5VLCWQP-26-CWFT"}}
                 .cookie("uids", "eyJ1aWRzIjp7InJ1Ymljb24iOiJKNVZMQ1dRUC0yNi1DV0ZUIn19")
-                .body(jsonFrom("deals/simulation/test-auction-request.json"))
+                .body(IntegrationTest.jsonFrom("deals/simulation/test-auction-request.json"))
                 .post("/openrtb2/auction");
 
         assertResponse("deals/simulation/test-auction-response-2.json", afterPlansUpdateResponse,
@@ -214,15 +228,15 @@ public class DealsSimulationTest extends IntegrationTest {
 
     private void assertResponse(String expectedResponsePath, Response response, List<String> bidders)
             throws IOException, JSONException {
-        final String expectedAuctionResponse = withTemporalFields(openrtbAuctionResponseFrom(expectedResponsePath,
-                response, bidders));
+        final String expectedAuctionResponse = withTemporalFields(IntegrationTest.openrtbAuctionResponseFrom(
+                expectedResponsePath, response, bidders));
         JSONAssert.assertEquals(expectedAuctionResponse, response.asString(), openrtbDeepDebugTimeComparator());
     }
 
     public static void assertDeliveryStatsProgressRequests(String path1, String path2)
             throws IOException, JSONException {
-        final String firstReportRequest = jsonFrom(path1);
-        final String secondReportRequest = jsonFrom(path2);
+        final String firstReportRequest = IntegrationTest.jsonFrom(path1);
+        final String secondReportRequest = IntegrationTest.jsonFrom(path2);
 
         await().atMost(20, TimeUnit.SECONDS).pollInterval(1, TimeUnit.SECONDS).until(() ->
                 verify(() -> WIRE_MOCK_RULE.verify(2, postRequestedFor(urlPathEqualTo("/delivery-stats-progress")))));

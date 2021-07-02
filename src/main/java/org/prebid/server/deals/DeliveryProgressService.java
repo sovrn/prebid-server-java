@@ -92,13 +92,13 @@ public class DeliveryProgressService implements ApplicationEventProcessor {
      */
     @Override
     public void processAuctionEvent(AuctionContext auctionContext) {
-        processAuctionEvent(auctionContext.getTxnLog(), ZonedDateTime.now(clock));
+        processAuctionEvent(auctionContext.getTxnLog(), auctionContext.getAccount().getId(), ZonedDateTime.now(clock));
     }
 
     /**
      * Updates delivery progress from {@link AuctionContext} statistics for defined date.
      */
-    protected void processAuctionEvent(TxnLog txnLog, ZonedDateTime now) {
+    protected void processAuctionEvent(TxnLog txnLog, String accountId, ZonedDateTime now) {
         final Map<String, Integer> planIdToTokenPriority = new HashMap<>();
 
         txnLog.lineItemSentToClientAsTopMatch().stream()
@@ -107,7 +107,7 @@ public class DeliveryProgressService implements ApplicationEventProcessor {
                 .filter(lineItem -> lineItem.getActiveDeliveryPlan() != null)
                 .forEach(lineItem -> incrementTokens(lineItem, now, planIdToTokenPriority));
 
-        currentDeliveryProgress.recordTransactionLog(txnLog, planIdToTokenPriority);
+        currentDeliveryProgress.recordTransactionLog(txnLog, planIdToTokenPriority, accountId);
     }
 
     /**

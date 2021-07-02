@@ -12,6 +12,8 @@ import io.restassured.config.RestAssuredConfig;
 import io.restassured.internal.mapping.Jackson2Mapper;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import lombok.AllArgsConstructor;
+import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONException;
 import org.junit.BeforeClass;
@@ -22,6 +24,7 @@ import org.prebid.server.cache.proto.request.BidCacheRequest;
 import org.prebid.server.cache.proto.request.PutObject;
 import org.prebid.server.cache.proto.response.BidCacheResponse;
 import org.prebid.server.cache.proto.response.CacheObject;
+import org.prebid.server.it.hooks.TestHooksConfiguration;
 import org.prebid.server.it.util.BidCacheRequestPattern;
 import org.skyscreamer.jsonassert.ArrayValueMatcher;
 import org.skyscreamer.jsonassert.Customization;
@@ -30,11 +33,18 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.skyscreamer.jsonassert.ValueMatcher;
 import org.skyscreamer.jsonassert.comparator.CustomComparator;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,7 +55,8 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import static java.lang.String.format;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@TestPropertySource("test-application.properties")
+@TestPropertySource({"test-application.properties", "test-application-hooks.properties"})
+@Import(TestHooksConfiguration.class)
 public abstract class IntegrationTest extends VertxTest {
 
     private static final int APP_PORT = 8080;
@@ -64,7 +75,7 @@ public abstract class IntegrationTest extends VertxTest {
     @Rule
     public WireMockClassRule instanceRule = WIRE_MOCK_RULE;
 
-    static final RequestSpecification SPEC = spec(APP_PORT);
+    protected static final RequestSpecification SPEC = spec(APP_PORT);
 
     @BeforeClass
     public static void setUp() throws IOException {
@@ -83,12 +94,12 @@ public abstract class IntegrationTest extends VertxTest {
                 .build();
     }
 
-    static String jsonFrom(String file) throws IOException {
+    protected static String jsonFrom(String file) throws IOException {
         // workaround to clear formatting
         return mapper.writeValueAsString(mapper.readTree(IntegrationTest.class.getResourceAsStream(file)));
     }
 
-    static String openrtbAuctionResponseFrom(String templatePath, Response response, List<String> bidders)
+    protected static String openrtbAuctionResponseFrom(String templatePath, Response response, List<String> bidders)
             throws IOException {
 
         return auctionResponseFrom(templatePath, response, "ext.responsetimemillis.%s",
@@ -252,5 +263,89 @@ public abstract class IntegrationTest extends VertxTest {
         public boolean applyGlobally() {
             return false;
         }
+    }
+
+    static final String LINE_ITEM_RESPONSE_ORDER = "lineItemResponseOrder";
+    static final String ID_TO_EXECUTION_PARAMETERS = "idToExecutionParameters";
+
+    public static class ResponseOrderTransformer extends ResponseTransformer {
+
+        private static final String LINE_ITEM_PATH = "/imp/0/ext/rp/target/line_item";
+
+        private final Lock lock = new ReentrantLock();
+        private final Condition lockCondition = lock.newCondition();
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public com.github.tomakehurst.wiremock.http.Response transform(
+                Request request,
+                com.github.tomakehurst.wiremock.http.Response response,
+                FileSource files,
+                Parameters parameters) {
+
+            final Queue<String> lineItemResponseOrder =
+                    (Queue<String>) parameters.get(LINE_ITEM_RESPONSE_ORDER);
+            final Map<String, BidRequestExecutionParameters> idToParameters =
+                    (Map<String, BidRequestExecutionParameters>) parameters.get(ID_TO_EXECUTION_PARAMETERS);
+
+            String requestDealId;
+            try {
+                requestDealId = readStringValue(mapper.readTree(request.getBodyAsString()), LINE_ITEM_PATH);
+            } catch (IOException e) {
+                throw new RuntimeException("Request should contain imp/ext/rp/target/line_item for deals request");
+            }
+
+            final BidRequestExecutionParameters requestParameters = idToParameters.get(requestDealId);
+
+            waitForTurn(lineItemResponseOrder, requestParameters.getDealId(), requestParameters.getDelay());
+
+            return com.github.tomakehurst.wiremock.http.Response.response()
+                    .body(requestParameters.getBody())
+                    .status(requestParameters.getStatus())
+                    .build();
+        }
+
+        private void waitForTurn(Queue<String> dealsResponseOrder, String id, Long delay) {
+            lock.lock();
+            try {
+                while (!dealsResponseOrder.peek().equals(id)) {
+                    lockCondition.await();
+                }
+                TimeUnit.MILLISECONDS.sleep(delay);
+                dealsResponseOrder.poll();
+                lockCondition.signalAll();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(format("Failed on waiting to return bid request for lineItem id = %s",
+                        id));
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        private String readStringValue(JsonNode jsonNode, String path) {
+            return jsonNode.at(path).asText();
+        }
+
+        @Override
+        public String getName() {
+            return "response-order-transformer";
+        }
+
+        @Override
+        public boolean applyGlobally() {
+            return false;
+        }
+    }
+
+    @Value
+    @AllArgsConstructor(staticName = "of")
+    static class BidRequestExecutionParameters {
+        String dealId;
+
+        String body;
+
+        Integer status;
+
+        Long delay;
     }
 }

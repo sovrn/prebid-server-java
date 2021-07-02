@@ -2,6 +2,7 @@ package org.prebid.server.util;
 
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.Cookie;
+import io.vertx.core.http.HttpHeaders;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Rule;
 import org.junit.Test;
@@ -9,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
+import org.prebid.server.model.HttpRequestContext;
 
 import java.time.ZonedDateTime;
 import java.util.Map;
@@ -128,6 +131,23 @@ public class HttpUtilTest {
     }
 
     @Test
+    public void cookiesAsMapFromRequestShouldReturnExpectedResult() {
+        // given
+        final HttpRequestContext httpRequest = HttpRequestContext.builder()
+                .headers(CaseInsensitiveMultiMap.builder()
+                        .add(HttpHeaders.COOKIE, Cookie.cookie("name", "value").encode())
+                        .build())
+                .build();
+
+        // when
+        final Map<String, String> cookies = HttpUtil.cookiesAsMap(httpRequest);
+
+        // then
+        assertThat(cookies).hasSize(1)
+                .containsOnly(entry("name", "value"));
+    }
+
+    @Test
     public void toSetCookieHeaderValueShouldReturnExpectedString() {
         // given
         final Cookie cookie = Cookie.cookie("cookie", "value")
@@ -155,7 +175,7 @@ public class HttpUtilTest {
     }
 
     @Test
-    public void getDateFromHeaderShouldThrowExceptionWhenHeaderWasNotFound() {
+    public void getDateFromHeaderShouldReturnNullWhenHeaderWasNotFound() {
         // given
         final MultiMap headers = MultiMap.caseInsensitiveMultiMap();
 
@@ -175,5 +195,18 @@ public class HttpUtilTest {
         assertThatThrownBy(() -> HttpUtil.getDateFromHeader(headers, "date-header"))
                 .isInstanceOf(PreBidException.class)
                 .hasMessage("date-header header is not compatible to ISO-8601 format: invalid");
+    }
+
+    @Test
+    public void getDateFromHeaderShouldReturnDateFromHeaders() {
+        // given
+        final MultiMap headers = MultiMap.caseInsensitiveMultiMap().add("date-header",
+                "2019-11-04T13:31:24.365+02:00[Europe/Kiev]");
+
+        // when
+        final ZonedDateTime result = HttpUtil.getDateFromHeader(headers, "date-header");
+
+        // then
+        assertThat(result).isEqualTo(ZonedDateTime.parse("2019-11-04T13:31:24.365+02:00[Europe/Kiev]"));
     }
 }

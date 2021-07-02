@@ -34,12 +34,12 @@ public class SimulationAwareLineItemService extends LineItemService {
     @Override
     public boolean accountHasDeals(AuctionContext auctionContext) {
         return accountHasDeals(auctionContext.getAccount().getId(),
-                HttpUtil.getDateFromHeader(auctionContext.getRoutingContext().request().headers(), PG_SIM_TIMESTAMP));
+                HttpUtil.getDateFromHeader(auctionContext.getHttpRequest().getHeaders(), PG_SIM_TIMESTAMP));
     }
 
     @Override
     public MatchLineItemsResult findMatchingLineItems(AuctionContext auctionContext, Imp imp) {
         return findMatchingLineItems(auctionContext, imp,
-                HttpUtil.getDateFromHeader(auctionContext.getRoutingContext().request().headers(), PG_SIM_TIMESTAMP));
+                HttpUtil.getDateFromHeader(auctionContext.getHttpRequest().getHeaders(), PG_SIM_TIMESTAMP));
     }
 }

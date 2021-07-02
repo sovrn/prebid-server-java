@@ -10,7 +10,7 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Publisher;
 import com.iab.openrtb.request.Site;
 import io.vertx.core.Future;
-import io.vertx.core.http.HttpServerRequest;
+import io.vertx.core.MultiMap;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
@@ -21,6 +21,7 @@ import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.StoredRequestProcessor;
 import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.auction.model.AuctionContext;
+import org.prebid.server.auction.model.DebugContext;
 import org.prebid.server.auction.model.IpAddress;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.deals.DealsProcessor;
@@ -33,9 +34,17 @@ import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.hooks.execution.HookStageExecutor;
+import org.prebid.server.hooks.execution.model.HookExecutionContext;
+import org.prebid.server.hooks.execution.model.HookStageExecutionResult;
+import org.prebid.server.hooks.v1.auction.AuctionRequestPayload;
+import org.prebid.server.hooks.v1.entrypoint.EntrypointPayload;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.metric.MetricName;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
+import org.prebid.server.model.Endpoint;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtPublisher;
@@ -87,6 +96,7 @@ public class Ortb2RequestFactory {
     private final ApplicationSettings applicationSettings;
     private final DealsProcessor dealsProcessor;
     private final IpAddressHelper ipAddressHelper;
+    private final HookStageExecutor hookStageExecutor;
     private final Clock clock;
     private final JacksonMapper mapper;
 
@@ -99,6 +109,7 @@ public class Ortb2RequestFactory {
                                StoredRequestProcessor storedRequestProcessor,
                                ApplicationSettings applicationSettings,
                                IpAddressHelper ipAddressHelper,
+                               HookStageExecutor hookStageExecutor,
                                DealsProcessor dealsProcessor,
                                Clock clock,
                                JacksonMapper mapper) {
@@ -112,32 +123,48 @@ public class Ortb2RequestFactory {
         this.storedRequestProcessor = Objects.requireNonNull(storedRequestProcessor);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
+        this.hookStageExecutor = Objects.requireNonNull(hookStageExecutor);
         this.dealsProcessor = dealsProcessor;
         this.clock = Objects.requireNonNull(clock);
         this.mapper = Objects.requireNonNull(mapper);
     }
 
-    public Future<AuctionContext> fetchAccountAndCreateAuctionContext(RoutingContext routingContext,
-                                                                      BidRequest bidRequest,
-                                                                      MetricName requestTypeMetric,
-                                                                      boolean isLookupStoredRequest,
-                                                                      long startTime,
-                                                                      List<String> errors) {
-        final Timeout timeout = timeout(bidRequest, startTime, timeoutResolver);
-        return accountFrom(bidRequest, timeout, routingContext, isLookupStoredRequest)
-                .map(account -> AuctionContext.builder()
-                        .routingContext(routingContext)
-                        .uidsCookie(uidsCookieService.parseFromRequest(routingContext))
-                        .bidRequest(bidRequest)
-                        .requestTypeMetric(requestTypeMetric)
-                        .timeout(timeout)
-                        .account(account)
-                        .prebidErrors(errors)
-                        .debugWarnings(new ArrayList<>())
-                        .txnLog(TxnLog.create().accountId(account.getId()))
-                        .deepDebugLog(createDeepDebugLog(bidRequest))
-                        .debugHttpCalls(new HashMap<>())
-                        .build());
+    public AuctionContext createAuctionContext(Endpoint endpoint, MetricName requestTypeMetric) {
+        return AuctionContext.builder()
+                .requestTypeMetric(requestTypeMetric)
+                .prebidErrors(new ArrayList<>())
+                .debugWarnings(new ArrayList<>())
+                .hookExecutionContext(HookExecutionContext.of(endpoint))
+                .debugContext(DebugContext.empty())
+                .requestRejected(false)
+                .txnLog(TxnLog.create())
+                .debugHttpCalls(new HashMap<>())
+                .build();
+    }
+
+    public AuctionContext enrichAuctionContext(AuctionContext auctionContext,
+                                               HttpRequestContext httpRequest,
+                                               BidRequest bidRequest,
+                                               long startTime) {
+
+        return auctionContext.toBuilder()
+                .httpRequest(httpRequest)
+                .uidsCookie(uidsCookieService.parseFromRequest(httpRequest))
+                .bidRequest(bidRequest)
+                .timeout(timeout(bidRequest, startTime))
+                .debugContext(debugContext(bidRequest))
+                .deepDebugLog(createDeepDebugLog(bidRequest))
+                .build();
+    }
+
+    public Future<Account> fetchAccount(AuctionContext auctionContext, boolean isLookupStoredRequest) {
+        final BidRequest bidRequest = auctionContext.getBidRequest();
+        final Timeout timeout = auctionContext.getTimeout();
+        final HttpRequestContext httpRequest = auctionContext.getHttpRequest();
+
+        return findAccountIdFrom(bidRequest, isLookupStoredRequest)
+                .map(this::validateIfAccountBlacklisted)
+                .compose(accountId -> loadAccount(timeout, httpRequest, accountId));
     }
 
     /**
@@ -151,9 +178,10 @@ public class Ortb2RequestFactory {
         return bidRequest;
     }
 
-    public BidRequest enrichBidRequestWithAccountAndPrivacyData(BidRequest bidRequest,
-                                                                Account account,
-                                                                PrivacyContext privacyContext) {
+    public BidRequest enrichBidRequestWithAccountAndPrivacyData(AuctionContext auctionContext) {
+        final BidRequest bidRequest = auctionContext.getBidRequest();
+        final Account account = auctionContext.getAccount();
+        final PrivacyContext privacyContext = auctionContext.getPrivacyContext();
 
         final ExtRequest requestExt = bidRequest.getExt();
         final ExtRequest enrichedRequestExt = enrichExtRequest(requestExt, account);
@@ -180,6 +208,77 @@ public class Ortb2RequestFactory {
         return bidRequest;
     }
 
+    public Future<HttpRequestContext> executeEntrypointHooks(RoutingContext routingContext,
+                                                             String body,
+                                                             AuctionContext auctionContext) {
+
+        return hookStageExecutor.executeEntrypointStage(
+                toCaseInsensitiveMultiMap(routingContext.queryParams()),
+                toCaseInsensitiveMultiMap(routingContext.request().headers()),
+                body,
+                auctionContext.getHookExecutionContext())
+                .map(stageResult -> toHttpRequest(stageResult, routingContext, auctionContext));
+    }
+
+    public Future<BidRequest> executeRawAuctionRequestHooks(AuctionContext auctionContext) {
+        return hookStageExecutor.executeRawAuctionRequestStage(auctionContext)
+                .map(stageResult -> toBidRequest(stageResult, auctionContext));
+    }
+
+    public Future<BidRequest> executeProcessedAuctionRequestHooks(AuctionContext auctionContext) {
+        return hookStageExecutor.executeProcessedAuctionRequestStage(auctionContext)
+                .map(stageResult -> toBidRequest(stageResult, auctionContext));
+    }
+
+    public Future<AuctionContext> restoreResultFromRejection(Throwable throwable) {
+        if (throwable instanceof RejectedRequestException) {
+            final AuctionContext auctionContext = ((RejectedRequestException) throwable).getAuctionContext();
+
+            return Future.succeededFuture(auctionContext.withRequestRejected());
+        }
+
+        return Future.failedFuture(throwable);
+    }
+
+    private static HttpRequestContext toHttpRequest(HookStageExecutionResult<EntrypointPayload> stageResult,
+                                                    RoutingContext routingContext,
+                                                    AuctionContext auctionContext) {
+
+        if (stageResult.isShouldReject()) {
+            throw new RejectedRequestException(auctionContext);
+        }
+
+        return HttpRequestContext.builder()
+                .absoluteUri(routingContext.request().absoluteURI())
+                .queryParams(stageResult.getPayload().queryParams())
+                .headers(stageResult.getPayload().headers())
+                .body(stageResult.getPayload().body())
+                .scheme(routingContext.request().scheme())
+                .remoteHost(routingContext.request().remoteAddress().host())
+                .build();
+    }
+
+    private static BidRequest toBidRequest(HookStageExecutionResult<AuctionRequestPayload> stageResult,
+                                           AuctionContext auctionContext) {
+
+        if (stageResult.isShouldReject()) {
+            throw new RejectedRequestException(auctionContext);
+        }
+
+        return stageResult.getPayload().bidRequest();
+    }
+
+    private static DebugContext debugContext(BidRequest bidRequest) {
+        final ExtRequestPrebid extRequestPrebid = getIfNotNull(bidRequest.getExt(), ExtRequest::getPrebid);
+
+        final boolean debugEnabled = Objects.equals(bidRequest.getTest(), 1)
+                || Objects.equals(getIfNotNull(extRequestPrebid, ExtRequestPrebid::getDebug), 1);
+
+        final TraceLevel traceLevel = getIfNotNull(extRequestPrebid, ExtRequestPrebid::getTrace);
+
+        return DebugContext.of(debugEnabled, traceLevel);
+    }
+
     public Future<AuctionContext> populateDealsInfo(AuctionContext auctionContext) {
         return dealsProcessor != null
                 ? dealsProcessor.populateDealsInfo(auctionContext)
@@ -189,25 +288,10 @@ public class Ortb2RequestFactory {
     /**
      * Returns {@link Timeout} based on request.tmax and adjustment value of {@link TimeoutResolver}.
      */
-    private Timeout timeout(BidRequest bidRequest, long startTime, TimeoutResolver timeoutResolver) {
+    private Timeout timeout(BidRequest bidRequest, long startTime) {
         final long resolvedRequestTimeout = timeoutResolver.resolve(bidRequest.getTmax());
         final long timeout = timeoutResolver.adjustTimeout(resolvedRequestTimeout);
         return timeoutFactory.create(startTime, timeout);
-    }
-
-    /**
-     * Make lookup for storedRequest if isLookupStoredRequest is true
-     * and account id is not found in original {@link BidRequest}.
-     * <p>
-     * Returns {@link Account} fetched by {@link ApplicationSettings}.
-     */
-    private Future<Account> accountFrom(BidRequest bidRequest,
-                                        Timeout timeout,
-                                        RoutingContext routingContext,
-                                        boolean isLookupStoredRequest) {
-        return findAccountIdFrom(bidRequest, isLookupStoredRequest)
-                .map(this::validateIfAccountBlacklisted)
-                .compose(accountId -> fetchAccount(timeout, routingContext, accountId));
     }
 
     private Future<String> findAccountIdFrom(BidRequest bidRequest, boolean isLookupStoredRequest) {
@@ -230,14 +314,14 @@ public class Ortb2RequestFactory {
         return accountId;
     }
 
-    private Future<Account> fetchAccount(Timeout timeout,
-                                         RoutingContext routingContext,
-                                         String accountId) {
+    private Future<Account> loadAccount(Timeout timeout,
+                                        HttpRequestContext httpRequest,
+                                        String accountId) {
         return StringUtils.isBlank(accountId)
-                ? responseForEmptyAccount(routingContext)
+                ? responseForEmptyAccount(httpRequest)
                 : applicationSettings.getAccountById(accountId, timeout)
                 .compose(this::ensureAccountActive,
-                        exception -> accountFallback(exception, accountId, routingContext));
+                        exception -> accountFallback(exception, accountId, httpRequest));
     }
 
     /**
@@ -291,26 +375,25 @@ public class Ortb2RequestFactory {
         return extPublisherPrebid != null ? StringUtils.stripToNull(extPublisherPrebid.getParentAccount()) : null;
     }
 
-    private Future<Account> responseForEmptyAccount(RoutingContext routingContext) {
-        EMPTY_ACCOUNT_LOGGER.warn(accountErrorMessage("Account not specified", routingContext), 100);
+    private Future<Account> responseForEmptyAccount(HttpRequestContext httpRequest) {
+        EMPTY_ACCOUNT_LOGGER.warn(accountErrorMessage("Account not specified", httpRequest), 100);
         return responseForUnknownAccount(StringUtils.EMPTY);
     }
 
-    private static String accountErrorMessage(String message, RoutingContext routingContext) {
-        final HttpServerRequest request = routingContext.request();
+    private static String accountErrorMessage(String message, HttpRequestContext httpRequest) {
         return String.format(
                 "%s, Url: %s and Referer: %s",
                 message,
-                request.absoluteURI(),
-                request.headers().get(HttpUtil.REFERER_HEADER));
+                httpRequest.getAbsoluteUri(),
+                httpRequest.getHeaders().get(HttpUtil.REFERER_HEADER));
     }
 
     private Future<Account> accountFallback(Throwable exception,
                                             String accountId,
-                                            RoutingContext routingContext) {
+                                            HttpRequestContext httpRequest) {
 
         if (exception instanceof PreBidException) {
-            UNKNOWN_ACCOUNT_LOGGER.warn(accountErrorMessage(exception.getMessage(), routingContext), 100);
+            UNKNOWN_ACCOUNT_LOGGER.warn(accountErrorMessage(exception.getMessage(), httpRequest), 100);
         } else {
             logger.warn("Error occurred while fetching account: {0}", exception.getMessage());
             logger.debug("Error occurred while fetching account", exception);
@@ -472,7 +555,12 @@ public class Ortb2RequestFactory {
 
             prebidExtBuilder.integration(accountDefaultIntegration);
 
-            return ExtRequest.of(prebidExtBuilder.build());
+            final ExtRequest updatedExt = ExtRequest.of(prebidExtBuilder.build());
+            if (ext != null) {
+                updatedExt.addProperties(ext.getProperties());
+            }
+
+            return updatedExt;
         }
 
         return null;
@@ -516,6 +604,13 @@ public class Ortb2RequestFactory {
         }
 
         return null;
+    }
+
+    private static CaseInsensitiveMultiMap toCaseInsensitiveMultiMap(MultiMap originalMap) {
+        final CaseInsensitiveMultiMap.Builder mapBuilder = CaseInsensitiveMultiMap.builder();
+        originalMap.entries().forEach(entry -> mapBuilder.add(entry.getKey(), entry.getValue()));
+
+        return mapBuilder.build();
     }
 
     /**
@@ -585,5 +680,18 @@ public class Ortb2RequestFactory {
 
     private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
         return target != null ? getter.apply(target) : null;
+    }
+
+    static class RejectedRequestException extends RuntimeException {
+
+        private final AuctionContext auctionContext;
+
+        RejectedRequestException(AuctionContext auctionContext) {
+            this.auctionContext = auctionContext;
+        }
+
+        public AuctionContext getAuctionContext() {
+            return auctionContext;
+        }
     }
 }

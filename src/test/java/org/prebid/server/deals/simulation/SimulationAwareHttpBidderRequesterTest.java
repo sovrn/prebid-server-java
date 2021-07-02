@@ -8,7 +8,6 @@ import com.iab.openrtb.request.Imp;
 import com.iab.openrtb.request.Pmp;
 import com.iab.openrtb.response.Bid;
 import io.vertx.core.Future;
-import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -28,6 +27,7 @@ import org.prebid.server.deals.lineitem.LineItem;
 import org.prebid.server.deals.proto.LineItemMetaData;
 import org.prebid.server.deals.proto.Price;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
 import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -63,7 +63,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
     @Mock
     private HttpBidderRequestEnricher requestEnricher;
     @Mock
-    private RoutingContext routingContext;
+    private CaseInsensitiveMultiMap requestHeaders;
     @Mock
     private LineItemService lineItemService;
 
@@ -103,7 +103,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, requestHeaders,
                 false);
 
         // then
@@ -134,7 +134,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, requestHeaders,
                 false);
 
         // then
@@ -164,7 +164,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, requestHeaders,
                 false);
 
         // then
@@ -194,7 +194,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when and then
-        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, routingContext, false))
+        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, requestHeaders, false))
                 .isInstanceOf(PreBidException.class)
                 .hasMessageStartingWith("Error decoding bidRequest.imp.pmp.deal.ext:");
     }
@@ -211,7 +211,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, routingContext,
+        final Future<BidderSeatBid> result = bidderRequester.requestBids(null, bidderRequest, null, requestHeaders,
                 false);
 
         // then
@@ -235,7 +235,7 @@ public class SimulationAwareHttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         // when
-        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, routingContext, false))
+        assertThatThrownBy(() -> bidderRequester.requestBids(null, bidderRequest, null, requestHeaders, false))
                 .isInstanceOf(PreBidException.class)
                 .hasMessage("Bid rate for line item with id lineItemId2 was not found");
     }

@@ -47,13 +47,13 @@ public class SimulationAwareDeliveryProgressService extends DeliveryProgressServ
 
     @Override
     public void processAuctionEvent(AuctionContext auctionContext) {
-        final ZonedDateTime now = HttpUtil.getDateFromHeader(auctionContext.getRoutingContext().request().headers(),
+        final ZonedDateTime now = HttpUtil.getDateFromHeader(auctionContext.getHttpRequest().getHeaders(),
                 PG_SIM_TIMESTAMP);
         if (firstReportUpdate) {
             firstReportUpdate = false;
             updateDeliveryProgressesStartTime(now);
         }
-        super.processAuctionEvent(auctionContext.getTxnLog(), now);
+        super.processAuctionEvent(auctionContext.getTxnLog(), auctionContext.getAccount().getId(), now);
     }
 
     protected void incrementTokens(LineItem lineItem, ZonedDateTime now, Map<String, Integer> planIdToTokenPriority) {

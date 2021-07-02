@@ -1,16 +1,8 @@
 package org.prebid.server.it;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.github.tomakehurst.wiremock.common.FileSource;
-import com.github.tomakehurst.wiremock.extension.Parameters;
-import com.github.tomakehurst.wiremock.extension.ResponseTransformer;
-import com.github.tomakehurst.wiremock.http.Request;
-import com.github.tomakehurst.wiremock.http.Response;
 import com.github.tomakehurst.wiremock.junit.WireMockClassRule;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import io.restassured.specification.RequestSpecification;
-import lombok.AllArgsConstructor;
-import lombok.Value;
 import org.json.JSONException;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -40,9 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -66,15 +55,13 @@ public class PrematureReturnTest extends VertxTest {
 
     private static final int APP_PORT = 9080;
     private static final int WIREMOCK_PORT = 8090;
-    private static final String LINE_ITEM_RESPONSE_ORDER = "lineItemResponseOrder";
-    private static final String ID_TO_EXECUTION_PARAMETERS = "idToExecutionParameters";
 
     private static final RequestSpecification SPEC = IntegrationTest.spec(APP_PORT);
 
     @SuppressWarnings("unchecked")
     @ClassRule
     public static final WireMockClassRule WIRE_MOCK_RULE = new WireMockClassRule(
-            options().port(WIREMOCK_PORT).extensions(ResponseOrderTransformer.class));
+            options().port(WIREMOCK_PORT).extensions(IntegrationTest.ResponseOrderTransformer.class));
 
     private static final String RUBICON = "rubicon";
 
@@ -120,12 +107,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem3");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-1.json"), 200, 0L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 20L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-3.json"), 200, 20L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -150,12 +137,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem1");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-1.json"), 200, 20L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 20L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-3.json"), 200, 0L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -180,12 +167,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem3");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-1.json"), 200, 0L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 200L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-3.json"), 200, 200L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -209,12 +196,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem1");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-1.json"), 200, 200L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 200L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-3.json"), 200, 0L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -239,12 +226,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem3");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-1.json"), 200, 0L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-2.json"), 200, 20L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-3.json"), 200, 20L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -269,12 +256,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem3");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-1.json"), 200, 0L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 20L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-3.json"), 200, 20L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -299,12 +286,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem3");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-1.json"), 200, 0L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-2.json"), 200, 20L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-3.json"), 200, 20L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -328,12 +315,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem1");
         lineItemResponseOrder.add("extLineItem3");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-1.json"), 200, 200L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 0L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-3.json"), 200, 200L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -358,12 +345,12 @@ public class PrematureReturnTest extends VertxTest {
         lineItemResponseOrder.add("extLineItem2");
         lineItemResponseOrder.add("extLineItem1");
 
-        final Map<String, BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
-        idToExecutionParameters.put("extLineItem1", BidRequestExecutionParameters.of("extLineItem1",
+        final Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters = new HashMap<>();
+        idToExecutionParameters.put("extLineItem1", IntegrationTest.BidRequestExecutionParameters.of("extLineItem1",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-no-bid-response-1.json"), 200, 200L));
-        idToExecutionParameters.put("extLineItem2", BidRequestExecutionParameters.of("extLineItem2",
+        idToExecutionParameters.put("extLineItem2", IntegrationTest.BidRequestExecutionParameters.of("extLineItem2",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-2.json"), 200, 200L));
-        idToExecutionParameters.put("extLineItem3", BidRequestExecutionParameters.of("extLineItem3",
+        idToExecutionParameters.put("extLineItem3", IntegrationTest.BidRequestExecutionParameters.of("extLineItem3",
                 IntegrationTest.jsonFrom("deals/premature/test-rubicon-bid-response-3.json"), 200, 0L));
 
         stubExchange(lineItemResponseOrder, idToExecutionParameters);
@@ -390,12 +377,13 @@ public class PrematureReturnTest extends VertxTest {
     }
 
     private void stubExchange(Queue<String> lineItemResponseOrder,
-                              Map<String, BidRequestExecutionParameters> idToExecutionParameters) {
+                              Map<String, IntegrationTest.BidRequestExecutionParameters> idToExecutionParameters) {
         WIRE_MOCK_RULE.stubFor(post(urlMatching("/rubicon-exchange.*"))
                 .willReturn(aResponse()
                         .withTransformers("response-order-transformer")
-                        .withTransformerParameter(LINE_ITEM_RESPONSE_ORDER, lineItemResponseOrder)
-                        .withTransformerParameter(ID_TO_EXECUTION_PARAMETERS, idToExecutionParameters)));
+                        .withTransformerParameter(IntegrationTest.LINE_ITEM_RESPONSE_ORDER, lineItemResponseOrder)
+                        .withTransformerParameter(IntegrationTest.ID_TO_EXECUTION_PARAMETERS,
+                                idToExecutionParameters)));
     }
 
     private void awaitForLineItemMetadata() {
@@ -448,77 +436,5 @@ public class PrematureReturnTest extends VertxTest {
                 .replaceAll("\"?\\{\\{ userdow }}\"?", Integer.toString(
                         dateTime.getDayOfWeek().get(WeekFields.SUNDAY_START.dayOfWeek())))
                 .replaceAll("\"?\\{\\{ userhour }}\"?", Integer.toString(dateTime.getHour()));
-    }
-
-    public static class ResponseOrderTransformer extends ResponseTransformer {
-
-        private static final String LINE_ITEM_PATH = "/imp/0/ext/rp/target/line_item";
-
-        private final Lock lock = new ReentrantLock();
-        private final Condition lockCondition = lock.newCondition();
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public Response transform(Request request, Response response, FileSource files, Parameters parameters) {
-            final Queue<String> lineItemResponseOrder = (Queue<String>) parameters.get(LINE_ITEM_RESPONSE_ORDER);
-            final Map<String, BidRequestExecutionParameters> idToParameters =
-                    (Map<String, BidRequestExecutionParameters>) parameters.get(ID_TO_EXECUTION_PARAMETERS);
-
-            String requestDealId;
-            try {
-                requestDealId = readStringValue(mapper.readTree(request.getBodyAsString()), LINE_ITEM_PATH);
-            } catch (IOException e) {
-                throw new RuntimeException("Request should contain imp/ext/rp/target/line_item for deals request");
-            }
-
-            final BidRequestExecutionParameters requestParameters = idToParameters.get(requestDealId);
-
-            waitForTurn(lineItemResponseOrder, requestParameters.getDealId(), requestParameters.getDelay());
-
-            return Response.response().body(requestParameters.getBody()).status(requestParameters.getStatus()).build();
-        }
-
-        private void waitForTurn(Queue<String> dealsResponseOrder, String id, Long delay) {
-            lock.lock();
-            try {
-                while (!dealsResponseOrder.peek().equals(id)) {
-                    lockCondition.await();
-                }
-                TimeUnit.MILLISECONDS.sleep(delay);
-                dealsResponseOrder.poll();
-                lockCondition.signalAll();
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(String.format("Failed on waiting to return bid request for lineItem id = %s",
-                        id));
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        private String readStringValue(JsonNode jsonNode, String path) {
-            return jsonNode.at(path).asText();
-        }
-
-        @Override
-        public String getName() {
-            return "response-order-transformer";
-        }
-
-        @Override
-        public boolean applyGlobally() {
-            return false;
-        }
-    }
-
-    @Value
-    @AllArgsConstructor(staticName = "of")
-    private static class BidRequestExecutionParameters {
-        String dealId;
-
-        String body;
-
-        Integer status;
-
-        Long delay;
     }
 }

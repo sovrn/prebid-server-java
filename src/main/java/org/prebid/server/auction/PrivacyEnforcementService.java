@@ -6,6 +6,7 @@ import com.iab.openrtb.request.Geo;
 import com.iab.openrtb.request.Site;
 import com.iab.openrtb.request.User;
 import io.vertx.core.Future;
+import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.collections4.CollectionUtils;
@@ -19,6 +20,7 @@ import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.privacy.PrivacyExtractor;
 import org.prebid.server.privacy.ccpa.Ccpa;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
@@ -96,7 +98,7 @@ public class PrivacyEnforcementService {
 
     public Future<PrivacyContext> contextFromBidRequest(AuctionContext auctionContext) {
         final BidRequest bidRequest = auctionContext.getBidRequest();
-        final RoutingContext routingContext = auctionContext.getRoutingContext();
+        final HttpRequestContext httpRequest = auctionContext.getHttpRequest();
         final List<String> errors = auctionContext.getPrebidErrors();
         final Account account = auctionContext.getAccount();
         final MetricName requestType = auctionContext.getRequestTypeMetric();
@@ -108,7 +110,7 @@ public class PrivacyEnforcementService {
         final Device device = bidRequest.getDevice();
 
         final Geo geo = device != null ? device.getGeo() : null;
-        final String country = getFromRsidCookieIfNull(geo != null ? geo.getCountry() : null, routingContext);
+        final String country = getFromRsidCookieIfNull(geo != null ? geo.getCountry() : null, httpRequest);
 
         final String effectiveIpAddress = resolveIpAddress(device, privacy);
 
@@ -145,7 +147,7 @@ public class PrivacyEnforcementService {
         final AccountGdprConfig accountGdpr = account.getGdpr();
         final String accountId = account.getId();
         final RequestLogInfo requestLogInfo = requestLogInfo(MetricName.setuid, null, accountId);
-        final String country = getFromRsidCookieIfNull(null, routingContext);
+        final String country = getFromRsidCookieIfNull(routingContext);
 
         return tcfDefinerService.resolveTcfContext(
                 privacy, country, ipAddress, accountGdpr, MetricName.setuid, requestLogInfo, timeout, null)
@@ -161,7 +163,7 @@ public class PrivacyEnforcementService {
         final AccountGdprConfig accountGdpr = account.getGdpr();
         final String accountId = account.getId();
         final RequestLogInfo requestLogInfo = requestLogInfo(MetricName.cookiesync, null, accountId);
-        final String country = getFromRsidCookieIfNull(null, routingContext);
+        final String country = getFromRsidCookieIfNull(routingContext);
 
         return tcfDefinerService.resolveTcfContext(
                 privacy, country, ipAddress, accountGdpr, MetricName.cookiesync, requestLogInfo, timeout, null)
@@ -169,7 +171,9 @@ public class PrivacyEnforcementService {
     }
 
     private String resolveIpFromRequest(HttpServerRequest request) {
-        final List<String> requestIps = implicitParametersExtractor.ipFrom(request);
+        final MultiMap headers = request.headers();
+        final String host = request.remoteAddress().host();
+        final List<String> requestIps = implicitParametersExtractor.ipFrom(headers, host);
         return requestIps.stream()
                 .map(ipAddressHelper::toIpAddress)
                 .filter(Objects::nonNull)
@@ -614,12 +618,17 @@ public class PrivacyEnforcementService {
         return result;
     }
 
-    private String getFromRsidCookieIfNull(String country, RoutingContext context) {
+    private String getFromRsidCookieIfNull(RoutingContext context) {
+        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        return rsid != null ? rsid.getCountry() : null;
+    }
+
+    private String getFromRsidCookieIfNull(String country, HttpRequestContext httpRequest) {
         if (StringUtils.isNotBlank(country)) {
             return country;
         }
 
-        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        final Rsid rsid = rsidCookieService.parseFromRequest(httpRequest);
         return rsid != null ? rsid.getCountry() : null;
     }
 }
