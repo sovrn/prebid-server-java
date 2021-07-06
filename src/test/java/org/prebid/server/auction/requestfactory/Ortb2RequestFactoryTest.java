@@ -198,13 +198,15 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 clock,
                 jacksonMapper);
 
+        given(storedRequestProcessor.processStoredRequests(any(), any()))
+                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+
         // when
         final Future<?> future = target.fetchAccount(
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(defaultBidRequest)
-                        .build(),
-                false);
+                        .build());
 
         // then
         verify(applicationSettings, never()).getAccountById(any(), any());
@@ -246,8 +248,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(bidRequest)
-                        .build(),
-                false);
+                        .build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -274,8 +275,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<?> future = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         assertThat(future.failed()).isTrue();
@@ -294,8 +294,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<?> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         assertThat(result.failed()).isTrue();
@@ -321,8 +320,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -343,8 +341,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -365,8 +362,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -391,8 +387,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -415,8 +410,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq(accountId), any());
@@ -435,13 +429,15 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .build()))
                 .build();
 
+        given(storedRequestProcessor.processStoredRequests(any(), any()))
+                .willReturn(Future.succeededFuture(givenBidRequest(identity())));
+
         // when
         final Future<Account> result = target.fetchAccount(
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(bidRequest)
-                        .build(),
-                false);
+                        .build());
 
         // then
         assertThat(result.result()).isEqualTo(Account.builder().id("").build());
@@ -464,8 +460,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq("123"), any());
@@ -490,8 +485,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq("123"), any());
@@ -516,8 +510,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq("123"), any());
@@ -545,8 +538,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq("123"), any());
@@ -580,8 +572,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq("123"), any());
@@ -608,8 +599,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq("123"), any());
@@ -635,8 +625,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(bidRequest)
-                        .build(),
-                false);
+                        .build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -657,8 +646,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         // when
         final Future<Account> result = target.fetchAccount(
-                AuctionContext.builder().bidRequest(bidRequest).build(),
-                false);
+                AuctionContext.builder().bidRequest(bidRequest).build());
 
         // then
         verify(applicationSettings).getAccountById(eq(ACCOUNT_ID), any());
@@ -671,6 +659,9 @@ public class Ortb2RequestFactoryTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(identity());
 
+        given(storedRequestProcessor.processStoredRequests(any(), any()))
+                .willReturn(Future.succeededFuture(bidRequest));
+
         given(applicationSettings.getAccountById(any(), any()))
                 .willReturn(Future.failedFuture(new RuntimeException("error")));
 
@@ -679,8 +670,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(bidRequest)
-                        .build(),
-                false);
+                        .build());
 
         // then
         verifyZeroInteractions(applicationSettings);
@@ -711,8 +701,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(receivedBidRequest)
-                        .build(),
-                true);
+                        .build());
 
         // then
         verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
@@ -738,8 +727,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(receivedBidRequest)
-                        .build(),
-                true);
+                        .build());
 
         // then
         verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
@@ -779,8 +767,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(receivedBidRequest)
-                        .build(),
-                true);
+                        .build());
 
         // then
         verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
@@ -802,8 +789,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 AuctionContext.builder()
                         .httpRequest(httpRequest)
                         .bidRequest(receivedBidRequest)
-                        .build(),
-                true);
+                        .build());
 
         // then
         verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
@@ -811,6 +797,19 @@ public class Ortb2RequestFactoryTest extends VertxTest {
 
         assertThat(result.failed()).isTrue();
         assertThat(result.cause()).hasMessage("error");
+    }
+
+    @Test
+    public void fetchAccountWithoutStoredRequestLookupShouldNeverCallStoredProcessor() {
+        // when
+        target.fetchAccountWithoutStoredRequestLookup(
+                AuctionContext.builder()
+                        .httpRequest(httpRequest)
+                        .bidRequest(givenBidRequest(identity()))
+                        .build());
+
+        // then
+        verifyZeroInteractions(storedRequestProcessor);
     }
 
     @Test
