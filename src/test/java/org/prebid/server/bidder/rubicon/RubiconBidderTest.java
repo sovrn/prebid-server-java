@@ -820,12 +820,12 @@ public class RubiconBidderTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldFillUserExtRpWithIabAttributeIfSegtaxEqualsThree() {
+    public void makeHttpRequestsShouldFillUserExtRpWithIabAttributeIfSegtaxEqualsFour() {
         // given
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder.user(User.builder()
                         .data(singletonList(
-                                givenDataWithSegmentEntry(3, "segmentId")
+                                givenDataWithSegmentEntry(4, "segmentId")
                         )).build()),
                 builder -> builder.video(Video.builder().build()),
                 identity());
@@ -851,12 +851,12 @@ public class RubiconBidderTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldFillUserExtRpWithIabAttributeOnlyIfSegtaxIsEqualThree() {
+    public void makeHttpRequestsShouldFillUserExtRpWithIabAttributeOnlyIfSegtaxIsEqualFour() {
         // given
         final BidRequest bidRequest = givenBidRequest(
                 builder -> builder.user(User.builder()
                         .data(asList(
-                                givenDataWithSegmentEntry(3, "segmentId"),
+                                givenDataWithSegmentEntry(4, "segmentId"),
                                 givenDataWithSegmentEntry(2, "secondSegmentId")))
                         .build()),
                 builder -> builder.video(Video.builder().build()),

@@ -1,24 +1,24 @@
 adapters:
-  criteo:
+  madvertise:
     enabled: false
-    endpoint: https://bidder.criteo.com/cdb?profileId=230
+    endpoint: https://mobile.mng-ads.com/bidrequest{{ZoneID}}
     pbs-enforces-gdpr: true
     pbs-enforces-ccpa: true
     modifying-vast-xml-allowed: true
-    generate-slot-id: true
     deprecated-names:
     aliases: {}
     meta-info:
-      maintainer-email: prebid@criteo.com
+      maintainer-email: support@madvertise.com
       app-media-types:
         - banner
+        - video
       site-media-types:
         - banner
       supported-vendors:
-      vendor-id: 91
+      vendor-id: 153
     usersync:
       url:
       redirect-url:
-      cookie-family-name: criteo
+      cookie-family-name: madvertise
       type: redirect
       support-cors: false
