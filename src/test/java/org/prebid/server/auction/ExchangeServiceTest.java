@@ -1,6 +1,5 @@
 package org.prebid.server.auction;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -1120,7 +1119,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         assertThat(bidResponse.getSeatbid()).flatExtracting(SeatBid::getBid)
-                .extracting(bid -> toExtPrebid(bid.getExt()).getPrebid().getTargeting())
+                .extracting(bid -> toExtBidPrebid(bid.getExt()).getTargeting())
                 .allSatisfy(map -> assertThat(map).isNull());
     }
 
@@ -1140,7 +1139,7 @@ public class ExchangeServiceTest extends VertxTest {
 
         // then
         assertThat(bidResponse.getSeatbid()).flatExtracting(SeatBid::getBid)
-                .extracting(bid -> toExtPrebid(bid.getExt()).getPrebid().getTargeting())
+                .extracting(bid -> toExtBidPrebid(bid.getExt()).getTargeting())
                 .allSatisfy(map -> assertThat(map).isNull());
     }
 
@@ -2681,7 +2680,7 @@ public class ExchangeServiceTest extends VertxTest {
         // then
         assertThat(bidResponse.getSeatbid()).hasSize(1)
                 .flatExtracting(SeatBid::getBid)
-                .extracting(bid -> toExtPrebid(bid.getExt()).getPrebid().getEvents())
+                .extracting(bid -> toExtBidPrebid(bid.getExt()).getEvents())
                 .containsNull();
     }
 
@@ -3714,10 +3713,9 @@ public class ExchangeServiceTest extends VertxTest {
         return map;
     }
 
-    private static ExtPrebid<ExtBidPrebid, ?> toExtPrebid(ObjectNode ext) {
+    private static ExtBidPrebid toExtBidPrebid(ObjectNode ext) {
         try {
-            return mapper.readValue(mapper.treeAsTokens(ext), new TypeReference<ExtPrebid<ExtBidPrebid, ?>>() {
-            });
+            return mapper.treeToValue(ext.get("prebid"), ExtBidPrebid.class);
         } catch (IOException e) {
             return rethrow(e);
         }
