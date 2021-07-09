@@ -107,9 +107,6 @@ public class BidResponseCreator {
 
     private static final String CACHE = "cache";
     private static final String PREBID_EXT = "prebid";
-    private static final String ORIGINAL_BID_CPM = "origbidcpm";
-    private static final String ORIGINAL_BID_CURRENCY = "origbidcur";
-    private static final String SKADN_PROPERTY = "skadn";
     private static final Integer DEFAULT_BID_LIMIT_MIN = 1;
 
     private final CacheService cacheService;
@@ -246,7 +243,13 @@ public class BidResponseCreator {
 
         return bid.toBuilder()
                 .id(enforcedRandomBidId)
-                .adm(updateBidAdm(bid, bidType, bidder, account, eventsContext, effectiveBidId, debugWarnings,
+                .adm(updateBidAdm(bid,
+                        bidType,
+                        bidder,
+                        account,
+                        eventsContext,
+                        effectiveBidId,
+                        debugWarnings,
                         lineItemId))
                 .ext(updateBidExt(
                         bid,
@@ -285,13 +288,25 @@ public class BidResponseCreator {
                 : bidAdm;
     }
 
-    private ObjectNode updateBidExt(Bid bid, BidType bidType, String bidder, Account account,
-                                    VideoStoredDataResult videoStoredDataResult, EventsContext eventsContext,
-                                    String generatedBidId, String effectiveBidId,
+    private ObjectNode updateBidExt(Bid bid,
+                                    BidType bidType,
+                                    String bidder,
+                                    Account account,
+                                    VideoStoredDataResult videoStoredDataResult,
+                                    EventsContext eventsContext,
+                                    String generatedBidId,
+                                    String effectiveBidId,
                                     String lineItemId) {
 
         final ExtBidPrebid updatedExtBidPrebid = updateBidExtPrebid(
-                bid, bidType, bidder, account, videoStoredDataResult, eventsContext, generatedBidId, effectiveBidId,
+                bid,
+                bidType,
+                bidder,
+                account,
+                videoStoredDataResult,
+                eventsContext,
+                generatedBidId,
+                effectiveBidId,
                 lineItemId);
         final ObjectNode existingBidExt = bid.getExt();
 
@@ -1290,6 +1305,7 @@ public class BidResponseCreator {
 
     private EventsContext createEventsContext(AuctionContext auctionContext) {
         return EventsContext.builder()
+                .auctionId(auctionContext.getBidRequest().getId())
                 .enabledForAccount(eventsEnabledForAccount(auctionContext))
                 .enabledForRequest(eventsEnabledForRequest(auctionContext))
                 .auctionTimestamp(auctionTimestamp(auctionContext))
@@ -1368,8 +1384,7 @@ public class BidResponseCreator {
                 account.getId(),
                 lineItemId,
                 eventsContext.isEnabledForRequest(),
-                eventsContext.getAuctionTimestamp(),
-                eventsContext.getIntegration())
+                eventsContext)
                 : null;
     }
 

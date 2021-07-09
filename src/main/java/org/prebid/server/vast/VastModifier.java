@@ -41,13 +41,17 @@ public class VastModifier {
         final String bidder = putObject.getBidder();
         final boolean isValueValid = value != null && !value.isNull();
         if (BooleanUtils.isTrue(isEventsEnabled) && allowedBidders.contains(bidder) && isValueValid) {
+            final EventsContext eventsContext = EventsContext.builder()
+                    .auctionId(putObject.getAid())
+                    .auctionTimestamp(putObject.getTimestamp())
+                    .integration(integration)
+                    .build();
             final String vastUrlTracking = eventsService.vastUrlTracking(
                     putObject.getBidid(),
                     bidder,
                     accountId,
                     null,
-                    putObject.getTimestamp(),
-                    integration);
+                    eventsContext);
             try {
                 return new TextNode(appendTrackingUrlToVastXml(value.asText(), vastUrlTracking, bidder));
             } catch (PreBidException e) {
@@ -75,11 +79,8 @@ public class VastModifier {
             return vastXml;
         }
 
-        final Long auctionTimestamp = eventsContext.getAuctionTimestamp();
-        final String integration = eventsContext.getIntegration();
-
         final String vastUrl = eventsService.vastUrlTracking(eventBidId, bidder,
-                accountId, lineItemId, auctionTimestamp, integration);
+                accountId, lineItemId, eventsContext);
         try {
             return appendTrackingUrlToVastXml(vastXml, vastUrl, bidder);
         } catch (PreBidException e) {

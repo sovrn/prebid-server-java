@@ -38,8 +38,8 @@
                 }
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1"
+                "win": "http://localhost:8080/event?t=win&b=bidId1&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId1&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1"
               }
             },
             "origbidcpm": 8.43
@@ -80,8 +80,8 @@
                 }
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2"
+                "win": "http://localhost:8080/event?t=win&b=bidId2&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId2&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2"
               }
             },
             "origbidcpm": 8.43
@@ -122,8 +122,8 @@
                 }
               },
               "events": {
-                "win": "http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3",
-                "imp": "http://localhost:8080/event?t=imp&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3"
+                "win": "http://localhost:8080/event?t=win&b=bidId4&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3",
+                "imp": "http://localhost:8080/event?t=imp&b=bidId4&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3"
               }
             },
             "origbidcpm": 8.43
@@ -141,7 +141,7 @@
         "cache": [
           {
             "uri": "{{ cache.endpoint }}",
-            "requestbody": "{\"puts\":[{\"type\":\"json\",\"value\":{\"id\":\"bidId4\",\"impid\":\"impId4\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId3\",\"w\":300,\"h\":250,\"ext\":{\"prebid\":{\"type\":\"banner\",\"events\":{\"win\":\"http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3\",\"imp\":\"http://localhost:8080/event?t=imp&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3\"}},\"origbidcpm\":8.43},\"wurl\":\"http://localhost:8080/event?t=win&b=bidId4&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3\"}},{\"type\":\"json\",\"value\":{\"id\":\"bidId2\",\"impid\":\"impId2\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid2\",\"dealid\":\"dealId2\",\"w\":320,\"h\":320,\"ext\":{\"prebid\":{\"type\":\"banner\",\"events\":{\"win\":\"http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2\",\"imp\":\"http://localhost:8080/event?t=imp&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2\"}},\"origbidcpm\":8.43},\"wurl\":\"http://localhost:8080/event?t=win&b=bidId2&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2\"}},{\"type\":\"json\",\"value\":{\"id\":\"bidId1\",\"impid\":\"impId1\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId1\",\"w\":300,\"h\":250,\"ext\":{\"prebid\":{\"type\":\"banner\",\"events\":{\"win\":\"http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1\",\"imp\":\"http://localhost:8080/event?t=imp&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1\"}},\"origbidcpm\":8.43},\"wurl\":\"http://localhost:8080/event?t=win&b=bidId1&a=2001&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1\"}}]}",
+            "requestbody": "{\"puts\":[{\"type\":\"json\",\"value\":{\"id\":\"bidId1\",\"impid\":\"impId1\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId1\",\"w\":300,\"h\":250,\"ext\":{\"origbidcpm\":8.43,\"prebid\":{\"type\":\"banner\",\"events\":{\"win\":\"http://localhost:8080/event?t=win&b=bidId1&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1\",\"imp\":\"http://localhost:8080/event?t=imp&b=bidId1&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1\"}}},\"wurl\":\"http://localhost:8080/event?t=win&b=bidId1&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem1\"},\"aid\":\"tid\"},{\"type\":\"json\",\"value\":{\"id\":\"bidId4\",\"impid\":\"impId4\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid1\",\"dealid\":\"dealId3\",\"w\":300,\"h\":250,\"ext\":{\"origbidcpm\":8.43,\"prebid\":{\"type\":\"banner\",\"events\":{\"win\":\"http://localhost:8080/event?t=win&b=bidId4&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3\",\"imp\":\"http://localhost:8080/event?t=imp&b=bidId4&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3\"}}},\"wurl\":\"http://localhost:8080/event?t=win&b=bidId4&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem3\"},\"aid\":\"tid\"},{\"type\":\"json\",\"value\":{\"id\":\"bidId2\",\"impid\":\"impId2\",\"price\":8.43,\"adm\":\"<Impression><![CDATA[]]></Impression>\",\"crid\":\"crid2\",\"dealid\":\"dealId2\",\"w\":320,\"h\":320,\"ext\":{\"origbidcpm\":8.43,\"prebid\":{\"type\":\"banner\",\"events\":{\"win\":\"http://localhost:8080/event?t=win&b=bidId2&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2\",\"imp\":\"http://localhost:8080/event?t=imp&b=bidId2&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2\"}}},\"wurl\":\"http://localhost:8080/event?t=win&b=bidId2&a=2001&aid=tid&ts=1000&bidder=rubicon&f=i&int=&x=0&l=lineItem2\"},\"aid\":\"tid\"}]}",
             "responsebody": "{\"responses\":[{\"uuid\":\"13e78248-7339-4e35-b297-874d0031bc1a\"},{\"uuid\":\"3f37ff80-b395-449f-a80e-c21a38bb6eec\"},{\"uuid\":\"1cdcf339-e59b-4e2c-8382-1fb845d4961c\"}]}",
             "status": 200
           }
