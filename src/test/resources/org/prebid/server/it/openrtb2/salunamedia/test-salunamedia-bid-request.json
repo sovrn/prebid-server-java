@@ -1,17 +1,15 @@
 {
-  "id": "request_id",
+  "id": "tid",
   "imp": [
     {
-      "id": "imp_id",
+      "id": "impId001",
       "banner": {
         "w": 300,
         "h": 250
       },
-      "tagid": "25251",
-      "secure": 0,
       "ext": {
         "bidder": {
-          "tagid": "25251"
+          "key": "someKey"
         }
       }
     }
@@ -31,13 +29,31 @@
     "ip": "193.168.244.1"
   },
   "at": 1,
-  "tmax": 5000,
+  "tmax": 2000,
   "cur": [
     "USD"
   ],
   "regs": {
     "ext": {
       "gdpr": 0
+    }
+  },
+  "ext": {
+    "prebid": {
+      "targeting": {
+        "pricegranularity": {
+          "precision": 2,
+          "ranges": [
+            {
+              "max": 20,
+              "increment": 0.1
+            }
+          ]
+        },
+        "includewinners": true,
+        "includebidderkeys": true
+      },
+      "auctiontimestamp": 1000
     }
   }
 }

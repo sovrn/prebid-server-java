@@ -4,6 +4,8 @@ import io.restassured.response.Response;
 import org.json.JSONException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.IOException;
@@ -17,16 +19,16 @@ import static io.restassured.RestAssured.given;
 import static java.util.Collections.singletonList;
 
 @RunWith(SpringRunner.class)
-public class TripleliftTest extends IntegrationTest {
+public class SaLunamediaTest extends IntegrationTest {
 
     @Test
-    public void openrtb2AuctionShouldRespondWithBidsFromTriplelift() throws IOException, JSONException {
+    public void openrtb2AuctionShouldRespondWithBidsFromSaLunamedia() throws IOException, JSONException {
         // given
-        WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/triplelift-exchange"))
+        WIRE_MOCK_RULE.stubFor(post(urlPathEqualTo("/salunamedia-exchange"))
                 .withHeader("Accept", equalTo("application/json"))
                 .withHeader("Content-Type", equalTo("application/json;charset=UTF-8"))
-                .withRequestBody(equalToJson(jsonFrom("openrtb2/triplelift/test-triplelift-bid-request.json")))
-                .willReturn(aResponse().withBody(jsonFrom("openrtb2/triplelift/test-triplelift-bid-response.json"))));
+                .withRequestBody(equalToJson(jsonFrom("openrtb2/salunamedia/test-salunamedia-bid-request.json")))
+                .willReturn(aResponse().withBody(jsonFrom("openrtb2/salunamedia/test-salunamedia-bid-response.json"))));
 
         // when
         final Response response = given(SPEC)
@@ -34,14 +36,15 @@ public class TripleliftTest extends IntegrationTest {
                 .header("X-Forwarded-For", "193.168.244.1")
                 .header("User-Agent", "userAgent")
                 .header("Origin", "http://www.example.com")
-                // this uids cookie value stands for {"uids":{"triplelift":"TL-UID"}}
-                .cookie("uids", "eyJ1aWRzIjp7InRyaXBsZWxpZnQiOiJUTC1VSUQifX0=")
-                .body(jsonFrom("openrtb2/triplelift/test-auction-triplelift-request.json"))
+                .body(jsonFrom("openrtb2/salunamedia/test-auction-salunamedia-request.json"))
                 .post("/openrtb2/auction");
 
         // then
-        assertJsonEquals("openrtb2/triplelift/test-auction-triplelift-response.json",
-                response, singletonList("triplelift"));
+        final String expectedAuctionResponse = openrtbAuctionResponseFrom(
+                "openrtb2/salunamedia/test-auction-salunamedia-response.json",
+                response, singletonList("sa_lunamedia"));
+
+        JSONAssert.assertEquals(expectedAuctionResponse, response.asString(), JSONCompareMode.NON_EXTENSIBLE);
     }
 }
 
