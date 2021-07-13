@@ -703,6 +703,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .extracting(Map.Entry::getKey, Map.Entry::getValue)
                 .containsOnly(
                         tuple("Content-Type", "application/json;charset=utf-8"),
+                        tuple("Referer", "refererPage"),
                         tuple("User-Agent", "userAgent"),
                         tuple("X-Forwarded-For", "masked-ip"));
     }
@@ -1300,6 +1301,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .put("adSlot", "adSlot1")))));
         return BidRequest.builder()
                 .id("bidRequestId")
+                .site(Site.builder()
+                        .page("refererPage")
+                        .build())
                 .device(Device.builder()
                         .connectiontype(17)
                         .lmt(1)
@@ -1567,6 +1571,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .limitAdTracking(true)
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
+                .referrerUri("refererPage")
                 .channel("app")
                 .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest", 123)));
     }

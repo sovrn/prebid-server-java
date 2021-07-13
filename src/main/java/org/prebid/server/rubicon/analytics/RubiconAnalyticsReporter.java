@@ -1264,10 +1264,9 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final MultiMap headers = MultiMap.caseInsensitiveMultiMap()
                 .add(HttpUtil.CONTENT_TYPE_HEADER, APPLICATION_JSON);
 
-        final String userAgent = event.getUserAgent();
-        if (userAgent != null) {
-            headers.add(HttpUtil.USER_AGENT_HEADER, userAgent);
-        }
+        HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.USER_AGENT_HEADER, event.getUserAgent());
+        HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.REFERER_HEADER, event.getReferrerUri());
+
         return headers;
     }
 
