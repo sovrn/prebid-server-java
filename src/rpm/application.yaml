@@ -85,6 +85,8 @@ adapters:
       redirect-url: /setuid?bidder=ix&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&uid=
   logicad:
     enabled: true
+  marsmedia:
+    enabled: true
   nobid:
     enabled: true
   openx:
