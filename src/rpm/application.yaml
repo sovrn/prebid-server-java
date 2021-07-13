@@ -46,6 +46,8 @@ adapters:
     aliases:
       districtm:
         enabled: true
+  bidmachine:
+    enabled: true
   brightroll:
     enabled: true
   consumable:
