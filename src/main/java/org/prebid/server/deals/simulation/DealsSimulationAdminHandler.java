@@ -25,7 +25,7 @@ public class DealsSimulationAdminHandler implements Handler<RoutingContext> {
 
     private static final TypeReference<Map<String, Double>> BID_RATES_TYPE_REFERENCE
             = new TypeReference<Map<String, Double>>() {
-    };
+            };
 
     private static final Logger logger = LoggerFactory.getLogger(DealsSimulationAdminHandler.class);
 
