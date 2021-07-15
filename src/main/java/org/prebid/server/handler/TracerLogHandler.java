@@ -25,14 +25,14 @@ public class TracerLogHandler implements Handler<RoutingContext> {
     }
 
     @Override
-    public void handle(RoutingContext context) {
-        final MultiMap parameters = context.request().params();
+    public void handle(RoutingContext routingContext) {
+        final MultiMap parameters = routingContext.request().params();
         final String accountId = parameters.get(ACCOUNT_PARAMETER);
         final String bidderCode = parameters.get(BIDDER_CODE_PARAMETER);
         final String lineItemId = parameters.get(LINE_ITEM_PARAMETER);
 
         if (StringUtils.isBlank(accountId) && StringUtils.isBlank(lineItemId) && StringUtils.isBlank(bidderCode)) {
-            context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
+            routingContext.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
                     .end("At least one parameter should ne defined: account, bidderCode, lineItemId");
             return;
         }
@@ -41,20 +41,20 @@ public class TracerLogHandler implements Handler<RoutingContext> {
         final String loggerLevel = parameters.get(LOG_LEVEL_PARAMETER);
         try {
             duration = parseDuration(parameters.get(DURATION_IN_SECONDS));
-        } catch (InvalidRequestException ex) {
-            context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(ex.getMessage());
+        } catch (InvalidRequestException e) {
+            routingContext.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code()).end(e.getMessage());
             return;
         }
 
         try {
             criteriaManager.addCriteria(accountId, bidderCode, lineItemId, loggerLevel, duration);
-        } catch (IllegalArgumentException ex) {
-            context.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
-                    .end(String.format("Invalid parameter: %s", ex.getMessage()));
+        } catch (IllegalArgumentException e) {
+            routingContext.response().setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
+                    .end(String.format("Invalid parameter: %s", e.getMessage()));
             return;
         }
 
-        context.response().end();
+        routingContext.response().end();
     }
 
     private static int parseDuration(String rawDuration) {
@@ -63,7 +63,7 @@ public class TracerLogHandler implements Handler<RoutingContext> {
         }
         try {
             return Integer.parseInt(rawDuration);
-        } catch (NumberFormatException ex) {
+        } catch (NumberFormatException e) {
             throw new InvalidRequestException(
                     String.format("duration parameter should be defined as integer, but was %s", rawDuration));
         }

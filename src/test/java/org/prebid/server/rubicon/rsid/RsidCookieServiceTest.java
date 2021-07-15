@@ -29,7 +29,7 @@ public class RsidCookieServiceTest {
     private RsidCookieService rsidCookieService;
 
     @Mock
-    private RoutingContext context;
+    private RoutingContext routingContext;
 
     @Before
     public void setUp() {
@@ -39,10 +39,10 @@ public class RsidCookieServiceTest {
     @Test
     public void shouldReturnNullIfNoCookieInRequest() {
         // given
-        given(context.cookieMap()).willReturn(emptyMap());
+        given(routingContext.cookieMap()).willReturn(emptyMap());
 
         // when
-        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        final Rsid rsid = rsidCookieService.parseFromRequest(routingContext);
 
         // then
         assertThat(rsid).isNull();
@@ -51,11 +51,11 @@ public class RsidCookieServiceTest {
     @Test
     public void shouldReturnNullIfCookieValueIsInvalid() {
         // given
-        given(context.cookieMap())
+        given(routingContext.cookieMap())
                 .willReturn(singletonMap("rsid", Cookie.cookie("rsid", "invalid-base64")));
 
         // when
-        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        final Rsid rsid = rsidCookieService.parseFromRequest(routingContext);
 
         // then
         assertThat(rsid).isNull();
@@ -64,13 +64,13 @@ public class RsidCookieServiceTest {
     @Test
     public void shouldCutOutPipeAndAllCharactersBeforeItAndReturnExpectedResult() {
         // given
-        given(context.cookieMap())
+        given(routingContext.cookieMap())
                 .willReturn(singletonMap("rsid", Cookie.cookie("rsid",
                         "chars_before_pipe|B9qWECXyvoJUFeX6MlUI0rdsb6KO+1hVre/oD1mN/CN4VoLIUnj4T/IHduc/n6k03b"
                                 + "YgvBh7oB3JHIxCI7JZAa8E5oMBeRSWa9qr15frXLoJaNEy0hbrXDlIwC9iqGWqIrmhaA==")));
 
         // when
-        final Rsid rsid = rsidCookieService.parseFromRequest(context);
+        final Rsid rsid = rsidCookieService.parseFromRequest(routingContext);
 
         // then
         assertThat(rsid).isEqualTo(Rsid.of("us"));
@@ -79,7 +79,7 @@ public class RsidCookieServiceTest {
     @Test
     public void shouldReturnExpectedResultsForVarianceOfInputs() {
         // given
-        given(context.cookieMap())
+        given(routingContext.cookieMap())
                 .willReturn(singletonMap("rsid", Cookie.cookie("rsid",
                         "B9qWECXyvoJUFeX6MlUI0rdsb6KO+1hVre/oD1mN/CN4VoLIUnj4T/IHduc/n6k03bYgvBh7oB3JHI"
                                 + "xCI7JZAa8E5oMBeRSWa9qr15frXLoJaNEy0hbrXDlIwC9iqGWqIrmhaA==")))
@@ -92,9 +92,9 @@ public class RsidCookieServiceTest {
 
         // when
         final List<Rsid> rsids = Arrays.asList(
-                rsidCookieService.parseFromRequest(context),
-                rsidCookieService.parseFromRequest(context),
-                rsidCookieService.parseFromRequest(context));
+                rsidCookieService.parseFromRequest(routingContext),
+                rsidCookieService.parseFromRequest(routingContext),
+                rsidCookieService.parseFromRequest(routingContext));
 
         // then
         final Rsid expected = Rsid.of("us");

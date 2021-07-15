@@ -109,10 +109,10 @@ public enum MetricName {
     // cache
     creative_size,
 
-    //account.*.requests.
+    // account.*.requests.
     rejected,
 
-    //currency rates
+    // currency rates
     stale,
 
     // settings cache

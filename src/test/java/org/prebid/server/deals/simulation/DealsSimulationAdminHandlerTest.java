@@ -65,7 +65,8 @@ public class DealsSimulationAdminHandlerTest extends VertxTest {
     @Before
     public void setUp() {
         dealsSimulationAdminHandler = new DealsSimulationAdminHandler(registerService,
-                plannerService, deliveryProgressService, deliveryStatsService, httpBidderRequester, jacksonMapper);
+                plannerService, deliveryProgressService, deliveryStatsService, httpBidderRequester, jacksonMapper,
+                "endpoint");
         given(routingContext.request()).willReturn(request);
         given(routingContext.response()).willReturn(response);
         given(request.headers()).willReturn(MultiMap.caseInsensitiveMultiMap()
@@ -140,7 +141,8 @@ public class DealsSimulationAdminHandlerTest extends VertxTest {
     public void handleShouldRespondWithErrorWhenBidderRequesterIsNotSet() {
         // given
         dealsSimulationAdminHandler = new DealsSimulationAdminHandler(
-                registerService, plannerService, deliveryProgressService, deliveryStatsService, null, jacksonMapper);
+                registerService, plannerService, deliveryProgressService, deliveryStatsService, null, jacksonMapper,
+                "endpoint");
         given(request.uri()).willReturn("/pbs-admin/e2eAdmin/bidRate");
 
         // when

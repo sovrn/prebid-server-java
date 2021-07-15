@@ -518,7 +518,8 @@ public class DealsConfiguration {
                 SimulationAwareDeliveryProgressService deliveryProgressService,
                 SimulationAwareDeliveryStatsService deliveryStatsService,
                 @Autowired(required = false) SimulationAwareHttpBidderRequester httpBidderRequester,
-                JacksonMapper mapper) {
+                JacksonMapper mapper,
+                @Value("${admin-endpoints.e2eadmin.path}") String path) {
 
             return new DealsSimulationAdminHandler(
                     registerService,
@@ -526,7 +527,8 @@ public class DealsConfiguration {
                     deliveryProgressService,
                     deliveryStatsService,
                     httpBidderRequester,
-                    mapper);
+                    mapper,
+                    path);
         }
 
         @Bean

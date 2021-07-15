@@ -71,7 +71,7 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     @Test
     public void getDeviceInfoShouldReturnFailedFutureWhenMatchThrowsException()
             throws NoSuchFieldException, IOException {
-        //given
+        // given
         givenDownloadedFile();
         given(provider.match(anyString())).willThrow(IOException.class);
 

@@ -61,6 +61,7 @@ import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.any;
@@ -126,8 +127,10 @@ public class SetuidHandlerTest extends VertxTest {
         given(routingContext.request()).willReturn(httpRequest);
         given(routingContext.response()).willReturn(httpResponse);
 
+        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
         given(httpResponse.headers()).willReturn(new CaseInsensitiveHeaders());
         given(httpResponse.putHeader(any(CharSequence.class), any(CharSequence.class))).willReturn(httpResponse);
+        given(httpResponse.closed()).willReturn(false);
 
         given(uidsCookieService.toCookie(any())).willReturn(Cookie.cookie("test", "test"));
 
@@ -199,7 +202,6 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).optout(true).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -218,8 +220,6 @@ public class SetuidHandlerTest extends VertxTest {
         // given
         given(uidsCookieService.parseFromRequest(any(RoutingContext.class)))
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -258,7 +258,6 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam(eq("bidder"))).willReturn("invalid_or_disabled");
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -337,7 +336,7 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
+        given(httpResponse.setStatusMessage(anyString())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -362,7 +361,6 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -386,7 +384,6 @@ public class SetuidHandlerTest extends VertxTest {
                 .willReturn(new UidsCookie(Uids.builder().uids(emptyMap()).build(), jacksonMapper));
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -414,8 +411,6 @@ public class SetuidHandlerTest extends VertxTest {
         final Future<Account> accountFuture = Future.succeededFuture(account);
         given(applicationSettings.getAccountById(any(), any())).willReturn(accountFuture);
 
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
         // when
         setuidHandler.handle(routingContext);
 
@@ -434,8 +429,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("account")).willReturn("accId");
 
         given(applicationSettings.getAccountById(any(), any())).willReturn(Future.failedFuture("bad req"));
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -539,8 +532,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
 
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
         // when
         setuidHandler.handle(routingContext);
 
@@ -564,8 +555,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("f")).willReturn("i");
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);
@@ -592,7 +581,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(bidderCatalog.usersyncerByName(any()))
                 .willReturn(Usersyncer.of(RUBICON, Usersyncer.UsersyncMethod.of("redirect", null, null, false), null));
 
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
         setuidHandler = new SetuidHandler(
                 2000,
                 uidsCookieService,
@@ -635,8 +623,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
 
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
         setuidHandler = new SetuidHandler(
                 2000,
                 uidsCookieService,
@@ -677,8 +663,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(bidderCatalog.usersyncerByName(any()))
                 .willReturn(Usersyncer.of(RUBICON, Usersyncer.UsersyncMethod.of("redirect", null, null, false), null));
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         setuidHandler = new SetuidHandler(
                 2000,
@@ -768,8 +752,6 @@ public class SetuidHandlerTest extends VertxTest {
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
 
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
-
         // when
         setuidHandler.handle(routingContext);
 
@@ -790,6 +772,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
                 bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
                 new TimeoutFactory(clock), true, uidsAuditCookieService, implicitParametersExtractor, ipAddressHelper);
+
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(false, emptyMap(), null)));
 
@@ -802,8 +785,6 @@ public class SetuidHandlerTest extends VertxTest {
 
         given(httpRequest.getParam("bidder")).willReturn(RUBICON);
         given(httpRequest.getParam("uid")).willReturn("J5VLCWQP-26-CWFT");
-
-        given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
         setuidHandler.handle(routingContext);

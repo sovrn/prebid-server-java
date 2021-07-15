@@ -50,7 +50,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new VersionHandler(versionInfo.getVersion(), versionInfo.getCommitHash(), mapper),
+                new VersionHandler(versionInfo.getVersion(), versionInfo.getCommitHash(), mapper, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -69,7 +69,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new CurrencyRatesHandler(currencyConversionRates, mapper),
+                new CurrencyRatesHandler(currencyConversionRates, path, mapper),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -88,7 +88,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new SettingsCacheNotificationHandler(settingsCache, mapper),
+                new SettingsCacheNotificationHandler(settingsCache, mapper, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -107,7 +107,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new SettingsCacheNotificationHandler(ampSettingsCache, mapper),
+                new SettingsCacheNotificationHandler(ampSettingsCache, mapper, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -125,7 +125,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new AccountCacheInvalidationHandler(cachingApplicationSettings),
+                new AccountCacheInvalidationHandler(cachingApplicationSettings, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -143,7 +143,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new HttpInteractionLogHandler(maxLimit, httpInteractionLogger),
+                new HttpInteractionLogHandler(maxLimit, httpInteractionLogger, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -161,7 +161,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new LoggerControlKnobHandler(maxDuration, loggerControlKnob),
+                new LoggerControlKnobHandler(maxDuration, loggerControlKnob, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);
@@ -214,7 +214,7 @@ public class AdminEndpointsConfiguration {
 
         return new CustomizedAdminEndpoint(
                 path,
-                new LineItemStatusHandler(deliveryProgressService, mapper),
+                new LineItemStatusHandler(deliveryProgressService, mapper, path),
                 isOnApplicationPort,
                 isProtected)
                 .withCredentials(adminEndpointCredentials);

@@ -115,8 +115,8 @@ public class UidsAuditCookieService {
     /**
      * Returns {@link UidAudit} from {@link RoutingContext} or null if no audit cookie exists.
      */
-    public UidAudit getUidsAudit(RoutingContext context) {
-        final Cookie uidAuditCookie = context.cookieMap().get(COOKIE_NAME);
+    public UidAudit getUidsAudit(RoutingContext routingContext) {
+        final Cookie uidAuditCookie = routingContext.cookieMap().get(COOKIE_NAME);
         return uidAuditCookie != null ? getUidAudit(uidAuditCookie.getValue()) : null;
     }
 
@@ -140,13 +140,13 @@ public class UidsAuditCookieService {
     /**
      * Creates uid audit {@link Cookie} using blowfish algorithm for data encryption and encrypt it with Base64.
      */
-    public Cookie createUidsAuditCookie(RoutingContext context, String uid, String accountId, String consent,
+    public Cookie createUidsAuditCookie(RoutingContext routingContext, String uid, String accountId, String consent,
                                         String country, String userIp) {
         if (uid == null) {
             throw new PreBidException("Uid was not defined, should be present to set uid audit cookie");
         }
 
-        final String referrer = context.request().getHeader(HttpHeaders.REFERER);
+        final String referrer = routingContext.request().getHeader(HttpHeaders.REFERER);
         final long renewedSeconds = ZonedDateTime.now(Clock.systemUTC()).toEpochSecond();
 
         final UidAudit uidAudit = UidAudit.builder()
@@ -169,8 +169,8 @@ public class UidsAuditCookieService {
     /**
      * Updates existing uid audit {@link Cookie}.
      */
-    Cookie updateUidsAuditCookie(RoutingContext context, String consent, UidAudit previousUidAudit) {
-        final String referrer = context.request().getHeader(HttpHeaders.REFERER);
+    Cookie updateUidsAuditCookie(RoutingContext routingContext, String consent, UidAudit previousUidAudit) {
+        final String referrer = routingContext.request().getHeader(HttpHeaders.REFERER);
         final long renewedSeconds = ZonedDateTime.now(Clock.systemUTC()).toEpochSecond();
 
         final String previousConsent = previousUidAudit.getConsent();

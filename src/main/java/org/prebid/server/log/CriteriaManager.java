@@ -52,7 +52,7 @@ public class CriteriaManager {
         final LogLevel logLevel;
         try {
             logLevel = LogLevel.valueOf(rawLogLevel.toLowerCase());
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(String.format("Invalid LoggingLevel: %s", rawLogLevel));
         }
 

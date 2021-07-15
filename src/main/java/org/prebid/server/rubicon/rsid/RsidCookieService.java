@@ -30,8 +30,8 @@ public class RsidCookieService {
     /**
      * Returns {@link Rsid} from Http cookie in request or null if absent.
      */
-    public Rsid parseFromRequest(RoutingContext context) {
-        final Cookie rsidCookie = context.cookieMap().get(COOKIE_NAME);
+    public Rsid parseFromRequest(RoutingContext routingContext) {
+        final Cookie rsidCookie = routingContext.cookieMap().get(COOKIE_NAME);
         final String rsidRawValue = rsidCookie != null ? rsidCookie.getValue() : null;
 
         return rsidRawValue != null ? toRsid(rsidRawValue) : null;

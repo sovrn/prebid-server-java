@@ -46,7 +46,7 @@ public class LineItemStatusHandlerTest extends VertxTest {
 
         given(routingContext.request().getParam(any())).willReturn("lineItemId");
 
-        handler = new LineItemStatusHandler(deliveryProgressService, jacksonMapper);
+        handler = new LineItemStatusHandler(deliveryProgressService, jacksonMapper, "endpoint");
     }
 
     @Test

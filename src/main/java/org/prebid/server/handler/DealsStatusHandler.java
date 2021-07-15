@@ -25,18 +25,18 @@ public class DealsStatusHandler implements Handler<RoutingContext> {
     }
 
     @Override
-    public void handle(RoutingContext context) {
+    public void handle(RoutingContext routingContext) {
         final DeliveryProgressReport deliveryProgressReport = deliveryProgressService
                 .getOverallDeliveryProgressReport();
         final String body = mapper.encode(deliveryProgressReport);
 
         // don't send the response if client has gone
-        if (context.response().closed()) {
+        if (routingContext.response().closed()) {
             logger.warn("The client already closed connection, response will be skipped");
             return;
         }
 
-        context.response()
+        routingContext.response()
                 .putHeader(HttpUtil.CONTENT_TYPE_HEADER, HttpHeaderValues.APPLICATION_JSON)
                 .exceptionHandler(this::handleResponseException)
                 .end(body);

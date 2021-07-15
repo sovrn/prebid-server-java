@@ -41,9 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 public class NotificationEventHandlerTest extends VertxTest {
@@ -307,7 +305,7 @@ public class NotificationEventHandlerTest extends VertxTest {
 
     @Test
     public void shouldUpdateEventForLineItemForEventTypeWinAndAccountEventsEnabled() {
-        //given
+        // given
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
                 .add("t", "win")
                 .add("b", "bidId")
@@ -327,7 +325,7 @@ public class NotificationEventHandlerTest extends VertxTest {
 
     @Test
     public void shouldProcessLineItemEventWhenRequestAnalyticsFlagDisabled() {
-        //given
+        // given
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
                 .add("t", "win")
                 .add("b", "bidId")
@@ -349,7 +347,7 @@ public class NotificationEventHandlerTest extends VertxTest {
 
     @Test
     public void shouldProcessLineItemEventWhenAccountEventsDisabled() {
-        //given
+        // given
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap()
                 .add("t", "win")
                 .add("b", "bidId")
@@ -433,7 +431,6 @@ public class NotificationEventHandlerTest extends VertxTest {
         notificationHandler.handle(routingContext);
 
         // then
-        verify(httpResponse, never()).setStatusCode(anyInt());
         verify(httpResponse).end();
     }
 
@@ -476,7 +473,6 @@ public class NotificationEventHandlerTest extends VertxTest {
 
         // then
         verify(httpResponse).end();
-        verifyNoMoreInteractions(httpResponse);
     }
 
     @Test

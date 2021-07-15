@@ -150,7 +150,7 @@ public abstract class IntegrationTest extends VertxTest {
         final Object val;
         try {
             val = response.path(responseUserTimePath);
-        } catch (Exception ex) {
+        } catch (Exception e) {
             return expectedResponseJson;
         }
 
@@ -362,7 +362,7 @@ public abstract class IntegrationTest extends VertxTest {
                 TimeUnit.MILLISECONDS.sleep(delay);
                 dealsResponseOrder.poll();
                 lockCondition.signalAll();
-            } catch (InterruptedException ex) {
+            } catch (InterruptedException e) {
                 throw new RuntimeException(format("Failed on waiting to return bid request for lineItem id = %s",
                         id));
             } finally {

@@ -82,7 +82,7 @@ public class DeviceAtlasDeviceInfoServiceTest {
 
     @Test
     public void getDeviceInfoShouldReturnFailedFutureWhenPropertiesIsNull() throws NoSuchFieldException {
-        //given
+        // given
         givenDownloadedFile();
         given(deviceApi.getProperties(anyString())).willReturn(null);
 

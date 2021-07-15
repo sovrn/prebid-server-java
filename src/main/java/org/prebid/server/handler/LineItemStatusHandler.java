@@ -24,39 +24,53 @@ public class LineItemStatusHandler implements Handler<RoutingContext> {
 
     private final DeliveryProgressService deliveryProgressService;
     private final JacksonMapper mapper;
+    private final String endpoint;
 
-    public LineItemStatusHandler(DeliveryProgressService deliveryProgressService, JacksonMapper mapper) {
+    public LineItemStatusHandler(DeliveryProgressService deliveryProgressService, JacksonMapper mapper,
+                                 String endpoint) {
         this.deliveryProgressService = Objects.requireNonNull(deliveryProgressService);
         this.mapper = Objects.requireNonNull(mapper);
+        this.endpoint = Objects.requireNonNull(endpoint);
     }
 
     @Override
-    public void handle(RoutingContext context) {
-        context.response()
+    public void handle(RoutingContext routingContext) {
+        routingContext.response()
                 .exceptionHandler(LineItemStatusHandler::handleResponseException);
 
-        final String lineItemId = lineItemIdFrom(context);
+        final String lineItemId = lineItemIdFrom(routingContext);
         if (StringUtils.isEmpty(lineItemId)) {
-            final String body = String.format("%s parameter is required", ID_PARAM);
-            HttpUtil.respondWith(context, HttpResponseStatus.BAD_REQUEST, body);
+            HttpUtil.executeSafely(routingContext, endpoint,
+                    response -> response
+                            .setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
+                            .end(String.format("%s parameter is required", ID_PARAM)));
             return;
         }
 
         try {
-            final ZonedDateTime time = HttpUtil.getDateFromHeader(context.request().headers(), PG_SIM_TIMESTAMP);
+            final ZonedDateTime time = HttpUtil.getDateFromHeader(routingContext.request().headers(), PG_SIM_TIMESTAMP);
             final LineItemStatusReport report = deliveryProgressService.getLineItemStatusReport(lineItemId, time);
 
-            HttpUtil.headers().forEach(entry -> context.response().putHeader(entry.getKey(), entry.getValue()));
-            HttpUtil.respondWith(context, HttpResponseStatus.OK, mapper.encode(report));
+            HttpUtil.headers().forEach(entry -> routingContext.response().putHeader(entry.getKey(), entry.getValue()));
+            HttpUtil.executeSafely(routingContext, endpoint,
+                    response -> response
+                            .setStatusCode(HttpResponseStatus.OK.code())
+                            .end(mapper.encode(report)));
         } catch (PreBidException e) {
-            HttpUtil.respondWith(context, HttpResponseStatus.BAD_REQUEST, e.getMessage());
+            HttpUtil.executeSafely(routingContext, endpoint,
+                    response -> response
+                            .setStatusCode(HttpResponseStatus.BAD_REQUEST.code())
+                            .end(e.getMessage()));
         } catch (Exception e) {
-            HttpUtil.respondWith(context, HttpResponseStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+            HttpUtil.executeSafely(routingContext, endpoint,
+                    response -> response
+                            .setStatusCode(HttpResponseStatus.INTERNAL_SERVER_ERROR.code())
+                            .end(e.getMessage()));
         }
     }
 
-    private static String lineItemIdFrom(RoutingContext context) {
-        return context.request().getParam(ID_PARAM);
+    private static String lineItemIdFrom(RoutingContext routingContext) {
+        return routingContext.request().getParam(ID_PARAM);
     }
 
     private static void handleResponseException(Throwable exception) {
