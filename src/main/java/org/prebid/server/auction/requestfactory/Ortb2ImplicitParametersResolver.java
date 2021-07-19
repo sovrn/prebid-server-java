@@ -520,7 +520,7 @@ public class Ortb2ImplicitParametersResolver {
 
         final ExtRequestPrebid prebid = ext.getPrebid();
 
-        final ExtRequestTargeting updatedTargeting = targetingOrNull(prebid, getImpMediaTypes(imps));
+        final ExtRequestTargeting updatedTargeting = targetingOrNull(prebid, imps);
         final ExtRequestPrebidCache updatedCache = cacheOrNull(prebid);
         final ExtRequestPrebidChannel updatedChannel = channelOrNull(prebid, bidRequest);
         final String updatedIntegration = integrationOrNull(prebid);
@@ -555,9 +555,14 @@ public class Ortb2ImplicitParametersResolver {
      */
     private static Set<BidType> getImpMediaTypes(List<Imp> imps) {
         final Set<BidType> impMediaTypes = new HashSet<>();
+
+        if (CollectionUtils.isEmpty(imps)) {
+            return impMediaTypes;
+        }
+
         for (Imp imp : imps) {
-            checkImpMediaTypes(imp, impMediaTypes);
-            if (impMediaTypes.size() > 3) {
+            resolveImpMediaTypes(imp, impMediaTypes);
+            if (impMediaTypes.size() >= 4) {
                 break;
             }
         }
@@ -567,7 +572,7 @@ public class Ortb2ImplicitParametersResolver {
     /**
      * Adds an existing media type to a set.
      */
-    private static void checkImpMediaTypes(Imp imp, Set<BidType> impsMediaTypes) {
+    private static void resolveImpMediaTypes(Imp imp, Set<BidType> impsMediaTypes) {
         if (imp.getBanner() != null) {
             impsMediaTypes.add(BidType.banner);
         }
@@ -585,7 +590,7 @@ public class Ortb2ImplicitParametersResolver {
     /**
      * Returns populated {@link ExtRequestTargeting} or null if no changes were applied.
      */
-    private ExtRequestTargeting targetingOrNull(ExtRequestPrebid prebid, Set<BidType> impMediaTypes) {
+    private ExtRequestTargeting targetingOrNull(ExtRequestPrebid prebid, List<Imp> imps) {
         final ExtRequestTargeting targeting = prebid != null ? prebid.getTargeting() : null;
 
         final boolean isTargetingNotNull = targeting != null;
@@ -599,7 +604,7 @@ public class Ortb2ImplicitParametersResolver {
         if (isPriceGranularityNull || isPriceGranularityTextual || isIncludeWinnersNull || isIncludeBidderKeysNull) {
             return targeting.toBuilder()
                     .pricegranularity(resolvePriceGranularity(targeting, isPriceGranularityNull,
-                            isPriceGranularityTextual, impMediaTypes))
+                            isPriceGranularityTextual, imps))
                     .includewinners(isIncludeWinnersNull || targeting.getIncludewinners())
                     .includebidderkeys(isIncludeBidderKeysNull
                             ? !isWinningOnly(prebid.getCache())
@@ -625,10 +630,10 @@ public class Ortb2ImplicitParametersResolver {
      * In case of invalid string value throws {@link InvalidRequestException}.
      */
     private JsonNode resolvePriceGranularity(ExtRequestTargeting targeting, boolean isPriceGranularityNull,
-                                             boolean isPriceGranularityTextual, Set<BidType> impMediaTypes) {
+                                             boolean isPriceGranularityTextual, List<Imp> imps) {
 
         final boolean hasAllMediaTypes = checkExistingMediaTypes(targeting.getMediatypepricegranularity())
-                .containsAll(impMediaTypes);
+                .containsAll(getImpMediaTypes(imps));
 
         if (isPriceGranularityNull && !hasAllMediaTypes) {
             return mapper.mapper().valueToTree(ExtPriceGranularity.from(PriceGranularity.DEFAULT));
