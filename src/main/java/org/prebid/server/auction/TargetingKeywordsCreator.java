@@ -142,8 +142,7 @@ public class TargetingKeywordsCreator {
                                 boolean winningBid,
                                 String cacheId,
                                 String format,
-                                String vastCacheId,
-                                String lineItemSource) {
+                                String vastCacheId) {
 
         final Map<String, String> keywords = makeFor(
                 bidder,
@@ -154,8 +153,7 @@ public class TargetingKeywordsCreator {
                 cacheId,
                 vastCacheId,
                 format,
-                bid.getDealid(),
-                lineItemSource);
+                bid.getDealid());
 
         if (resolver == null) {
             return truncateKeys(keywords);
@@ -178,8 +176,7 @@ public class TargetingKeywordsCreator {
                                         String cacheId,
                                         String vastCacheId,
                                         String format,
-                                        String dealId,
-                                        String lineItemSource) {
+                                        String dealId) {
 
         final KeywordMap keywordMap = new KeywordMap(bidder, winningBid, includeWinners, includeBidderKeys,
                 Collections.emptySet());

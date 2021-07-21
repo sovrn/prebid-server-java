@@ -396,14 +396,12 @@ public class BidResponseCreator {
         final Imp correspondingImp = correspondingImp(bid, imps);
         final ExtDealLine extDealLine = LineItemUtil.extDealLineFrom(bid, correspondingImp, mapper);
         final String lineItemId = extDealLine != null ? extDealLine.getLineItemId() : null;
-        final String lineItemSource = extDealLine != null ? extDealLine.getBidder() : null;
         return BidInfo.builder()
                 .bid(bid)
                 .bidType(type)
                 .bidder(bidder)
                 .correspondingImp(correspondingImp)
                 .lineItemId(lineItemId)
-                .lineItemSource(lineItemSource)
                 .build();
     }
 
@@ -1208,9 +1206,8 @@ public class BidResponseCreator {
                     bidRequest, account);
 
             final boolean isWinningBid = targetingInfo.isWinningBid();
-            final String lineItemSource = bidInfo.getLineItemSource();
             targetingKeywords = keywordsCreator.makeFor(bid, bidderCode, isWinningBid, cacheId,
-                    bidType.getName(), videoCacheId, lineItemSource);
+                    bidType.getName(), videoCacheId);
         } else {
             targetingKeywords = null;
         }
