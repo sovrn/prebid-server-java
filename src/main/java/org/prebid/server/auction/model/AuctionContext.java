@@ -53,8 +53,10 @@ public class AuctionContext {
 
     boolean requestRejected;
 
+    @JsonIgnore
     TxnLog txnLog;
 
+    @JsonIgnore
     DeepDebugLog deepDebugLog;
 
     public AuctionContext with(Account account) {
