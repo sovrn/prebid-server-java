@@ -281,7 +281,6 @@ public class CacheService {
                                                       EventsContext eventsContext) {
 
         final Account account = auctionContext.getAccount();
-        final String bidRequestId = auctionContext.getBidRequest().getId();
         final String accountId = account.getId();
         final String requestId = auctionContext.getBidRequest().getId();
         final List<CachedCreative> cachedCreatives = Stream.concat(
@@ -405,7 +404,7 @@ public class CacheService {
                 .aid(eventsContext.getAuctionId())
                 .type("json")
                 .value(bidObjectNode)
-                .expiry(cacheBid.getTtl())
+                .ttlseconds(cacheBid.getTtl())
                 .build();
 
         return CachedCreative.of(payload, creativeSizeFromAdm(bid.getAdm()));
@@ -423,7 +422,7 @@ public class CacheService {
                 .aid(requestId)
                 .type("xml")
                 .value(vastXml != null ? new TextNode(vastXml) : null)
-                .expiry(cacheBid.getTtl())
+                .ttlseconds(cacheBid.getTtl())
                 .build();
 
         return CachedCreative.of(payload, creativeSizeFromTextNode(payload.getValue()));
