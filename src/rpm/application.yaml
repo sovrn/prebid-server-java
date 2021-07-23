@@ -85,6 +85,7 @@ adapters:
       redirect-url: /setuid?bidder=inmobi&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&uid={ID5UID}
   ix:
     enabled: true
+    endpoint: http://rubicon-us-east.lb.indexww.com/pbs?p=189517
     usersync:
       url: https://ssum.casalemedia.com/usermatchredir?s=189517&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&cb=
       redirect-url: /setuid?bidder=ix&gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&uid=
