@@ -36,6 +36,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidCache;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
+import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidPbs;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestTargeting;
 import org.prebid.server.proto.openrtb.ext.request.ExtSite;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -112,7 +113,8 @@ public class Ortb2ImplicitParametersResolver {
      */
     BidRequest resolve(BidRequest bidRequest,
                        HttpRequestContext httpRequest,
-                       TimeoutResolver timeoutResolver) {
+                       TimeoutResolver timeoutResolver,
+                       String endpoint) {
         checkBlacklistedApp(bidRequest);
 
         final BidRequest result;
@@ -140,7 +142,7 @@ public class Ortb2ImplicitParametersResolver {
 
         final ExtRequest ext = bidRequest.getExt();
         final ExtRequest populatedExt = populateRequestExt(
-                ext, bidRequest, ObjectUtils.defaultIfNull(populatedImps, imps));
+                ext, bidRequest, ObjectUtils.defaultIfNull(populatedImps, imps), endpoint);
 
         if (populatedDevice != null || populatedSite != null || populatedSource != null
                 || populatedImps != null || resolvedAt != null || resolvedCurrencies != null || resolvedTmax != null
@@ -513,7 +515,7 @@ public class Ortb2ImplicitParametersResolver {
     /**
      * Returns updated {@link ExtRequest} if required or null otherwise.
      */
-    private ExtRequest populateRequestExt(ExtRequest ext, BidRequest bidRequest, List<Imp> imps) {
+    private ExtRequest populateRequestExt(ExtRequest ext, BidRequest bidRequest, List<Imp> imps, String endpoint) {
         if (ext == null) {
             return null;
         }
@@ -523,9 +525,10 @@ public class Ortb2ImplicitParametersResolver {
         final ExtRequestTargeting updatedTargeting = targetingOrNull(prebid, imps);
         final ExtRequestPrebidCache updatedCache = cacheOrNull(prebid);
         final ExtRequestPrebidChannel updatedChannel = channelOrNull(prebid, bidRequest);
+        final ExtRequestPrebidPbs updatedPbs = pbsOrNull(bidRequest, endpoint);
         final String updatedIntegration = integrationOrNull(prebid);
 
-        if (updatedTargeting != null || updatedCache != null || updatedChannel != null
+        if (updatedTargeting != null || updatedCache != null || updatedChannel != null || updatedPbs != null
                 || updatedIntegration != null) {
             final ExtRequestPrebid.ExtRequestPrebidBuilder prebidBuilder = prebid != null
                     ? prebid.toBuilder()
@@ -538,6 +541,8 @@ public class Ortb2ImplicitParametersResolver {
                             getIfNotNull(prebid, ExtRequestPrebid::getCache)))
                     .channel(ObjectUtils.defaultIfNull(updatedChannel,
                             getIfNotNull(prebid, ExtRequestPrebid::getChannel)))
+                    .pbs(ObjectUtils.defaultIfNull(updatedPbs,
+                            getIfNotNull(prebid, ExtRequestPrebid::getPbs)))
                     .integration(ObjectUtils.defaultIfNull(updatedIntegration,
                             getIfNotNull(prebid, ExtRequestPrebid::getIntegration)))
                     .build());
@@ -567,6 +572,21 @@ public class Ortb2ImplicitParametersResolver {
             }
         }
         return impMediaTypes;
+    }
+
+    /**
+     * Returns populated {@link ExtRequestPrebidPbs} or null if no changes were applied.
+     */
+    private ExtRequestPrebidPbs pbsOrNull(BidRequest bidRequest, String endpoint) {
+        final String existingEndpoint = getIfNotNull(getIfNotNull(bidRequest.getExt().getPrebid(),
+                ExtRequestPrebid::getPbs),
+                ExtRequestPrebidPbs::getEndpoint);
+
+        if (StringUtils.isNotBlank(existingEndpoint)) {
+            return null;
+        }
+
+        return ExtRequestPrebidPbs.of(endpoint);
     }
 
     /**
