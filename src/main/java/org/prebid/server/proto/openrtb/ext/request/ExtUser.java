@@ -58,6 +58,12 @@ public class ExtUser extends FlexibleExtension {
      */
     JsonNode digitrust;
 
+    /**
+     * Defines the contract for bidrequest.user.ext.ConsentedProvidersSettings
+     */
+    @JsonProperty("ConsentedProvidersSettings")
+    ConsentedProvidersSettings consentedProvidersSettings;
+
     @JsonIgnore
     public boolean isEmpty() {
         return Objects.equals(this, EMPTY);
