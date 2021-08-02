@@ -59,7 +59,7 @@ import static org.awaitility.Awaitility.await;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class DealsTest extends VertxTest {
 
-    private static final int APP_PORT = 9080;
+    private static final int APP_PORT = 8070;
     private static final int WIREMOCK_PORT = 8090;
 
     private static final RequestSpecification SPEC = IntegrationTest.spec(APP_PORT);
