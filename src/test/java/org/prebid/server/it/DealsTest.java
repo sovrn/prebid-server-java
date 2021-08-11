@@ -272,6 +272,7 @@ public class DealsTest extends VertxTest {
 
         arrayValueMatchers.add(new Customization("ext.debug.trace.deals", arrayValueMatcher));
         arrayValueMatchers.add(new Customization("ext.debug.httpcalls.cache", cacheArrayValueMatcher));
+        arrayValueMatchers.add(new Customization("**.requestheaders.x-prebid", (o1, o2) -> true));
         return new CustomComparator(JSONCompareMode.NON_EXTENSIBLE, arrayValueMatchers.toArray(new Customization[0]));
     }
 

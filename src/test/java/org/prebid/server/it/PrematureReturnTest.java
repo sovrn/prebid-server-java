@@ -424,9 +424,10 @@ public class PrematureReturnTest extends VertxTest {
                 .collect(Collectors.toList());
 
         arrayValueMatchers.add(new Customization("ext.debug.trace.deals", arrayValueMatcher));
+        arrayValueMatchers.add(new Customization("**.requestheaders.x-prebid", (o1, o2) -> true));
 
         return new CustomComparator(JSONCompareMode.NON_EXTENSIBLE,
-                arrayValueMatchers.toArray(new Customization[arrayValueMatchers.size()]));
+                arrayValueMatchers.toArray(new Customization[0]));
     }
 
     private String withTemporalFields(String auctionResponse) {
