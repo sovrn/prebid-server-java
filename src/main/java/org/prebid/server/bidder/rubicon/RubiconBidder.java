@@ -1282,7 +1282,8 @@ public class RubiconBidder implements Bidder<BidRequest> {
     private BidRequest createLineItemBidRequest(ExtDealLine lineItem, BidRequest bidRequest, Imp imp) {
         final Imp dealsImp = imp.toBuilder()
                 .banner(modifyBanner(imp.getBanner(), lineItem.getSizes()))
-                .ext(modifyRubiconImpExt(imp.getExt(), bidRequest.getExt(), lineItem.getExtLineItemId()))
+                .ext(modifyRubiconImpExt(imp.getExt(), bidRequest.getExt(), lineItem.getExtLineItemId(),
+                        getAdSlot(imp, extImpContext(imp))))
                 .build();
 
         return bidRequest.toBuilder()
@@ -1294,7 +1295,8 @@ public class RubiconBidder implements Bidder<BidRequest> {
         return CollectionUtils.isEmpty(sizes) || banner == null ? banner : banner.toBuilder().format(sizes).build();
     }
 
-    private ObjectNode modifyRubiconImpExt(ObjectNode impExtNode, ExtRequest extRequest, String extLineItemId) {
+    private ObjectNode modifyRubiconImpExt(ObjectNode impExtNode, ExtRequest extRequest, String extLineItemId,
+                                           String adSlot) {
         final RubiconImpExt rubiconImpExt = mapper.mapper().convertValue(impExtNode, RubiconImpExt.class);
         final RubiconImpExtRp impExtRp = rubiconImpExt.getRp();
 
@@ -1306,7 +1308,7 @@ public class RubiconBidder implements Bidder<BidRequest> {
                 impExtRp.getTrack());
 
         return mapper.mapper().valueToTree(RubiconImpExt.of(modifiedImpExtRp, rubiconImpExt.getViewabilityvendors(),
-                getMaxBids(extRequest)));
+                getMaxBids(extRequest), adSlot));
     }
 
     private List<BidderBid> extractBids(BidRequest prebidRequest,
