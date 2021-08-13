@@ -198,6 +198,7 @@ host-cookie:
     value: "true"
 status-response: ready
 gdpr:
+  default-value: 1
   host-vendor-id: 52
   vendorlist:
     v1:
