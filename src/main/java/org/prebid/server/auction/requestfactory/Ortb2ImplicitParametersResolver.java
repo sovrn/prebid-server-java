@@ -579,7 +579,7 @@ public class Ortb2ImplicitParametersResolver {
      */
     private ExtRequestPrebidPbs pbsOrNull(BidRequest bidRequest, String endpoint) {
         final String existingEndpoint = getIfNotNull(getIfNotNull(bidRequest.getExt().getPrebid(),
-                ExtRequestPrebid::getPbs),
+                        ExtRequestPrebid::getPbs),
                 ExtRequestPrebidPbs::getEndpoint);
 
         if (StringUtils.isNotBlank(existingEndpoint)) {
@@ -717,7 +717,7 @@ public class Ortb2ImplicitParametersResolver {
      */
     private ExtRequestPrebidChannel channelOrNull(ExtRequestPrebid prebid, BidRequest bidRequest) {
         final String existingChannelName = getIfNotNull(getIfNotNull(prebid,
-                ExtRequestPrebid::getChannel),
+                        ExtRequestPrebid::getChannel),
                 ExtRequestPrebidChannel::getName);
 
         if (StringUtils.isNotBlank(existingChannelName)) {

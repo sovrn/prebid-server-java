@@ -40,6 +40,7 @@ import org.prebid.server.rubicon.rsid.model.Rsid;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.AccountCcpaConfig;
 import org.prebid.server.settings.model.AccountGdprConfig;
+import org.prebid.server.settings.model.AccountPrivacyConfig;
 import org.prebid.server.settings.model.EnabledForRequestType;
 
 import java.text.DecimalFormat;
@@ -116,12 +117,13 @@ public class PrivacyEnforcementService {
 
         final String effectiveIpAddress = resolveIpAddress(device, privacy);
 
-        final AccountGdprConfig accountGdpr = account.getGdpr();
+        final AccountGdprConfig accountGdpr = accountGdprConfig(account);
         final String accountId = account.getId();
         final RequestLogInfo requestLogInfo = requestLogInfo(requestType, bidRequest, accountId);
 
         return tcfDefinerService.resolveTcfContext(
-                privacy, country, effectiveIpAddress, accountGdpr, requestType, requestLogInfo, timeout, debugWarnings)
+                        privacy, country, effectiveIpAddress, accountGdpr, requestType, requestLogInfo, timeout,
+                        debugWarnings)
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext, tcfContext.getIpAddress()));
     }
 
@@ -146,13 +148,13 @@ public class PrivacyEnforcementService {
 
         final Privacy privacy = privacyExtractor.validPrivacyFromSetuidRequest(httpRequest);
         final String ipAddress = resolveIpFromRequest(httpRequest);
-        final AccountGdprConfig accountGdpr = account.getGdpr();
+        final AccountGdprConfig accountGdpr = accountGdprConfig(account);
         final String accountId = account.getId();
         final RequestLogInfo requestLogInfo = requestLogInfo(MetricName.setuid, null, accountId);
         final String country = getFromRsidCookieIfNull(routingContext);
 
         return tcfDefinerService.resolveTcfContext(
-                privacy, country, ipAddress, accountGdpr, MetricName.setuid, requestLogInfo, timeout, null)
+                        privacy, country, ipAddress, accountGdpr, MetricName.setuid, requestLogInfo, timeout, null)
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext));
     }
 
@@ -162,13 +164,13 @@ public class PrivacyEnforcementService {
 
         final Privacy privacy = privacyExtractor.validPrivacyFrom(cookieSyncRequest);
         final String ipAddress = resolveIpFromRequest(httpRequest);
-        final AccountGdprConfig accountGdpr = account.getGdpr();
+        final AccountGdprConfig accountGdpr = accountGdprConfig(account);
         final String accountId = account.getId();
         final RequestLogInfo requestLogInfo = requestLogInfo(MetricName.cookiesync, null, accountId);
         final String country = getFromRsidCookieIfNull(routingContext);
 
         return tcfDefinerService.resolveTcfContext(
-                privacy, country, ipAddress, accountGdpr, MetricName.cookiesync, requestLogInfo, timeout, null)
+                        privacy, country, ipAddress, accountGdpr, MetricName.cookiesync, requestLogInfo, timeout, null)
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext));
     }
 
@@ -261,17 +263,23 @@ public class PrivacyEnforcementService {
     }
 
     private Boolean isCcpaEnabled(Account account) {
-        final AccountCcpaConfig accountCcpaConfig = account.getCcpa();
+        final AccountPrivacyConfig accountPrivacyConfig = account.getPrivacy();
+        final AccountCcpaConfig accountCcpaConfig =
+                accountPrivacyConfig != null ? accountPrivacyConfig.getCcpa() : null;
+        final Boolean accountEnforceCcpa = accountPrivacyConfig != null ? accountPrivacyConfig.getEnforceCcpa() : null;
         final Boolean accountCcpaEnabled = accountCcpaConfig != null ? accountCcpaConfig.getEnabled() : null;
 
-        return ObjectUtils.firstNonNull(accountCcpaEnabled, account.getEnforceCcpa(), ccpaEnforce);
+        return ObjectUtils.firstNonNull(accountCcpaEnabled, accountEnforceCcpa, ccpaEnforce);
     }
 
     private boolean isCcpaEnabled(Account account, MetricName requestType) {
-        final AccountCcpaConfig accountCcpaConfig = account.getCcpa();
+        final AccountPrivacyConfig accountPrivacyConfig = account.getPrivacy();
+        final AccountCcpaConfig accountCcpaConfig =
+                accountPrivacyConfig != null ? accountPrivacyConfig.getCcpa() : null;
+        final Boolean accountEnforceCcpa = accountPrivacyConfig != null ? accountPrivacyConfig.getEnforceCcpa() : null;
         final Boolean accountCcpaEnabled = accountCcpaConfig != null ? accountCcpaConfig.getEnabled() : null;
         if (requestType == null) {
-            return ObjectUtils.firstNonNull(accountCcpaEnabled, account.getEnforceCcpa(), ccpaEnforce);
+            return ObjectUtils.firstNonNull(accountCcpaEnabled, accountEnforceCcpa, ccpaEnforce);
         }
 
         final EnabledForRequestType enabledForRequestType = accountCcpaConfig != null
@@ -281,7 +289,7 @@ public class PrivacyEnforcementService {
         final Boolean enabledForType = enabledForRequestType != null
                 ? enabledForRequestType.isEnabledFor(requestType)
                 : null;
-        return ObjectUtils.firstNonNull(enabledForType, accountCcpaEnabled, account.getEnforceCcpa(), ccpaEnforce);
+        return ObjectUtils.firstNonNull(enabledForType, accountCcpaEnabled, accountEnforceCcpa, ccpaEnforce);
     }
 
     private Map<String, BidderPrivacyResult> maskCcpa(
@@ -384,8 +392,10 @@ public class PrivacyEnforcementService {
             TcfContext tcfContext, Set<String> bidders, BidderAliases aliases, Account account) {
 
         return tcfDefinerService.resultForBidderNames(
-                Collections.unmodifiableSet(bidders), VendorIdResolver.of(aliases, bidderCatalog), tcfContext,
-                account.getGdpr())
+                        Collections.unmodifiableSet(bidders),
+                        VendorIdResolver.of(aliases, bidderCatalog),
+                        tcfContext,
+                        accountGdprConfig(account))
                 .map(tcfResponse -> mapTcfResponseToEachBidder(tcfResponse, bidders));
     }
 
@@ -648,6 +658,12 @@ public class PrivacyEnforcementService {
         final List<BidderPrivacyResult> result = new ArrayList<>(ccpaResult.values());
         result.addAll(gdprResult);
         return result;
+    }
+
+    private static AccountGdprConfig accountGdprConfig(Account account) {
+        final AccountPrivacyConfig privacyConfig = account.getPrivacy();
+
+        return privacyConfig != null ? privacyConfig.getGdpr() : null;
     }
 
     private String getFromRsidCookieIfNull(RoutingContext context) {

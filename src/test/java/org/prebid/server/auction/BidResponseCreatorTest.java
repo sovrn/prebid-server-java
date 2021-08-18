@@ -85,6 +85,8 @@ import org.prebid.server.proto.openrtb.ext.response.ExtHttpCall;
 import org.prebid.server.proto.openrtb.ext.response.ExtResponseCache;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.AccountAnalyticsConfig;
+import org.prebid.server.settings.model.AccountAuctionConfig;
+import org.prebid.server.settings.model.AccountEventsConfig;
 import org.prebid.server.settings.model.VideoStoredDataResult;
 import org.prebid.server.vast.VastModifier;
 
@@ -343,7 +345,9 @@ public class BidResponseCreatorTest extends VertxTest {
                         imp1, imp2),
                 builder -> builder.account(Account.builder()
                         .id("accountId")
-                        .eventsEnabled(true)
+                        .auction(AccountAuctionConfig.builder()
+                                .events(AccountEventsConfig.of(true))
+                                .build())
                         .build()));
 
         final Bid bid1 = Bid.builder().id("bidId1").impid("impId1").price(BigDecimal.valueOf(5.67)).build();
@@ -456,7 +460,12 @@ public class BidResponseCreatorTest extends VertxTest {
     public void shouldRequestCacheServiceWithVideoBidsToModify() {
         // given
         final String accountId = "accountId";
-        final Account account = Account.builder().id(accountId).eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id(accountId)
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
 
         final Imp imp1 = givenImp("impId1");
         final Imp imp2 = givenImp("impId2");
@@ -738,7 +747,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldUseGeneratedBidIdForEventAndCacheWhenIdGeneratorIsUUIDAndEventEnabledForAccountAndRequest() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         final Imp imp = givenImp();
 
         // Allow events for request
@@ -1308,7 +1322,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldTruncateTargetingKeywordsByAccountConfig() {
         // given
-        final Account account = Account.builder().id("accountId").truncateTargetAttr(20).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .truncateTargetAttr(20)
+                        .build())
+                .build();
         final BidRequest bidRequest = givenBidRequest(
                 identity(),
                 extBuilder -> extBuilder.targeting(givenTargeting()),
@@ -1341,7 +1360,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldTruncateTargetingKeywordsByRequestPassedValue() {
         // given
-        final Account account = Account.builder().id("accountId").truncateTargetAttr(25).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .truncateTargetAttr(25)
+                        .build())
+                .build();
         final ExtRequestTargeting targeting = ExtRequestTargeting.builder()
                 .pricegranularity(mapper.valueToTree(
                         ExtPriceGranularity.of(2,
@@ -1355,7 +1379,6 @@ public class BidResponseCreatorTest extends VertxTest {
                 identity(),
                 extBuilder -> extBuilder.targeting(targeting),
                 givenImp());
-
         final AuctionContext auctionContext = givenAuctionContext(
                 bidRequest,
                 contextBuilder -> contextBuilder.account(account));
@@ -1793,7 +1816,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldAddExtPrebidEventsIfEventsAreEnabledAndExtRequestPrebidEventPresent() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         final BidRequest bidRequest = givenBidRequest(
                 identity(),
                 extBuilder -> extBuilder
@@ -1843,8 +1871,10 @@ public class BidResponseCreatorTest extends VertxTest {
         // given
         final Account account = Account.builder()
                 .id("accountId")
-                .eventsEnabled(true)
-                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                 .build();
         final BidRequest bidRequest = givenBidRequest(
                 identity(),
@@ -1884,7 +1914,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldAddExtPrebidEventsIfEventsAreEnabledAndDefaultAccountAnalyticsConfig() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         final BidRequest bidRequest = givenBidRequest(
                 identity(),
                 extBuilder -> extBuilder
@@ -1960,7 +1995,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldNotAddExtPrebidEventsIfEventsAreNotEnabled() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(false).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(false))
+                        .build())
+                .build();
         final AuctionContext auctionContext = givenAuctionContext(
                 givenBidRequest(
                         identity(),
@@ -1986,7 +2026,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldNotAddExtPrebidEventsIfExtRequestPrebidEventsNull() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         final AuctionContext auctionContext = givenAuctionContext(
                 givenBidRequest(givenImp()),
                 contextBuilder -> contextBuilder.account(account));
@@ -2015,8 +2060,10 @@ public class BidResponseCreatorTest extends VertxTest {
         // given
         final Account account = Account.builder()
                 .id("accountId")
-                .eventsEnabled(true)
-                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                 .build();
         final BidRequest bidRequest = givenBidRequest(
                 identity(),
@@ -2538,7 +2585,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldPassIntegrationToCacheServiceAndBidEvents() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         final BidRequest bidRequest = BidRequest.builder()
                 .cur(singletonList("USD"))
                 .imp(singletonList(givenImp()))

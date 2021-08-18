@@ -27,6 +27,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtDeal;
 import org.prebid.server.proto.openrtb.ext.request.ExtDealLine;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
 import org.prebid.server.settings.model.Account;
+import org.prebid.server.settings.model.AccountAuctionConfig;
 import org.prebid.server.settings.model.AccountBidValidationConfig;
 import org.prebid.server.settings.model.BidValidationEnforcement;
 import org.prebid.server.util.DealUtil;
@@ -212,7 +213,9 @@ public class ResponseBidValidator {
     }
 
     private BidValidationEnforcement effectiveBannerMaxSizeEnforcement(Account account) {
-        final AccountBidValidationConfig validationConfig = account.getBidValidations();
+        final AccountAuctionConfig accountAuctionConfig = account.getAuction();
+        final AccountBidValidationConfig validationConfig =
+                accountAuctionConfig != null ? accountAuctionConfig.getBidValidations() : null;
         final BidValidationEnforcement accountBannerMaxSizeEnforcement =
                 validationConfig != null ? validationConfig.getBannerMaxSizeEnforcement() : null;
 
