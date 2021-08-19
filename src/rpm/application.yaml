@@ -175,7 +175,37 @@ settings:
   enforce-valid-account: true
   database:
     type: mysql
-    account-query: SELECT uuid, price_granularity, banner_cache_ttl, video_cache_ttl, events_enabled, enforce_ccpa, tcf_config, analytics_sampling_factor, truncate_target_attr, default_integration, analytics_config, bid_validations, status, config FROM accounts_account where uuid = ? LIMIT 1
+    account-query: >
+      SELECT
+        uuid,
+        JSON_MERGE_PATCH(config, JSON_OBJECT(
+          'status', status,
+          'auction', JSON_OBJECT(
+            'price-granularity', price_granularity,
+            'banner-cache-ttl', banner_cache_ttl,
+            'video-cache-ttl', video_cache_ttl,
+            'truncate-target-attr', truncate_target_attr,
+            'default-integration', default_integration,
+            'bid-validations', bid_validations,
+            'events', JSON_OBJECT(
+              'enabled', NOT NOT(events_enabled)
+            )
+          ),
+          'privacy', JSON_OBJECT(
+            'enforce-ccpa', NOT NOT(enforce_ccpa),
+            'gdpr', tcf_config
+          ),
+          'analytics', JSON_MERGE_PATCH(analytics_config, JSON_OBJECT(
+            'modules', JSON_OBJECT(
+              'rubicon', JSON_OBJECT(
+                'sampling-factor', analytics_sampling_factor
+              )
+            )
+          ))
+        )) as consolidated_config
+        FROM accounts_account
+        WHERE uuid = %ACCOUNT_ID%
+        LIMIT 1
     stored-requests-query: SELECT accountId, uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%) UNION ALL SELECT accountId, uuid, config, 'imp' as dataType FROM stored_requests WHERE uuid IN (%IMP_ID_LIST%)
     amp-stored-requests-query: SELECT accountId, uuid, config, 'request' as dataType FROM stored_requests WHERE uuid IN (%REQUEST_ID_LIST%)
     stored-responses-query: SELECT resid, responseData FROM stored_responses WHERE resid IN (%RESPONSE_ID_LIST%)
