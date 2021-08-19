@@ -372,7 +372,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -411,7 +411,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -450,7 +450,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -483,7 +483,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -532,7 +532,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -583,7 +583,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analyticsConfig(AccountAnalyticsConfig.of(singletonMap("web", true)))
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -978,7 +978,14 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .bidId("bidid")
-                .account(Account.builder().id("123123").analyticsSamplingFactor(10).build())
+                .account(Account.builder()
+                        .id("123123")
+                        .analytics(AccountAnalyticsConfig.of(
+                                null,
+                                singletonMap("rubicon",
+                                        mapper.createObjectNode()
+                                                .put("sampling-factor", 10))))
+                        .build())
                 .httpContext(httpContext)
                 .build();
 
@@ -998,7 +1005,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .bidId("bidid")
-                .account(Account.builder().id("123123").analyticsSamplingFactor(null).build())
+                .account(Account.builder().id("123123").build())
                 .httpContext(httpContext)
                 .build();
 
@@ -1159,7 +1166,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                 .bidResponse(
                                                         org.prebid.server.rubicon.analytics.proto
                                                                 .BidResponse.of(345, BigDecimal.valueOf(0.46),
-                                                                "video", Dimensions.of(500, 600)))
+                                                                        "video", Dimensions.of(500, 600)))
                                                 .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -1182,7 +1189,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
                                                                         .BidResponse.of(456, BigDecimal.valueOf(0.57),
-                                                                        "video", Dimensions.of(600, 700)))
+                                                                                "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
@@ -1193,7 +1200,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
                                                                         .BidResponse.of(567, BigDecimal.valueOf(0.68),
-                                                                        "video", Dimensions.of(600, 700)))
+                                                                                "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
@@ -1604,7 +1611,14 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     private AuctionContext givenAuctionContext(BidRequest bidRequest, Integer samplingFactor) {
         return AuctionContext.builder()
                 .bidRequest(bidRequest)
-                .account(Account.builder().id("123").analyticsSamplingFactor(samplingFactor).build())
+                .account(Account.builder()
+                        .id("123")
+                        .analytics(AccountAnalyticsConfig.of(
+                                null,
+                                singletonMap("rubicon",
+                                        mapper.createObjectNode()
+                                                .put("sampling-factor", samplingFactor))))
+                        .build())
                 .privacyContext(PrivacyContext.of(null, TcfContext.builder().gdpr("1").build()))
                 .geoInfo(GeoInfo.builder().vendor("vendor").metroNielsen(123).build())
                 .build();

@@ -323,7 +323,11 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("l", "lineItemId")
                 .add("a", "accountId"));
 
-        final Account account = Account.builder().eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         given(applicationSettings.getAccountById(anyString(), any()))
                 .willReturn(Future.succeededFuture(account));
 
@@ -344,7 +348,11 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("a", "accountId")
                 .add("x", "0"));
 
-        final Account account = Account.builder().eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         given(applicationSettings.getAccountById(anyString(), any()))
                 .willReturn(Future.succeededFuture(account));
 
@@ -365,7 +373,11 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("l", "lineItemId")
                 .add("a", "accountId"));
 
-        final Account account = Account.builder().eventsEnabled(false).build();
+        final Account account = Account.builder()
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(false))
+                        .build())
+                .build();
         given(applicationSettings.getAccountById(anyString(), any()))
                 .willReturn(Future.succeededFuture(account));
 
@@ -395,7 +407,11 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("l", "lineItemId")
                 .add("a", "accountId"));
 
-        final Account account = Account.builder().eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         given(applicationSettings.getAccountById(anyString(), any()))
                 .willReturn(Future.succeededFuture(account));
 
@@ -417,7 +433,11 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("x", "0"));
 
         given(applicationSettings.getAccountById(anyString(), any()))
-                .willReturn(Future.succeededFuture(Account.builder().eventsEnabled(true).build()));
+                .willReturn(Future.succeededFuture(Account.builder()
+                        .auction(AccountAuctionConfig.builder()
+                                .events(AccountEventsConfig.of(true))
+                                .build())
+                        .build()));
 
         // when
         notificationHandler.handle(routingContext);
@@ -436,7 +456,11 @@ public class NotificationEventHandlerTest extends VertxTest {
                 .add("x", "0"));
 
         given(applicationSettings.getAccountById(anyString(), any()))
-                .willReturn(Future.succeededFuture(Account.builder().eventsEnabled(true).build()));
+                .willReturn(Future.succeededFuture(Account.builder()
+                        .auction(AccountAuctionConfig.builder()
+                                .events(AccountEventsConfig.of(true))
+                                .build())
+                        .build()));
 
         // when
         notificationHandler.handle(routingContext);
@@ -552,7 +576,12 @@ public class NotificationEventHandlerTest extends VertxTest {
                         .add("l", "lineItemId"));
 
         given(applicationSettings.getAccountById(anyString(), any()))
-                .willReturn(Future.succeededFuture(Account.builder().id("accountId").eventsEnabled(true).build()));
+                .willReturn(Future.succeededFuture(Account.builder()
+                        .id("accountId")
+                        .auction(AccountAuctionConfig.builder()
+                                .events(AccountEventsConfig.of(true))
+                                .build())
+                        .build()));
 
         // when
         notificationHandler.handle(routingContext);
@@ -573,7 +602,12 @@ public class NotificationEventHandlerTest extends VertxTest {
         final NotificationEvent expectedEvent = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .bidId("bidId")
-                .account(Account.builder().id("accountId").eventsEnabled(true).build())
+                .account(Account.builder()
+                        .id("accountId")
+                        .auction(AccountAuctionConfig.builder()
+                                .events(AccountEventsConfig.of(true))
+                                .build())
+                        .build())
                 .httpContext(expectedHttpContext)
                 .lineItemId("lineItemId")
                 .build();

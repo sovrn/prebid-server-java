@@ -1790,7 +1790,12 @@ public class BidResponseCreatorTest extends VertxTest {
     @Test
     public void shouldCallEventsServiceWhenEventsDisabledByRequestButBidWithLineItem() {
         // given
-        final Account account = Account.builder().id("accountId").eventsEnabled(true).build();
+        final Account account = Account.builder()
+                .id("accountId")
+                .auction(AccountAuctionConfig.builder()
+                        .events(AccountEventsConfig.of(true))
+                        .build())
+                .build();
         final BidRequest bidRequest = givenBidRequest(
                 identity(),
                 extBuilder -> extBuilder.targeting(givenTargeting()),

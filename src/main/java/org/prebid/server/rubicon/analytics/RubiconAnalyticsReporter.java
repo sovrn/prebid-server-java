@@ -165,6 +165,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private static final String OTHER_CHANNEL = "other";
     private static final Set<String> SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList("web", "amp", "app"));
 
+    private static final String SAMPLING_FACTOR_FIELD = "sampling-factor";
+
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
         VIDEO_SIZE_AD_FORMATS.put(201, VideoAdFormat.PREROLL);
@@ -269,7 +271,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
         final String requestAccountId = account.getId();
         final Integer accountId = parseId(requestAccountId);
-        final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+        final Integer accountSamplingFactor = accountSamplingFactor(account);
 
         if (shouldProcessEvent(
                 account, accountId, bidRequest, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
@@ -306,7 +308,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
         final String requestAccountId = account.getId();
         final Integer accountId = NumberUtils.isDigits(requestAccountId) ? parseId(requestAccountId) : null;
-        final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+        final Integer accountSamplingFactor = accountSamplingFactor(account);
         final String storedId = parseStoredId(httpContext.getUri());
 
         // only continue if counter matches sampling factor
@@ -337,7 +339,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         }
 
         final Integer accountId = parseId(account.getId());
-        final Integer accountSamplingFactor = account.getAnalyticsSamplingFactor();
+        final Integer accountSamplingFactor = accountSamplingFactor(account);
 
         // only continue if counter matches sampling factor
         // note: this event type doesn't use global event count because it is related to particular account
@@ -388,9 +390,10 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     }
 
     private static boolean isChannelSupported(BidRequest bidRequest, Account account) {
-        final AccountAnalyticsConfig analyticsConfig = ObjectUtils.defaultIfNull(
-                account.getAnalyticsConfig(), AccountAnalyticsConfig.fallback());
-        final Map<String, Boolean> channelConfig = analyticsConfig.getAuctionEvents();
+        final AccountAnalyticsConfig analyticsConfig = account.getAnalytics();
+        final Map<String, Boolean> channelConfig = ObjectUtils.defaultIfNull(
+                analyticsConfig != null ? analyticsConfig.getAuctionEvents() : null,
+                AccountAnalyticsConfig.fallbackAuctionEvents());
 
         final String channelFromRequest = channelFromRequest(bidRequest);
 
@@ -420,8 +423,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private static String channelFromRequest(BidRequest bidRequest) {
         return getIfNotNull(getIfNotNull(getIfNotNull(bidRequest.getExt(),
-                ExtRequest::getPrebid),
-                ExtRequestPrebid::getChannel),
+                                ExtRequest::getPrebid),
+                        ExtRequestPrebid::getChannel),
                 ExtRequestPrebidChannel::getName);
     }
 
@@ -1303,6 +1306,20 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private static Future<Void> failResponse(Throwable exception) {
         logger.warn("Error occurred while interacting with Rubicon Analytics", exception);
         return Future.failedFuture(exception);
+    }
+
+    private Integer accountSamplingFactor(Account account) {
+        final ObjectNode configuration = moduleConfiguration(account);
+        final JsonNode samplingFactorNode = configuration != null ? configuration.get(SAMPLING_FACTOR_FIELD) : null;
+
+        return samplingFactorNode != null && samplingFactorNode.isInt() ? samplingFactorNode.asInt() : null;
+    }
+
+    private ObjectNode moduleConfiguration(Account account) {
+        final AccountAnalyticsConfig analyticsConfig = account.getAnalytics();
+        final Map<String, ObjectNode> modulesConfig = analyticsConfig != null ? analyticsConfig.getModules() : null;
+
+        return MapUtils.getObject(modulesConfig, name());
     }
 
     /**
