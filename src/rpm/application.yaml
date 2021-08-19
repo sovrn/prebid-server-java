@@ -126,6 +126,7 @@ adapters:
     enabled: true
   triplelift:
     enabled: true
+    endpoint: https://tlx.3lift.com/s2s/auction?sra=1&supplier_id=39
   ttx:
     enabled: true
     aliases:
