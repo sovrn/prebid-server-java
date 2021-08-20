@@ -93,6 +93,7 @@ adapters:
     enabled: true
   marsmedia:
     enabled: true
+    endpoint: http://bidd.rtbanalytics.com:8080/bidder/?bid=ladqho
   nobid:
     enabled: true
   openx:
