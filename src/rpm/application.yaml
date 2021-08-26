@@ -177,32 +177,35 @@ settings:
   database:
     type: mysql
     account-query: >
-      SELECT JSON_MERGE_PATCH(COALESCE(config, '{}'), JSON_OBJECT(
-              'id', uuid,
-              'status', status,
-              'auction', JSON_OBJECT(
-                      'price-granularity', price_granularity,
-                      'banner-cache-ttl', banner_cache_ttl,
-                      'video-cache-ttl', video_cache_ttl,
-                      'truncate-target-attr', truncate_target_attr,
-                      'default-integration', default_integration,
-                      'bid-validations', bid_validations,
-                      'events', JSON_OBJECT(
-                              'enabled', NOT NOT (events_enabled)
-                          )
-                  ),
-              'privacy', JSON_OBJECT(
-                      'enforce-ccpa', NOT NOT (enforce_ccpa),
-                      'gdpr', tcf_config
-                  ),
-              'analytics', JSON_MERGE_PATCH(COALESCE(analytics_config, '{}'), JSON_OBJECT(
-                      'modules', JSON_OBJECT(
-                              'rubicon', JSON_OBJECT(
-                                      'sampling-factor', analytics_sampling_factor
-                                  )
-                          )
-                  ))
-          )) as consolidated_config
+      SELECT JSON_MERGE_PATCH(
+                     JSON_OBJECT(
+                             'id', uuid,
+                             'status', status,
+                             'auction', JSON_OBJECT(
+                                     'price-granularity', price_granularity,
+                                     'banner-cache-ttl', banner_cache_ttl,
+                                     'video-cache-ttl', video_cache_ttl,
+                                     'truncate-target-attr', truncate_target_attr,
+                                     'default-integration', default_integration,
+                                     'bid-validations', bid_validations,
+                                     'events', JSON_OBJECT(
+                                             'enabled', NOT NOT (events_enabled)
+                                         )
+                                 ),
+                             'privacy', JSON_OBJECT(
+                                     'enforce-ccpa', NOT NOT (enforce_ccpa),
+                                     'gdpr', tcf_config
+                                 ),
+                             'analytics', JSON_MERGE_PATCH(COALESCE(analytics_config, '{}'), JSON_OBJECT(
+                             'modules', JSON_OBJECT(
+                                     'rubicon', JSON_OBJECT(
+                                             'sampling-factor', analytics_sampling_factor
+                                         )
+                                 )
+                         ))
+                         ),
+                     COALESCE(config, '{}')
+                 ) as consolidated_config
         FROM accounts_account
         WHERE uuid = %ACCOUNT_ID%
         LIMIT 1
