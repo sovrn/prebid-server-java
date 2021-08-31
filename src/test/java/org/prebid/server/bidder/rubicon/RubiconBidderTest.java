@@ -2845,8 +2845,7 @@ public class RubiconBidderTest extends VertxTest {
     @Test
     public void makeBidsShouldReturnBidWithBidIdFieldFromBidResponseIfZero() throws JsonProcessingException {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity());
-        final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest,
+        final HttpCall<BidRequest> httpCall = givenHttpCall(givenBidRequest(identity()),
                 mapper.writeValueAsString(RubiconBidResponse.builder()
                         .bidid("bidid1") // returned bidid from XAPI
                         .seatbid(singletonList(RubiconSeatBid.builder()
@@ -2866,8 +2865,7 @@ public class RubiconBidderTest extends VertxTest {
     @Test
     public void makeBidsShouldReturnBidWithOriginalBidIdFieldFromBidResponseIfNotZero() throws JsonProcessingException {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity());
-        final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest,
+        final HttpCall<BidRequest> httpCall = givenHttpCall(givenBidRequest(identity()),
                 mapper.writeValueAsString(RubiconBidResponse.builder()
                         .bidid("bidid1") // returned bidid from XAPI
                         .seatbid(singletonList(RubiconSeatBid.builder()
@@ -2890,8 +2888,7 @@ public class RubiconBidderTest extends VertxTest {
         rubiconBidder = new RubiconBidder(
                 ENDPOINT_URL, USERNAME, PASSWORD, SUPPORTED_VENDORS, true, currencyConversionService, jacksonMapper);
 
-        final BidRequest bidRequest = givenBidRequest(identity());
-        final HttpCall<BidRequest> httpCall = givenHttpCall(bidRequest,
+        final HttpCall<BidRequest> httpCall = givenHttpCall(givenBidRequest(identity()),
                 mapper.writeValueAsString(RubiconBidResponse.builder()
                         .seatbid(singletonList(RubiconSeatBid.builder()
                                 .bid(singletonList(Bid.builder().id("bidid1").price(ONE).build()))

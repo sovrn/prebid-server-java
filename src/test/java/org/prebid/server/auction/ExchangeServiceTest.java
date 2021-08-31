@@ -851,7 +851,8 @@ public class ExchangeServiceTest extends VertxTest {
                 givenImp(doubleMap("bidder", 1, "bidderAlias", 2), identity())),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .aliases(singletonMap("bidderAlias", "bidder"))
-                        .auctiontimestamp(1000L).build())));
+                        .auctiontimestamp(1000L)
+                        .build())));
 
         // when
         exchangeService.holdAuction(givenRequestContext(bidRequest));
@@ -896,8 +897,7 @@ public class ExchangeServiceTest extends VertxTest {
                         builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .auctiontimestamp(1000L)
                                 .aliases(singletonMap("bidderAlias", "bidder"))
-                                .build()))))), any(), any(),
-                anyBoolean()))
+                                .build()))))), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().impid("impId1").price(BigDecimal.ONE).build())))));
 
@@ -910,8 +910,7 @@ public class ExchangeServiceTest extends VertxTest {
                         builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
                                 .auctiontimestamp(1000L)
                                 .aliases(singletonMap("bidderAlias", "bidder"))
-                                .build()))))), any(), any(),
-                anyBoolean()))
+                                .build()))))), any(), any(), anyBoolean()))
                 .willReturn(Future.succeededFuture(givenSeatBid(singletonList(
                         givenBid(Bid.builder().impid("impId2").price(BigDecimal.ONE).build())))));
 
@@ -1054,10 +1053,9 @@ public class ExchangeServiceTest extends VertxTest {
                         .cache(ExtRequestPrebidCache.of(null, null, true))
                         .auctiontimestamp(1000L)
                         .build())));
-        final AuctionContext context = givenRequestContext(bidRequest);
 
         // when
-        exchangeService.holdAuction(context).result();
+        exchangeService.holdAuction(givenRequestContext(bidRequest)).result();
 
         // then
         final ArgumentCaptor<AuctionContext> auctionContextArgumentCaptor =
@@ -1134,7 +1132,8 @@ public class ExchangeServiceTest extends VertxTest {
                 givenSingleImp(singletonMap("someBidder", 1)),
                 builder -> builder.ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .data(ExtRequestPrebidData.of(singletonList("someBidder"), null))
-                        .auctiontimestamp(1000L).build())));
+                        .auctiontimestamp(1000L)
+                        .build())));
 
         // when
         final BidResponse bidResponse = exchangeService.holdAuction(givenRequestContext(bidRequest)).result();

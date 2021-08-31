@@ -54,7 +54,6 @@ import static java.util.Collections.singletonMap;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
@@ -143,34 +142,6 @@ public class HttpBidderRequesterTest extends VertxTest {
         assertThat(bidderSeatBid.getHttpCalls()).isEmpty();
         assertThat(bidderSeatBid.getErrors())
                 .extracting(BidderError::getMessage).containsOnly("error1", "error2");
-    }
-
-    @Test
-    public void shouldSendPopulatedPostRequest() {
-        // given
-        givenHttpClientReturnsResponse(200, null);
-
-        final MultiMap headers = new CaseInsensitiveHeaders();
-        headers.add("header1", "value1");
-        headers.add("header2", "value2");
-        given(requestEnricher.enrichHeaders(any(), any(), any())).willReturn(headers);
-
-        given(bidder.makeHttpRequests(any())).willReturn(Result.of(singletonList(
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri("uri")
-                        .body("requestBody")
-                        .headers(headers)
-                        .build()),
-                emptyList()));
-
-        final BidderRequest bidderRequest = BidderRequest.of("bidder", null, givenBidRequest());
-        // when
-        httpBidderRequester.requestBids(bidder, bidderRequest, timeout, CaseInsensitiveMultiMap.empty(), false);
-
-        // then
-        verify(httpClient).request(eq(HttpMethod.POST), eq("uri"), argThat(new MultiMapMatcher(headers)),
-                eq("requestBody"), eq(500L));
     }
 
     @Test

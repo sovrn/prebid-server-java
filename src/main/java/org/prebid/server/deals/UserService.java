@@ -4,7 +4,7 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.cache.model.DebugHttpCall;
 import org.prebid.server.cookie.UidsCookie;

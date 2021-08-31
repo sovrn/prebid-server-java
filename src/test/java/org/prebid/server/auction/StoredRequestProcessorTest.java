@@ -147,7 +147,8 @@ public class StoredRequestProcessorTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .storedrequest(ExtStoredRequest.of("123")).build())));
+                        .storedrequest(ExtStoredRequest.of("123"))
+                        .build())));
 
         final String storedRequestBidRequestJson = mapper.writeValueAsString(BidRequest.builder()
                 .id("test-request-id")
@@ -403,7 +404,8 @@ public class StoredRequestProcessorTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .storedrequest(ExtStoredRequest.of("123")).build())));
+                        .storedrequest(ExtStoredRequest.of("123"))
+                        .build())));
 
         final Map<String, String> storedRequestFetchResult = singletonMap("123", "{{}");
         given(applicationSettings.getStoredData(any(), anySet(), anySet(), any())).willReturn(Future
@@ -423,7 +425,8 @@ public class StoredRequestProcessorTest extends VertxTest {
     public void shouldReturnFailedFutureWhenMergedResultCouldNotBeConvertedToBidRequest() throws IOException {
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .storedrequest(ExtStoredRequest.of("123")).build())));
+                        .storedrequest(ExtStoredRequest.of("123"))
+                        .build())));
 
         final Map<String, String> storedRequestFetchResult = singletonMap("123", mapper.writeValueAsString(
                 mapper.createObjectNode().put("tmax", "stringValue")));
@@ -445,7 +448,8 @@ public class StoredRequestProcessorTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(builder -> builder
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
-                                .storedrequest(ExtStoredRequest.of(null)).build())));
+                        .storedrequest(ExtStoredRequest.of(null))
+                        .build())));
 
         // when
         final Future<BidRequest> bidRequestFuture = storedRequestProcessor.processStoredRequests(null, bidRequest);

@@ -601,7 +601,7 @@ public class DealsConfiguration {
     @Bean
     DealsProcessor dealsProcessor(
             LineItemService lineItemService,
-            DeviceInfoService deviceInfoService,
+            @Autowired(required = false) DeviceInfoService deviceInfoService,
             @Autowired(required = false) GeoLocationService geoLocationService,
             UserService userService,
             Clock clock,

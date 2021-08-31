@@ -1748,9 +1748,11 @@ public class RequestValidatorTest extends VertxTest {
         final ExtPriceGranularity priceGranularity = ExtPriceGranularity.of(1, singletonList(
                 ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(0.01))));
         final ExtMediaTypePriceGranularity mediaTypePriceGranuality = ExtMediaTypePriceGranularity.of(
-                mapper.valueToTree(
-                        ExtPriceGranularity.of(-1, singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5),
-                                BigDecimal.valueOf(1))))), null, null);
+                mapper.valueToTree(ExtPriceGranularity.of(
+                        -1,
+                        singletonList(ExtGranularityRange.of(BigDecimal.valueOf(5), BigDecimal.valueOf(1))))),
+                null,
+                null);
         final BidRequest bidRequest = validBidRequestBuilder()
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .targeting(ExtRequestTargeting.builder()

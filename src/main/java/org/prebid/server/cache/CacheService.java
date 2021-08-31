@@ -553,8 +553,8 @@ public class CacheService {
     /**
      * Composes cached asset url template against the given query, schema and host.
      */
-    public static String composeCachedAssetUrlTemplate(String cacheSchema, String cacheHost, String path,
-                                                       String cacheQuery) {
+    public static String getCachedAssetUrlTemplate(String cacheSchema, String cacheHost, String path,
+                                                   String cacheQuery) {
         try {
             final URL baseUrl = getCacheBaseUrl(cacheSchema, cacheHost);
             return new URL(baseUrl, path + "?" + cacheQuery).toString();

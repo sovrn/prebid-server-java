@@ -148,15 +148,15 @@ public class CacheServiceTest extends VertxTest {
     public void getCachedAssetUrlTemplateShouldFailOnInvalidCacheServiceUrl() {
         // when and then
         assertThatIllegalArgumentException().isThrownBy(() ->
-                CacheService.composeCachedAssetUrlTemplate("http", "{invalid:host}", "cache", "qs"));
+                CacheService.getCachedAssetUrlTemplate("http", "{invalid:host}", "cache", "qs"));
         assertThatIllegalArgumentException().isThrownBy(() ->
-                CacheService.composeCachedAssetUrlTemplate("invalid-schema", "example-server:80808", "cache", "qs"));
+                CacheService.getCachedAssetUrlTemplate("invalid-schema", "example-server:80808", "cache", "qs"));
     }
 
     @Test
     public void getCachedAssetUrlTemplateShouldReturnValidUrl() {
         // when
-        final String result = CacheService.composeCachedAssetUrlTemplate("http", "example.com", "cache", "qs");
+        final String result = CacheService.getCachedAssetUrlTemplate("http", "example.com", "cache", "qs");
 
         // then
         assertThat(result).isEqualTo("http://example.com/cache?qs");

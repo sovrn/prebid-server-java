@@ -628,6 +628,19 @@ public class Ortb2RequestFactory {
         return mapBuilder.build();
     }
 
+    private DeepDebugLog createDeepDebugLog(BidRequest bidRequest) {
+        final ExtRequest ext = bidRequest.getExt();
+        return DeepDebugLog.create(ext != null && isDeepDebugEnabled(ext), clock);
+    }
+
+    /**
+     * Determines deep debug flag from {@link ExtRequest}.
+     */
+    private static boolean isDeepDebugEnabled(ExtRequest extRequest) {
+        final ExtRequestPrebid extRequestPrebid = extRequest != null ? extRequest.getPrebid() : null;
+        return extRequestPrebid != null && extRequestPrebid.getTrace() == TraceLevel.verbose;
+    }
+
     /**
      * Rubicon-fork can fetch account id not only from {@link Site} or {@link App},
      * so need to make sure it is updated in {@link BidRequest}.
@@ -670,19 +683,6 @@ public class Ortb2RequestFactory {
         return (publisher != null ? publisher.toBuilder() : Publisher.builder())
                 .id(accountId)
                 .build();
-    }
-
-    private DeepDebugLog createDeepDebugLog(BidRequest bidRequest) {
-        final ExtRequest ext = bidRequest.getExt();
-        return DeepDebugLog.create(ext != null && isDeepDebugEnabled(ext), clock);
-    }
-
-    /**
-     * Determines deep debug flag from {@link ExtRequest}.
-     */
-    private static boolean isDeepDebugEnabled(ExtRequest extRequest) {
-        final ExtRequestPrebid extRequestPrebid = extRequest != null ? extRequest.getPrebid() : null;
-        return extRequestPrebid != null && extRequestPrebid.getTrace() == TraceLevel.verbose;
     }
 
     private static boolean isObjectNode(JsonNode node) {

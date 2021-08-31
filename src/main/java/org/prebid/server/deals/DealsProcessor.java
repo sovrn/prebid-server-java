@@ -91,7 +91,7 @@ public class DealsProcessor {
                           CriteriaLogManager criteriaLogManager) {
 
         this.lineItemService = Objects.requireNonNull(lineItemService);
-        this.deviceInfoService = Objects.requireNonNull(deviceInfoService);
+        this.deviceInfoService = deviceInfoService;
         this.geoLocationService = geoLocationService;
         this.userService = Objects.requireNonNull(userService);
         this.clock = Objects.requireNonNull(clock);
@@ -119,7 +119,7 @@ public class DealsProcessor {
         final GeoInfo geoInfo = context.getGeoInfo();
 
         final CompositeFuture compositeFuture = CompositeFuture.join(
-                deviceInfoService.getDeviceInfo(device.getUa()),
+                lookupDeviceInfo(device),
                 geoInfo != null ? Future.succeededFuture(geoInfo) : lookupGeoInfo(device, timeout),
                 userService.getUserDetails(context, timeout));
 
@@ -157,6 +157,12 @@ public class DealsProcessor {
         }
 
         return resolvedImp;
+    }
+
+    private Future<DeviceInfo> lookupDeviceInfo(Device device) {
+        return deviceInfoService != null
+                ? deviceInfoService.getDeviceInfo(device.getUa())
+                : Future.failedFuture("Device info is disabled by configuration");
     }
 
     private Future<GeoInfo> lookupGeoInfo(Device device, Timeout timeout) {

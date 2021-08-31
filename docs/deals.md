@@ -84,8 +84,7 @@ over HTTP sent to a central proxy server.
 
 ## GeoLocation service
 
-This service currently has 2 implementations:
-- NetAcuity
+This service currently has 1 implementation:
 - MaxMind
 
 In order to support targeting by geographical attributes the service will provide the following information:
@@ -97,15 +96,6 @@ In order to support targeting by geographical attributes the service will provid
 5. `lat` - latitude from -90.0 to +90.0, where negative is south
 6. `lon` - longitude from -180.0 to +180.0, where negative is west
 
-### GeoLocation service configuration for NetAcuity
-
-```yaml
-geolocation:
-  enabled: true
-  type: netacuity
-  netacuity:
-    server: <comma separated netacuity servers list url>   
-```
 ### GeoLocation service configuration for MaxMind
 
 ```yaml
@@ -156,40 +146,6 @@ DeviceInfoService returns  device-related attributes based on User-Agent for use
 - osVersion
 - browser: chrome, firefox, edge, safari
 - browserVersion
-
-### Device info configuration
-
-The service has two implementations from DeviceAtlas and from 51Degrees.
- 
-These two services need resources that are in remote storage. 
-To download a file from a remote resource we need to configure RemoteFileSyncer.
-
-```yaml
-device-info:
-  enabled: true
-  <service implementation>:
-    remote-file-syncer:
-      download-url: <remote file url>
-      save-filepath: <local path to the file>
-      retry-count: 3
-      retry-interval-ms: 3000
-      timeout-ms: 300000
-      http-client:
-        connect-timeout-ms: 2500
-        max-redirects: 3
-```
-
-#### Device atlas
-
-`service implementation` - device-atlas  
-`remote file url` - https://deviceatlas.com/getJSON.php?licencekey=7149893eca559541604844460b6373ed
-`local path to the file` -  /var/tmp/prebid/DeviceAtlas.json.gz
-   
-#### 51 Degrees
-
-`service implementation` - fifty-one-degrees      
-`remote file url` - https://media.githubusercontent.com/media/51Degrees/Java-Device-Detection/master/data/51Degrees-LiteV3.2.dat
-`local path to the file` -  /var/tmp/prebid/51Degrees-LiteV3.2.dat
 
 ## See also
 

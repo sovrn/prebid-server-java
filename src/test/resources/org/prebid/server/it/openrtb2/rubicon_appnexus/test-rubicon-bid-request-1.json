@@ -83,7 +83,6 @@
     }
   },
   "user": {
-    "buyeruid": "J5VLCWQP-26-CWFT",
     "data": [
       {
         "ext": {
@@ -99,6 +98,7 @@
         ]
       }
     ],
+    "buyeruid": "J5VLCWQP-26-CWFT",
     "ext": {
       "consent": "CPBCa-mPBCa-mAAAAAENA0CAAEAAAAAAACiQAaQAwAAgAgABoAAAAAA",
       "eids": [

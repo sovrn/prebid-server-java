@@ -502,8 +502,7 @@ public class BidResponseCreatorTest extends VertxTest {
 
         final String modifiedAdm = "modifiedAdm";
         given(vastModifier.createBidVastXml(any(), any(), any(), any(), any(), any(), any(), any()))
-                .willReturn(
-                        modifiedAdm);
+                .willReturn(modifiedAdm);
 
         // just a stub to get through method call chain
         givenCacheServiceResult(singletonList(CacheInfo.empty()));
@@ -559,8 +558,7 @@ public class BidResponseCreatorTest extends VertxTest {
         final String modifiedVast = "modifiedVast";
         given(vastModifier
                 .createBidVastXml(anyString(), anyString(), anyString(),
-                        anyString(), anyString(), any(),
-                        any(), any()))
+                        anyString(), anyString(), any(), any(), any()))
                 .willReturn(modifiedVast);
 
         // when
@@ -574,8 +572,8 @@ public class BidResponseCreatorTest extends VertxTest {
                 .containsOnly(modifiedVast);
 
         verify(vastModifier)
-                .createBidVastXml(eq(bidder), eq(BID_ADM), eq(BID_NURL), eq(bidId), eq("accountId"), any(),
-                        any(), any());
+                .createBidVastXml(eq(bidder), eq(BID_ADM), eq(BID_NURL), eq(bidId), eq("accountId"), any(), any(),
+                        any());
     }
 
     @SuppressWarnings("unchecked")

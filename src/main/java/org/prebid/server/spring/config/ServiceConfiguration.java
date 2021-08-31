@@ -114,7 +114,7 @@ public class ServiceConfiguration {
                 CacheTtl.of(bannerCacheTtl, videoCacheTtl),
                 httpClient,
                 CacheService.getCacheEndpointUrl(scheme, host, path),
-                CacheService.composeCachedAssetUrlTemplate(scheme, host, path, query),
+                CacheService.getCachedAssetUrlTemplate(scheme, host, path, query),
                 vastModifier,
                 eventsService,
                 metrics,
