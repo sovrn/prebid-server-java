@@ -103,6 +103,9 @@ adapters:
     endpoint: http://b1h.zemanta.com/api/bidder/prebid/bid/
     usersync:
       url: https://b1h.zemanta.com/usersync/prebid?gdpr={{gdpr}}&gdpr_consent={{gdpr_consent}}&us_privacy={{us_privacy}}&cb=
+  pangle:
+    enabled: true
+    endpoint: https://api16-access-sg.pangle.io/api/ad/union/openrtb/get_ads/
   pubmatic:
     enabled: true
   pubnative:
