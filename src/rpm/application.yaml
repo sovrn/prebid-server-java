@@ -136,6 +136,8 @@ adapters:
     aliases:
       '33across':
         enabled: true
+  ucfunnel:
+    enabled: true
   verizonmedia:
     enabled: true
   vrtcal:
