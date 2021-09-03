@@ -11,7 +11,7 @@ COPY src/rpm/logback-spring.xml /app/prebid-server/conf/logback-spring.xml
 COPY src/main/docker/run.sh /app/prebid-server/run.sh
 RUN chmod +x /app/prebid-server/run.sh
 
-COPY target/prebid-server.jar /app/prebid-server/prebid-server.jar
+COPY extra/bundle/target/prebid-server-bundle.jar /app/prebid-server/prebid-server.jar
 
 EXPOSE 8080
 
