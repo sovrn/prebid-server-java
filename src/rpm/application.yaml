@@ -262,3 +262,6 @@ geolocation:
     opening-threshold: 100
     opening-interval-ms: 2000
     closing-interval-ms: 20000
+hooks:
+  ortb2-blocking:
+    enabled: true
