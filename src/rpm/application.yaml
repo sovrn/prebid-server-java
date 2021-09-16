@@ -46,6 +46,8 @@ adapters:
     aliases:
       districtm:
         enabled: true
+  beachfront:
+    enabled: true
   bidmachine:
     enabled: true
   brightroll:
