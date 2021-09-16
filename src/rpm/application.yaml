@@ -138,10 +138,15 @@ adapters:
         enabled: true
   ucfunnel:
     enabled: true
-  verizonmedia:
-    enabled: true
   vrtcal:
     enabled: true
+  yahoossp:
+    enabled: true
+    aliases:
+      verizonmedia:
+        enabled: true
+      yssp:
+        enabled: true
   yieldlab:
     enabled: true
   yieldmo:
