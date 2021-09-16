@@ -28,6 +28,7 @@ import org.prebid.server.exception.BlacklistedAppException;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.identity.IdGenerator;
+import org.prebid.server.json.JsonMerger;
 import org.prebid.server.model.CaseInsensitiveMultiMap;
 import org.prebid.server.model.Endpoint;
 import org.prebid.server.model.HttpRequestContext;
@@ -81,6 +82,8 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
     private IpAddressHelper ipAddressHelper;
     @Mock
     private IdGenerator idGenerator;
+    @Mock
+    private JsonMerger jsonMerger;
 
     private Ortb2ImplicitParametersResolver target;
 
@@ -108,6 +111,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 paramsExtractor,
                 ipAddressHelper,
                 idGenerator,
+                jsonMerger,
                 jacksonMapper);
     }
 
@@ -1411,6 +1415,152 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
     }
 
     @Test
+    public void shouldAddNewBidderToImpBidderParamsWhenRequestLevelHasNotSharedBidderWithParams() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().bidderparams(mapper.createObjectNode().set("bidder2",
+                        mapper.createObjectNode().put("key2", "value2"))).build()))
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.createObjectNode().set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode()
+                                        .set("bidder1", mapper.createObjectNode().put("key1", "value1")))))
+                        .build())).build();
+
+        given(paramsExtractor.secureFrom(any())).willReturn(0);
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, httpRequest, timeoutResolver, ENDPOINT);
+
+        // then
+        final ObjectNode expectedResult = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set("bidder2", mapper.createObjectNode().put("key2", "value2"))
+                                .set("bidder1", mapper.createObjectNode().put("key1", "value1"))));
+
+        assertThat(result.getImp()).extracting(Imp::getExt)
+                .element(0).isNotNull().isEqualTo(expectedResult);
+    }
+
+    @Test
+    public void shouldMergeImpAndRequestBidderParamsForSharedBidderWithImpPriority() {
+        // given
+        final BidRequest bidRequest = BidRequest.builder()
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().bidderparams(mapper.createObjectNode().set("bidder1",
+                        mapper.createObjectNode().put("key1", "value1-request").put("key2", "value2"))).build()))
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.createObjectNode()
+                                .set("prebid", mapper.createObjectNode()
+                                        .set("bidder", mapper.createObjectNode()
+                                                .set("bidder1", mapper.createObjectNode().put("key1", "value1-imp")))))
+                        .build())).build();
+
+        given(jsonMerger.merge(any(), any())).willReturn(mapper.createObjectNode().put("key1", "value1-imp")
+                .put("key2", "value2"));
+
+        given(paramsExtractor.secureFrom(any())).willReturn(0);
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, httpRequest, timeoutResolver, ENDPOINT);
+
+        // then
+        final ObjectNode expectedResult = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .set("bidder1", mapper.createObjectNode().put("key1", "value1-imp")
+                                        .put("key2", "value2"))));
+
+        assertThat(result.getImp()).extracting(Imp::getExt).element(0).isNotNull().isEqualTo(expectedResult);
+    }
+
+    @Test
+    public void shouldNotRemoveImpBidderParamsThatWasNotParticipateInMerge() {
+        // given
+        final ObjectNode impBidderParams = mapper.createObjectNode().set("bidder1",
+                mapper.createObjectNode().put("key1", "value1"));
+        impBidderParams.set("bidder2", mapper.createObjectNode().put("key1", "value1"));
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().bidderparams(mapper.createObjectNode().set("bidder1",
+                        mapper.createObjectNode().put("key2", "value2"))).build()))
+                .imp(singletonList(Imp.builder()
+                        .ext(impBidderParams).build())).build();
+
+        given(jsonMerger.merge(any(), any())).willReturn(mapper.createObjectNode().put("key1", "value1")
+                .put("key2", "value2"));
+
+        given(paramsExtractor.secureFrom(any())).willReturn(0);
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, httpRequest, timeoutResolver, ENDPOINT);
+
+        // then
+        final ObjectNode expectedResult = mapper.createObjectNode()
+                .set("prebid", mapper.createObjectNode()
+                        .set("bidder", mapper.createObjectNode()
+                                .<ObjectNode>set("bidder1", mapper.createObjectNode().put("key1", "value1")
+                                        .put("key2", "value2"))
+                                .set("bidder2", mapper.createObjectNode().put("key1", "value1"))));
+
+        assertThat(result.getImp()).extracting(Imp::getExt)
+                .element(0).isNotNull().isEqualTo(expectedResult);
+    }
+
+    @Test
+    public void shouldNotAddContextAndPrebidAsBidderParamsIfDefinedInRequest() {
+        // given
+        final ObjectNode requestBidderParams = mapper.createObjectNode().set("prebid",
+                mapper.createObjectNode().put("key1", "value1"));
+        requestBidderParams.set("context", mapper.createObjectNode().put("key1", "value1"));
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().bidderparams(requestBidderParams).build()))
+                .imp(singletonList(Imp.builder()
+                        .ext(mapper.createObjectNode()
+                                .set("prebid", mapper.createObjectNode()
+                                        .set("bidder", mapper.createObjectNode()
+                                                .set("bidder1", mapper.createObjectNode().put("key1", "value1")))))
+                        .build())).build();
+
+        given(paramsExtractor.secureFrom(any())).willReturn(0);
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, httpRequest, timeoutResolver, ENDPOINT);
+
+        // then
+        assertThat(result.getImp()).extracting(Imp::getExt)
+                .element(0).isNotNull().isEqualTo(mapper.createObjectNode()
+                        .set("prebid", mapper.createObjectNode()
+                                .set("bidder", mapper.createObjectNode()
+                                        .set("bidder1", mapper.createObjectNode().put("key1", "value1")))));
+    }
+
+    @Test
+    public void shouldNotMergeContextAndPrebidAsBidderParamsIfDefinedInRequest() {
+        // given
+        final ObjectNode requestBidderParams = mapper.createObjectNode().set("prebid",
+                mapper.createObjectNode().put("key1", "value1-request"));
+        requestBidderParams.set("context", mapper.createObjectNode().put("key1", "value1"));
+
+        final ObjectNode impBidderParams = mapper.createObjectNode().set("prebid",
+                mapper.createObjectNode().put("key2", "value2"));
+        impBidderParams.set("context", mapper.createObjectNode().put("key2", "value2"));
+
+        final BidRequest bidRequest = BidRequest.builder()
+                .ext(ExtRequest.of(ExtRequestPrebid.builder().bidderparams(requestBidderParams).build()))
+                .imp(singletonList(Imp.builder()
+                        .ext(impBidderParams).build())).build();
+
+        given(paramsExtractor.secureFrom(any())).willReturn(0);
+
+        // when
+        final BidRequest result = target.resolve(bidRequest, httpRequest, timeoutResolver, ENDPOINT);
+
+        // then
+        assertThat(result.getImp()).extracting(Imp::getExt).element(0).isNotNull().isEqualTo(impBidderParams);
+    }
+
+    @Test
     public void shouldSetDefaultIncludeBidderKeysIfIncludeBidderKeysIsMissed() {
         // given
         final BidRequest bidRequest = BidRequest.builder()
@@ -1465,6 +1615,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 paramsExtractor,
                 ipAddressHelper,
                 idGenerator,
+                jsonMerger,
                 jacksonMapper);
 
         final BidRequest bidRequest = BidRequest.builder()
@@ -1493,6 +1644,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 paramsExtractor,
                 ipAddressHelper,
                 idGenerator,
+                jsonMerger,
                 jacksonMapper);
 
         final BidRequest bidRequest = BidRequest.builder()
@@ -1522,6 +1674,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 paramsExtractor,
                 ipAddressHelper,
                 idGenerator,
+                jsonMerger,
                 jacksonMapper);
 
         final BidRequest bidRequest = BidRequest.builder()
@@ -1551,6 +1704,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 paramsExtractor,
                 ipAddressHelper,
                 idGenerator,
+                jsonMerger,
                 jacksonMapper);
 
         final BidRequest bidRequest = BidRequest.builder()
@@ -1631,6 +1785,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
                 paramsExtractor,
                 ipAddressHelper,
                 idGenerator,
+                jsonMerger,
                 jacksonMapper);
 
         final BidRequest bidRequest = BidRequest.builder()
