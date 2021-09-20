@@ -59,6 +59,7 @@ import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.AccountAuctionConfig;
 import org.prebid.server.settings.model.AccountStatus;
 import org.prebid.server.util.HttpUtil;
+import org.prebid.server.util.ObjectUtil;
 import org.prebid.server.util.StreamUtil;
 import org.prebid.server.validation.RequestValidator;
 import org.prebid.server.validation.model.ValidationResult;
@@ -222,10 +223,10 @@ public class Ortb2RequestFactory {
                                                              AuctionContext auctionContext) {
 
         return hookStageExecutor.executeEntrypointStage(
-                toCaseInsensitiveMultiMap(routingContext.queryParams()),
-                toCaseInsensitiveMultiMap(routingContext.request().headers()),
-                body,
-                auctionContext.getHookExecutionContext())
+                        toCaseInsensitiveMultiMap(routingContext.queryParams()),
+                        toCaseInsensitiveMultiMap(routingContext.request().headers()),
+                        body,
+                        auctionContext.getHookExecutionContext())
                 .map(stageResult -> toHttpRequest(stageResult, routingContext, auctionContext));
     }
 
@@ -278,12 +279,12 @@ public class Ortb2RequestFactory {
     }
 
     private static DebugContext debugContext(BidRequest bidRequest) {
-        final ExtRequestPrebid extRequestPrebid = getIfNotNull(bidRequest.getExt(), ExtRequest::getPrebid);
+        final ExtRequestPrebid extRequestPrebid = ObjectUtil.getIfNotNull(bidRequest.getExt(), ExtRequest::getPrebid);
 
         final boolean debugEnabled = Objects.equals(bidRequest.getTest(), 1)
-                || Objects.equals(getIfNotNull(extRequestPrebid, ExtRequestPrebid::getDebug), 1);
+                || Objects.equals(ObjectUtil.getIfNotNull(extRequestPrebid, ExtRequestPrebid::getDebug), 1);
 
-        final TraceLevel traceLevel = getIfNotNull(extRequestPrebid, ExtRequestPrebid::getTrace);
+        final TraceLevel traceLevel = ObjectUtil.getIfNotNull(extRequestPrebid, ExtRequestPrebid::getTrace);
 
         return DebugContext.of(debugEnabled, traceLevel);
     }
@@ -417,8 +418,9 @@ public class Ortb2RequestFactory {
         if (extRequest == null) {
             return null;
         }
-        final ExtRequestPrebid extRequestPrebid = getIfNotNull(extRequest, ExtRequest::getPrebid);
-        final ExtStoredRequest extStoredRequest = getIfNotNull(extRequestPrebid, ExtRequestPrebid::getStoredrequest);
+        final ExtRequestPrebid extRequestPrebid = ObjectUtil.getIfNotNull(extRequest, ExtRequest::getPrebid);
+        final ExtStoredRequest extStoredRequest = ObjectUtil.getIfNotNull(extRequestPrebid,
+                ExtRequestPrebid::getStoredrequest);
         return extStoredRequest != null ? parseAccountFromStoredRequest(extStoredRequest) : null;
     }
 
@@ -445,7 +447,7 @@ public class Ortb2RequestFactory {
      * Returns list of aliases for Rubicon bidder or empty if not defined.
      */
     private Set<String> rubiconAliases(ExtRequest ext) {
-        final ExtRequestPrebid prebid = getIfNotNull(ext, ExtRequest::getPrebid);
+        final ExtRequestPrebid prebid = ObjectUtil.getIfNotNull(ext, ExtRequest::getPrebid);
         final Map<String, String> aliases = getIfNotNullOrDefault(prebid, ExtRequestPrebid::getAliases,
                 Collections.emptyMap());
 
@@ -554,8 +556,8 @@ public class Ortb2RequestFactory {
     }
 
     private ExtRequest enrichExtRequest(ExtRequest ext, Account account) {
-        final ExtRequestPrebid prebidExt = getIfNotNull(ext, ExtRequest::getPrebid);
-        final String integration = getIfNotNull(prebidExt, ExtRequestPrebid::getIntegration);
+        final ExtRequestPrebid prebidExt = ObjectUtil.getIfNotNull(ext, ExtRequest::getPrebid);
+        final String integration = ObjectUtil.getIfNotNull(prebidExt, ExtRequestPrebid::getIntegration);
         final String accountDefaultIntegration = accountDefaultIntegration(account);
 
         if (StringUtils.isBlank(integration) && StringUtils.isNotBlank(accountDefaultIntegration)) {
@@ -579,17 +581,18 @@ public class Ortb2RequestFactory {
         final String ipAddress = privacyContext.getIpAddress();
         final IpAddress ip = ipAddressHelper.toIpAddress(ipAddress);
 
-        final String ipV4InRequest = getIfNotNull(device, Device::getIp);
+        final String ipV4InRequest = ObjectUtil.getIfNotNull(device, Device::getIp);
         final String ipV4 = ip != null && ip.getVersion() == IpAddress.IP.v4 ? ipAddress : null;
         final boolean shouldUpdateIpV4 = ipV4 != null && !Objects.equals(ipV4InRequest, ipV4);
 
-        final String ipV6InRequest = getIfNotNull(device, Device::getIpv6);
+        final String ipV6InRequest = ObjectUtil.getIfNotNull(device, Device::getIpv6);
         final String ipV6 = ip != null && ip.getVersion() == IpAddress.IP.v6 ? ipAddress : null;
         final boolean shouldUpdateIpV6 = ipV6 != null && !Objects.equals(ipV6InRequest, ipV6);
 
-        final Geo geo = getIfNotNull(device, Device::getGeo);
-        final String countryInRequest = getIfNotNull(geo, Geo::getCountry);
-        final String country = getIfNotNull(privacyContext.getTcfContext().getGeoInfo(), GeoInfo::getCountry);
+        final Geo geo = ObjectUtil.getIfNotNull(device, Device::getGeo);
+        final String countryInRequest = ObjectUtil.getIfNotNull(geo, Geo::getCountry);
+        final String country = ObjectUtil.getIfNotNull(privacyContext.getTcfContext().getGeoInfo(),
+                GeoInfo::getCountry);
         final boolean shouldUpdateCountry = country != null && !Objects.equals(countryInRequest, country);
 
         if (shouldUpdateIpV4 || shouldUpdateIpV6 || shouldUpdateCountry) {
@@ -690,11 +693,7 @@ public class Ortb2RequestFactory {
     }
 
     private static <T, R> R getIfNotNullOrDefault(T target, Function<T, R> getter, R defaultValue) {
-        return ObjectUtils.defaultIfNull(getIfNotNull(target, getter), defaultValue);
-    }
-
-    private static <T, R> R getIfNotNull(T target, Function<T, R> getter) {
-        return target != null ? getter.apply(target) : null;
+        return ObjectUtils.defaultIfNull(ObjectUtil.getIfNotNull(target, getter), defaultValue);
     }
 
     static class RejectedRequestException extends RuntimeException {
