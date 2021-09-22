@@ -761,7 +761,7 @@ public class CookieSyncHandlerTest extends VertxTest {
 
         given(bidderCatalog.bidderInfoByName(APPNEXUS))
                 .willReturn(BidderInfo.create(true, null, null,
-                        null, null, null, null, 2, true, true, false));
+                        null, null, null, null, 2, true, false));
 
         givenTcfServiceReturningBidderNamesResult(singleton(RUBICON));
 
@@ -1466,9 +1466,9 @@ public class CookieSyncHandlerTest extends VertxTest {
         given(bidderCatalog.names()).willReturn(new HashSet<>(asList("conversant", APPNEXUS, PUBMATIC)));
         given(bidderCatalog.isActive(anyString())).willReturn(true);
         given(bidderCatalog.bidderInfoByName(anyString())).willReturn(
-                BidderInfo.create(true, null, null, null, null, null, null, 1, false, false, false),
-                BidderInfo.create(true, null, null, null, null, null, null, 2, false, false, false),
-                BidderInfo.create(true, null, null, null, null, null, null, 3, false, false, false));
+                BidderInfo.create(true, null, null, null, null, null, null, 1, false, false),
+                BidderInfo.create(true, null, null, null, null, null, null, 2, false, false),
+                BidderInfo.create(true, null, null, null, null, null, null, 3, false, false));
 
         given(uidsAuditCookieService.getUidsAudit(any(RoutingContext.class))).willReturn(null);
 
