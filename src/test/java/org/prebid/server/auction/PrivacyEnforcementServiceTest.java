@@ -1769,7 +1769,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 null,
                 null,
                 null,
-                new BidderInfo.GdprInfo(gdprVendorId, true),
+                new BidderInfo.GdprInfo(gdprVendorId),
                 enforceCcpa,
                 false);
     }
