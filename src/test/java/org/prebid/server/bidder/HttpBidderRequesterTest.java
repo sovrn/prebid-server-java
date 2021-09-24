@@ -299,34 +299,34 @@ public class HttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(Arrays.asList(
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r1")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal1"))
-                        .build(),
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r2")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal1"))
-                        .build(),
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r3")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal2"))
-                        .build(),
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r4")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal1"))
-                        .build()),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r1")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal1"))
+                                .build(),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r2")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal1"))
+                                .build(),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r3")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal2"))
+                                .build(),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r4")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal1"))
+                                .build()),
                 emptyList()));
 
         final HttpClientResponse respWithDeal1 = HttpClientResponse.of(200, null,
@@ -352,7 +352,7 @@ public class HttpBidderRequesterTest extends VertxTest {
         // when
         final BidderSeatBid bidderSeatBid =
                 httpBidderRequester.requestBids(
-                        bidder, bidderRequest, timeout, CaseInsensitiveMultiMap.empty(), false)
+                                bidder, bidderRequest, timeout, CaseInsensitiveMultiMap.empty(), false)
                         .result();
 
         // then
@@ -370,34 +370,34 @@ public class HttpBidderRequesterTest extends VertxTest {
         final BidderRequest bidderRequest = BidderRequest.of("bidder", null, bidRequest);
 
         given(bidder.makeHttpRequests(any())).willReturn(Result.of(Arrays.asList(
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r1")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal1"))
-                        .build(),
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r2")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal2"))
-                        .build(),
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r3")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal2"))
-                        .build(),
-                HttpRequest.<BidRequest>builder()
-                        .method(HttpMethod.POST)
-                        .uri(EMPTY)
-                        .body("r4")
-                        .headers(new CaseInsensitiveHeaders())
-                        .payload(bidRequestWithDeals("deal2"))
-                        .build()),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r1")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal1"))
+                                .build(),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r2")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal2"))
+                                .build(),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r3")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal2"))
+                                .build(),
+                        HttpRequest.<BidRequest>builder()
+                                .method(HttpMethod.POST)
+                                .uri(EMPTY)
+                                .body("r4")
+                                .headers(new CaseInsensitiveHeaders())
+                                .payload(bidRequestWithDeals("deal2"))
+                                .build()),
                 emptyList()));
 
         givenHttpClientReturnsResponse(200, "responseBody");
@@ -408,7 +408,7 @@ public class HttpBidderRequesterTest extends VertxTest {
         // when
         final BidderSeatBid bidderSeatBid =
                 httpBidderRequester.requestBids(
-                        bidder, bidderRequest, timeout, CaseInsensitiveMultiMap.empty(), false)
+                                bidder, bidderRequest, timeout, CaseInsensitiveMultiMap.empty(), false)
                         .result();
 
         // then
