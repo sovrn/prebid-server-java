@@ -13,14 +13,7 @@
           "adm": "adm001",
           "h": 250,
           "w": 300,
-          "adomain": [
-            "improvedigital.com"
-          ],
           "ext": {
-            "improvedigital": {
-              "buying_type": "classic",
-              "line_item_id": 321329
-            }
           }
         }
       ]
