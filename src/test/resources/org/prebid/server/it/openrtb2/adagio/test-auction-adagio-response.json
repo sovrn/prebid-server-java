@@ -4,32 +4,31 @@
     {
       "bid": [
         {
-          "id": "request_id",
+          "id": "bid_id",
           "impid": "imp_id",
-          "price": 0.5,
-          "adm": "some-test-ad",
-          "adomain": [
-            "goodadvertiser.com"
-          ],
-          "crid": "crid",
+          "price": 3.33,
+          "adm": "adm001",
+          "adid": "adid001",
+          "cid": "cid001",
+          "crid": "crid001",
           "w": 300,
           "h": 250,
           "ext": {
             "prebid": {
               "type": "banner"
             },
-            "origbidcpm": 0.5
+            "origbidcpm": 3.33
           }
         }
       ],
-      "seat": "visx",
+      "seat": "adagio",
       "group": 0
     }
   ],
   "cur": "USD",
   "ext": {
     "responsetimemillis": {
-      "visx": "{{ visx.response_time_ms }}"
+      "adagio": "{{ adagio.response_time_ms }}"
     },
     "prebid": {
       "auctiontimestamp": 0
