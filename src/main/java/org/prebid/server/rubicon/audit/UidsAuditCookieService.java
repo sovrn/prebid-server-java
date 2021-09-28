@@ -34,28 +34,39 @@ public class UidsAuditCookieService {
     private static final Logger logger = LoggerFactory.getLogger(UidsAuditCookieService.class);
 
     private static final String COOKIE_NAME = "uids-audit";
-    private static final String COOKIE_DOMAIN = "rubiconproject.com";
     private static final String ENCRYPTION_ALGORITHM = "Blowfish";
 
     private final Cipher encryptor;
     private final Cipher decryptor;
     private final Long ttlSeconds;
     private final String hostIp;
+    private final String hostCookieDomain;
 
-    private UidsAuditCookieService(Cipher encryptor, Cipher decryptor, Long ttlSeconds, String hostIp) {
+    private UidsAuditCookieService(Cipher encryptor,
+                                   Cipher decryptor,
+                                   Long ttlSeconds,
+                                   String hostIp,
+                                   String hostCookieDomain) {
         this.encryptor = encryptor;
         this.decryptor = decryptor;
         this.ttlSeconds = ttlSeconds;
         this.hostIp = hostIp;
+        this.hostCookieDomain = hostCookieDomain;
     }
 
     /**
      * Creates {@link UidsAuditCookieService} by creating blowfish encoder and decoder, and looking for host ip
      * address.
      */
-    public static UidsAuditCookieService create(String encryptionKey, Integer ttlDays, String hostIp) {
+    public static UidsAuditCookieService create(String encryptionKey,
+                                                Integer ttlDays,
+                                                String hostIp,
+                                                String hostCookieDomain) {
         if (StringUtils.isEmpty(encryptionKey)) {
             throw new IllegalArgumentException("Cookies audit encryption cannot be done without encryption key");
+        }
+        if (StringUtils.isEmpty(hostCookieDomain)) {
+            throw new IllegalArgumentException("Audit cookie domain must be non-empty");
         }
 
         final SecretKeySpec secretKeySpec = new SecretKeySpec(encryptionKey.getBytes(), ENCRYPTION_ALGORITHM);
@@ -68,8 +79,11 @@ public class UidsAuditCookieService {
         } else {
             resolvedHostIp = hostIp;
         }
-        return new UidsAuditCookieService(encodingCipher, decodingCipher, Duration.ofDays(ttlDays).getSeconds(),
-                getDecimalIp(resolvedHostIp));
+        return new UidsAuditCookieService(encodingCipher,
+                decodingCipher,
+                Duration.ofDays(ttlDays).getSeconds(),
+                getDecimalIp(resolvedHostIp),
+                hostCookieDomain);
     }
 
     /**
@@ -236,6 +250,6 @@ public class UidsAuditCookieService {
      */
     private Cookie toCookie(UidAudit uidAudit) {
         final String uidAuditRow = encrypt(UidsAuditParser.uidAuditToRow(uidAudit));
-        return Cookie.cookie(COOKIE_NAME, uidAuditRow).setDomain(COOKIE_DOMAIN).setMaxAge(ttlSeconds);
+        return Cookie.cookie(COOKIE_NAME, uidAuditRow).setDomain(hostCookieDomain).setMaxAge(ttlSeconds);
     }
 }

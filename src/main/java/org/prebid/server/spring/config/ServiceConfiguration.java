@@ -476,9 +476,10 @@ public class ServiceConfiguration {
     UidsAuditCookieService uidsAuditCookieService(
             @Value("${gdpr.rubicon.audit-cookie-encryption-key:#{null}}") String encryptionKey,
             @Value("${host-cookie.ttl-days}") Integer ttlDays,
-            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp) {
+            @Value("${gdpr.rubicon.host-ip:#{null}}") String hostIp,
+            @Value("${host-cookie.domain}") String hostCookieDomain) {
 
-        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp);
+        return UidsAuditCookieService.create(encryptionKey, ttlDays, hostIp, hostCookieDomain);
     }
 
     @Bean
