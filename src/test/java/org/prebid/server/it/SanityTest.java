@@ -14,8 +14,7 @@ import org.springframework.test.context.junit4.SpringRunner;
         "spring.config.additional-location=sample/prebid-config.yaml", "http.port=0", "admin.port=0",
         "gdpr.rubicon.rsid-cookie-encryption-key=encryption-key",
         "gdpr.rubicon.audit-cookie-encryption-key=key",
-        "auction.enforce-random-bid-id=false",
-        "host-cookie.domain=domain"})
+        "auction.enforce-random-bid-id=false"})
 public class SanityTest extends VertxTest {
 
     @Test

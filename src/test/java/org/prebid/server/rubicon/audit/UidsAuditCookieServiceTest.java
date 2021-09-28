@@ -34,8 +34,6 @@ import static org.mockito.BDDMockito.given;
 
 public class UidsAuditCookieServiceTest {
 
-    private static final String COOKIE_DOMAIN = "rubiconproject.com";
-
     @Rule
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
@@ -54,7 +52,7 @@ public class UidsAuditCookieServiceTest {
         uidsAuditCookieService = UidsAuditCookieService.create("key",
                 10,
                 "127.0.0.1",
-                COOKIE_DOMAIN);
+                "rubiconproject.com");
         given(routingContext.request()).willReturn(request);
         given(request.getHeader(HttpHeaders.REFERER)).willReturn("referrer");
 
@@ -67,7 +65,7 @@ public class UidsAuditCookieServiceTest {
     @Test
     public void createShouldThrowIllegalArgumentExceptionIfCookieEnabledAndKeyIsNull() {
         // given, when and then
-        assertThatThrownBy(() -> UidsAuditCookieService.create(null, null, null, COOKIE_DOMAIN))
+        assertThatThrownBy(() -> UidsAuditCookieService.create(null, null, null, null))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Cookies audit encryption cannot be done without encryption key");
     }
@@ -148,7 +146,7 @@ public class UidsAuditCookieServiceTest {
     public void createUidsAuditCookieShouldDoIpLookUpIfHostIpIsNullInConfig() throws BadPaddingException,
             IllegalBlockSizeException, SocketException, UnknownHostException {
         // given
-        uidsAuditCookieService = UidsAuditCookieService.create("key", 10, null, COOKIE_DOMAIN);
+        uidsAuditCookieService = UidsAuditCookieService.create("key", 10, null, null);
 
         // when
         final Cookie cookie = uidsAuditCookieService.createUidsAuditCookie(routingContext, "uid", null, null, null,

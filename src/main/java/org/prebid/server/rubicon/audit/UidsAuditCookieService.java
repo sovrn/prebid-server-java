@@ -65,9 +65,6 @@ public class UidsAuditCookieService {
         if (StringUtils.isEmpty(encryptionKey)) {
             throw new IllegalArgumentException("Cookies audit encryption cannot be done without encryption key");
         }
-        if (StringUtils.isEmpty(hostCookieDomain)) {
-            throw new IllegalArgumentException("Audit cookie domain must be non-empty");
-        }
 
         final SecretKeySpec secretKeySpec = new SecretKeySpec(encryptionKey.getBytes(), ENCRYPTION_ALGORITHM);
         final Cipher encodingCipher = createCypher(Cipher.ENCRYPT_MODE, secretKeySpec);
@@ -250,6 +247,12 @@ public class UidsAuditCookieService {
      */
     private Cookie toCookie(UidAudit uidAudit) {
         final String uidAuditRow = encrypt(UidsAuditParser.uidAuditToRow(uidAudit));
-        return Cookie.cookie(COOKIE_NAME, uidAuditRow).setDomain(hostCookieDomain).setMaxAge(ttlSeconds);
+        final Cookie cookie = Cookie.cookie(COOKIE_NAME, uidAuditRow).setMaxAge(ttlSeconds);
+
+        if (StringUtils.isNotEmpty(hostCookieDomain)) {
+            cookie.setDomain(hostCookieDomain);
+        }
+
+        return cookie;
     }
 }
