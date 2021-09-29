@@ -91,6 +91,7 @@ import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.AccountAnalyticsConfig;
 import org.prebid.server.util.HttpUtil;
+import org.prebid.server.util.ObjectUtil;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
@@ -726,11 +727,11 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private Params paramsFrom(Imp imp, String bidder) {
         if (imp != null && Objects.equals(bidder, RUBICON_BIDDER)) {
-            // it should be safe to cast since there wouldn't be rubicon bids if this imp had no "rubicon" field in ext
-            final ExtImpRubicon impExt = readExt(
-                    (ObjectNode) imp.getExt().get(PREBID_EXT).get(BIDDER_EXT).get(RUBICON_BIDDER), ExtImpRubicon.class);
+            final ExtImpRubicon parsedImpExt = getFromImpExt(imp);
 
-            return impExt != null ? Params.of(impExt.getAccountId(), impExt.getSiteId(), impExt.getZoneId()) : null;
+            return parsedImpExt != null
+                    ? Params.of(parsedImpExt.getAccountId(), parsedImpExt.getSiteId(), parsedImpExt.getZoneId())
+                    : null;
         }
         return null;
     }
@@ -742,6 +743,17 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private static String mediaTypeString(BidType bidType) {
         return bidType != null ? bidType.name() : null;
+    }
+
+    private ExtImpRubicon getFromImpExt(Imp imp) {
+        final ObjectNode impExt = imp.getExt();
+        final JsonNode rubiconParamsNode = impExt != null
+                ? imp.getExt().path(PREBID_EXT).path(BIDDER_EXT).path(RUBICON_BIDDER)
+                : null;
+
+        return rubiconParamsNode != null && !rubiconParamsNode.isMissingNode()
+                ? readExt((ObjectNode) rubiconParamsNode, ExtImpRubicon.class)
+                : null;
     }
 
     private <T> T readExt(ObjectNode ext, Class<T> type) {
@@ -945,10 +957,9 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private String videoAdFormat(Imp imp, boolean hasRubiconBid) {
         if (hasRubiconBid) {
-            // it should be safe to cast since there wouldn't be rubicon bids if this imp had no "rubicon" field in ext
-            final ExtImpRubicon impExt = readExt(
-                    (ObjectNode) imp.getExt().get(PREBID_EXT).get(BIDDER_EXT).get(RUBICON_BIDDER), ExtImpRubicon.class);
-            final RubiconVideoParams videoParams = impExt != null ? impExt.getVideo() : null;
+            final ExtImpRubicon parsedImpExt = getFromImpExt(imp);
+            final RubiconVideoParams videoParams = ObjectUtil.getIfNotNull(parsedImpExt, ExtImpRubicon::getVideo);
+
             if (videoParams != null) {
                 return VIDEO_SIZE_AD_FORMATS.get(videoParams.getSizeId());
             }
@@ -1019,30 +1030,31 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     }
 
     private static String pbAdSlotFromExtImp(ExtImp extImp) {
-        return getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
-                ExtImp::getContext),
-                ExtImpContext::getData),
-                data -> data.get(PBADSLOT_EXT)),
+        return getIfNotNull(
+                getIfNotNull(
+                        getIfNotNull(
+                                getIfNotNull(extImp, ExtImp::getContext), ExtImpContext::getData),
+                        data -> data.get(PBADSLOT_EXT)),
                 pbadslotNode -> pbadslotNode.isTextual() ? pbadslotNode.textValue() : null);
     }
 
     private static Gam gamFromExtImp(ExtImp extImp) {
         final ObjectNode adserverNode = getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
-                ExtImp::getContext),
-                ExtImpContext::getData),
-                data -> data.isObject() ? data.get(ADSERVER_EXT) : null),
+                                        ExtImp::getContext),
+                                ExtImpContext::getData), data -> data.isObject() ? data.get(ADSERVER_EXT) : null),
                 adserver -> adserver.isObject() ? (ObjectNode) adserver : null);
 
-        final String adserverName = getIfNotNull(getIfNotNull(adserverNode,
-                adserver -> adserver.get(NAME_EXT)),
-                name -> name.isTextual() ? name.textValue() : null);
+        final String adserverName =
+                getIfNotNull(getIfNotNull(adserverNode, adserver -> adserver.get(NAME_EXT)),
+                        name -> name.isTextual()
+                                ? name.textValue()
+                                : null);
 
         if (!StringUtils.equals(adserverName, GAM_EXT)) {
             return null;
         }
 
-        final String adSlot = getIfNotNull(getIfNotNull(adserverNode,
-                adserver -> adserver.get(ADSLOT_EXT)),
+        final String adSlot = getIfNotNull(getIfNotNull(adserverNode, adserver -> adserver.get(ADSLOT_EXT)),
                 adSlotNode -> adSlotNode.isTextual() ? adSlotNode.textValue() : null);
 
         return StringUtils.isNotBlank(adSlot) ? Gam.of(adSlot) : null;
@@ -1108,14 +1120,14 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final boolean pbsApplies = Objects.equals(tcfContext.getGdpr(), GDPR_ONE_STRING);
 
         final Integer gdpr = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest,
-                BidRequest::getRegs),
-                Regs::getExt),
+                                BidRequest::getRegs),
+                        Regs::getExt),
                 ExtRegs::getGdpr);
         final Boolean applies = Objects.equals(gdpr, GDPR_ONE_INTEGER);
 
         final String consentString = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest,
-                BidRequest::getUser),
-                User::getExt),
+                                BidRequest::getUser),
+                        User::getExt),
                 ExtUser::getConsent);
 
         final Integer version = TcfDefinerService.isConsentValid(tcfContext.getConsent())

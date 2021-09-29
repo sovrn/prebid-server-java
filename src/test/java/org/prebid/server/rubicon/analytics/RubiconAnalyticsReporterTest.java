@@ -109,7 +109,6 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
@@ -425,7 +424,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(auctionEvent);
 
         // then
-        verify(httpClient, never()).post(anyString(), any(), any(), anyLong());
+        verifyZeroInteractions(httpClient);
     }
 
     @Test
@@ -457,6 +456,51 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .httpContext(httpContext)
                 .bidResponse(BidResponse.builder()
                         .seatbid(emptyList())
+                        .build())
+                .build();
+
+        // when
+        reporter.processEvent(auctionEvent);
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processAuctionEventShouldTolerateMissingExtPrebidBidderNode() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(singletonList(Imp.builder()
+                                        .id("impId")
+                                        .ext(mapper.createObjectNode().set("prebid", mapper.createObjectNode()))
+                                        .video(Video.builder().build())
+                                        .build()))
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(singletonList(SeatBid.builder()
+                                .seat("rubicon")
+                                .bid(singletonList(Bid.builder()
+                                        .impid("impId")
+                                        .ext(mapper.createObjectNode()
+                                                .set("prebid", mapper.createObjectNode()
+                                                        .put("type", "video")))
+                                        .build()))
+                                .build()))
                         .build())
                 .build();
 
