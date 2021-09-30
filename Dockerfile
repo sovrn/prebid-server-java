@@ -3,8 +3,6 @@ FROM docker.rp-core.com/hub/maven:3.6.1-amazoncorretto-11 as builder
 
 WORKDIR /app/prebid-server
 
-RUN apk add --no-cache rpm
-
 COPY .git .git
 COPY extra extra
 COPY sample sample
