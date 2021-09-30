@@ -3,6 +3,8 @@ FROM docker.rp-core.com/hub/maven:3.6.1-amazoncorretto-11 as builder
 
 WORKDIR /app/prebid-server
 
+RUN yum install -y rpm-build && yum clean all
+
 COPY .git .git
 COPY extra extra
 COPY sample sample
@@ -20,8 +22,8 @@ RUN mvn -f extra/pom.xml clean verify -U \
 # Final image
 FROM docker.rp-core.com/rp_centos_7.3:1
 
-RUN yum install -y java-11-amazon-corretto-devel-11.0.3.7-1
-RUN yum clean all
+RUN yum install -y java-11-amazon-corretto-devel-11.0.3.7-1 && yum clean all
+
 RUN mkdir -p /app/prebid-server/conf /app/prebid-server/log /app/prebid-server/data/vendorlist-cache
 
 COPY src/rpm/tcf-v1-fallback-vendorlist.json /app/prebid-server/conf/tcf-v1-fallback-vendorlist.json
