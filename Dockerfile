@@ -1,5 +1,5 @@
 # Builder image
-FROM docker.rp-core.com/hub/maven:3.5-jdk-8-alpine as builder
+FROM docker.rp-core.com/hub/maven:3.6.1-amazoncorretto-11 as builder
 
 WORKDIR /app/prebid-server
 
@@ -22,7 +22,7 @@ RUN mvn -f extra/pom.xml clean verify -U \
 # Final image
 FROM docker.rp-core.com/rp_centos_7.3:1
 
-RUN yum install -y jdk-1.8.0_202-fcs
+RUN yum install -y java-11-amazon-corretto-devel-11.0.3.7-1
 RUN yum clean all
 RUN mkdir -p /app/prebid-server/conf /app/prebid-server/log /app/prebid-server/data/vendorlist-cache
 
