@@ -60,8 +60,8 @@ import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.rsid.RsidCookieService;
 import org.prebid.server.settings.ApplicationSettings;
 import org.prebid.server.settings.model.BidValidationEnforcement;
-import org.prebid.server.spring.config.model.CircuitBreakerProperties;
 import org.prebid.server.spring.config.model.ExternalConversionProperties;
+import org.prebid.server.spring.config.model.HttpClientCircuitBreakerProperties;
 import org.prebid.server.spring.config.model.HttpClientProperties;
 import org.prebid.server.util.VersionInfo;
 import org.prebid.server.validation.BidderParamValidator;
@@ -398,8 +398,8 @@ public class ServiceConfiguration {
     @Bean
     @ConfigurationProperties(prefix = "http-client.circuit-breaker")
     @ConditionalOnProperty(prefix = "http-client.circuit-breaker", name = "enabled", havingValue = "true")
-    CircuitBreakerProperties httpClientCircuitBreakerProperties() {
-        return new CircuitBreakerProperties();
+    HttpClientCircuitBreakerProperties httpClientCircuitBreakerProperties() {
+        return new HttpClientCircuitBreakerProperties();
     }
 
     @Bean
@@ -409,14 +409,21 @@ public class ServiceConfiguration {
             Vertx vertx,
             Metrics metrics,
             HttpClientProperties httpClientProperties,
-            @Qualifier("httpClientCircuitBreakerProperties") CircuitBreakerProperties circuitBreakerProperties,
+            @Qualifier("httpClientCircuitBreakerProperties")
+                    HttpClientCircuitBreakerProperties circuitBreakerProperties,
             Clock clock) {
 
         final HttpClient httpClient = createBasicHttpClient(vertx, httpClientProperties);
 
-        return new CircuitBreakerSecuredHttpClient(vertx, httpClient, metrics,
-                circuitBreakerProperties.getOpeningThreshold(), circuitBreakerProperties.getOpeningIntervalMs(),
-                circuitBreakerProperties.getClosingIntervalMs(), clock);
+        return new CircuitBreakerSecuredHttpClient(
+                vertx,
+                httpClient,
+                metrics,
+                circuitBreakerProperties.getOpeningThreshold(),
+                circuitBreakerProperties.getOpeningIntervalMs(),
+                circuitBreakerProperties.getClosingIntervalMs(),
+                circuitBreakerProperties.getIdleExpireHours(),
+                clock);
     }
 
     private static BasicHttpClient createBasicHttpClient(Vertx vertx, HttpClientProperties httpClientProperties) {

@@ -159,8 +159,8 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         final Future<PrivacyContext> privacyContext = privacyEnforcementService.contextFromBidRequest(auctionContext);
 
         // then
-        FutureAssertion.assertThat(privacyContext).succeededWith(
-                PrivacyContext.of(Privacy.of(EMPTY, EMPTY, Ccpa.EMPTY, 1), tcfContext));
+        FutureAssertion.assertThat(privacyContext)
+                .succeededWith(PrivacyContext.of(Privacy.of(EMPTY, EMPTY, Ccpa.EMPTY, 1), tcfContext));
     }
 
     @Test
@@ -483,7 +483,6 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .account(Account.builder()
                         .privacy(AccountPrivacyConfig.of(
                                 null,
-                                null,
                                 AccountCcpaConfig.builder()
                                         .enabledForRequestType(EnabledForRequestType.of(false, false, true, false))
                                         .build()))
@@ -534,7 +533,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         final AuctionContext context = AuctionContext.builder()
                 .account(Account.builder()
-                        .privacy(AccountPrivacyConfig.of(true, null, null))
+                        .privacy(AccountPrivacyConfig.of(null, AccountCcpaConfig.builder().enabled(true).build()))
                         .build())
                 .requestTypeMetric(MetricName.openrtb2app)
                 .bidRequest(bidRequest)
@@ -583,7 +582,6 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         final AuctionContext context = AuctionContext.builder()
                 .account(Account.builder()
                         .privacy(AccountPrivacyConfig.of(
-                                null,
                                 null,
                                 AccountCcpaConfig.builder().enabled(true).build()))
                         .build())
@@ -782,8 +780,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
                 .build();
         assertThat(result).containsOnly(expectedBidderPrivacy);
 
-        verify(tcfDefinerService)
-                .resultForBidderNames(eq(singleton(BIDDER_NAME)), any(), any(), any());
+        verify(tcfDefinerService).resultForBidderNames(eq(singleton(BIDDER_NAME)), any(), any(), any());
     }
 
     @Test
@@ -1471,7 +1468,7 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
 
         final Ccpa ccpa = Ccpa.of("1YYY");
         final Account account = Account.builder()
-                .privacy(AccountPrivacyConfig.of(false, null, null))
+                .privacy(AccountPrivacyConfig.of(null, AccountCcpaConfig.builder().enabled(false).build()))
                 .build();
 
         // when and then
@@ -1502,7 +1499,6 @@ public class PrivacyEnforcementServiceTest extends VertxTest {
         final Ccpa ccpa = Ccpa.of("1YYY");
         final Account account = Account.builder()
                 .privacy(AccountPrivacyConfig.of(
-                        null,
                         null,
                         AccountCcpaConfig.builder().enabled(true).build()))
                 .build();
