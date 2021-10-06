@@ -32,6 +32,7 @@ http-client:
     opening-threshold: 100
     opening-interval-ms: 2000
     closing-interval-ms: 20000
+    idle-expire-hours: 24
 adapters:
   adform:
     enabled: true
