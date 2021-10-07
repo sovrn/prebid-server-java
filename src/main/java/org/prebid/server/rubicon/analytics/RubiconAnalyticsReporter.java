@@ -167,6 +167,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private static final Set<String> SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList("web", "amp", "app"));
 
     private static final String SAMPLING_FACTOR_FIELD = "sampling-factor";
+    private static final String INTEGRATION_OVERRIDE_FIELD = "integration-override";
 
     static {
         VIDEO_SIZE_AD_FORMATS = new HashMap<>();
@@ -362,8 +363,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
         final NotificationEvent.Type type = notificationEvent.getType();
         final Event event = type == NotificationEvent.Type.win
-                ? makeWinEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration)
-                : makeImpEvent(bidId, bidder, accountId, httpContext, uidsCookie, timestamp, integration);
+                ? makeWinEvent(bidId, bidder, account, accountId, httpContext, uidsCookie, timestamp, integration)
+                : makeImpEvent(bidId, bidder, account, accountId, httpContext, uidsCookie, timestamp, integration);
 
         return postEvent(event, headers(event), false);
     }
@@ -435,9 +436,17 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         return StringUtils.substringBefore(tagIdValueAndOthers, URL_PARAM_SEPARATOR);
     }
 
-    private Event makeWinEvent(String bidId, String bidder, Integer accountId, HttpContext httpContext,
-                               UidsCookie uidsCookie, Long timestamp, String integration) {
-        return eventBuilderFromNotification(httpContext, timestamp, integration)
+    private Event makeWinEvent(
+            String bidId,
+            String bidder,
+            Account account,
+            Integer accountId,
+            HttpContext httpContext,
+            UidsCookie uidsCookie,
+            Long timestamp,
+            String integration) {
+
+        return eventBuilderFromNotification(httpContext, timestamp, integration, account)
                 .bidsWon(Collections.singletonList(BidWon.builder()
                         .bidId(bidId)
                         .bidder(bidder)
@@ -450,10 +459,17 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                 .build();
     }
 
-    private Event makeImpEvent(String bidId, String bidder, Integer accountId, HttpContext httpContext,
-                               UidsCookie uidsCookie,
-                               Long timestamp, String integration) {
-        return eventBuilderFromNotification(httpContext, timestamp, integration)
+    private Event makeImpEvent(
+            String bidId,
+            String bidder,
+            Account account,
+            Integer accountId,
+            HttpContext httpContext,
+            UidsCookie uidsCookie,
+            Long timestamp,
+            String integration) {
+
+        return eventBuilderFromNotification(httpContext, timestamp, integration, account)
                 .impressions(Collections.singletonList(Impression.builder()
                         .bidId(bidId)
                         .bidder(bidder)
@@ -467,13 +483,17 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     }
 
     private Event.EventBuilder eventBuilderFromNotification(
-            HttpContext httpContext, Long timestamp, String integration) {
+            HttpContext httpContext,
+            Long timestamp,
+            String integration,
+            Account account) {
 
         final String referrerUri = httpContext.getHeaders().get(HttpUtil.REFERER_HEADER.toString());
 
         return Event.builder()
                 .eventTimeMillis(timestamp != null ? timestamp : Instant.now().toEpochMilli())
-                .integration(ObjectUtils.defaultIfNull(integration, PBS_INTEGRATION))
+                .integration(
+                        ObjectUtils.firstNonNull(accountIntegrationOverride(account), integration, PBS_INTEGRATION))
                 .version(pbsVersion)
                 .referrerUri(referrerUri)
                 .referrerHostname(referrerHostname(referrerUri))
@@ -1172,12 +1192,12 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final BidRequest bidRequest = auctionContext.getBidRequest();
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
-        final String extIntegration = integrationFrom(bidRequest);
+        final String integration = integrationFrom(auctionContext.getAccount(), bidRequest);
         final String extWrapperName = parseExtParameters(bidRequest).getWrappername();
         final String referrerUri = getIfNotNull(bidRequest.getSite(), Site::getPage);
 
         return Event.builder()
-                .integration(StringUtils.isBlank(extIntegration) ? PBS_INTEGRATION : extIntegration)
+                .integration(integration)
                 .wrapperName(extWrapperName)
                 .version(pbsVersion)
                 .limitAdTracking(deviceLmt != null ? deviceLmt != 0 : null)
@@ -1194,10 +1214,17 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         return target != null ? getter.apply(target) : null;
     }
 
-    private static String integrationFrom(BidRequest bidRequest) {
+    private String integrationFrom(Account account, BidRequest bidRequest) {
+        final String accountIntegrationOverride = accountIntegrationOverride(account);
+        if (StringUtils.isNotBlank(accountIntegrationOverride)) {
+            return accountIntegrationOverride;
+        }
+
         final ExtRequest requestExt = bidRequest.getExt();
         final ExtRequestPrebid prebidExt = requestExt != null ? requestExt.getPrebid() : null;
-        return prebidExt != null ? prebidExt.getIntegration() : null;
+        final String extIntegration = prebidExt != null ? prebidExt.getIntegration() : null;
+
+        return StringUtils.isNotBlank(extIntegration) ? extIntegration : PBS_INTEGRATION;
     }
 
     private ExtRequestPrebidBiddersRubicon parseExtParameters(BidRequest bidRequest) {
@@ -1325,6 +1352,16 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final JsonNode samplingFactorNode = configuration != null ? configuration.get(SAMPLING_FACTOR_FIELD) : null;
 
         return samplingFactorNode != null && samplingFactorNode.isInt() ? samplingFactorNode.asInt() : null;
+    }
+
+    private String accountIntegrationOverride(Account account) {
+        final ObjectNode configuration = moduleConfiguration(account);
+        final JsonNode integrationOverrideNode =
+                configuration != null ? configuration.get(INTEGRATION_OVERRIDE_FIELD) : null;
+
+        return integrationOverrideNode != null && integrationOverrideNode.isTextual()
+                ? integrationOverrideNode.asText()
+                : null;
     }
 
     private ObjectNode moduleConfiguration(Account account) {

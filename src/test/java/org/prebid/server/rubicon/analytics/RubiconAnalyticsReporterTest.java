@@ -723,6 +723,31 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     }
 
     @Test
+    public void processAuctionEventShouldUseAccountIntegrationOverride() throws JsonProcessingException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .httpContext(httpContext)
+                .auctionContext(givenAuctionContext(
+                        sampleAuctionBidRequest("request-integration", null),
+                        null,
+                        "account-integration"))
+                .bidResponse(sampleBidResponse())
+                .build();
+
+        // when
+        reporter.processEvent(auctionEvent);
+
+        // then
+        final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(anyString(), any(), eventCaptor.capture(), anyLong());
+
+        final Event event = mapper.readValue(eventCaptor.getValue(), Event.class);
+        then(event.getIntegration()).isEqualTo("account-integration");
+    }
+
+    @Test
     public void processAuctionEventShouldPostEventToEndpointWithExpectedHeaders() {
         // given
         givenHttpClientReturnsResponse(200, null);
@@ -1040,6 +1065,38 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         // then
         verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processNotificationEventShouldUseAccountIntegrationOverride() throws JsonProcessingException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final HttpContext httpContext = HttpContext.builder().headers(emptyMap()).cookies(emptyMap()).build();
+        final NotificationEvent event = NotificationEvent.builder()
+                .type(NotificationEvent.Type.win)
+                .integration("event-integration")
+                .bidId("bidid")
+                .account(Account.builder()
+                        .id("123123")
+                        .analytics(AccountAnalyticsConfig.of(
+                                null,
+                                singletonMap("rubicon",
+                                        mapper.createObjectNode()
+                                                .put("integration-override", "account-integration"))))
+                        .build())
+                .httpContext(httpContext)
+                .build();
+
+        // when
+        reporter.processEvent(event);
+
+        // then
+        final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(anyString(), any(), eventCaptor.capture(), anyLong());
+
+        final Event capturedEvent = mapper.readValue(eventCaptor.getValue(), Event.class);
+        then(capturedEvent.getIntegration()).isEqualTo("account-integration");
     }
 
     @Test
@@ -1652,7 +1709,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .willReturn(Future.failedFuture(throwable));
     }
 
-    private AuctionContext givenAuctionContext(BidRequest bidRequest, Integer samplingFactor) {
+    private AuctionContext givenAuctionContext(
+            BidRequest bidRequest, Integer samplingFactor, String integrationOverride) {
+
         return AuctionContext.builder()
                 .bidRequest(bidRequest)
                 .account(Account.builder()
@@ -1661,7 +1720,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                 null,
                                 singletonMap("rubicon",
                                         mapper.createObjectNode()
-                                                .put("sampling-factor", samplingFactor))))
+                                                .put("sampling-factor", samplingFactor)
+                                                .put("integration-override", integrationOverride))))
                         .build())
                 .privacyContext(PrivacyContext.of(null, TcfContext.builder().gdpr("1").build()))
                 .geoInfo(GeoInfo.builder().vendor("vendor").metroNielsen(123).build())
@@ -1669,7 +1729,11 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     }
 
     private AuctionContext givenAuctionContext(BidRequest bidRequest) {
-        return givenAuctionContext(bidRequest, null);
+        return givenAuctionContext(bidRequest, null, null);
+    }
+
+    private AuctionContext givenAuctionContext(BidRequest bidRequest, Integer samplingFactor) {
+        return givenAuctionContext(bidRequest, samplingFactor, null);
     }
 
     @SuppressWarnings("SameParameterValue")
