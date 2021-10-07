@@ -9,6 +9,7 @@ import io.vertx.core.net.JksOptions;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
+import org.prebid.server.auction.DebugResolver;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.FpdResolver;
 import org.prebid.server.auction.ImplicitParametersExtractor;
@@ -188,6 +189,12 @@ public class ServiceConfiguration {
     }
 
     @Bean
+    DebugResolver debugResolver(@Value("${debug.override-token:#{null}") String debugOverrideToken,
+                                BidderCatalog bidderCatalog) {
+        return new DebugResolver(bidderCatalog, debugOverrideToken);
+    }
+
+    @Bean
     Ortb2ImplicitParametersResolver ortb2ImplicitParametersResolver(
             @Value("${auction.cache.only-winning-bids}") boolean shouldCacheOnlyWinningBids,
             @Value("${auction.ad-server-currency}") String adServerCurrency,
@@ -255,6 +262,7 @@ public class ServiceConfiguration {
             OrtbTypesResolver ortbTypesResolver,
             PrivacyEnforcementService privacyEnforcementService,
             TimeoutResolver timeoutResolver,
+            DebugResolver debugResolver,
             JacksonMapper mapper) {
 
         return new AuctionRequestFactory(
@@ -267,6 +275,7 @@ public class ServiceConfiguration {
                 ortbTypesResolver,
                 privacyEnforcementService,
                 timeoutResolver,
+                debugResolver,
                 mapper);
     }
 
@@ -293,6 +302,7 @@ public class ServiceConfiguration {
                                         FpdResolver fpdResolver,
                                         PrivacyEnforcementService privacyEnforcementService,
                                         TimeoutResolver timeoutResolver,
+                                        DebugResolver debugResolver,
                                         JacksonMapper mapper) {
 
         return new AmpRequestFactory(
@@ -304,6 +314,7 @@ public class ServiceConfiguration {
                 fpdResolver,
                 privacyEnforcementService,
                 timeoutResolver,
+                debugResolver,
                 mapper);
     }
 
@@ -316,6 +327,7 @@ public class ServiceConfiguration {
             Ortb2ImplicitParametersResolver ortb2ImplicitParametersResolver,
             PrivacyEnforcementService privacyEnforcementService,
             TimeoutResolver timeoutResolver,
+            DebugResolver debugResolver,
             JacksonMapper mapper) {
 
         return new VideoRequestFactory(
@@ -326,6 +338,7 @@ public class ServiceConfiguration {
                 storedRequestProcessor,
                 privacyEnforcementService,
                 timeoutResolver,
+                debugResolver,
                 mapper);
     }
 
@@ -574,6 +587,7 @@ public class ServiceConfiguration {
             PrivacyEnforcementService privacyEnforcementService,
             FpdResolver fpdResolver,
             SchainResolver schainResolver,
+            DebugResolver debugResolver,
             HttpBidderRequester httpBidderRequester,
             ResponseBidValidator responseBidValidator,
             CurrencyConversionService currencyConversionService,
@@ -594,6 +608,7 @@ public class ServiceConfiguration {
                 privacyEnforcementService,
                 fpdResolver,
                 schainResolver,
+                debugResolver,
                 httpBidderRequester,
                 responseBidValidator,
                 currencyConversionService,
