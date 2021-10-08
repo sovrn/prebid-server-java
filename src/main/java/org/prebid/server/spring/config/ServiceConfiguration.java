@@ -170,7 +170,7 @@ public class ServiceConfiguration {
         return new TimeoutResolver(defaultTimeout, maxTimeout, timeoutAdjustment);
     }
 
-    @Bean
+    @Bean("auctionTimeoutResolver")
     TimeoutResolver auctionTimeoutResolver(
             @Value("${auction.default-timeout-ms}") long defaultTimeout,
             @Value("${auction.max-timeout-ms}") long maxTimeout,
@@ -224,7 +224,7 @@ public class ServiceConfiguration {
             @Value("${auction.blacklisted-accounts}") String blacklistedAccountsString,
             UidsCookieService uidsCookieService,
             RequestValidator requestValidator,
-            TimeoutResolver timeoutResolver,
+            @Qualifier("auctionTimeoutResolver") TimeoutResolver timeoutResolver,
             TimeoutFactory timeoutFactory,
             StoredRequestProcessor storedRequestProcessor,
             ApplicationSettings applicationSettings,
@@ -261,7 +261,7 @@ public class ServiceConfiguration {
             Ortb2ImplicitParametersResolver ortb2ImplicitParametersResolver,
             OrtbTypesResolver ortbTypesResolver,
             PrivacyEnforcementService privacyEnforcementService,
-            TimeoutResolver timeoutResolver,
+            @Qualifier("auctionTimeoutResolver") TimeoutResolver timeoutResolver,
             DebugResolver debugResolver,
             JacksonMapper mapper) {
 
