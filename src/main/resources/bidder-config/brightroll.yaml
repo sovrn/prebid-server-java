@@ -21,3 +21,4 @@ adapters:
     accounts:
       - id: businessinsider
         bid_floor: 0.65
+      - id: adthrive
