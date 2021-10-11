@@ -162,15 +162,6 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    TimeoutResolver timeoutResolver(
-            @Value("${default-timeout-ms}") long defaultTimeout,
-            @Value("${max-timeout-ms}") long maxTimeout,
-            @Value("${timeout-adjustment-ms}") long timeoutAdjustment) {
-
-        return new TimeoutResolver(defaultTimeout, maxTimeout, timeoutAdjustment);
-    }
-
-    @Bean("auctionTimeoutResolver")
     TimeoutResolver auctionTimeoutResolver(
             @Value("${auction.default-timeout-ms}") long defaultTimeout,
             @Value("${auction.max-timeout-ms}") long maxTimeout,
@@ -180,16 +171,7 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    TimeoutResolver ampTimeoutResolver(
-            @Value("${amp.default-timeout-ms}") long defaultTimeout,
-            @Value("${amp.max-timeout-ms}") long maxTimeout,
-            @Value("${amp.timeout-adjustment-ms}") long timeoutAdjustment) {
-
-        return new TimeoutResolver(defaultTimeout, maxTimeout, timeoutAdjustment);
-    }
-
-    @Bean
-    DebugResolver debugResolver(@Value("${debug.override-token:#{null}") String debugOverrideToken,
+    DebugResolver debugResolver(@Value("${debug.override-token:#{null}}") String debugOverrideToken,
                                 BidderCatalog bidderCatalog) {
         return new DebugResolver(bidderCatalog, debugOverrideToken);
     }
@@ -224,7 +206,7 @@ public class ServiceConfiguration {
             @Value("${auction.blacklisted-accounts}") String blacklistedAccountsString,
             UidsCookieService uidsCookieService,
             RequestValidator requestValidator,
-            @Qualifier("auctionTimeoutResolver") TimeoutResolver timeoutResolver,
+            TimeoutResolver auctionTimeoutResolver,
             TimeoutFactory timeoutFactory,
             StoredRequestProcessor storedRequestProcessor,
             ApplicationSettings applicationSettings,
@@ -241,7 +223,7 @@ public class ServiceConfiguration {
                 blacklistedAccounts,
                 uidsCookieService,
                 requestValidator,
-                timeoutResolver,
+                auctionTimeoutResolver,
                 timeoutFactory,
                 storedRequestProcessor,
                 applicationSettings,
@@ -261,7 +243,7 @@ public class ServiceConfiguration {
             Ortb2ImplicitParametersResolver ortb2ImplicitParametersResolver,
             OrtbTypesResolver ortbTypesResolver,
             PrivacyEnforcementService privacyEnforcementService,
-            @Qualifier("auctionTimeoutResolver") TimeoutResolver timeoutResolver,
+            TimeoutResolver auctionTimeoutResolver,
             DebugResolver debugResolver,
             JacksonMapper mapper) {
 
@@ -274,7 +256,7 @@ public class ServiceConfiguration {
                 new InterstitialProcessor(),
                 ortbTypesResolver,
                 privacyEnforcementService,
-                timeoutResolver,
+                auctionTimeoutResolver,
                 debugResolver,
                 mapper);
     }
@@ -301,7 +283,7 @@ public class ServiceConfiguration {
                                         Ortb2ImplicitParametersResolver ortb2ImplicitParametersResolver,
                                         FpdResolver fpdResolver,
                                         PrivacyEnforcementService privacyEnforcementService,
-                                        TimeoutResolver timeoutResolver,
+                                        TimeoutResolver auctionTimeoutResolver,
                                         DebugResolver debugResolver,
                                         JacksonMapper mapper) {
 
@@ -313,7 +295,7 @@ public class ServiceConfiguration {
                 ortb2ImplicitParametersResolver,
                 fpdResolver,
                 privacyEnforcementService,
-                timeoutResolver,
+                auctionTimeoutResolver,
                 debugResolver,
                 mapper);
     }
@@ -326,7 +308,7 @@ public class ServiceConfiguration {
             Ortb2RequestFactory ortb2RequestFactory,
             Ortb2ImplicitParametersResolver ortb2ImplicitParametersResolver,
             PrivacyEnforcementService privacyEnforcementService,
-            TimeoutResolver timeoutResolver,
+            TimeoutResolver auctionTimeoutResolver,
             DebugResolver debugResolver,
             JacksonMapper mapper) {
 
@@ -337,7 +319,7 @@ public class ServiceConfiguration {
                 ortb2ImplicitParametersResolver,
                 storedRequestProcessor,
                 privacyEnforcementService,
-                timeoutResolver,
+                auctionTimeoutResolver,
                 debugResolver,
                 mapper);
     }
@@ -359,7 +341,7 @@ public class ServiceConfiguration {
             VideoRequestValidator videoRequestValidator,
             Metrics metrics,
             TimeoutFactory timeoutFactory,
-            TimeoutResolver timeoutResolver,
+            TimeoutResolver auctionTimeoutResolver,
             JacksonMapper mapper,
             JsonMerger jsonMerger) {
 
@@ -374,7 +356,7 @@ public class ServiceConfiguration {
                 videoRequestValidator,
                 metrics,
                 timeoutFactory,
-                timeoutResolver,
+                auctionTimeoutResolver,
                 mapper,
                 jsonMerger);
     }
