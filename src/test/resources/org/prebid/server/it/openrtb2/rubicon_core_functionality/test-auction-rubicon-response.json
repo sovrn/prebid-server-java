@@ -47,6 +47,14 @@
   ],
   "cur": "USD",
   "ext": {
+    "warnings": {
+      "prebid": [
+        {
+          "code": 999,
+          "message": "VastXml does not contain neither InLine nor Wrapper for rubicon response"
+        }
+      ]
+    },
     "responsetimemillis": {
       "rubicon": "{{ rubicon.response_time_ms }}",
       "cache": "{{ cache.response_time_ms }}"
