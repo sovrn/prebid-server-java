@@ -13,8 +13,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 @TestPropertySource(properties = {
         "spring.config.additional-location=sample/prebid-config.yaml", "http.port=0", "admin.port=0",
         "gdpr.rubicon.rsid-cookie-encryption-key=encryption-key",
-        "gdpr.rubicon.audit-cookie-encryption-key=key",
-        "auction.enforce-random-bid-id=false"})
+        "gdpr.rubicon.audit-cookie-encryption-key=key"})
 public class SanityTest extends VertxTest {
 
     @Test

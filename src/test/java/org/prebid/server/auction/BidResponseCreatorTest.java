@@ -198,7 +198,6 @@ public class BidResponseCreatorTest extends VertxTest {
                 idGenerator,
                 hookStageExecutor,
                 0,
-                false,
                 clock,
                 jacksonMapper);
 
@@ -1295,7 +1294,6 @@ public class BidResponseCreatorTest extends VertxTest {
                 idGenerator,
                 hookStageExecutor,
                 20,
-                false,
                 clock,
                 jacksonMapper);
 
@@ -2714,43 +2712,6 @@ public class BidResponseCreatorTest extends VertxTest {
         // then
         assertThat(bidResponse.getExt().getErrors()).containsOnly(
                 entry("bidder1", singletonList(ExtBidderError.of(2, "bad_input", singleton(IMP_ID)))));
-    }
-
-    @Test
-    public void shouldEnforceRandomBidId() {
-        // given
-        final AuctionContext auctionContext = givenAuctionContext(givenBidRequest(identity(), identity(), givenImp()));
-
-        final Bid bid = Bid.builder().id("bidId1").price(BigDecimal.valueOf(5.67)).impid(IMP_ID).build();
-        final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of(
-                "someVeryLongBidderName",
-                givenSeatBid(BidderBid.of(bid, banner, "USD")),
-                100));
-
-        final BidResponseCreator bidResponseCreator = new BidResponseCreator(
-                cacheService,
-                bidderCatalog,
-                vastModifier,
-                eventsService,
-                storedRequestProcessor,
-                winningBidComparatorFactory,
-                idGenerator,
-                hookStageExecutor,
-                20,
-                true,
-                clock,
-                jacksonMapper);
-
-        // when
-        final BidResponse bidResponse =
-                bidResponseCreator.create(bidderResponses, auctionContext, CACHE_INFO, MULTI_BIDS).result();
-
-        // then
-        assertThat(bidResponse.getSeatbid())
-                .flatExtracting(SeatBid::getBid).hasSize(1)
-                .extracting(Bid::getId)
-                .extracting(UUID::fromString) // will throw exception if not UUID string
-                .doesNotContainNull();
     }
 
     // end of Rubicon-fork specific tests

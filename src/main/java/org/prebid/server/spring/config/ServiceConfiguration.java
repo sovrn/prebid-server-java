@@ -5,6 +5,8 @@ import de.malkusch.whoisServerList.publicSuffixList.PublicSuffixListFactory;
 import io.vertx.core.Vertx;
 import io.vertx.core.file.FileSystem;
 import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.BidResponseCreator;
@@ -95,6 +97,8 @@ import java.util.stream.Stream;
 
 @Configuration
 public class ServiceConfiguration {
+
+    private static final Logger logger = LoggerFactory.getLogger(ServiceConfiguration.class);
 
     @Bean
     CacheService cacheService(
@@ -542,9 +546,14 @@ public class ServiceConfiguration {
             IdGenerator bidIdGenerator,
             HookStageExecutor hookStageExecutor,
             @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
-            @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
+            @Value("${auction.enforce-random-bid-id:#{null}}") Boolean enforceRandomBidId,
             Clock clock,
             JacksonMapper mapper) {
+
+        if (enforceRandomBidId != null) {
+            logger.warn("auction.enforce-random-bid-id is deprecated but specified,"
+                    + " please use auction.generate-bid-id instead");
+        }
 
         return new BidResponseCreator(
                 cacheService,
@@ -556,7 +565,6 @@ public class ServiceConfiguration {
                 bidIdGenerator,
                 hookStageExecutor,
                 truncateAttrChars,
-                enforceRandomBidId,
                 clock,
                 mapper);
     }

@@ -99,7 +99,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -119,7 +118,6 @@ public class BidResponseCreator {
     private final IdGenerator bidIdGenerator;
     private final HookStageExecutor hookStageExecutor;
     private final int truncateAttrChars;
-    private final boolean enforceRandomBidId;
     private final Clock clock;
     private final JacksonMapper mapper;
 
@@ -137,7 +135,6 @@ public class BidResponseCreator {
                               IdGenerator bidIdGenerator,
                               HookStageExecutor hookStageExecutor,
                               int truncateAttrChars,
-                              boolean enforceRandomBidId,
                               Clock clock,
                               JacksonMapper mapper) {
 
@@ -150,7 +147,6 @@ public class BidResponseCreator {
         this.bidIdGenerator = Objects.requireNonNull(bidIdGenerator);
         this.hookStageExecutor = Objects.requireNonNull(hookStageExecutor);
         this.truncateAttrChars = validateTruncateAttrChars(truncateAttrChars);
-        this.enforceRandomBidId = enforceRandomBidId;
         this.clock = Objects.requireNonNull(clock);
         this.mapper = Objects.requireNonNull(mapper);
 
@@ -240,11 +236,9 @@ public class BidResponseCreator {
         final String generatedBidId = bidIdGenerator.getType() != IdGeneratorType.none
                 ? bidIdGenerator.generateId()
                 : null;
-        final String enforcedRandomBidId = enforceRandomBidId ? UUID.randomUUID().toString() : bid.getId();
-        final String effectiveBidId = ObjectUtils.defaultIfNull(generatedBidId, enforcedRandomBidId);
+        final String effectiveBidId = ObjectUtils.defaultIfNull(generatedBidId, bid.getId());
 
         return bid.toBuilder()
-                .id(enforcedRandomBidId)
                 .adm(updateBidAdm(bid,
                         bidType,
                         bidder,
