@@ -204,7 +204,9 @@ settings:
                                          )
                                  ),
                              'privacy', JSON_OBJECT(
-                                     'enforce-ccpa', NOT NOT (enforce_ccpa),
+                                     'ccpa', JSON_OBJECT(
+                                             'enabled', NOT NOT(enforce_ccpa)
+                                         ),
                                      'gdpr', tcf_config
                                  ),
                              'analytics', JSON_MERGE_PATCH(COALESCE(analytics_config, '{}'), JSON_OBJECT(
