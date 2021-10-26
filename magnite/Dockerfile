@@ -15,7 +15,7 @@ COPY pom.xml pom.xml
 ARG BUILD_NUMBER
 ARG GIT_COMMIT
 
-RUN mvn -f extra/pom.xml clean verify -U \
+RUN mvn -f extra/pom.xml clean package -U \
         -Dci.build.number=${BUILD_NUMBER} \
         -Dci.repository.revision.number=${GIT_COMMIT};
 
@@ -28,7 +28,7 @@ RUN mkdir -p /app/prebid-server/conf /app/prebid-server/log /app/prebid-server/d
 
 COPY src/rpm/tcf-v1-fallback-vendorlist.json /app/prebid-server/conf/tcf-v1-fallback-vendorlist.json
 COPY src/rpm/logback-spring.xml /app/prebid-server/conf/logback-spring.xml
-COPY src/main/docker/run.sh /app/prebid-server/run.sh
+COPY magnite/run.sh /app/prebid-server/run.sh
 
 RUN chmod +x /app/prebid-server/run.sh
 
