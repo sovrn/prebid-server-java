@@ -61,6 +61,7 @@ LIMIT 1
         withDefaultBiddersConfig()
         withPrebidCache(Dependencies.networkServiceContainer)
         withMetricsEndpoint()
+        withRubiconSpecificConfig()
         withNetwork(Dependencies.network)
         withConfig(config)
     }
@@ -129,6 +130,11 @@ LIMIT 1
 
     void withMetricsEndpoint() {
         withConfig(["admin-endpoints.collected-metrics.enabled": "true"])
+    }
+
+    void withRubiconSpecificConfig() {
+        withConfig(["gdpr.rubicon.rsid-cookie-encryption-key": "someRsidEncryptionKey"])
+        withConfig(["gdpr.rubicon.audit-cookie-encryption-key": "someAuditEncryptionKey"])
     }
 
     PrebidServerContainer withConfig(Map<String, String> config) {
