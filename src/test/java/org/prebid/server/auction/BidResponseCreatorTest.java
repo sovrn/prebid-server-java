@@ -31,6 +31,7 @@ import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
+import org.prebid.server.auction.categorymapping.CategoryMappingService;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.BidInfo;
 import org.prebid.server.auction.model.BidRequestCacheInfo;
@@ -181,13 +182,14 @@ public class BidResponseCreatorTest extends VertxTest {
         given(cacheService.getEndpointHost()).willReturn("testHost");
         given(cacheService.getEndpointPath()).willReturn("testPath");
         given(cacheService.getCachedAssetURLTemplate()).willReturn("uuid=");
-        given(categoryMappingService.createCategoryMapping(any(), any(), any(), any())).willAnswer(invocationOnMock ->
-                Future.succeededFuture(CategoryMappingResult.of(emptyMap(), emptyMap(),
-                        invocationOnMock.getArgument(0), null))
-        );
+
+        given(categoryMappingService.createCategoryMapping(any(), any(), any()))
+                .willAnswer(invocationOnMock -> Future.succeededFuture(
+                        CategoryMappingResult.of(emptyMap(), emptyMap(), invocationOnMock.getArgument(0), null)));
 
         given(storedRequestProcessor.videoStoredDataResult(any(), anyList(), anyList(), any()))
                 .willReturn(Future.succeededFuture(VideoStoredDataResult.empty()));
+
         given(idGenerator.getType()).willReturn(IdGeneratorType.none);
 
         given(hookStageExecutor.executeProcessedBidderResponseStage(any(), any()))
@@ -201,7 +203,6 @@ public class BidResponseCreatorTest extends VertxTest {
 
         bidResponseCreator = new BidResponseCreator(
                 cacheService,
-                categoryMappingService,
                 bidderCatalog,
                 vastModifier,
                 eventsService,
@@ -209,6 +210,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 winningBidComparatorFactory,
                 idGenerator,
                 hookStageExecutor,
+                categoryMappingService,
                 0,
                 false,
                 clock,
@@ -914,7 +916,7 @@ public class BidResponseCreatorTest extends VertxTest {
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
                 givenSeatBid(BidderBid.of(bid1, banner, "USD"), BidderBid.of(bid2, banner, "USD")), 100));
 
-        given(categoryMappingService.createCategoryMapping(any(), any(), any(), any()))
+        given(categoryMappingService.createCategoryMapping(any(), any(), any()))
                 .willReturn(Future.succeededFuture(CategoryMappingResult.of(emptyMap(), emptyMap(),
                         singletonList(BidderResponse.of("bidder1", givenSeatBid(BidderBid.of(bid1, banner, "USD")),
                                 100)),
@@ -943,7 +945,7 @@ public class BidResponseCreatorTest extends VertxTest {
         final Bid bid = Bid.builder().id("bidId1").price(BigDecimal.valueOf(5.67)).impid(IMP_ID).build();
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
                 givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
-        given(categoryMappingService.createCategoryMapping(any(), any(), any(), any()))
+        given(categoryMappingService.createCategoryMapping(any(), any(), any()))
                 .willReturn(Future.failedFuture(new InvalidRequestException("category exception")));
 
         // when
@@ -1396,7 +1398,6 @@ public class BidResponseCreatorTest extends VertxTest {
 
         final BidResponseCreator bidResponseCreator = new BidResponseCreator(
                 cacheService,
-                categoryMappingService,
                 bidderCatalog,
                 vastModifier,
                 eventsService,
@@ -1404,6 +1405,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 winningBidComparatorFactory,
                 idGenerator,
                 hookStageExecutor,
+                categoryMappingService,
                 20,
                 false,
                 clock,
@@ -2165,7 +2167,7 @@ public class BidResponseCreatorTest extends VertxTest {
                         ExtBidPrebid.builder().video(ExtBidPrebidVideo.of(1, "category")).build()))).build();
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1",
                 givenSeatBid(BidderBid.of(bid, banner, "USD")), 100));
-        given(categoryMappingService.createCategoryMapping(anyList(), any(), any(), any()))
+        given(categoryMappingService.createCategoryMapping(any(), any(), any()))
                 .willReturn(Future.succeededFuture(CategoryMappingResult.of(emptyMap(),
                         Collections.singletonMap(bid, true),
                         bidderResponses, emptyList())));
@@ -2868,7 +2870,6 @@ public class BidResponseCreatorTest extends VertxTest {
 
         final BidResponseCreator bidResponseCreator = new BidResponseCreator(
                 cacheService,
-                categoryMappingService,
                 bidderCatalog,
                 vastModifier,
                 eventsService,
@@ -2876,6 +2877,7 @@ public class BidResponseCreatorTest extends VertxTest {
                 winningBidComparatorFactory,
                 idGenerator,
                 hookStageExecutor,
+                categoryMappingService,
                 20,
                 true,
                 clock,

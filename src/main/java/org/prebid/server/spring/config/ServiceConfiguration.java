@@ -9,7 +9,6 @@ import io.vertx.core.net.JksOptions;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.BidResponseCreator;
 import org.prebid.server.auction.BidResponsePostProcessor;
-import org.prebid.server.auction.CategoryMappingService;
 import org.prebid.server.auction.DebugResolver;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.FpdResolver;
@@ -25,6 +24,9 @@ import org.prebid.server.auction.TimeoutResolver;
 import org.prebid.server.auction.VideoResponseFactory;
 import org.prebid.server.auction.VideoStoredRequestProcessor;
 import org.prebid.server.auction.WinningBidComparatorFactory;
+import org.prebid.server.auction.categorymapping.BasicCategoryMappingService;
+import org.prebid.server.auction.categorymapping.CategoryMappingService;
+import org.prebid.server.auction.categorymapping.NoOpCategoryMappingService;
 import org.prebid.server.auction.requestfactory.AmpRequestFactory;
 import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
 import org.prebid.server.auction.requestfactory.Ortb2ImplicitParametersResolver;
@@ -134,9 +136,21 @@ public class ServiceConfiguration {
     }
 
     @Bean
-    CategoryMappingService categoryMapper(ApplicationSettings applicationSettings,
-                                          JacksonMapper jacksonMapper) {
-        return new CategoryMappingService(applicationSettings, jacksonMapper);
+    @ConditionalOnProperty(prefix = "auction", name = "category-mapping-enabled", havingValue = "true")
+    CategoryMappingService basicCategoryMappingService(ApplicationSettings applicationSettings,
+                                                       JacksonMapper jacksonMapper) {
+
+        return new BasicCategoryMappingService(applicationSettings, jacksonMapper);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "auction",
+            name = "category-mapping-enabled",
+            matchIfMissing = true,
+            havingValue = "false")
+    CategoryMappingService noOpCategoryMappingService() {
+        return new NoOpCategoryMappingService();
     }
 
     @Bean
@@ -512,12 +526,14 @@ public class ServiceConfiguration {
             HttpClient httpClient,
             @Autowired(required = false) BidderRequestCompletionTrackerFactory bidderRequestCompletionTrackerFactory,
             BidderErrorNotifier bidderErrorNotifier,
-            HttpBidderRequestEnricher requestEnricher) {
+            HttpBidderRequestEnricher requestEnricher,
+            JacksonMapper mapper) {
 
         return new HttpBidderRequester(httpClient,
                 bidderRequestCompletionTrackerFactory,
                 bidderErrorNotifier,
-                requestEnricher);
+                requestEnricher,
+                mapper);
     }
 
     @Bean
@@ -551,7 +567,6 @@ public class ServiceConfiguration {
     @Bean
     BidResponseCreator bidResponseCreator(
             CacheService cacheService,
-            CategoryMappingService categoryMappingService,
             BidderCatalog bidderCatalog,
             VastModifier vastModifier,
             EventsService eventsService,
@@ -559,6 +574,7 @@ public class ServiceConfiguration {
             WinningBidComparatorFactory winningBidComparatorFactory,
             IdGenerator bidIdGenerator,
             HookStageExecutor hookStageExecutor,
+            CategoryMappingService categoryMappingService,
             @Value("${settings.targeting.truncate-attr-chars}") int truncateAttrChars,
             @Value("${auction.enforce-random-bid-id}") boolean enforceRandomBidId,
             Clock clock,
@@ -566,7 +582,6 @@ public class ServiceConfiguration {
 
         return new BidResponseCreator(
                 cacheService,
-                categoryMappingService,
                 bidderCatalog,
                 vastModifier,
                 eventsService,
@@ -574,6 +589,7 @@ public class ServiceConfiguration {
                 winningBidComparatorFactory,
                 bidIdGenerator,
                 hookStageExecutor,
+                categoryMappingService,
                 truncateAttrChars,
                 enforceRandomBidId,
                 clock,

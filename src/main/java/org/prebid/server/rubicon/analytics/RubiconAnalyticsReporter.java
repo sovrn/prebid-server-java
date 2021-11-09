@@ -1278,7 +1278,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
      * Sends event to analytics service.
      */
     private Future<Void> postEvent(Event event, MultiMap headers, boolean isDebugEnabled) {
-        final String eventBody = mapper.encode(event);
+        final String eventBody = mapper.encodeToString(event);
         if (isDebugEnabled) {
             logger.warn(String.format("Sending analytic event: %s", eventBody));
         }

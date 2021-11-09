@@ -158,7 +158,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
 
             status = HttpResponseStatus.OK;
             enrichWithSuccessfulHeaders(response);
-            body = mapper.encode(cleanImpIdsFromErrors(bidResponse));
+            body = mapper.encodeToString(cleanImpIdsFromErrors(bidResponse));
         } else {
             bidResponse = null;
             extBidResponse = null;
