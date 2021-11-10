@@ -21,7 +21,6 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.AuctionEvent;
-import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.requestfactory.AuctionRequestFactory;
@@ -35,6 +34,8 @@ import org.prebid.server.execution.TimeoutFactory;
 import org.prebid.server.log.HttpInteractionLogger;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.proto.openrtb.ext.request.ExtGranularityRange;
 import org.prebid.server.proto.openrtb.ext.request.ExtMediaTypePriceGranularity;
 import org.prebid.server.proto.openrtb.ext.request.ExtPriceGranularity;
@@ -55,13 +56,11 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static java.util.function.UnaryOperator.identity;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -703,7 +702,6 @@ public class AuctionHandlerTest extends VertxTest {
 
         final MultiMap params = MultiMap.caseInsensitiveMultiMap();
         params.add("param", "value1");
-        params.add("param", "value2");
         given(httpRequest.params()).willReturn(params);
 
         // when
@@ -711,8 +709,10 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         final AuctionEvent auctionEvent = captureAuctionEvent();
-        final Map<String, String> obtainedParams = auctionEvent.getHttpContext().getQueryParams();
-        assertThat(obtainedParams.entrySet()).containsOnly(entry("param", "value1"));
+        final CaseInsensitiveMultiMap expectedParams = CaseInsensitiveMultiMap.builder()
+                .add("param", "value1")
+                .build();
+        assertThat(auctionEvent.getHttpContext().getQueryParams()).isEqualTo(expectedParams);
     }
 
     @Test
@@ -723,7 +723,6 @@ public class AuctionHandlerTest extends VertxTest {
 
         final CaseInsensitiveHeaders headers = new CaseInsensitiveHeaders();
         headers.add("header", "value1");
-        headers.add("header", "value2");
         given(httpRequest.headers()).willReturn(headers);
 
         // when
@@ -731,8 +730,11 @@ public class AuctionHandlerTest extends VertxTest {
 
         // then
         final AuctionEvent auctionEvent = captureAuctionEvent();
-        final Map<String, String> obtainedHeaders = auctionEvent.getHttpContext().getHeaders();
-        assertThat(obtainedHeaders.entrySet()).containsOnly(entry("header", "value1"));
+        final CaseInsensitiveMultiMap expectedHeaders = CaseInsensitiveMultiMap.builder()
+                .add("header", "value1")
+                .add("header", "value2")
+                .build();
+        assertThat(auctionEvent.getHttpContext().getHeaders()).isEqualTo(expectedHeaders);
     }
 
     private AuctionContext captureAuctionContext() {
@@ -768,11 +770,10 @@ public class AuctionHandlerTest extends VertxTest {
                 .build();
     }
 
-    private static HttpContext givenHttpContext() {
-        return HttpContext.builder()
-                .queryParams(emptyMap())
-                .headers(emptyMap())
-                .cookies(emptyMap())
+    private static HttpRequestContext givenHttpContext() {
+        return HttpRequestContext.builder()
+                .queryParams(CaseInsensitiveMultiMap.empty())
+                .headers(CaseInsensitiveMultiMap.empty())
                 .build();
     }
 }

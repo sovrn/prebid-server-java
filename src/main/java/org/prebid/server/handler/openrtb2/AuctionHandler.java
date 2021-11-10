@@ -15,7 +15,6 @@ import io.vertx.ext.web.RoutingContext;
 import org.apache.commons.collections4.MapUtils;
 import org.prebid.server.analytics.AnalyticsReporterDelegator;
 import org.prebid.server.analytics.model.AuctionEvent;
-import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.model.AuctionContext;
 import org.prebid.server.auction.model.Tuple2;
@@ -32,6 +31,7 @@ import org.prebid.server.log.HttpInteractionLogger;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.model.Endpoint;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.proto.openrtb.ext.response.ExtBidResponse;
@@ -93,7 +93,7 @@ public class AuctionHandler implements Handler<RoutingContext> {
         final long startTime = clock.millis();
 
         final AuctionEvent.AuctionEventBuilder auctionEventBuilder = AuctionEvent.builder()
-                .httpContext(HttpContext.from(routingContext));
+                .httpContext(HttpRequestContext.from(routingContext));
 
         auctionRequestFactory.fromRequest(routingContext, startTime)
 
@@ -101,7 +101,6 @@ public class AuctionHandler implements Handler<RoutingContext> {
                 .map(this::updateAppAndNoCookieAndImpsMetrics)
                 .compose(context -> exchangeService.holdAuction(context)
                         .map(bidResponse -> Tuple2.of(bidResponse, context)))
-
                 .map(result -> addToEvent(result.getLeft(), auctionEventBuilder::bidResponse, result))
                 .setHandler(result -> handleResult(result, auctionEventBuilder, routingContext, startTime));
     }

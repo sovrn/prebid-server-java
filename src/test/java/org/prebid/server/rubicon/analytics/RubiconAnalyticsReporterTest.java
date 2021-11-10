@@ -31,7 +31,6 @@ import org.mockito.junit.MockitoRule;
 import org.prebid.server.VertxTest;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
-import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.model.AuctionContext;
@@ -45,6 +44,8 @@ import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
 import org.prebid.server.geolocation.model.GeoInfo;
+import org.prebid.server.model.CaseInsensitiveMultiMap;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.model.PrivacyContext;
 import org.prebid.server.proto.openrtb.ext.ExtPrebid;
@@ -94,7 +95,6 @@ import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
@@ -142,7 +142,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     @Mock
     private HttpServerRequest httpRequest;
 
-    private HttpContext httpContext;
+    private HttpRequestContext httpContext;
 
     @Before
     public void setUp() {
@@ -171,7 +171,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap());
         given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
 
-        httpContext = HttpContext.builder().cookies(emptyMap()).build();
+        httpContext = HttpRequestContext.builder()
+                .headers(CaseInsensitiveMultiMap.empty())
+                .build();
 
         reporter = new RubiconAnalyticsReporter(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
@@ -241,7 +243,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(null)
                         .build())
-                .httpContext(HttpContext.builder().build())
+                .httpContext(HttpRequestContext.builder().build())
                 .build();
 
         // when
@@ -262,7 +264,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                         .bidRequest(BidRequest.builder().build())
                         .account(null)
                         .build())
-                .httpContext(HttpContext.builder().build())
+                .httpContext(HttpRequestContext.builder().build())
                 .build();
 
         // when
@@ -283,7 +285,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                         .bidRequest(BidRequest.builder().build())
                         .account(Account.builder().build())
                         .build())
-                .httpContext(HttpContext.builder().build())
+                .httpContext(HttpRequestContext.builder().build())
                 .bidResponse(null)
                 .build();
 
@@ -943,11 +945,12 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
-        final Map<String, String> headers = new HashMap<>();
-        headers.put("Referer", "http://referer");
-        headers.put("User-Agent", "ua");
-        headers.put("DNT", "1");
-        final HttpContext httpContext = HttpContext.builder().headers(headers).cookies(emptyMap()).build();
+        final CaseInsensitiveMultiMap headers = CaseInsensitiveMultiMap.builder()
+                .add("Referer", "http://referer")
+                .add("User-Agent", "ua")
+                .add("DNT", "1")
+                .build();
+        final HttpRequestContext httpContext = HttpRequestContext.builder().headers(headers).build();
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .bidId("bidid")
@@ -993,11 +996,12 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
-        final Map<String, String> headers = new HashMap<>();
-        headers.put("Referer", "http://referer");
-        headers.put("User-Agent", "ua");
-        headers.put("DNT", "1");
-        final HttpContext httpContext = HttpContext.builder().headers(headers).cookies(emptyMap()).build();
+        final CaseInsensitiveMultiMap headers = CaseInsensitiveMultiMap.builder()
+                .add("Referer", "http://referer")
+                .add("User-Agent", "ua")
+                .add("DNT", "1")
+                .build();
+        final HttpRequestContext httpContext = HttpRequestContext.builder().headers(headers).build();
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.imp)
                 .bidId("bidid")
@@ -1043,7 +1047,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
-        final HttpContext httpContext = HttpContext.builder().headers(emptyMap()).cookies(emptyMap()).build();
+        final HttpRequestContext httpContext = HttpRequestContext.builder()
+                .headers(CaseInsensitiveMultiMap.empty())
+                .build();
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .bidId("bidid")
@@ -1072,7 +1078,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
-        final HttpContext httpContext = HttpContext.builder().headers(emptyMap()).cookies(emptyMap()).build();
+        final HttpRequestContext httpContext = HttpRequestContext.builder()
+                .headers(CaseInsensitiveMultiMap.empty())
+                .build();
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .integration("event-integration")
@@ -1102,7 +1110,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     @Test
     public void processNotificationEventShouldNotSendEventIfAccountSamplingFactorIsMissing() {
         // given
-        final HttpContext httpContext = HttpContext.builder().headers(emptyMap()).cookies(emptyMap()).build();
+        final HttpRequestContext httpContext = HttpRequestContext.builder()
+                .headers(CaseInsensitiveMultiMap.empty())
+                .build();
         final NotificationEvent event = NotificationEvent.builder()
                 .type(NotificationEvent.Type.win)
                 .bidId("bidid")
@@ -1157,7 +1167,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(null)
                         .build())
-                .httpContext(HttpContext.builder().build())
+                .httpContext(HttpRequestContext.builder().build())
                 .build();
 
         // when
@@ -1175,7 +1185,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                         .bidRequest(BidRequest.builder().build())
                         .account(null)
                         .build())
-                .httpContext(HttpContext.builder().build())
+                .httpContext(HttpRequestContext.builder().build())
                 .build();
 
         // when
@@ -1193,7 +1203,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                         .bidRequest(BidRequest.builder().build())
                         .account(Account.builder().build())
                         .build())
-                .httpContext(HttpContext.builder().build())
+                .httpContext(HttpRequestContext.builder().build())
                 .bidResponse(null)
                 .build();
 
@@ -1228,7 +1238,10 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
         givenCurrencyConversion(BigDecimal.TEN);
-        httpContext = HttpContext.builder().uri("http://host-url/event/tag_id=storedId1").cookies(emptyMap()).build();
+        httpContext = HttpRequestContext.builder()
+                .headers(CaseInsensitiveMultiMap.empty())
+                .absoluteUri("http://host-url/event/tag_id=storedId1")
+                .build();
         final AmpEvent event = AmpEvent.builder()
                 .httpContext(httpContext)
                 .auctionContext(givenAuctionContext(sampleAmpBidRequest()))

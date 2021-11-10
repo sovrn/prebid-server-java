@@ -33,7 +33,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.prebid.server.analytics.AnalyticsReporter;
 import org.prebid.server.analytics.model.AmpEvent;
 import org.prebid.server.analytics.model.AuctionEvent;
-import org.prebid.server.analytics.model.HttpContext;
 import org.prebid.server.analytics.model.NotificationEvent;
 import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.auction.model.AuctionContext;
@@ -47,6 +46,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
+import org.prebid.server.model.HttpRequestContext;
 import org.prebid.server.privacy.gdpr.TcfDefinerService;
 import org.prebid.server.privacy.gdpr.model.TcfContext;
 import org.prebid.server.privacy.model.PrivacyContext;
@@ -261,7 +261,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
             return Future.failedFuture(new InvalidRequestException("Exception is thrown while auction processing"));
         }
 
-        final HttpContext httpContext = auctionEvent.getHttpContext();
+        final HttpRequestContext httpContext = auctionEvent.getHttpContext();
         final BidRequest bidRequest = auctionContext.getBidRequest();
         final Account account = auctionContext.getAccount();
         final BidResponse bidResponse = auctionEvent.getBidResponse();
@@ -278,7 +278,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         if (shouldProcessEvent(
                 account, accountId, bidRequest, accountSamplingFactor, accountToAuctionEventCount, auctionEventCount)) {
 
-            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
+            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(HttpUtil.cookiesAsMap(httpContext));
 
             final Event event = toAuctionEvent(
                     httpContext,
@@ -299,7 +299,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
             return Future.failedFuture(new InvalidRequestException("Exception is thrown while amp processing"));
         }
 
-        final HttpContext httpContext = ampEvent.getHttpContext();
+        final HttpRequestContext httpContext = ampEvent.getHttpContext();
         final BidRequest bidRequest = auctionContext.getBidRequest();
         final Account account = auctionContext.getAccount();
         final BidResponse bidResponse = ampEvent.getBidResponse();
@@ -311,13 +311,13 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final String requestAccountId = account.getId();
         final Integer accountId = NumberUtils.isDigits(requestAccountId) ? parseId(requestAccountId) : null;
         final Integer accountSamplingFactor = accountSamplingFactor(account);
-        final String storedId = parseStoredId(httpContext.getUri());
+        final String storedId = parseStoredId(httpContext.getAbsoluteUri());
 
         // only continue if counter matches sampling factor
         if (shouldProcessEvent(
                 account, accountId, bidRequest, accountSamplingFactor, accountToAmpEventCount, ampEventCount)) {
 
-            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
+            final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(HttpUtil.cookiesAsMap(httpContext));
 
             final Event event = toAuctionEvent(
                     httpContext,
@@ -335,7 +335,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private Future<Void> processNotificationEvent(NotificationEvent notificationEvent) {
         final String bidId = notificationEvent.getBidId();
         final Account account = notificationEvent.getAccount();
-        final HttpContext httpContext = notificationEvent.getHttpContext();
+        final HttpRequestContext httpContext = notificationEvent.getHttpContext();
         if (bidId == null || account == null || httpContext == null) {
             return Future.failedFuture(new InvalidRequestException("Necessary data is missing while event processing"));
         }
@@ -357,7 +357,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         }
 
         final String bidder = notificationEvent.getBidder();
-        final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(httpContext.getCookies());
+        final UidsCookie uidsCookie = uidsCookieService.parseFromCookies(HttpUtil.cookiesAsMap(httpContext));
         final Long timestamp = notificationEvent.getTimestamp();
         final String integration = notificationEvent.getIntegration();
 
@@ -441,7 +441,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
             String bidder,
             Account account,
             Integer accountId,
-            HttpContext httpContext,
+            HttpRequestContext httpContext,
             UidsCookie uidsCookie,
             Long timestamp,
             String integration) {
@@ -464,7 +464,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
             String bidder,
             Account account,
             Integer accountId,
-            HttpContext httpContext,
+            HttpRequestContext httpContext,
             UidsCookie uidsCookie,
             Long timestamp,
             String integration) {
@@ -483,7 +483,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     }
 
     private Event.EventBuilder eventBuilderFromNotification(
-            HttpContext httpContext,
+            HttpRequestContext httpContext,
             Long timestamp,
             String integration,
             Account account) {
@@ -687,8 +687,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                 : null;
     }
 
-    private boolean hasRubiconId(HttpContext httpContext) {
-        return uidsCookieService.parseHostCookie(httpContext.getCookies()) != null;
+    private boolean hasRubiconId(HttpRequestContext httpContext) {
+        return uidsCookieService.parseHostCookie(HttpUtil.cookiesAsMap(httpContext)) != null;
     }
 
     private static Imp findImpById(List<Imp> imps, String impId) {
@@ -1060,8 +1060,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private static Gam gamFromExtImp(ExtImp extImp) {
         final ObjectNode adserverNode = getIfNotNull(getIfNotNull(getIfNotNull(getIfNotNull(extImp,
-                                        ExtImp::getContext),
-                                ExtImpContext::getData), data -> data.isObject() ? data.get(ADSERVER_EXT) : null),
+                                ExtImp::getContext),
+                        ExtImpContext::getData), data -> data.isObject() ? data.get(ADSERVER_EXT) : null),
                 adserver -> adserver.isObject() ? (ObjectNode) adserver : null);
 
         final String adserverName =
@@ -1096,12 +1096,12 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         return extBid != null ? extBid.getPrebid().getTargeting() : null;
     }
 
-    private Event toAuctionEvent(HttpContext httpContext,
+    private Event toAuctionEvent(HttpRequestContext httpContext,
                                  AuctionContext auctionContext,
                                  List<AdUnit> adUnits,
                                  Integer accountId,
                                  Integer accountSamplingFactor,
-                                 BiFunction<HttpContext, AuctionContext, Event.EventBuilder> eventBuilderBase) {
+                                 BiFunction<HttpRequestContext, AuctionContext, Event.EventBuilder> eventBuilderBase) {
 
         final BidRequest bidRequest = auctionContext.getBidRequest();
 
@@ -1188,7 +1188,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     /**
      * Prepares event from request.
      */
-    private Event.EventBuilder eventBuilderBase(HttpContext httpContext, AuctionContext auctionContext) {
+    private Event.EventBuilder eventBuilderBase(HttpRequestContext httpContext, AuctionContext auctionContext) {
         final BidRequest bidRequest = auctionContext.getBidRequest();
         final Device device = bidRequest.getDevice();
         final Integer deviceLmt = getIfNotNull(device, Device::getLmt);
@@ -1241,14 +1241,15 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     }
 
     private org.prebid.server.rubicon.analytics.proto.User user(
-            HttpContext httpContext, AuctionContext auctionContext) {
+            HttpRequestContext httpContext, AuctionContext auctionContext) {
 
         final org.prebid.server.rubicon.analytics.proto.Geo geo = geo(httpContext, auctionContext);
 
         return geo != null ? org.prebid.server.rubicon.analytics.proto.User.of(geo) : null;
     }
 
-    private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpContext httpContext, AuctionContext auctionContext) {
+    private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpRequestContext httpContext,
+                                                              AuctionContext auctionContext) {
         final Device device = auctionContext.getBidRequest().getDevice();
         final String country = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
 
@@ -1264,8 +1265,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         return geo != null ? geo.getCountry() : null;
     }
 
-    private String countryFrom(HttpContext httpContext) {
-        final UidAudit uidsAudit = uidsAuditCookieService.getUidsAudit(httpContext.getCookies());
+    private String countryFrom(HttpRequestContext httpContext) {
+        final UidAudit uidsAudit = uidsAuditCookieService.getUidsAudit(HttpUtil.cookiesAsMap(httpContext));
         return uidsAudit != null ? uidsAudit.getCountry() : null;
     }
 
