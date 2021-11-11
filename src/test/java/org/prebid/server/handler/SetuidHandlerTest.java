@@ -70,7 +70,7 @@ import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 public class SetuidHandlerTest extends VertxTest {
 
@@ -906,7 +906,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verifyZeroInteractions(uidsAuditCookieService);
+        verifyNoInteractions(uidsAuditCookieService);
 
         final String uidsCookie = captureCookie();
         final Uids decodedUids = decodeUids(uidsCookie);
@@ -934,7 +934,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verifyZeroInteractions(uidsAuditCookieService);
+        verifyNoInteractions(uidsAuditCookieService);
 
         final String uidsCookie = captureCookie();
         final Uids decodedUids = decodeUids(uidsCookie);
@@ -993,7 +993,7 @@ public class SetuidHandlerTest extends VertxTest {
         setuidHandler.handle(routingContext);
 
         // then
-        verifyZeroInteractions(applicationSettings);
+        verifyNoInteractions(applicationSettings);
     }
 
     @Test

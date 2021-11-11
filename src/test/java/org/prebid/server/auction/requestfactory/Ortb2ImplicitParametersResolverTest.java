@@ -1099,7 +1099,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
         // then
         assertThat(result.getSite())
                 .extracting(Site::getExt)
-                .containsOnly(ExtSite.of(0, null));
+                .isEqualTo(ExtSite.of(0, null));
     }
 
     @Test
@@ -1631,7 +1631,7 @@ public class Ortb2ImplicitParametersResolverTest extends VertxTest {
         // then
         assertThat(result.getExt())
                 .extracting(extBidRequest -> extBidRequest.getPrebid().getTargeting().getIncludebidderkeys())
-                .containsOnly(false);
+                .isEqualTo(false);
     }
 
     @Test

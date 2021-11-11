@@ -8,7 +8,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mock;
-import org.mockito.internal.util.reflection.FieldSetter;
+import org.mockito.internal.util.reflection.ReflectionMemberAccessor;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.deals.model.DeviceInfo;
@@ -69,7 +69,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnFailedFutureWhenUserAgentWasNotDefined() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnFailedFutureWhenUserAgentWasNotDefined()
+            throws NoSuchFieldException, IllegalAccessException {
         // when
         givenDownloadedFile();
         final Future<DeviceInfo> resultFuture = deviceInfoService.getDeviceInfo(null);
@@ -81,7 +82,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnFailedFutureWhenPropertiesIsNull() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnFailedFutureWhenPropertiesIsNull()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         given(deviceApi.getProperties(anyString())).willReturn(null);
@@ -95,7 +97,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoWithAndroid() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoWithAndroid()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
 
@@ -127,7 +130,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoWithIos() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoWithIos()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) "
@@ -158,7 +162,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoWithIphone() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoWithIphone()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) ";
@@ -187,7 +192,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForTablet() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForTablet()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0";
@@ -217,7 +223,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForWindows() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForWindows()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -248,7 +255,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForSafari() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForSafari()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) "
@@ -278,7 +286,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForInternetExplorerAndWindowsPhone() throws NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForInternetExplorerAndWindowsPhone()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (compatible; MSIE 9.0; Windows Phone OS 7.5; Trident/5.0; IEMobile/9.0)";
@@ -308,7 +317,8 @@ public class DeviceAtlasDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldTolerateWhenPropertyNotExist() throws NoSuchFieldException {
+    public void getDeviceInfoShouldTolerateWhenPropertyNotExist()
+            throws NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0";
@@ -328,9 +338,11 @@ public class DeviceAtlasDeviceInfoServiceTest {
         assertThat(resultFuture.result()).isEqualTo(expected);
     }
 
-    private void givenDownloadedFile() throws NoSuchFieldException {
-        FieldSetter.setField(deviceInfoService,
-                deviceInfoService.getClass().getDeclaredField("deviceApi"), deviceApi);
+    private void givenDownloadedFile() throws NoSuchFieldException, IllegalAccessException {
+        new ReflectionMemberAccessor().set(
+                deviceInfoService.getClass().getDeclaredField("deviceApi"),
+                deviceInfoService,
+                deviceApi);
     }
 
     private static Property givenProperty(String value) {

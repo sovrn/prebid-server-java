@@ -30,7 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @RunWith(VertxUnitRunner.class)
 public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
@@ -81,8 +81,8 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isNotNull().hasMessage("Timeout has been exceeded");
 
-        verifyZeroInteractions(netAcuityServerAddressProvider);
-        verifyZeroInteractions(netAcuityGeoLocationService);
+        verifyNoInteractions(netAcuityServerAddressProvider);
+        verifyNoInteractions(netAcuityGeoLocationService);
     }
 
     @Test
@@ -204,7 +204,7 @@ public class CircuitBreakerSecuredNetAcuityGeoLocationServiceTest {
         final Future<GeoInfo> future = doLookup(context);
 
         // then
-        verifyZeroInteractions(netAcuityGeoLocationService);
+        verifyNoInteractions(netAcuityGeoLocationService);
 
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(PreBidException.class);

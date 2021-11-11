@@ -10,7 +10,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.Mock;
-import org.mockito.internal.util.reflection.FieldSetter;
+import org.mockito.internal.util.reflection.ReflectionMemberAccessor;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.prebid.server.deals.model.DeviceInfo;
@@ -70,7 +70,7 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
 
     @Test
     public void getDeviceInfoShouldReturnFailedFutureWhenMatchThrowsException()
-            throws NoSuchFieldException, IOException {
+            throws NoSuchFieldException, IOException, IllegalAccessException {
         // given
         givenDownloadedFile();
         given(provider.match(anyString())).willThrow(IOException.class);
@@ -84,7 +84,8 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoWithAndroid() throws IOException, NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoWithAndroid()
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
 
@@ -115,7 +116,8 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoWithIos() throws IOException, NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoWithIos()
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) "
@@ -144,7 +146,8 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoWithIphone() throws IOException, NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoWithIphone()
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) ";
@@ -172,7 +175,8 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForTablet() throws IOException, NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForTablet()
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0";
@@ -201,7 +205,8 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForWindows() throws IOException, NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForWindows()
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -231,7 +236,8 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
     }
 
     @Test
-    public void getDeviceInfoShouldReturnDeviceInfoForSafari() throws IOException, NoSuchFieldException {
+    public void getDeviceInfoShouldReturnDeviceInfoForSafari()
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) "
@@ -260,7 +266,7 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
 
     @Test
     public void getDeviceInfoShouldReturnDeviceInfoForInternetExplorerAndWindowsPhone()
-            throws IOException, NoSuchFieldException {
+            throws IOException, NoSuchFieldException, IllegalAccessException {
         // given
         givenDownloadedFile();
         final String ua = "Mozilla/5.0 (compatible; MSIE 9.0; Windows Phone OS 7.5; Trident/5.0; IEMobile/9.0)";
@@ -287,9 +293,11 @@ public class FiftyOneDegreesDeviceInfoServiceTest {
         assertThat(resultFuture.result()).isEqualTo(expected);
     }
 
-    private void givenDownloadedFile() throws NoSuchFieldException {
-        FieldSetter.setField(deviceInfoService,
-                deviceInfoService.getClass().getDeclaredField("provider"), provider);
+    private void givenDownloadedFile() throws NoSuchFieldException, IllegalAccessException {
+        new ReflectionMemberAccessor().set(
+                deviceInfoService.getClass().getDeclaredField("provider"),
+                deviceInfoService,
+                provider);
     }
 
     private Values givenValues(String value) {

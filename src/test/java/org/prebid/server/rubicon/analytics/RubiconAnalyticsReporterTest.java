@@ -110,7 +110,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 public class RubiconAnalyticsReporterTest extends VertxTest {
 
@@ -215,7 +215,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
                 .hasMessage("Exception is thrown while auction processing");
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -233,7 +233,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
                 .hasMessage("Necessary data is missing while auction processing");
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -253,7 +253,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
                 .hasMessage("Necessary data is missing while auction processing");
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -274,7 +274,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
                 .hasMessage("Necessary data is missing while auction processing");
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -296,7 +296,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
                 .hasMessage("Necessary data is missing while auction processing");
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -316,7 +316,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThat(future.failed()).isTrue();
         assertThat(future.cause()).isInstanceOf(InvalidRequestException.class)
                 .hasMessage("Necessary data is missing while auction processing");
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -426,7 +426,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(auctionEvent);
 
         // then
-        verifyZeroInteractions(httpClient);
+        verifyNoInteractions(httpClient);
     }
 
     @Test
@@ -1128,7 +1128,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(event);
 
         // then
-        verifyZeroInteractions(httpClient);
+        verifyNoInteractions(httpClient);
     }
 
     @Test
@@ -1142,7 +1142,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(ampEvent);
 
         // then
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -1157,7 +1157,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(ampEvent);
 
         // then
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -1174,7 +1174,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(ampEvent);
 
         // then
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -1192,7 +1192,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(ampEvent);
 
         // then
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -1211,7 +1211,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(ampEvent);
 
         // then
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @Test
@@ -1228,7 +1228,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         reporter.processEvent(ampEvent);
 
         // then
-        verifyZeroInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
+        verifyNoInteractions(bidderCatalog, uidsCookieService, uidsAuditCookieService, httpClient);
     }
 
     @SuppressWarnings("checkstyle:methodlength")

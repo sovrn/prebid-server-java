@@ -79,7 +79,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 public class CookieSyncHandlerTest extends VertxTest {
 
@@ -1174,7 +1174,7 @@ public class CookieSyncHandlerTest extends VertxTest {
                 .extracting(bidderStatus -> bidderStatus.getUsersync().getUrl())
                 .containsOnly("http://adnxsexample.com/sync?gdpr=&gdpr_consent=");
 
-        verifyZeroInteractions(applicationSettings);
+        verifyNoInteractions(applicationSettings);
     }
 
     @Test
@@ -1508,7 +1508,7 @@ public class CookieSyncHandlerTest extends VertxTest {
         assertThat(bidderStatus).hasSize(2)
                 .element(0)
                 .extracting(BidderUsersyncStatus::getBidder)
-                .containsOnly(RUBICON);
+                .isEqualTo(RUBICON);
         assertThat(bidderStatus.get(1).getBidder())
                 .isIn(PUBMATIC, APPNEXUS, "conversant");
     }
@@ -1613,7 +1613,7 @@ public class CookieSyncHandlerTest extends VertxTest {
         cookieSyncHandler.handle(routingContext);
 
         // then
-        verifyZeroInteractions(uidsAuditCookieService);
+        verifyNoInteractions(uidsAuditCookieService);
 
         final CookieSyncResponse cookieSyncResponse = captureCookieSyncResponse();
         assertThat(cookieSyncResponse).isEqualTo(CookieSyncResponse.of("ok",
