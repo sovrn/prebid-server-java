@@ -370,7 +370,7 @@ public class HttpBidderRequesterTest extends VertxTest {
                         .result();
 
         // then
-        verify(bidder, times(1)).makeHttpRequests(any());
+        verify(bidder).makeHttpRequests(any());
         verify(httpClient, times(4)).request(any(), any(), any(), any(byte[].class), anyLong());
         verify(bidder, times(2)).makeBids(any(), any());
 
@@ -426,7 +426,7 @@ public class HttpBidderRequesterTest extends VertxTest {
                         .result();
 
         // then
-        verify(bidder, times(1)).makeHttpRequests(any());
+        verify(bidder).makeHttpRequests(any());
         verify(httpClient, times(4)).request(any(), any(), any(), any(byte[].class), anyLong());
         verify(bidder, times(4)).makeBids(any(), any());
 
@@ -744,7 +744,7 @@ public class HttpBidderRequesterTest extends VertxTest {
 
         // then
         // only one calls is expected (200) since other requests have failed with errors.
-        verify(bidder, times(1)).makeBids(any(), any());
+        verify(bidder).makeBids(any(), any());
         assertThat(bidderSeatBid.getBids()).hasSize(1);
         assertThat(bidderSeatBid.getErrors()).containsOnly(
                 BidderError.badInput("makeHttpRequestsError"),
