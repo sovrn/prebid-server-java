@@ -18,6 +18,7 @@ import org.prebid.server.auction.model.BidderPrivacyResult;
 import org.prebid.server.auction.model.IpAddress;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.execution.Timeout;
+import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.metric.MetricName;
 import org.prebid.server.metric.Metrics;
 import org.prebid.server.model.HttpRequestContext;
@@ -75,6 +76,7 @@ public class PrivacyEnforcementService {
     private final ImplicitParametersExtractor implicitParametersExtractor;
     private final IpAddressHelper ipAddressHelper;
     private final Metrics metrics;
+    private final CountryCodeMapper countryCodeMapper;
     private final boolean ccpaEnforce;
     private final boolean lmtEnforce;
 
@@ -85,6 +87,7 @@ public class PrivacyEnforcementService {
                                      ImplicitParametersExtractor implicitParametersExtractor,
                                      IpAddressHelper ipAddressHelper,
                                      Metrics metrics,
+                                     CountryCodeMapper countryCodeMapper,
                                      boolean ccpaEnforce,
                                      boolean lmtEnforce) {
 
@@ -95,6 +98,7 @@ public class PrivacyEnforcementService {
         this.implicitParametersExtractor = Objects.requireNonNull(implicitParametersExtractor);
         this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.metrics = Objects.requireNonNull(metrics);
+        this.countryCodeMapper = Objects.requireNonNull(countryCodeMapper);
         this.ccpaEnforce = ccpaEnforce;
         this.lmtEnforce = lmtEnforce;
     }
@@ -115,6 +119,7 @@ public class PrivacyEnforcementService {
         final Geo geo = device != null ? device.getGeo() : null;
         final String country = getFromRsidCookieIfNull(geo != null ? geo.getCountry() : null, httpRequest);
 
+        final String alpha2CountryCode = resolveAlpha2CountryCode(country);
         final String effectiveIpAddress = resolveIpAddress(device, privacy);
 
         final AccountGdprConfig accountGdpr = accountGdprConfig(account);
@@ -122,9 +127,19 @@ public class PrivacyEnforcementService {
         final RequestLogInfo requestLogInfo = requestLogInfo(requestType, bidRequest, accountId);
 
         return tcfDefinerService.resolveTcfContext(
-                        privacy, country, effectiveIpAddress, accountGdpr, requestType, requestLogInfo, timeout,
+                        privacy,
+                        alpha2CountryCode,
+                        effectiveIpAddress,
+                        accountGdpr,
+                        requestType,
+                        requestLogInfo,
+                        timeout,
                         debugWarnings)
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext, tcfContext.getIpAddress()));
+    }
+
+    private String resolveAlpha2CountryCode(String alpha3CountryCode) {
+        return countryCodeMapper.mapToAlpha2(alpha3CountryCode);
     }
 
     private String resolveIpAddress(Device device, Privacy privacy) {

@@ -33,6 +33,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.hooks.execution.HookStageExecutor;
 import org.prebid.server.hooks.execution.model.HookExecutionContext;
@@ -99,6 +100,7 @@ public class Ortb2RequestFactory {
     private final DealsProcessor dealsProcessor;
     private final IpAddressHelper ipAddressHelper;
     private final HookStageExecutor hookStageExecutor;
+    private final CountryCodeMapper countryCodeMapper;
     private final Clock clock;
     private final JacksonMapper mapper;
 
@@ -113,6 +115,7 @@ public class Ortb2RequestFactory {
                                IpAddressHelper ipAddressHelper,
                                HookStageExecutor hookStageExecutor,
                                DealsProcessor dealsProcessor,
+                               CountryCodeMapper countryCodeMapper,
                                Clock clock,
                                JacksonMapper mapper) {
 
@@ -127,6 +130,7 @@ public class Ortb2RequestFactory {
         this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.hookStageExecutor = Objects.requireNonNull(hookStageExecutor);
         this.dealsProcessor = dealsProcessor;
+        this.countryCodeMapper = Objects.requireNonNull(countryCodeMapper);
         this.clock = Objects.requireNonNull(clock);
         this.mapper = Objects.requireNonNull(mapper);
     }
@@ -579,9 +583,8 @@ public class Ortb2RequestFactory {
 
         final Geo geo = ObjectUtil.getIfNotNull(device, Device::getGeo);
         final String countryInRequest = ObjectUtil.getIfNotNull(geo, Geo::getCountry);
-        final String country = ObjectUtil.getIfNotNull(privacyContext.getTcfContext().getGeoInfo(),
-                GeoInfo::getCountry);
-        final boolean shouldUpdateCountry = country != null && !Objects.equals(countryInRequest, country);
+        final String alpha3CountryCode = resolveAlpha3CountryCode(privacyContext);
+        final boolean shouldUpdateCountry = alpha3CountryCode != null && !alpha3CountryCode.equals(countryInRequest);
 
         if (shouldUpdateIpV4 || shouldUpdateIpV6 || shouldUpdateCountry) {
             final Device.DeviceBuilder deviceBuilder = device != null ? device.toBuilder() : Device.builder();
@@ -596,7 +599,7 @@ public class Ortb2RequestFactory {
 
             if (shouldUpdateCountry) {
                 final Geo.GeoBuilder geoBuilder = geo != null ? geo.toBuilder() : Geo.builder();
-                geoBuilder.country(country);
+                geoBuilder.country(alpha3CountryCode);
                 deviceBuilder.geo(geoBuilder.build());
             }
 
@@ -604,6 +607,13 @@ public class Ortb2RequestFactory {
         }
 
         return null;
+    }
+
+    private String resolveAlpha3CountryCode(PrivacyContext privacyContext) {
+        final String alpha2CountryCode = ObjectUtil.getIfNotNull(
+                privacyContext.getTcfContext().getGeoInfo(), GeoInfo::getCountry);
+
+        return countryCodeMapper.mapToAlpha3(alpha2CountryCode);
     }
 
     private static String accountDefaultIntegration(Account account) {

@@ -39,6 +39,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.hooks.execution.HookStageExecutor;
 import org.prebid.server.hooks.execution.model.HookExecutionContext;
@@ -120,6 +121,8 @@ public class Ortb2RequestFactoryTest extends VertxTest {
     private HookStageExecutor hookStageExecutor;
     @Mock
     private DealsProcessor dealsProcessor;
+    @Mock
+    private CountryCodeMapper countryCodeMapper;
 
     private final Clock clock = Clock.systemDefaultZone();
 
@@ -177,6 +180,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsProcessor,
+                countryCodeMapper,
                 clock,
                 jacksonMapper);
     }
@@ -196,6 +200,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsProcessor,
+                countryCodeMapper,
                 clock,
                 jacksonMapper);
 
@@ -233,6 +238,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsProcessor,
+                countryCodeMapper,
                 clock,
                 jacksonMapper);
 
@@ -756,6 +762,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsProcessor,
+                countryCodeMapper,
                 clock,
                 jacksonMapper);
 
@@ -1008,6 +1015,8 @@ public class Ortb2RequestFactoryTest extends VertxTest {
     @Test
     public void enrichBidRequestWithAccountAndPrivacyDataShouldAddCountryFromPrivacy() {
         // given
+        given(countryCodeMapper.mapToAlpha3("ua")).willReturn("UKR");
+
         final BidRequest bidRequest = givenBidRequest(identity());
         final PrivacyContext privacyContext = PrivacyContext.of(
                 Privacy.of("", "", Ccpa.EMPTY, 0),
@@ -1028,11 +1037,11 @@ public class Ortb2RequestFactoryTest extends VertxTest {
         final BidRequest result = target.enrichBidRequestWithAccountAndPrivacyData(auctionContext);
 
         // then
-        assertThat(Collections.singleton(result))
+        assertThat(List.of(result))
                 .extracting(BidRequest::getDevice)
                 .extracting(Device::getGeo)
                 .extracting(Geo::getCountry)
-                .containsOnly("ua");
+                .containsExactly("UKR");
     }
 
     @Test
