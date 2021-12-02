@@ -60,6 +60,8 @@ adapters:
     enabled: true
   conversant:
     enabled: true
+  criteo:
+    enabled: true
   datablocks:
     enabled: true
     usersync:
