@@ -143,6 +143,9 @@ adapters:
         enabled: true
   ucfunnel:
     enabled: true
+  unicorn:
+    enabled: true
+    endpoint: https://ds-staging.uncn.jp/pb/0/bid.json
   vrtcal:
     enabled: true
   yahoossp:
