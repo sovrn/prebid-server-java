@@ -36,8 +36,9 @@ http-client:
 adapters:
   adf:
     enabled: true
-  adform:
-    enabled: true
+    aliases:
+      adform:
+        enabled: true
   adgeneration:
     enabled: true
   adhese:
