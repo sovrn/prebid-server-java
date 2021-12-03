@@ -7,11 +7,14 @@
         "w": 300,
         "h": 250
       },
-      "tagid": "tag_id",
+      "tagid" : "some_pid",
+      "bidfloorcur" : "USD",
+      "secure" : 0,
       "ext": {
         "bidder": {
-          "TagID": "tag_id",
-          "placementId": "tag_id"
+          "pid": "some_pid",
+          "supplyType": "some_type",
+          "bidfloor": 42.42
         }
       }
     }
@@ -22,7 +25,6 @@
     "publisher": {
       "domain": "example.com"
     },
-    "keywords": "keyword1",
     "ext": {
       "amp": 0
     }
@@ -31,9 +33,7 @@
     "ua": "userAgent",
     "ip": "193.168.244.1"
   },
-  "user": {
-    "customdata": "audience1"
-  },
+  "test": 0,
   "at": 1,
   "tmax": 5000,
   "cur": [

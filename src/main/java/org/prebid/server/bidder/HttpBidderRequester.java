@@ -34,6 +34,7 @@ import org.prebid.server.vertx.http.model.HttpClientResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -418,7 +419,9 @@ public class HttpBidderRequester {
                     .map(call -> call.getRequest().getPayload())
                     .filter(BidRequest.class::isInstance)
                     .map(BidRequest.class::cast)
-                    .flatMap(request -> request.getImp().stream())
+                    .map(BidRequest::getImp)
+                    .filter(Objects::nonNull) // bidder requests may not have imps but just stored request id instead
+                    .flatMap(Collection::stream)
                     .map(Imp::getId)
                     .collect(Collectors.toSet());
         }
