@@ -43,6 +43,7 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
@@ -189,6 +190,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private final UidsCookieService uidsCookieService;
     private final UidsAuditCookieService uidsAuditCookieService;
     private final CurrencyConversionService currencyService;
+    private final CountryCodeMapper countryCodeMapper;
     private final IpAddressHelper ipAddressHelper;
     private final HttpClient httpClient;
     private final boolean logEmptyDimensions;
@@ -211,6 +213,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                                     UidsCookieService uidsCookieService,
                                     UidsAuditCookieService uidsAuditCookieService,
                                     CurrencyConversionService currencyService,
+                                    CountryCodeMapper countryCodeMapper,
                                     IpAddressHelper ipAddressHelper,
                                     HttpClient httpClient,
                                     boolean logEmptyDimensions,
@@ -226,6 +229,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.uidsAuditCookieService = Objects.requireNonNull(uidsAuditCookieService);
         this.currencyService = Objects.requireNonNull(currencyService);
+        this.countryCodeMapper = Objects.requireNonNull(countryCodeMapper);
         this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.httpClient = Objects.requireNonNull(httpClient);
         this.logEmptyDimensions = logEmptyDimensions;
@@ -1250,13 +1254,15 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpRequestContext httpContext,
                                                               AuctionContext auctionContext) {
+
         final Device device = auctionContext.getBidRequest().getDevice();
-        final String country = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
+        final String alpha3CountryCode = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
+        final String alpha2CountryCode = countryCodeMapper.mapToAlpha2(alpha3CountryCode);
 
         final Integer metroCode = getIfNotNull(auctionContext.getGeoInfo(), GeoInfo::getMetroNielsen);
 
-        return country != null || metroCode != null
-                ? org.prebid.server.rubicon.analytics.proto.Geo.of(country, metroCode)
+        return alpha2CountryCode != null || metroCode != null
+                ? org.prebid.server.rubicon.analytics.proto.Geo.of(alpha2CountryCode, metroCode)
                 : null;
     }
 

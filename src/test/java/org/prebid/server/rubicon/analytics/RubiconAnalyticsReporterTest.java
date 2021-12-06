@@ -43,6 +43,7 @@ import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.model.CaseInsensitiveMultiMap;
 import org.prebid.server.model.HttpRequestContext;
@@ -130,6 +131,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     @Mock
     private CurrencyConversionService currencyService;
     @Mock
+    private CountryCodeMapper countryCodeMapper;
+    @Mock
     private IpAddressHelper ipAddressHelper;
     @Mock
     private UidsCookie uidsCookie;
@@ -177,7 +180,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         reporter = new RubiconAnalyticsReporter(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                ipAddressHelper, httpClient, false, jacksonMapper);
+                countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
     }
 
     @Test
@@ -185,7 +188,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThatIllegalArgumentException()
                 .isThrownBy(
                         () -> new RubiconAnalyticsReporter("invalid_url", null, null, null, PBS_HOST_VENDOR_ID, null,
-                                null, null, null, null, null, null, false, null))
+                                null, null, null, null, null, null, null, false, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -669,7 +672,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         reporter = new RubiconAnalyticsReporter(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
-                currencyService, ipAddressHelper, httpClient, false, jacksonMapper);
+                currencyService, countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -705,7 +708,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         reporter = new RubiconAnalyticsReporter(HOST_URL, 100, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
-                currencyService, ipAddressHelper, httpClient, false, jacksonMapper);
+                currencyService, countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -785,6 +788,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
+        given(countryCodeMapper.mapToAlpha2("countryFromRequest")).willReturn("mappedToAlpha2Country");
         final String integration = "dbpg";
         final String wrappername = "12314wp";
 
@@ -1122,7 +1126,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         reporter = new RubiconAnalyticsReporter(HOST_URL, null, null, "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                ipAddressHelper, httpClient, false, jacksonMapper);
+                countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
 
         // when
         reporter.processEvent(event);
@@ -1238,6 +1242,9 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         givenHttpClientReturnsResponse(200, null);
         given(bidderCatalog.isValidName("unknown")).willReturn(false);
         givenCurrencyConversion(BigDecimal.TEN);
+        given(countryCodeMapper.mapToAlpha2("countryFromAuditCookie"))
+                .willReturn("mappedToAlpha2CountryFromAuditCookie");
+
         httpContext = HttpRequestContext.builder()
                 .headers(CaseInsensitiveMultiMap.empty())
                 .absoluteUri("http://host-url/event/tag_id=storedId1")
@@ -1694,7 +1701,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .userAgent("userAgent")
                 .referrerUri("refererPage")
                 .channel("app")
-                .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromRequest", 123)));
+                .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("mappedToAlpha2Country", 123)));
     }
 
     private static Event.EventBuilder expectedEventBuilderBaseFromSite() {
@@ -1705,7 +1712,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .eventCreator(EventCreator.of("pbsHostname", "dataCenterRegion"))
                 .userAgent("userAgent")
                 .channel("amp")
-                .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of("countryFromAuditCookie", 123)))
+                .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of(
+                        "mappedToAlpha2CountryFromAuditCookie", 123)))
                 .referrerUri("http://referer/page")
                 .referrerHostname("referer");
     }

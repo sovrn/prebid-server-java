@@ -7,6 +7,7 @@ import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.rubicon.analytics.RubiconAnalyticsReporter;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -38,6 +39,7 @@ public class RubiconAnalyticsConfiguration {
                                                       UidsCookieService uidsCookieService,
                                                       UidsAuditCookieService uidsAuditCookieService,
                                                       CurrencyConversionService currencyConversionService,
+                                                      CountryCodeMapper countryCodeMapper,
                                                       IpAddressHelper ipAddressHelper,
                                                       HttpClient httpClient,
                                                       JacksonMapper mapper) {
@@ -56,6 +58,7 @@ public class RubiconAnalyticsConfiguration {
                 uidsCookieService,
                 uidsAuditCookieService,
                 currencyConversionService,
+                countryCodeMapper,
                 ipAddressHelper,
                 httpClient,
                 logEmptyDimensions,
