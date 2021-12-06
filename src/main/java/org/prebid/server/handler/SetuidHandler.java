@@ -144,8 +144,8 @@ public class SetuidHandler implements Handler<RoutingContext> {
         final Timeout timeout = timeoutFactory.create(defaultTimeout);
 
         return accountById(requestAccount, timeout)
-                .compose(account -> privacyEnforcementService.contextFromSetuidRequest(httpRequest, account, timeout,
-                        routingContext)
+                .compose(account -> privacyEnforcementService.contextFromSetuidRequest(
+                                httpRequest, account, timeout, routingContext)
                         .map(privacyContext -> SetuidContext.builder()
                                 .routingContext(routingContext)
                                 .uidsCookie(uidsCookie)
@@ -386,10 +386,7 @@ public class SetuidHandler implements Handler<RoutingContext> {
                 setuidContext.getUidsCookie(), bidder, uid);
 
         final Cookie updatedUidsCookie = uidsCookieService.toCookie(uidsCookieUpdateResult.getUidsCookie());
-        addCookie(routingContext, updatedUidsCookie);
-        if (uidsAuditCookie != null) {
-            addCookie(routingContext, uidsAuditCookie);
-        }
+        enrichWithCookies(routingContext, updatedUidsCookie, uidsAuditCookie);
 
         final int statusCode = HttpResponseStatus.OK.code();
         HttpUtil.executeSafely(routingContext, Endpoint.setuid, buildCookieResponseConsumer(setuidContext, statusCode));
@@ -415,6 +412,16 @@ public class SetuidHandler implements Handler<RoutingContext> {
             final UidsCookie updatedCookie = uidsCookie.updateUid(bidderName, uid);
             metrics.updateUserSyncSetsMetric(bidderName);
             return UidsCookieUpdateResult.updated(updatedCookie);
+        }
+    }
+
+    private void enrichWithCookies(RoutingContext routingContext, Cookie uidsCookie, Cookie uidsAuditCookie) {
+        addCookie(routingContext, exceededCookeWithName(uidsCookie.getName()));
+        addCookie(routingContext, uidsCookie);
+
+        if (uidsAuditCookie != null) {
+            addCookie(routingContext, exceededCookeWithName(uidsAuditCookie.getName()));
+            addCookie(routingContext, uidsAuditCookie);
         }
     }
 
@@ -468,7 +475,14 @@ public class SetuidHandler implements Handler<RoutingContext> {
         }
     }
 
-    private void addCookie(RoutingContext routingContext, Cookie cookie) {
+    private Cookie exceededCookeWithName(String cookieName) {
+        return Cookie.cookie(cookieName, "deleted")
+                .setDomain("rubiconproject.com")
+                .setPath("/")
+                .setMaxAge(0);
+    }
+
+    private static void addCookie(RoutingContext routingContext, Cookie cookie) {
         routingContext.response().headers().add(HttpUtil.SET_COOKIE_HEADER, HttpUtil.toSetCookieHeaderValue(cookie));
     }
 

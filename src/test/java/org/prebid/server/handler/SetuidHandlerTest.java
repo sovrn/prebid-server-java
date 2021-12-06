@@ -10,6 +10,7 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.net.impl.SocketAddressImpl;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -50,11 +51,14 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
@@ -67,8 +71,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anySet;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -186,6 +190,7 @@ public class SetuidHandlerTest extends VertxTest {
                 uidsAuditCookieService,
                 implicitParametersExtractor,
                 ipAddressHelper);
+
         given(httpResponse.setStatusCode(anyInt())).willReturn(httpResponse);
 
         // when
@@ -328,6 +333,7 @@ public class SetuidHandlerTest extends VertxTest {
                 uidsAuditCookieService,
                 implicitParametersExtractor,
                 ipAddressHelper);
+
         final PrivacyEnforcementAction privacyEnforcementAction = PrivacyEnforcementAction.restrictAll();
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(
@@ -423,6 +429,47 @@ public class SetuidHandlerTest extends VertxTest {
     }
 
     @Test
+    public void shouldAddCookiesWithExpiredCopies() {
+        // given
+        given(uidsCookieService.parseFromRequest(any(RoutingContext.class))).willReturn(new UidsCookie(
+                Uids.builder().uids(singletonMap(RUBICON, UidWithExpiry.live("value"))).build(),
+                jacksonMapper));
+        given(uidsCookieService.toCookie(any()))
+                .willReturn(Cookie.cookie("uids", "value").setDomain("hostCookieDomain"));
+
+        given(httpRequest.getParam("bidder")).willReturn(RUBICON);
+
+        given(uidsAuditCookieService.createUidsAuditCookie(any(), any(), any(), any(), any(), any()))
+                .willReturn(Cookie.cookie("uids-audit", "value").setDomain("hostCookieDomain"));
+
+        // when
+        setuidHandler.handle(routingContext);
+
+        // then
+        final List<String> cookies = captureAllCookies();
+
+        assertThat(cookies.get(0)).startsWith("uids=");
+        final Map<String, String> firstCookieAsMap = parseCookie(cookies.get(0));
+        assertThat(firstCookieAsMap.get("uids")).isEqualTo("deleted");
+        assertThat(firstCookieAsMap.get("Max-Age")).isEqualTo("0");
+        assertThat(firstCookieAsMap.get("Domain")).isEqualTo("rubiconproject.com");
+
+        assertThat(cookies.get(1)).startsWith("uids=");
+        final Map<String, String> secondCookieAsMap = parseCookie(cookies.get(1));
+        assertThat(secondCookieAsMap.get("Domain")).isEqualTo("hostCookieDomain");
+
+        assertThat(cookies.get(2)).startsWith("uids-audit=");
+        final Map<String, String> thirdCookieAsMap = parseCookie(cookies.get(2));
+        assertThat(thirdCookieAsMap.get("uids-audit")).isEqualTo("deleted");
+        assertThat(thirdCookieAsMap.get("Max-Age")).isEqualTo("0");
+        assertThat(thirdCookieAsMap.get("Domain")).isEqualTo("rubiconproject.com");
+
+        assertThat(cookies.get(3)).startsWith("uids-audit=");
+        final Map<String, String> fourthCookieAsMap = parseCookie(cookies.get(3));
+        assertThat(fourthCookieAsMap.get("Domain")).isEqualTo("hostCookieDomain");
+    }
+
+    @Test
     public void shouldPassAccountToPrivacyEnforcementServiceWhenAccountIsNotFound() {
         // given
         given(uidsCookieService.parseFromRequest(any(RoutingContext.class)))
@@ -464,7 +511,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).sendFile(any());
 
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(ADNXS).getUid()).isEqualTo("12345");
@@ -516,7 +563,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(httpResponse).end();
         verify(httpResponse, never()).sendFile(any());
 
-        final String uidsCookie = captureAllCookies().get(0);
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(FACEBOOK).getUid()).isEqualTo("facebookUid");
@@ -540,7 +587,7 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         verify(routingContext, never()).addCookie(any(Cookie.class));
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
@@ -716,7 +763,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(httpResponse).sendFile(any());
         verify(routingContext, never()).addCookie(any(Cookie.class));
 
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(2);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("updatedUid");
@@ -742,6 +789,7 @@ public class SetuidHandlerTest extends VertxTest {
                 uidsAuditCookieService,
                 implicitParametersExtractor,
                 ipAddressHelper);
+
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(false, emptyMap(), null)));
 
@@ -762,7 +810,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).sendFile(any());
 
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
@@ -772,9 +820,21 @@ public class SetuidHandlerTest extends VertxTest {
     public void shouldSkipTcfChecksAndRespondWithCookieIfHostVendorIdNotDefined() throws IOException {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
-        setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
-                bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
-                new TimeoutFactory(clock), true, uidsAuditCookieService, implicitParametersExtractor, ipAddressHelper);
+        setuidHandler = new SetuidHandler(
+                2000,
+                uidsCookieService,
+                applicationSettings,
+                bidderCatalog,
+                privacyEnforcementService,
+                tcfDefinerService,
+                null,
+                analyticsReporterDelegator,
+                metrics,
+                new TimeoutFactory(clock),
+                true,
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
 
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(false, emptyMap(), null)));
@@ -796,7 +856,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).sendFile(any());
 
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
@@ -807,9 +867,22 @@ public class SetuidHandlerTest extends VertxTest {
             throws IOException {
         // given
         final Clock clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
-        setuidHandler = new SetuidHandler(2000, uidsCookieService, applicationSettings,
-                bidderCatalog, privacyEnforcementService, tcfDefinerService, null, analyticsReporterDelegator, metrics,
-                new TimeoutFactory(clock), true, uidsAuditCookieService, implicitParametersExtractor, ipAddressHelper);
+        setuidHandler = new SetuidHandler(
+                2000,
+                uidsCookieService,
+                applicationSettings,
+                bidderCatalog,
+                privacyEnforcementService,
+                tcfDefinerService,
+                null,
+                analyticsReporterDelegator,
+                metrics,
+                new TimeoutFactory(clock),
+                true,
+                uidsAuditCookieService,
+                implicitParametersExtractor,
+                ipAddressHelper);
+
         given(tcfDefinerService.resultForVendorIds(anySet(), any()))
                 .willReturn(Future.succeededFuture(TcfResponse.of(true, emptyMap(), null)));
 
@@ -832,7 +905,7 @@ public class SetuidHandlerTest extends VertxTest {
         verify(routingContext, never()).addCookie(any(Cookie.class));
         verify(httpResponse).sendFile(any());
 
-        final String uidsCookie = captureCookie();
+        final String uidsCookie = captureAllCookies().get(1);
         final Uids decodedUids = decodeUids(uidsCookie);
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
@@ -882,8 +955,8 @@ public class SetuidHandlerTest extends VertxTest {
 
         // then
         final List<String> cookies = captureAllCookies();
-        assertThat(cookies.get(0)).startsWith("uids=");
-        assertThat(cookies.get(1)).startsWith("uids-audit=");
+        assertThat(cookies.get(1)).startsWith("uids=");
+        assertThat(cookies.get(3)).startsWith("uids-audit=");
     }
 
     @Test
@@ -908,8 +981,9 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verifyNoInteractions(uidsAuditCookieService);
 
-        final String uidsCookie = captureCookie();
-        final Uids decodedUids = decodeUids(uidsCookie);
+        final List<String> cookies = captureAllCookies();
+        assertThat(cookies).hasSize(2);
+        final Uids decodedUids = decodeUids(cookies.get(1));
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(RUBICON).getUid()).isEqualTo("J5VLCWQP-26-CWFT");
     }
@@ -936,8 +1010,9 @@ public class SetuidHandlerTest extends VertxTest {
         // then
         verifyNoInteractions(uidsAuditCookieService);
 
-        final String uidsCookie = captureCookie();
-        final Uids decodedUids = decodeUids(uidsCookie);
+        final List<String> cookies = captureAllCookies();
+        assertThat(cookies).hasSize(2);
+        final Uids decodedUids = decodeUids(cookies.get(1));
         assertThat(decodedUids.getUids()).hasSize(1);
         assertThat(decodedUids.getUids().get(ADNXS).getUid()).isEqualTo("12345");
     }
@@ -1109,7 +1184,7 @@ public class SetuidHandlerTest extends VertxTest {
 
     private List<String> captureAllCookies() {
         final ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(responseHeaders, times(2)).add(eq(new AsciiString("Set-Cookie")), captor.capture());
+        verify(responseHeaders, atLeast(2)).add(eq(new AsciiString("Set-Cookie")), captor.capture());
         return captor.getAllValues();
     }
 
@@ -1122,5 +1197,15 @@ public class SetuidHandlerTest extends VertxTest {
         final ArgumentCaptor<SetuidEvent> setuidEventCaptor = ArgumentCaptor.forClass(SetuidEvent.class);
         verify(analyticsReporterDelegator).processEvent(setuidEventCaptor.capture(), eq(tcfContext));
         return setuidEventCaptor.getValue();
+    }
+
+    private Map<String, String> parseCookie(String cookie) {
+        return Arrays.stream(cookie.split("; "))
+                .map(keyValueString -> {
+                    final String[] keyValueArray = keyValueString.split("=");
+                    return keyValueArray.length == 2 ? Pair.of(keyValueArray[0], keyValueArray[1]) : null;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
     }
 }
