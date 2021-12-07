@@ -32,7 +32,7 @@ public class UidAudit {
     String userIp;
 
     /**
-     * Country obtained user ip address.
+     * Country obtained user ip address in ISO-3166-1-alpha-2 format.
      */
     String country;
 

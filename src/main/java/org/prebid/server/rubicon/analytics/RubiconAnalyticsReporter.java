@@ -1255,15 +1255,21 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private org.prebid.server.rubicon.analytics.proto.Geo geo(HttpRequestContext httpContext,
                                                               AuctionContext auctionContext) {
 
-        final Device device = auctionContext.getBidRequest().getDevice();
-        final String alpha3CountryCode = ObjectUtils.defaultIfNull(countryFrom(device), countryFrom(httpContext));
-        final String alpha2CountryCode = countryCodeMapper.mapToAlpha2(alpha3CountryCode);
-
+        final String country = countryFrom(auctionContext.getBidRequest().getDevice(), httpContext);
         final Integer metroCode = getIfNotNull(auctionContext.getGeoInfo(), GeoInfo::getMetroNielsen);
 
-        return alpha2CountryCode != null || metroCode != null
-                ? org.prebid.server.rubicon.analytics.proto.Geo.of(alpha2CountryCode, metroCode)
+        return country != null || metroCode != null
+                ? org.prebid.server.rubicon.analytics.proto.Geo.of(country, metroCode)
                 : null;
+    }
+
+    private String countryFrom(Device device, HttpRequestContext httpContext) {
+        final String alpha3CountryCode = countryFrom(device);
+        final String country = ObjectUtils.defaultIfNull(
+                countryCodeMapper.mapToAlpha2(alpha3CountryCode),
+                countryFrom(httpContext));
+
+        return ObjectUtils.defaultIfNull(country, alpha3CountryCode); // fallback to device.geo.country if not resolved
     }
 
     private static String countryFrom(Device device) {

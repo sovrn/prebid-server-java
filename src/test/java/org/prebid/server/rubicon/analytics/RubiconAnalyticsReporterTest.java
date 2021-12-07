@@ -1713,7 +1713,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .userAgent("userAgent")
                 .channel("amp")
                 .user(User.of(org.prebid.server.rubicon.analytics.proto.Geo.of(
-                        "mappedToAlpha2CountryFromAuditCookie", 123)))
+                        "countryFromAuditCookie", 123)))
                 .referrerUri("http://referer/page")
                 .referrerHostname("referer");
     }
