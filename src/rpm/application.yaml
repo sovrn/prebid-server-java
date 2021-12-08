@@ -247,7 +247,6 @@ recaptcha-secret: secret_value
 host-cookie:
   opt-out-url: http://prebid.org/optout
   opt-in-url: http://prebid.org/optin
-  domain: prebid-server.rubiconproject.com
   family: rubicon
   cookie-name: khaos
   optout-cookie:
