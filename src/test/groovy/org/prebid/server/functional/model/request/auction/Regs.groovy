@@ -9,8 +9,6 @@ class Regs {
     RegsExt ext
 
     static Regs getDefaultRegs() {
-        new Regs().tap {
-            ext = new RegsExt(gdpr: 0)
-        }
+        new Regs(ext: new RegsExt(gdpr: 0))
     }
 }

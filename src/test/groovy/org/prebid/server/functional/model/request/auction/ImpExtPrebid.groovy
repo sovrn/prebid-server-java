@@ -12,8 +12,6 @@ class ImpExtPrebid {
     StoredAuctionResponse storedAuctionResponse
 
     static ImpExtPrebid getDefaultImpExtPrebid() {
-        new ImpExtPrebid().tap {
-            bidder = Bidder.defaultBidder
-        }
+        new ImpExtPrebid(bidder: Bidder.defaultBidder)
     }
 }

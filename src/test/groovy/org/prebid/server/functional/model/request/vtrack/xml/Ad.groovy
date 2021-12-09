@@ -8,8 +8,6 @@ class Ad {
     Wrapper wrapper
 
     static Ad getDefaultAd(String payload) {
-        new Ad().tap {
-            wrapper = Wrapper.getDefaultWrapper(payload)
-        }
+        new Ad(wrapper: Wrapper.getDefaultWrapper(payload))
     }
 }

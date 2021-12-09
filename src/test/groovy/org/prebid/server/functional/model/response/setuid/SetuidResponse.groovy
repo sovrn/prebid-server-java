@@ -8,4 +8,5 @@ class SetuidResponse {
 
     UidsCookie uidsCookie
     Byte[] responseBody
+    Map<String, List<String>> headers
 }

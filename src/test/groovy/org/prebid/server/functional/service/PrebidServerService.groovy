@@ -136,22 +136,6 @@ class PrebidServerService {
         response.as(CookieSyncResponse)
     }
 
-    @Step("[GET] /setuid")
-    SetuidResponse sendSetUidRequest(SetuidRequest request, UidsCookie uidsCookie) {
-        def uidsCookieAsJson = mapper.encode(uidsCookie)
-        def uidsCookieAsEncodedJson = Base64.urlEncoder.encodeToString(uidsCookieAsJson.bytes)
-        def response = given(requestSpecification).cookie("uids", uidsCookieAsEncodedJson)
-                                                  .queryParams(mapper.toMap(request))
-                                                  .get(SET_UID_ENDPOINT)
-
-        checkResponseStatusCode(response)
-
-        def setuidResponse = new SetuidResponse()
-        setuidResponse.uidsCookie = getDecodedUidsCookie(response)
-        setuidResponse.responseBody = response.asByteArray()
-        setuidResponse
-    }
-
     @Step("[GET] /getuids")
     GetuidResponse sendGetUidRequest(UidsCookie uidsCookie) {
         def uidsCookieAsJson = mapper.encode(uidsCookie)
@@ -162,6 +146,45 @@ class PrebidServerService {
 
         checkResponseStatusCode(response)
         response.as(GetuidResponse)
+    }
+
+    @Step("[GET] /setuid")
+    SetuidResponse sendSetUidRequest(SetuidRequest request) {
+        def response = given(requestSpecification).queryParams(mapper.toMap(request))
+                                                  .get(SET_UID_ENDPOINT)
+
+        checkResponseStatusCode(response)
+
+        new SetuidResponse(headers: getHeaders(response),
+                uidsCookie: getDecodedUidsCookie(response),
+                responseBody: response.asByteArray())
+    }
+
+    @Step("[GET] /setuid")
+    SetuidResponse sendSetUidRequest(SetuidRequest request, UidsCookie uidsCookie) {
+        def response = given(requestSpecification).cookie("uids", encodeUidsCookie(uidsCookie))
+                                                  .queryParams(mapper.toMap(request))
+                                                  .get(SET_UID_ENDPOINT)
+
+        checkResponseStatusCode(response)
+
+        new SetuidResponse(headers: getHeaders(response),
+                uidsCookie: getDecodedUidsCookie(response),
+                responseBody: response.asByteArray())
+    }
+
+    @Step("[GET] /setuid")
+    SetuidResponse sendSetUidRequest(SetuidRequest request, UidsCookie uidsCookie, String uidsAuditCookie) {
+        def response = given(requestSpecification).cookies(["uids"      : encodeUidsCookie(uidsCookie),
+                                                            "uids-audit": uidsAuditCookie])
+                                                  .queryParams(mapper.toMap(request))
+                                                  .get(SET_UID_ENDPOINT)
+
+        checkResponseStatusCode(response)
+
+        new SetuidResponse(headers: getHeaders(response),
+                uidsCookie: getDecodedUidsCookie(response),
+                responseBody: response.asByteArray())
     }
 
     @Step("[GET] /event")
@@ -264,6 +287,11 @@ class PrebidServerService {
                                    .get(AMP_ENDPOINT)
     }
 
+    private String encodeUidsCookie(UidsCookie uidsCookie) {
+        def uidsCookieAsJson = mapper.encode(uidsCookie)
+        Base64.urlEncoder.encodeToString(uidsCookieAsJson.bytes)
+    }
+
     private void checkResponseStatusCode(Response response) {
         def statusCode = response.statusCode
         if (statusCode != 200) {
@@ -273,8 +301,14 @@ class PrebidServerService {
         }
     }
 
-    private static Map<String, String> getHeaders(Response response) {
-        response.headers().collectEntries { [it.name, it.value] }
+    private static Map<String, List<String>> getHeaders(Response response) {
+        Map<String, List<String>> map = [:]
+        response.headers().each {
+            map.get(it.name)
+                    ? map.get(it.name).add(it.value)
+                    : map.put(it.name, [it.value])
+        }
+        map
     }
 
     private UidsCookie getDecodedUidsCookie(Response response) {

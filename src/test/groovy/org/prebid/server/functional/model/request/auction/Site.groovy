@@ -23,9 +23,6 @@ class Site {
     SiteExt ext
 
     static Site getDefaultSite() {
-        new Site().tap {
-            page = PBSUtils.randomString
-            publisher = Publisher.defaultPublisher
-        }
+        new Site(page: PBSUtils.randomString, publisher: Publisher.defaultPublisher)
     }
 }

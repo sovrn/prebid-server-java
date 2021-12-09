@@ -12,9 +12,6 @@ class Format {
     Integer wmin
 
     static Format getDefaultFormat() {
-        new Format().tap {
-            w = 300
-            h = 250
-        }
+        new Format(w: 300, h: 250)
     }
 }

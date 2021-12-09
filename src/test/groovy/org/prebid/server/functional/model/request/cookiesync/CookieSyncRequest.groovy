@@ -22,9 +22,6 @@ class CookieSyncRequest {
     String account
 
     static CookieSyncRequest getDefaultCookieSyncRequest() {
-        def request = new CookieSyncRequest()
-        request.bidders = [GENERIC]
-        request.gdpr = 0
-        request
+        new CookieSyncRequest(bidders: [GENERIC], gdpr: 0)
     }
 }

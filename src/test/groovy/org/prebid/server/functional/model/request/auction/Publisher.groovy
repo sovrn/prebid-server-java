@@ -12,8 +12,6 @@ class Publisher {
     String domain
 
     static Publisher getDefaultPublisher() {
-        new Publisher().tap {
-            id = PBSUtils.randomNumber.toString()
-        }
+        new Publisher(id: PBSUtils.randomNumber)
     }
 }

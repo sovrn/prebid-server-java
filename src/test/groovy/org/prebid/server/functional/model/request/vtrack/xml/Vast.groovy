@@ -12,9 +12,6 @@ class Vast {
     Ad ad
 
     static Vast getDefaultVastModel(String payload) {
-        new Vast().tap {
-            version = "3.0"
-            ad = Ad.getDefaultAd(payload)
-        }
+        new Vast(version: "3.0", ad: Ad.getDefaultAd(payload))
     }
 }

@@ -18,8 +18,6 @@ class ImpExt {
     AppNexus appNexus
 
     static ImpExt getDefaultImpExt() {
-        new ImpExt().tap {
-            prebid = ImpExtPrebid.defaultImpExtPrebid
-        }
+        new ImpExt(prebid: ImpExtPrebid.defaultImpExtPrebid)
     }
 }

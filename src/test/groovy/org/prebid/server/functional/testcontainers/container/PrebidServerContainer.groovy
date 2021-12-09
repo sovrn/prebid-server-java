@@ -1,6 +1,7 @@
 package org.prebid.server.functional.testcontainers.container
 
 import org.prebid.server.functional.testcontainers.Dependencies
+import org.prebid.server.functional.util.PBSUtils
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.MySQLContainer
 import org.testcontainers.containers.wait.strategy.Wait
@@ -133,8 +134,10 @@ LIMIT 1
     }
 
     void withRubiconSpecificConfig() {
-        withConfig(["gdpr.rubicon.rsid-cookie-encryption-key": "someRsidEncryptionKey"])
-        withConfig(["gdpr.rubicon.audit-cookie-encryption-key": "someAuditEncryptionKey"])
+        withConfig(["gdpr.rubicon.rsid-cookie-encryption-key" : PBSUtils.randomString,
+                    "gdpr.rubicon.audit-cookie-encryption-key": PBSUtils.randomString,
+                    "auction.enforce-random-bid-id": "false"
+        ])
     }
 
     PrebidServerContainer withConfig(Map<String, String> config) {

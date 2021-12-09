@@ -6,6 +6,7 @@ import org.prebid.server.functional.model.bidder.BidderName
 import org.prebid.server.functional.model.request.Format
 
 import static org.prebid.server.functional.model.bidder.BidderName.GENERIC
+import static org.prebid.server.functional.model.bidder.BidderName.RUBICON
 
 @ToString(includeNames = true, ignoreNulls = true)
 class SetuidRequest {
@@ -20,9 +21,10 @@ class SetuidRequest {
     String account
 
     static SetuidRequest getDefaultSetuidRequest() {
-        def request = new SetuidRequest()
-        request.bidder = GENERIC
-        request.gdpr = "0"
-        request
+       new SetuidRequest(bidder: GENERIC, gdpr: "0")
+    }
+
+    static SetuidRequest getRubiconSetuidRequest() {
+        new SetuidRequest(bidder: RUBICON, gdpr: "0")
     }
 }
