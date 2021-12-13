@@ -18,7 +18,6 @@ import com.iab.openrtb.response.BidResponse;
 import com.iab.openrtb.response.SeatBid;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
-import io.vertx.core.http.CaseInsensitiveHeaders;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.Before;
@@ -172,7 +171,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         given(routingContext.request()).willReturn(httpRequest);
         given(httpRequest.uri()).willReturn("");
         given(httpRequest.params()).willReturn(MultiMap.caseInsensitiveMultiMap());
-        given(httpRequest.headers()).willReturn(new CaseInsensitiveHeaders());
+        given(httpRequest.headers()).willReturn(MultiMap.caseInsensitiveMultiMap());
 
         httpContext = HttpRequestContext.builder()
                 .headers(CaseInsensitiveMultiMap.empty())

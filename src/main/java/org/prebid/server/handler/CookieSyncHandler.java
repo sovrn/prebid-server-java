@@ -164,7 +164,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         metrics.updateCookieSyncRequestMetric();
 
         toCookieSyncContext(routingContext)
-                .setHandler(cookieSyncContextResult -> handleCookieSyncContextResult(cookieSyncContextResult,
+                .onComplete(cookieSyncContextResult -> handleCookieSyncContextResult(cookieSyncContextResult,
                         routingContext));
     }
 
@@ -232,7 +232,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
             }
 
             isAllowedForHostVendorId(tcfContext)
-                    .setHandler(hostTcfResponseResult -> respondByTcfResponse(
+                    .onComplete(hostTcfResponseResult -> respondByTcfResponse(
                             hostTcfResponseResult,
                             biddersToSync(cookieSyncContext),
                             cookieSyncContext));
@@ -381,7 +381,7 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                 final AccountGdprConfig accountGdprConfig =
                         accountPrivacyConfig != null ? accountPrivacyConfig.getGdpr() : null;
                 tcfDefinerService.resultForBidderNames(biddersToSync, tcfContext, accountGdprConfig)
-                        .setHandler(tcfResponseResult -> respondByTcfResultForBidders(tcfResponseResult,
+                        .onComplete(tcfResponseResult -> respondByTcfResultForBidders(tcfResponseResult,
                                 biddersToSync, cookieSyncContext));
             } else {
                 // Reject all bidders when Host TCF response has blocked pixel
