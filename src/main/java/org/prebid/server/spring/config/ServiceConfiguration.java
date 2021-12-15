@@ -375,7 +375,7 @@ public class ServiceConfiguration {
             JacksonMapper mapper,
             JsonMerger jsonMerger) {
 
-        return VideoStoredRequestProcessor.create(
+        return new VideoStoredRequestProcessor(
                 enforceStoredRequest,
                 splitToList(blacklistedAccountsString),
                 defaultTimeoutMs,
@@ -655,7 +655,7 @@ public class ServiceConfiguration {
             JacksonMapper mapper,
             JsonMerger jsonMerger) {
 
-        return StoredRequestProcessor.create(
+        return new StoredRequestProcessor(
                 defaultTimeoutMs,
                 defaultBidRequestPath,
                 generateBidRequestId,
