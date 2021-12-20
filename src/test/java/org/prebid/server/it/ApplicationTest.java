@@ -486,7 +486,7 @@ public class ApplicationTest extends IntegrationTest {
 
         // then
         final Map<String, JsonNode> responseAsMap = jacksonMapper.decodeValue(response.asString(),
-                new TypeReference<Map<String, JsonNode>>() {
+                new TypeReference<>() {
                 });
 
         final List<String> bidders = getBidderNamesFromParamFiles();
@@ -512,7 +512,7 @@ public class ApplicationTest extends IntegrationTest {
 
         // then
         final List<String> responseAsList = jacksonMapper.decodeValue(response.asString(),
-                new TypeReference<List<String>>() {
+                new TypeReference<>() {
                 });
 
         final List<String> bidders = getBidderNamesFromParamFiles();

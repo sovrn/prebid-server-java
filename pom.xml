@@ -56,6 +56,8 @@
         <deviceatlas-common.version>1.1.1</deviceatlas-common.version>
         <deviceatlas-deviceapi.version>2.1.2</deviceatlas-deviceapi.version>
         <fiftyonedegrees.version>3.2.18.1</fiftyonedegrees.version>
+        <logback.version>1.2.8</logback.version>
+        <log4j.version>2.17.0</log4j.version>
 
         <!-- test dependencies versions -->
         <junit.version>4.13.2</junit.version>
@@ -67,7 +69,7 @@
         <awaitility.version>4.1.0</awaitility.version>
         <jetty.version>9.4.44.v20210927</jetty.version>
         <restassured.version>4.4.0</restassured.version>
-        <h2.version>1.4.200</h2.version>
+        <h2.version>2.0.202</h2.version>
         <spock.version>2.0-groovy-3.0</spock.version>
         <testcontainers.version>1.16.2</testcontainers.version>
         <mockserver-client.version>5.11.2</mockserver-client.version>
@@ -378,6 +380,27 @@
             <groupId>com.deviceatlas</groupId>
             <artifactId>deviceatlas-deviceapi</artifactId>
             <version>${deviceatlas-deviceapi.version}</version>
+        </dependency>
+        <!--TODO: Remove this after bumping to new Spring Parent with safe log4j and logback -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <version>${logback.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-to-slf4j</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
         </dependency>
         <!-- Test -->
         <dependency>
