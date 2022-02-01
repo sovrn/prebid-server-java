@@ -8,10 +8,9 @@
         "h": 250
       },
       "ext": {
-        "adagio": {
-          "organizationId": "someOrganizationId",
-          "site": "someSiteId",
-          "placement": "somePlacementInfo"
+        "bizzclick": {
+          "accountId": "accountId",
+          "placementId": "placementId"
         }
       }
     }

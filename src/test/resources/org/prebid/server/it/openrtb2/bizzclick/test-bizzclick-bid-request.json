@@ -2,19 +2,10 @@
   "id": "request_id",
   "imp": [
     {
-      "id": "imp_id2",
-      "video": {
-        "mimes": [
-          "video/mp4"
-        ],
-        "w": 640,
-        "h": 480
-      },
-      "tagid": "tag_id2",
-      "ext": {
-        "bidder": {
-          "TagID": "tag_id2"
-        }
+      "id": "imp_id",
+      "banner": {
+        "w": 300,
+        "h": 250
       }
     }
   ],
