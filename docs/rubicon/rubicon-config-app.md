@@ -16,3 +16,4 @@ This document describes all configuration properties available for Prebid Server
 - `analytics.rp.host-url` - the protocol + host value to submit analytics (don't add `/event` at the end).
 - `analytics.rp.pbs-version` - indicates Prebid Server version in analytics request.
 - `analytics.rp.sampling-factor` - determines how many requests will be sent to Rubicon Analytics Service. If NULL or less or equals zero  - analytics will be sent only if account sampling factor configured.
+- `analytics.rp.host-vendor-id` - determines vendor-id of analytic reporter provider.
