@@ -13,7 +13,7 @@ import io.vertx.ext.web.handler.CorsHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.prebid.server.analytics.AnalyticsReporterDelegator;
+import org.prebid.server.analytics.reporter.AnalyticsReporterDelegator;
 import org.prebid.server.auction.AmpResponsePostProcessor;
 import org.prebid.server.auction.ExchangeService;
 import org.prebid.server.auction.ImplicitParametersExtractor;
@@ -302,6 +302,7 @@ public class WebConfiguration {
             @Value("${gdpr.rubicon.enable-cookie:#{true}}") boolean enableCookie,
             @Autowired(required = false) UidsAuditCookieService uidsAuditCookieService,
             @Value("${cookie-sync.default-timeout-ms}") int defaultTimeoutMs,
+            @Value("${cookie-sync.coop-sync.default-max-limit:#{null}}") Integer defaultMaxLimit,
             UidsCookieService uidsCookieService,
             ApplicationSettings applicationSettings,
             BidderCatalog bidderCatalog,
@@ -314,9 +315,22 @@ public class WebConfiguration {
             Metrics metrics,
             TimeoutFactory timeoutFactory,
             JacksonMapper mapper) {
-        return new CookieSyncHandler(enableCookie, uidsAuditCookieService, externalUrl, defaultTimeoutMs,
-                uidsCookieService, applicationSettings, bidderCatalog, tcfDefinerService, privacyEnforcementService,
-                hostVendorId, defaultCoopSync, coopSyncPriorities.getPri(), analyticsReporterDelegator, metrics,
+
+        return new CookieSyncHandler(
+                enableCookie,
+                uidsAuditCookieService,
+                externalUrl,
+                defaultTimeoutMs,
+                defaultMaxLimit,
+                uidsCookieService,
+                applicationSettings,
+                bidderCatalog,
+                tcfDefinerService,
+                privacyEnforcementService,
+                hostVendorId,
+                defaultCoopSync,
+                coopSyncPriorities.getPri(),
+                analyticsReporterDelegator, metrics,
                 timeoutFactory,
                 mapper);
     }
