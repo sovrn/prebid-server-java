@@ -161,6 +161,9 @@ adapters:
     enabled: true
   yieldone:
     enabled: true
+  medianet:
+    enabled: true
+    endpoint: https://prebid-adapter.media.net/rtb/pb/prebids2s?src=prebid-server.rubiconproject.com
 auction:
   ad-server-currency: USD
   enforce-random-bid-id: true
