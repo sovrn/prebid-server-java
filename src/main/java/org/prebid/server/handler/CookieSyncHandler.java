@@ -87,7 +87,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
     private final UidsAuditCookieService uidsAuditCookieService;
     private final String externalUrl;
     private final long defaultTimeout;
-    private final Integer defaultMaxLimit;
+    private final Integer coopSyncDefaultLimit;
+    private final Integer coopSyncMaxLimit;
     private final UidsCookieService uidsCookieService;
     private final ApplicationSettings applicationSettings;
     private final BidderCatalog bidderCatalog;
@@ -107,7 +108,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
                              UidsAuditCookieService uidsAuditCookieService,
                              String externalUrl,
                              long defaultTimeout,
-                             Integer defaultMaxLimit,
+                             Integer coopSyncDefaultLimit,
+                             Integer coopSyncMaxLimit,
                              UidsCookieService uidsCookieService,
                              ApplicationSettings applicationSettings,
                              BidderCatalog bidderCatalog,
@@ -124,7 +126,8 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
         this.uidsAuditCookieService = uidsAuditCookieService;
         this.externalUrl = HttpUtil.validateUrl(Objects.requireNonNull(externalUrl));
         this.defaultTimeout = defaultTimeout;
-        this.defaultMaxLimit = defaultMaxLimit;
+        this.coopSyncDefaultLimit = coopSyncDefaultLimit;
+        this.coopSyncMaxLimit = coopSyncMaxLimit;
         this.uidsCookieService = Objects.requireNonNull(uidsCookieService);
         this.applicationSettings = Objects.requireNonNull(applicationSettings);
         this.bidderCatalog = Objects.requireNonNull(bidderCatalog);
@@ -640,11 +643,12 @@ public class CookieSyncHandler implements Handler<RoutingContext> {
 
         final Integer resolvedLimit = ObjectUtils.firstNonNull(
                 cookieSyncContext.getCookieSyncRequest().getLimit(),
-                ObjectUtil.getIfNotNull(accountCookieSyncConfig, AccountCookieSyncConfig::getDefaultLimit));
+                ObjectUtil.getIfNotNull(accountCookieSyncConfig, AccountCookieSyncConfig::getDefaultLimit),
+                coopSyncDefaultLimit);
 
         final Integer resolvedMaxLimit = ObjectUtils.firstNonNull(
                 ObjectUtil.getIfNotNull(accountCookieSyncConfig, AccountCookieSyncConfig::getMaxLimit),
-                defaultMaxLimit);
+                coopSyncMaxLimit);
 
         return resolvedLimit != null && resolvedMaxLimit != null && resolvedLimit > resolvedMaxLimit
                 ? resolvedMaxLimit
