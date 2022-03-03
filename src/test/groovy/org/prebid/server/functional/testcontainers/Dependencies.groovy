@@ -7,6 +7,8 @@ import org.testcontainers.containers.MySQLContainer
 import org.testcontainers.containers.Network
 import org.testcontainers.lifecycle.Startables
 
+import java.sql.DriverManager
+
 class Dependencies {
 
     private static final Boolean IS_LAUNCH_CONTAINERS = Boolean.valueOf(
@@ -30,6 +32,8 @@ class Dependencies {
         if (IS_LAUNCH_CONTAINERS) {
             Startables.deepStart([networkServiceContainer, mysqlContainer])
                       .join()
+            Class.forName(mysqlContainer.driverClassName)
+            DriverManager.getConnection(mysqlContainer.getJdbcUrl()).clos
         }
     }
 
