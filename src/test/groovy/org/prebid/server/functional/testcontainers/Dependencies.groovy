@@ -33,7 +33,8 @@ class Dependencies {
             Startables.deepStart([networkServiceContainer, mysqlContainer])
                       .join()
             Class.forName(mysqlContainer.driverClassName)
-            DriverManager.getConnection(mysqlContainer.getJdbcUrl()).clos
+            DriverManager.getConnection(mysqlContainer.getJdbcUrl(), mysqlContainer.getUsername(), mysqlContainer.getPassword())
+                         .close()
         }
     }
 
