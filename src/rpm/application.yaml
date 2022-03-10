@@ -164,6 +164,8 @@ adapters:
   medianet:
     enabled: true
     endpoint: https://prebid-adapter.media.net/rtb/pb/prebids2s?src=prebid-server.rubiconproject.com
+  amx:
+    enabled: true
 auction:
   ad-server-currency: USD
   enforce-random-bid-id: true
