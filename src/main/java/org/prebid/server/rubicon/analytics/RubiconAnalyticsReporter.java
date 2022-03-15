@@ -91,6 +91,7 @@ import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.AccountAnalyticsConfig;
+import org.prebid.server.settings.model.AccountAuctionEventConfig;
 import org.prebid.server.util.HttpUtil;
 import org.prebid.server.util.ObjectUtil;
 import org.prebid.server.vertx.http.HttpClient;
@@ -397,9 +398,12 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private static boolean isChannelSupported(BidRequest bidRequest, Account account) {
         final AccountAnalyticsConfig analyticsConfig = account.getAnalytics();
-        final Map<String, Boolean> channelConfig = ObjectUtils.defaultIfNull(
-                analyticsConfig != null ? analyticsConfig.getAuctionEvents() : null,
-                AccountAnalyticsConfig.fallbackAuctionEvents());
+        final AccountAuctionEventConfig accountAuctionEventConfig =
+                ObjectUtil.getIfNotNull(analyticsConfig, AccountAnalyticsConfig::getAuctionEvents);
+        final Map<String, Boolean> accountAuctionEvents =
+                ObjectUtil.getIfNotNull(accountAuctionEventConfig, AccountAuctionEventConfig::getEvents);
+        final Map<String, Boolean> channelConfig =
+                ObjectUtils.defaultIfNull(accountAuctionEvents, AccountAnalyticsConfig.fallbackAuctionEvents());
 
         final String channelFromRequest = channelFromRequest(bidRequest);
 

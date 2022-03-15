@@ -82,6 +82,7 @@ import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBidders;
 import org.prebid.server.rubicon.proto.request.ExtRequestPrebidBiddersRubicon;
 import org.prebid.server.settings.model.Account;
 import org.prebid.server.settings.model.AccountAnalyticsConfig;
+import org.prebid.server.settings.model.AccountAuctionEventConfig;
 import org.prebid.server.vertx.http.HttpClient;
 import org.prebid.server.vertx.http.model.HttpClientResponse;
 
@@ -364,6 +365,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -375,7 +378,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -402,6 +405,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         rubiconNode.set("client-analytics", BooleanNode.valueOf(true));
         analyticNode.set(reporter.name(), rubiconNode);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -414,7 +419,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -441,6 +446,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         rubiconNode.set("client-analytics", BooleanNode.valueOf(false));
         analyticNode.set(reporter.name(), rubiconNode);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -453,7 +460,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -475,6 +482,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -490,7 +499,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -520,6 +529,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -531,7 +542,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -569,6 +580,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -580,7 +593,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
@@ -620,6 +633,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         givenHttpClientReturnsResponse(200, null);
 
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
         final AuctionEvent auctionEvent = AuctionEvent.builder()
                 .auctionContext(AuctionContext.builder()
                         .bidRequest(BidRequest.builder()
@@ -631,7 +646,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                         .build()))
                                 .build())
                         .account(Account.builder()
-                                .analytics(AccountAnalyticsConfig.of(singletonMap("web", true), null))
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
                                 .build())
                         .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
                         .build())
