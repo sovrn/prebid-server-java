@@ -110,7 +110,6 @@ public class PrivacyEnforcementService {
         final Account account = auctionContext.getAccount();
         final MetricName requestType = auctionContext.getRequestTypeMetric();
         final Timeout timeout = auctionContext.getTimeout();
-        final List<String> debugWarnings = auctionContext.getDebugWarnings();
 
         final Privacy privacy = privacyExtractor.validPrivacyFrom(bidRequest, errors);
 
@@ -127,15 +126,21 @@ public class PrivacyEnforcementService {
         final RequestLogInfo requestLogInfo = requestLogInfo(requestType, bidRequest, accountId);
 
         return tcfDefinerService.resolveTcfContext(
-                        privacy,
-                        alpha2CountryCode,
-                        effectiveIpAddress,
-                        accountGdpr,
-                        requestType,
-                        requestLogInfo,
-                        timeout,
-                        debugWarnings)
+                privacy,
+                alpha2CountryCode,
+                effectiveIpAddress,
+                accountGdpr,
+                requestType,
+                requestLogInfo,
+                timeout)
+                .map(tcfContext -> logWarnings(auctionContext.getDebugWarnings(), tcfContext))
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext, tcfContext.getIpAddress()));
+    }
+
+    private static TcfContext logWarnings(List<String> debugWarnings, TcfContext tcfContext) {
+        debugWarnings.addAll(tcfContext.getWarnings());
+
+        return tcfContext;
     }
 
     private String resolveAlpha2CountryCode(String alpha3CountryCode) {
@@ -170,7 +175,7 @@ public class PrivacyEnforcementService {
         final String country = getFromRsidCookieIfNull(routingContext);
 
         return tcfDefinerService.resolveTcfContext(
-                        privacy, country, ipAddress, accountGdpr, MetricName.setuid, requestLogInfo, timeout, null)
+                privacy, country, ipAddress, accountGdpr, MetricName.setuid, requestLogInfo, timeout)
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext));
     }
 
@@ -188,7 +193,7 @@ public class PrivacyEnforcementService {
         final String country = getFromRsidCookieIfNull(routingContext);
 
         return tcfDefinerService.resolveTcfContext(
-                        privacy, country, ipAddress, accountGdpr, MetricName.cookiesync, requestLogInfo, timeout, null)
+                privacy, country, ipAddress, accountGdpr, MetricName.cookiesync, requestLogInfo, timeout)
                 .map(tcfContext -> PrivacyContext.of(privacy, tcfContext));
     }
 
@@ -412,10 +417,10 @@ public class PrivacyEnforcementService {
                                                                                        Account account) {
 
         return tcfDefinerService.resultForBidderNames(
-                        Collections.unmodifiableSet(bidders),
-                        VendorIdResolver.of(aliases, bidderCatalog),
-                        tcfContext,
-                        accountGdprConfig(account))
+                Collections.unmodifiableSet(bidders),
+                VendorIdResolver.of(aliases, bidderCatalog),
+                tcfContext,
+                accountGdprConfig(account))
                 .map(tcfResponse -> mapTcfResponseToEachBidder(tcfResponse, bidders));
     }
 
