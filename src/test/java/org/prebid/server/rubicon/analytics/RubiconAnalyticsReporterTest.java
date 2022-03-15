@@ -396,6 +396,76 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     }
 
     @Test
+    public void processAuctionEventShouldProcesspbjsRequestsIfWebAllowedByAccount() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("pbjs", true);
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(emptyList())
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("web"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(emptyList())
+                        .build())
+                .build();
+
+        // when
+        reporter.processEvent(auctionEvent);
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
+    public void processAuctionEventShouldProcesspbjsRequestsIfAllowedByAccount() {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+
+        final AccountAuctionEventConfig accountAuctionEventConfig = AccountAuctionEventConfig.builder().build();
+        accountAuctionEventConfig.addEvent("web", true);
+        final AuctionEvent auctionEvent = AuctionEvent.builder()
+                .auctionContext(AuctionContext.builder()
+                        .bidRequest(BidRequest.builder()
+                                .imp(emptyList())
+                                .cur(singletonList("USD"))
+                                .site(Site.builder().build())
+                                .ext(ExtRequest.of(ExtRequestPrebid.builder()
+                                        .channel(ExtRequestPrebidChannel.of("pbjs"))
+                                        .build()))
+                                .build())
+                        .account(Account.builder()
+                                .analytics(AccountAnalyticsConfig.of(accountAuctionEventConfig, null))
+                                .build())
+                        .privacyContext(PrivacyContext.of(null, TcfContext.empty()))
+                        .build())
+                .httpContext(httpContext)
+                .bidResponse(BidResponse.builder()
+                        .seatbid(emptyList())
+                        .build())
+                .build();
+
+        // when
+        reporter.processEvent(auctionEvent);
+
+        // then
+        verify(httpClient).post(anyString(), any(), any(), anyLong());
+    }
+
+    @Test
     public void processAuctionEventShouldNotProcessClientAnalyticsRequest() {
         // given
         givenHttpClientReturnsResponse(200, null);

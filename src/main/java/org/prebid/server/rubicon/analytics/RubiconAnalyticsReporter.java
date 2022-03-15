@@ -102,10 +102,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -156,29 +154,29 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private static final Integer GDPR_ONE_INTEGER = 1;
 
     private static final TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>> EXT_PREBID_TYPE_REFERENCE =
-            new TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>>() {
+            new TypeReference<>() {
             };
 
     private static final TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>> IMP_EXT_TYPE_REFERENCE =
-            new TypeReference<ExtPrebid<ExtImpPrebid, ObjectNode>>() {
+            new TypeReference<>() {
             };
     private static final String APPLICATION_JSON =
-            HttpHeaderValues.APPLICATION_JSON.toString() + ";" + HttpHeaderValues.CHARSET.toString() + "=" + "utf-8";
+            HttpHeaderValues.APPLICATION_JSON + ";" + HttpHeaderValues.CHARSET + "=" + "utf-8";
 
     private static final String OTHER_CHANNEL = "other";
-    private static final Set<String> SUPPORTED_CHANNELS = new HashSet<>(Arrays.asList("web", "amp", "app"));
+    private static final Set<String> SUPPORTED_CHANNELS = Set.of("web", "amp", "app");
 
     private static final String SAMPLING_FACTOR_FIELD = "sampling-factor";
     private static final String INTEGRATION_OVERRIDE_FIELD = "integration-override";
 
     static {
-        VIDEO_SIZE_AD_FORMATS = new HashMap<>();
-        VIDEO_SIZE_AD_FORMATS.put(201, VideoAdFormat.PREROLL);
-        VIDEO_SIZE_AD_FORMATS.put(202, "interstitial");
-        VIDEO_SIZE_AD_FORMATS.put(203, "outstream");
-        VIDEO_SIZE_AD_FORMATS.put(204, VideoAdFormat.MIDROLL);
-        VIDEO_SIZE_AD_FORMATS.put(205, VideoAdFormat.POSTROLL);
-        VIDEO_SIZE_AD_FORMATS.put(207, "vertical");
+        VIDEO_SIZE_AD_FORMATS = Map.of(
+                201, VideoAdFormat.PREROLL,
+                202, "interstitial",
+                203, "outstream",
+                204, VideoAdFormat.MIDROLL,
+                205, VideoAdFormat.POSTROLL,
+                207, "vertical");
     }
 
     private final String endpointUrl;
@@ -432,10 +430,20 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     }
 
     private static String channelFromRequest(BidRequest bidRequest) {
-        return getIfNotNull(getIfNotNull(getIfNotNull(bidRequest.getExt(),
-                                ExtRequest::getPrebid),
-                        ExtRequestPrebid::getChannel),
-                ExtRequestPrebidChannel::getName);
+        return recogniseChannelName(
+                getIfNotNull(getIfNotNull(getIfNotNull(bidRequest.getExt(),
+                                        ExtRequest::getPrebid),
+                                ExtRequestPrebid::getChannel),
+                        ExtRequestPrebidChannel::getName));
+    }
+
+    // TODO: remove alias resolving after transition period
+    private static String recogniseChannelName(String channelName) {
+        if (StringUtils.equalsIgnoreCase("pbjs", channelName)) {
+            return "web";
+        }
+
+        return channelName;
     }
 
     private static String parseStoredId(String uri) {
