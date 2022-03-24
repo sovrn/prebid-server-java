@@ -1828,7 +1828,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                 .put("sampling-factor", samplingFactor)
                                                 .put("integration-override", integrationOverride))))
                         .build())
-                .privacyContext(PrivacyContext.of(null, TcfContext.builder().gdpr("1").build()))
+                .privacyContext(PrivacyContext.of(null, TcfContext.builder().inGdprScope(true).build()))
                 .geoInfo(GeoInfo.builder().vendor("vendor").metroNielsen(123).build())
                 .build();
     }

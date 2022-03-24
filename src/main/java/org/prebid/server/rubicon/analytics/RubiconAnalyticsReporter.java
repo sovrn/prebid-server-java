@@ -1153,7 +1153,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         final TcfContext tcfContext = privacyContext.getTcfContext();
         final BidRequest bidRequest = auctionContext.getBidRequest();
 
-        final boolean pbsApplies = Objects.equals(tcfContext.getGdpr(), GDPR_ONE_STRING);
+        final boolean pbsApplies = tcfContext.isInGdprScope();
 
         final Integer gdpr = getIfNotNull(getIfNotNull(getIfNotNull(bidRequest,
                                 BidRequest::getRegs),
