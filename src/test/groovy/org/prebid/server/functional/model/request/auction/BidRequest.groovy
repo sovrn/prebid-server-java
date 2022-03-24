@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 
-import static org.prebid.server.functional.model.request.auction.DistributionChannel.APP
 import static org.prebid.server.functional.model.request.auction.DistributionChannel.SITE
 
 @EqualsAndHashCode
@@ -33,25 +32,25 @@ class BidRequest {
     BidRequestExt ext
 
     static BidRequest getDefaultBidRequest(DistributionChannel channel = SITE) {
-        new BidRequest().tap {
-            it.addImp(Imp.defaultImpression)
-            regs = Regs.defaultRegs
-            id = UUID.randomUUID()
-            tmax = 2500
-            ext = new BidRequestExt(prebid: new Prebid(debug: 1))
-            if (channel == SITE) {
-                site = Site.defaultSite
-            }
-            if (channel == APP) {
-                app = App.defaultApp
-            }
-        }
+        getDefaultRequest(Imp.defaultImpression, channel)
     }
 
     static BidRequest getDefaultStoredRequest() {
         getDefaultBidRequest().tap {
             site = null
         }
+    }
+
+    private static BidRequest getDefaultRequest(Imp imp, DistributionChannel channel) {
+        def request = new BidRequest().tap {
+            it.addImp(imp)
+            regs = Regs.defaultRegs
+            id = UUID.randomUUID()
+            tmax = 2500
+            ext = new BidRequestExt(prebid: new Prebid(debug: 1))
+        }
+        channel == SITE ? (request.site = Site.defaultSite) : (request.app = App.defaultApp)
+        request
     }
 
     void addImp(Imp impression) {
