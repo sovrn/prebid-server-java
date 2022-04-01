@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 public class BidResponse {
 
     @JsonProperty("dealId")
-    Integer dealId;
+    String dealId;
 
     @JsonProperty("bidPriceUSD")
     BigDecimal bidPriceUsd;

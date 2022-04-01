@@ -829,7 +829,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
         return bid != null
                 ? org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                parseId(bid.getDealid()),
+                bid.getDealid(),
                 convertToUSD(bid.getPrice(), currency, requestCurrencyRates, usepbsrates),
                 mediaType,
                 validDimensions("bid", bid.getW(), bid.getH(), bidder, accountId))

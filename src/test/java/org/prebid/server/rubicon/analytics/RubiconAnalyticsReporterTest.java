@@ -911,8 +911,10 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverHasUserId(true)
                                                         .params(Params.of(123, 456, 789))
                                                         .bidResponse(org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of(345, BigDecimal.valueOf(4.56),
-                                                                        "video", Dimensions.of(500, 600)))
+                                                                .BidResponse.of("some-deal-id",
+                                                                        BigDecimal.valueOf(4.56),
+                                                                        "video",
+                                                                        Dimensions.of(500, 600)))
                                                         .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -931,7 +933,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .bidResponse(org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of(456, BigDecimal.valueOf(5.67),
+                                                                .BidResponse.of("456", BigDecimal.valueOf(5.67),
                                                                         "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -941,7 +943,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .bidResponse(org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of(567, BigDecimal.valueOf(6.78),
+                                                                .BidResponse.of("567", BigDecimal.valueOf(6.78),
                                                                         "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -1370,8 +1372,10 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                 .params(Params.of(123, 456, 789))
                                                 .bidResponse(
                                                         org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of(345, BigDecimal.valueOf(0.46),
-                                                                        "video", Dimensions.of(500, 600)))
+                                                                .BidResponse.of("some-deal-id",
+                                                                        BigDecimal.valueOf(0.46),
+                                                                        "video",
+                                                                        Dimensions.of(500, 600)))
                                                 .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -1393,7 +1397,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of(456, BigDecimal.valueOf(0.57),
+                                                                        .BidResponse.of("456", BigDecimal.valueOf(0.57),
                                                                                 "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -1404,7 +1408,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of(567, BigDecimal.valueOf(0.68),
+                                                                        .BidResponse.of("567", BigDecimal.valueOf(0.68),
                                                                                 "video", Dimensions.of(600, 700)))
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
@@ -1711,7 +1715,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                 .bid(singletonList(Bid.builder()
                                         .id("bidId1")
                                         .impid("impId1")
-                                        .dealid("345")
+                                        .dealid("some-deal-id")
                                         .price(BigDecimal.valueOf(4.56))
                                         .w(500)
                                         .h(600)
