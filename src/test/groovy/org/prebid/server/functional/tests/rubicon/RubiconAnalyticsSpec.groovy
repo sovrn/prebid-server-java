@@ -14,7 +14,7 @@ import static org.prebid.server.functional.model.request.auction.DistributionCha
 
 class RubiconAnalyticsSpec extends RubiconBaseSpec {
 
-    def "PBS should send WEB to rubicon analytics adapter when ext.prebid.channel = #channelNameRequest, auctionEvents enabled for #channelNameDb"() {
+    def "PBS should send WEB to rubicon analytics adapter when ext.prebid.channel = #channelNameRequest, auctionEvents enabled for #channelNameAccount"() {
         given: "Rubicon BidRequest with channel: #channelNameRequest"
         def bidRequest = getRubiconBidRequest(SITE).tap {
             ext.prebid.channel = new Channel(name: channelNameRequest)

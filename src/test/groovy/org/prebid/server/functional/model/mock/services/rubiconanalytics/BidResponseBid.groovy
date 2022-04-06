@@ -13,4 +13,5 @@ class BidResponseBid {
     String floorRule
     BigDecimal floorRuleValue
     String dealId
+    Dimension dimensions
 }
