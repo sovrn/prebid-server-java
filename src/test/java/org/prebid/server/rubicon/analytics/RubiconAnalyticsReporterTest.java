@@ -96,6 +96,7 @@ import java.util.Map;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
@@ -109,6 +110,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -1028,6 +1030,65 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                         true,
                         Gdpr.of(true, false, null, null))))
                 .build());
+    }
+
+    @Test
+    public void processAuctionEventShouldConvertNotUSDBidCurrencyToUSD() throws IOException {
+        // given
+        givenHttpClientReturnsResponse(200, null);
+        given(currencyService.convertCurrency(eq(BigDecimal.ONE), any(), eq("EUR"), eq("USD"), any()))
+                .willReturn(BigDecimal.TEN);
+
+        final AuctionEvent event = AuctionEvent.builder()
+                .httpContext(httpContext)
+                .auctionContext(givenAuctionContext(sampleAuctionBidRequest("dbpg", "12314wp")
+                        .toBuilder()
+
+                        .cur(singletonList("EUR"))
+                        .build()))
+                .bidResponse(BidResponse.builder()
+                        .ext(ExtBidResponse.builder()
+                                .errors(emptyMap())
+                                .responsetimemillis(doubleMap("rubicon", 101, "appnexus", 202))
+                                .build())
+                        .seatbid(singletonList(SeatBid.builder()
+                                .bid(singletonList(Bid.builder()
+                                        .id(null) // mark as optional
+                                        .impid("impId1")
+                                        .dealid("567")
+                                        .price(BigDecimal.ONE)
+                                        .w(600)
+                                        .h(700)
+                                        .ext(mapper.valueToTree(ExtPrebid.of(ExtBidPrebid.builder()
+                                                        .bidid(null)
+                                                        .type(BidType.video)
+                                                        .targeting(singletonMap("key22", "value22"))
+                                                        .build(),
+                                                null)))
+                                        .build()))
+                                .build()))
+                        .build())
+                .build();
+
+        // when
+        reporter.processEvent(event);
+
+        // then
+        final ArgumentCaptor<String> eventCaptor = ArgumentCaptor.forClass(String.class);
+        verify(httpClient).post(eq("http://host-url/event"), any(), eventCaptor.capture(), anyLong());
+
+        then(mapper.readValue(eventCaptor.getValue(), Event.class))
+                .extracting(Event::getAuctions)
+                .extracting(auctions -> auctions.get(0))
+                .extracting(Auction::getAdUnits)
+                .extracting(adUnits -> adUnits.get(0))
+                .extracting(AdUnit::getBids)
+                .extracting(bids -> bids.get(0))
+                .extracting(org.prebid.server.rubicon.analytics.proto.Bid::getBidResponse)
+                .extracting(org.prebid.server.rubicon.analytics.proto.BidResponse::getBidPriceUsd)
+                .isEqualTo(BigDecimal.TEN);
+        verify(currencyService)
+                .convertCurrency(eq(BigDecimal.ONE), isNull(), eq("EUR"), eq("USD"), isNull());
     }
 
     @Test

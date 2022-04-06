@@ -841,7 +841,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
             Boolean usepbsrates) {
 
         try {
-            return currencyService.convertCurrency(price, requestCurrencyRates, USD_CURRENCY, currency, usepbsrates);
+            return currencyService.convertCurrency(price, requestCurrencyRates, currency, USD_CURRENCY, usepbsrates);
         } catch (PreBidException e) {
             logger.info("Unable to covert bid currency {0} to desired ad server currency {1}. {2}",
                     currency, USD_CURRENCY, e.getMessage());
