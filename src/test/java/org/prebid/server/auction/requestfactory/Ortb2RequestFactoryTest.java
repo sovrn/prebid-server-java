@@ -39,6 +39,7 @@ import org.prebid.server.exception.PreBidException;
 import org.prebid.server.exception.UnauthorizedAccountException;
 import org.prebid.server.execution.Timeout;
 import org.prebid.server.execution.TimeoutFactory;
+import org.prebid.server.floors.PriceFloorProcessor;
 import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.hooks.execution.HookStageExecutor;
@@ -121,6 +122,8 @@ public class Ortb2RequestFactoryTest extends VertxTest {
     @Mock
     private DealsPopulator dealsPopulator;
     @Mock
+    private PriceFloorProcessor priceFloorProcessor;
+    @Mock
     private CountryCodeMapper countryCodeMapper;
 
     private final Clock clock = Clock.systemDefaultZone();
@@ -179,6 +182,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsPopulator,
+                priceFloorProcessor,
                 countryCodeMapper,
                 clock,
                 jacksonMapper);
@@ -199,6 +203,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsPopulator,
+                priceFloorProcessor,
                 countryCodeMapper,
                 clock,
                 jacksonMapper);
@@ -237,6 +242,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsPopulator,
+                priceFloorProcessor,
                 countryCodeMapper,
                 clock,
                 jacksonMapper);
@@ -761,6 +767,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 ipAddressHelper,
                 hookStageExecutor,
                 dealsPopulator,
+                priceFloorProcessor,
                 countryCodeMapper,
                 clock,
                 jacksonMapper);
