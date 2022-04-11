@@ -15,6 +15,7 @@ import org.prebid.server.functional.model.request.auction.Format
 import org.prebid.server.functional.model.request.auction.Geo
 import org.prebid.server.functional.model.request.auction.ImpExtContextData
 import org.prebid.server.functional.model.request.auction.ImpExtContextDataAdServer
+import org.prebid.server.functional.model.response.auction.BidResponse
 import org.prebid.server.functional.util.PBSUtils
 import spock.lang.Ignore
 
@@ -95,8 +96,14 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
         and: "PBS fetch rules from floors provider"
         cacheFloorsProviderRules(bidRequest)
 
+        and: "Set bidder response"
+        def bidResponse = BidResponse.getDefaultBidResponse(bidRequest).tap {
+            seatbid.first().bid.first().price = floorValue
+        }
+        bidder.setResponse(bidRequest.id, bidResponse)
+
         when: "PBS processes auction request"
-       def response =  floorsPbsService.sendAuctionRequest(bidRequest)
+        def response =  floorsPbsService.sendAuctionRequest(bidRequest)
 
         then: "PBS should not contain errors, warnings"
         assert !response.ext?.warnings
@@ -116,7 +123,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
     def "PBS should treat rule values case-insensitive"() {
         given: "BidRequest with domain"
         def domain = PBSUtils.randomString
-        def accountId = PBSUtils.randomString
+        def accountId = PBSUtils.randomNumber.toString()
         def bidRequest = BidRequest.defaultBidRequest.tap {
                                             site.domain = domain
                                             site.publisher.id = accountId}
@@ -149,7 +156,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
     def "PBS should consider rules file invalid when rules file contains an unrecognized dimension in the schema"() {
         given: "BidRequest with domain"
         def domain = PBSUtils.randomString
-        def accountId = PBSUtils.randomString
+        def accountId = PBSUtils.randomNumber.toString()
         def bidRequest = BidRequest.defaultBidRequest.tap {
                                             site.domain = domain
                                             site.publisher.id = accountId}
@@ -192,7 +199,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
     def "PBS should round floor value to 4-digits of precision"() {
         given: "BidRequest with domain"
         def domain = PBSUtils.randomString
-        def accountId = PBSUtils.randomString
+        def accountId = PBSUtils.randomNumber.toString()
         def bidRequest = BidRequest.defaultBidRequest.tap {
                                             site.domain = domain
                                             site.publisher.id = accountId}
@@ -337,7 +344,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
     def "PBS should choose correct rule when domain is defined in rules"() {
         given: "BidRequest with domain"
         def domain = PBSUtils.randomString
-        def accountId = PBSUtils.randomString
+        def accountId = PBSUtils.randomNumber.toString()
         def bidRequest = bidRequestClosure(domain, accountId) as BidRequest
 
         and: "Account with enabled fetch, fetch.url in the DB"
@@ -386,7 +393,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
     def "PBS should choose correct rule when siteDomain is defined in rules"() {
         given: "BidRequest with domain"
         def domain = PBSUtils.randomString
-        def accountId = PBSUtils.randomString
+        def accountId = PBSUtils.randomNumber.toString()
         def bidRequest = bidRequestClosure(domain, accountId) as BidRequest
 
         and: "Account in the DB"
@@ -427,7 +434,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
      def "PBS should choose correct rule when pubDomain is defined in rules"() {
         given: "BidRequest with domain"
         def domain = PBSUtils.randomString
-        def accountId = PBSUtils.randomString
+        def accountId = PBSUtils.randomNumber.toString()
         def bidRequest = bidRequestClosure(domain, accountId) as BidRequest
 
         and: "Account in the DB"
