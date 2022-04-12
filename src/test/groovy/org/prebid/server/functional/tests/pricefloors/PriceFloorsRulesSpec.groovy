@@ -17,7 +17,6 @@ import org.prebid.server.functional.model.request.auction.ImpExtContextData
 import org.prebid.server.functional.model.request.auction.ImpExtContextDataAdServer
 import org.prebid.server.functional.model.response.auction.BidResponse
 import org.prebid.server.functional.util.PBSUtils
-import spock.lang.Ignore
 
 import static org.prebid.server.functional.model.ChannelType.APP
 import static org.prebid.server.functional.model.ChannelType.WEB
@@ -178,6 +177,12 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
 
         and: "PBS fetch rules from floors provider"
         cacheFloorsProviderRules(bidRequest)
+
+        and: "Set bidder response"
+        def bidResponse = BidResponse.getDefaultBidResponse(bidRequest).tap {
+            seatbid.first().bid.first().price = floorValue
+        }
+        bidder.setResponse(bidRequest.id, bidResponse)
 
         when: "PBS processes auction request"
         def response =  floorsPbsService.sendAuctionRequest(bidRequest)
@@ -681,8 +686,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
         PBSUtils.randomString | PBSUtils.randomFloorValue | PBSUtils.randomFloorValue | 0.8
     }
 
-    @Ignore
-    def "PBS should choose no rule specifying deviceType when device is not present"() {
+    def "PBS should choose wildcard device type when device is not present"() {
         given: "BidRequest without device.ua"
         def bidRequest = BidRequest.defaultBidRequest.tap {
             device = null
@@ -692,20 +696,15 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
         def account = getAccountWithEnabledFetch(bidRequest.site.publisher.id)
         accountDao.save(account)
 
-        and: "Set Floors Provider response without model weights defined"
+        and: "Set Floors Provider response with wildcard deviceType rule"
         def floorValue = PBSUtils.randomFloorValue
         def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups << ModelGroup.modelGroup
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values = [(new Rule(mediaType: BANNER).rule): floorValue]
-            data.modelGroups[0].modelWeight = null
-            data.modelGroups[1].schema = new PriceFloorSchema(fields: [DEVICE_TYPE])
-            data.modelGroups[1].values =
+            data.modelGroups[0].schema = new PriceFloorSchema(fields: [DEVICE_TYPE])
+            data.modelGroups[0].values =
                     [(new Rule(deviceType: PHONE).rule): floorValue + 0.1,
                      (new Rule(deviceType: TABLET).rule): floorValue + 0.2,
                      (new Rule(deviceType: DESKTOP).rule): floorValue + 0.3,
-                     (new Rule(deviceType: MULTIPLE).rule): floorValue + 0.4]
-             data.modelGroups[1].modelWeight = null
+                     (new Rule(deviceType: MULTIPLE).rule): floorValue]
         }
         floorsProvider.setResponse(bidRequest.site.publisher.id, floorsResponse)
 
@@ -715,7 +714,7 @@ class PriceFloorsRulesSpec extends PriceFloorsBaseSpec {
         when: "PBS processes auction request with empty user agent header"
         floorsPbsService.sendAuctionRequest(bidRequest, ["User-Agent":""])
 
-        then: "Bidder request bidFloor should correspond to appropriate rule"
+        then: "Bidder request bidFloor should correspond to a wildcard rule"
         def bidderRequest = bidder.getBidderRequests(bidRequest.id).last()
         assert bidderRequest.imp[0].bidFloor == floorValue
     }
