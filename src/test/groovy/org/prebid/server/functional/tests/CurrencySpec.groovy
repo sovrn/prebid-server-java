@@ -1,29 +1,16 @@
 package org.prebid.server.functional.tests
 
-import org.prebid.server.functional.model.Currency
-import org.prebid.server.functional.model.mock.services.currencyconversion.CurrencyConversionRatesResponse
 import org.prebid.server.functional.model.request.auction.BidRequest
 import org.prebid.server.functional.model.response.auction.BidResponse
 import org.prebid.server.functional.service.PrebidServerService
-import org.prebid.server.functional.testcontainers.scaffolding.CurrencyConversion
-
-import java.math.RoundingMode
 
 import static org.prebid.server.functional.model.Currency.EUR
 import static org.prebid.server.functional.model.Currency.JPY
 import static org.prebid.server.functional.model.Currency.USD
-import static org.prebid.server.functional.testcontainers.Dependencies.networkServiceContainer
+import static org.prebid.server.functional.testcontainers.PbsConfig.getExternalCurrencyConverterConfig
 
 class CurrencySpec extends BaseSpec {
 
-    private static final Currency DEFAULT_CURRENCY = USD
-    private static final int PRICE_PRECISION = 3
-    private static final Map<Currency, Map<Currency, BigDecimal>> DEFAULT_CURRENCY_RATES = [(USD): [(EUR): 0.8872327211427558,
-                                                                                                    (JPY): 114.12],
-                                                                                            (EUR): [(USD): 1.3429368029739777]]
-    private static final CurrencyConversion currencyConversion = new CurrencyConversion(networkServiceContainer, mapper).tap {
-        setCurrencyConversionRatesResponse(CurrencyConversionRatesResponse.getDefaultCurrencyConversionRatesResponse(DEFAULT_CURRENCY_RATES))
-    }
     private static final PrebidServerService pbsService = pbsServiceFactory.getService(externalCurrencyConverterConfig)
 
     def "PBS should use default server currency if not specified in the request"() {
@@ -103,29 +90,5 @@ class CurrencySpec extends BaseSpec {
         requestCurrency || bidCurrency
         USD             || JPY
         JPY             || USD
-    }
-
-    private static Map<String, String> getExternalCurrencyConverterConfig() {
-        ["auction.ad-server-currency"                          : DEFAULT_CURRENCY as String,
-         "currency-converter.external-rates.enabled"           : "true",
-         "currency-converter.external-rates.url"               : "$networkServiceContainer.rootUri/currency".toString(),
-         "currency-converter.external-rates.default-timeout-ms": "4000",
-         "currency-converter.external-rates.refresh-period-ms" : "900000"]
-    }
-
-    private static BigDecimal convertCurrency(BigDecimal price, Currency fromCurrency, Currency toCurrency) {
-        return (price * getConversionRate(fromCurrency, toCurrency)).setScale(PRICE_PRECISION, RoundingMode.HALF_EVEN)
-    }
-
-    private static BigDecimal getConversionRate(Currency fromCurrency, Currency toCurrency) {
-        def conversionRate
-        if (fromCurrency == toCurrency) {
-            conversionRate = 1
-        } else if (fromCurrency in DEFAULT_CURRENCY_RATES) {
-            conversionRate = DEFAULT_CURRENCY_RATES[fromCurrency][toCurrency]
-        } else {
-            conversionRate = 1 / DEFAULT_CURRENCY_RATES[toCurrency][fromCurrency]
-        }
-        conversionRate
     }
 }

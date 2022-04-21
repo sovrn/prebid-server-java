@@ -228,7 +228,7 @@ class PriceFloorsEnforcementSpec extends PriceFloorsBaseSpec {
         def pbsService = pbsServiceFactory.getService(floorsConfig +
                 ["settings.default-account-config": mapper.encode(defaultAccountConfigSettings)])
 
-        and: "Default basic  BidRequest with generic bidder with preferdeals = true"
+        and: "Default basic BidRequest with generic bidder with preferdeals = true"
         def bidRequest = BidRequest.defaultBidRequest.tap {
             ext.prebid.targeting = new Targeting(preferdeals: true)
         }

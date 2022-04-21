@@ -1,13 +1,13 @@
 package org.prebid.server.rubicon.analytics.proto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 
 import java.math.BigDecimal;
 
-@AllArgsConstructor(staticName = "of")
 @Value
+@Builder
 public class BidResponse {
 
     @JsonProperty("dealId")
@@ -20,4 +20,13 @@ public class BidResponse {
     String mediaType;
 
     Dimensions dimensions;
+
+    @JsonProperty("floorValue")
+    BigDecimal floorValue;
+
+    @JsonProperty("floorRule")
+    String floorRule;
+
+    @JsonProperty("floorRuleValue")
+    BigDecimal floorRuleValue;
 }

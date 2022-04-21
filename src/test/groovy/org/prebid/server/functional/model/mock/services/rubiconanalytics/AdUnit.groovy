@@ -2,6 +2,7 @@ package org.prebid.server.functional.model.mock.services.rubiconanalytics
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import groovy.transform.ToString
+import org.prebid.server.functional.model.bidderspecific.Error
 
 @ToString(includeNames = true, ignoreNulls = true)
 class AdUnit {
@@ -16,4 +17,5 @@ class AdUnit {
     String adUnitCode
     @JsonProperty("adserverTargeting")
     Map<String, String> adServerTargeting
+    Error error
 }

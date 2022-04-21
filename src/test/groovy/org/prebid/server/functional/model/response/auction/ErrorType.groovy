@@ -10,7 +10,8 @@ enum ErrorType {
     APPNEXUS("appnexus"),
     PREBID("prebid"),
     CACHE("cache"),
-    GENERIC_ALIAS("genericAlias")
+    GENERIC_ALIAS("genericAlias"),
+    RUBICON_ALIAS("rubiconAlias")
 
     @JsonValue
     final String value

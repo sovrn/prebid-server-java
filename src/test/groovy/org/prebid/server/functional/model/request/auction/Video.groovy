@@ -13,7 +13,7 @@ class Video {
     Integer h
     Integer startdelay
     Integer placement
-    Integer linearity
+    Linearity linearity
     Integer skip
     Integer skipmin
     Integer skipafter
@@ -28,10 +28,10 @@ class Video {
     List<Integer> delivery
     Integer pos
     List<Banner> companionad
-    List<Integer> api
+    List<Api> api
     List<Integer> companiontype
 
     static Video getDefaultVideo() {
-            new Video(mimes: ["video/mp4"], w: 300, h: 200)
+        new Video(mimes: ["video/mp4"], w: 300, h: 200)
     }
 }

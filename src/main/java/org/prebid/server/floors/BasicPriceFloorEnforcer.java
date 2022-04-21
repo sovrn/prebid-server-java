@@ -155,7 +155,7 @@ public class BasicPriceFloorEnforcer implements PriceFloorEnforcer {
             if (isPriceBelowFloor(price, floor)) {
                 warnings.add(BidderError.rejectedIpf(
                         String.format("Bid with id '%s' was rejected by floor enforcement: "
-                                + "price %s is below the floor %s", bid.getId(), price, floor)));
+                                + "price %s is below the floor %s", bid.getId(), price, floor), bid.getImpid()));
 
                 // TODO: create a record for analytics adapters to be aware of this rejection and reason
 

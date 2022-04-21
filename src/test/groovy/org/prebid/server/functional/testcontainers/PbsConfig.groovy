@@ -6,6 +6,7 @@ import org.testcontainers.containers.MySQLContainer
 import static org.prebid.server.functional.testcontainers.Dependencies.networkServiceContainer
 import static org.prebid.server.functional.testcontainers.container.PrebidServerContainer.ADMIN_ENDPOINT_PASSWORD
 import static org.prebid.server.functional.testcontainers.container.PrebidServerContainer.ADMIN_ENDPOINT_USERNAME
+import static org.prebid.server.functional.tests.BaseSpec.DEFAULT_CURRENCY
 
 final class PbsConfig {
 
@@ -108,6 +109,14 @@ LIMIT 1
          "gdpr.rubicon.audit-cookie-encryption-key": PBSUtils.randomString,
          "auction.enforce-random-bid-id"           : "false"
         ].asImmutable()
+    }
+
+    static Map<String, String> getExternalCurrencyConverterConfig() {
+        ["auction.ad-server-currency"                          : DEFAULT_CURRENCY as String,
+         "currency-converter.external-rates.enabled"           : "true",
+         "currency-converter.external-rates.url"               : "$networkServiceContainer.rootUri/currency".toString(),
+         "currency-converter.external-rates.default-timeout-ms": "4000",
+         "currency-converter.external-rates.refresh-period-ms" : "900000"]
     }
 
     private PbsConfig() {}

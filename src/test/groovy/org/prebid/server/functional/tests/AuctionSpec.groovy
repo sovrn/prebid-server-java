@@ -22,7 +22,6 @@ class AuctionSpec extends BaseSpec {
                                                                             "auction.default-timeout-ms": DEFAULT_TIMEOUT as String])
 
     def "PBS should return version in response header for auction request for #description"() {
-
         when: "PBS processes auction request"
         def response = defaultPbsService.sendAuctionRequestRaw(bidRequest)
 

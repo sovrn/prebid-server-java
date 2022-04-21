@@ -17,6 +17,8 @@ public class Auction {
     @JsonProperty("adUnits")
     List<AdUnit> adUnits;
 
+    PriceFloorsData floors;
+
     @JsonProperty("accountId")
     Integer accountId;
 

@@ -12,6 +12,7 @@ class Bidder {
 
     Generic genericAlias
     Generic generic
+    Rubicon rubiconAlias
     Rubicon rubicon
     @JsonProperty("appnexus")
     AppNexus appNexus

@@ -43,6 +43,12 @@ import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.floors.PriceFloorResolver;
+import org.prebid.server.floors.model.PriceFloorData;
+import org.prebid.server.floors.model.PriceFloorEnforcement;
+import org.prebid.server.floors.model.PriceFloorModelGroup;
+import org.prebid.server.floors.model.PriceFloorResult;
+import org.prebid.server.floors.model.PriceFloorRules;
 import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.json.JacksonMapper;
@@ -57,6 +63,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtAppPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtImp;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpContext;
 import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebid;
+import org.prebid.server.proto.openrtb.ext.request.ExtImpPrebidFloors;
 import org.prebid.server.proto.openrtb.ext.request.ExtRegs;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestCurrency;
@@ -64,6 +71,7 @@ import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebid;
 import org.prebid.server.proto.openrtb.ext.request.ExtRequestPrebidChannel;
 import org.prebid.server.proto.openrtb.ext.request.ExtStoredRequest;
 import org.prebid.server.proto.openrtb.ext.request.ExtUser;
+import org.prebid.server.proto.openrtb.ext.request.ImpMediaType;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.ExtImpRubicon;
 import org.prebid.server.proto.openrtb.ext.request.rubicon.RubiconVideoParams;
 import org.prebid.server.proto.openrtb.ext.response.BidType;
@@ -83,6 +91,7 @@ import org.prebid.server.rubicon.analytics.proto.Gam;
 import org.prebid.server.rubicon.analytics.proto.Gdpr;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
+import org.prebid.server.rubicon.analytics.proto.PriceFloorsData;
 import org.prebid.server.rubicon.analytics.proto.StartDelay;
 import org.prebid.server.rubicon.analytics.proto.VideoAdFormat;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
@@ -108,6 +117,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -134,6 +144,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private static final String SUCCESS_STATUS = "success";
     private static final String NO_BID_STATUS = "no-bid";
     private static final String ERROR_STATUS = "error";
+    public static final String REJECTED_IPF_STATUS = "rejected-ipf";
 
     private static final String RUBICON_BIDDER = "rubicon";
 
@@ -150,7 +161,6 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private static final String USD_CURRENCY = "USD";
 
-    private static final String GDPR_ONE_STRING = "1";
     private static final Integer GDPR_ONE_INTEGER = 1;
 
     private static final TypeReference<ExtPrebid<ExtBidPrebid, ObjectNode>> EXT_PREBID_TYPE_REFERENCE =
@@ -168,6 +178,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private static final String SAMPLING_FACTOR_FIELD = "sampling-factor";
     private static final String INTEGRATION_OVERRIDE_FIELD = "integration-override";
+    private static final String EXT_PREBID_FLOORS = "floors";
 
     static {
         VIDEO_SIZE_AD_FORMATS = Map.of(
@@ -192,6 +203,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private final CountryCodeMapper countryCodeMapper;
     private final IpAddressHelper ipAddressHelper;
     private final HttpClient httpClient;
+    private final PriceFloorResolver floorResolver;
     private final boolean logEmptyDimensions;
     private final JacksonMapper mapper;
 
@@ -215,6 +227,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                                     CountryCodeMapper countryCodeMapper,
                                     IpAddressHelper ipAddressHelper,
                                     HttpClient httpClient,
+                                    PriceFloorResolver floorResolver,
                                     boolean logEmptyDimensions,
                                     JacksonMapper mapper) {
 
@@ -231,6 +244,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         this.countryCodeMapper = Objects.requireNonNull(countryCodeMapper);
         this.ipAddressHelper = Objects.requireNonNull(ipAddressHelper);
         this.httpClient = Objects.requireNonNull(httpClient);
+        this.floorResolver = Objects.requireNonNull(floorResolver);
         this.logEmptyDimensions = logEmptyDimensions;
         this.mapper = Objects.requireNonNull(mapper);
     }
@@ -287,6 +301,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                     httpContext,
                     auctionContext,
                     toAdUnits(bidRequest, uidsCookie, bidResponse, requestAccountId),
+                    resolveFloorsData(bidRequest),
                     accountId,
                     accountSamplingFactor,
                     this::eventBuilderBase);
@@ -326,6 +341,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                     httpContext,
                     auctionContext,
                     toAdUnits(bidRequest, uidsCookie, bidResponse, storedId, requestAccountId),
+                    resolveFloorsData(bidRequest),
                     accountId,
                     accountSamplingFactor,
                     this::eventBuilderBase);
@@ -538,6 +554,41 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         return Objects.equals(debug, 1);
     }
 
+    private static PriceFloorsData resolveFloorsData(BidRequest bidderRequest) {
+        final ExtRequest ext = bidderRequest.getExt();
+        final ExtRequestPrebid prebid = ObjectUtil.getIfNotNull(ext, ExtRequest::getPrebid);
+        final PriceFloorRules floorRules = ObjectUtil.getIfNotNull(prebid, ExtRequestPrebid::getFloors);
+        if (floorRules == null) {
+            return null;
+        }
+        final PriceFloorData floorsData = floorRules.getData();
+        final PriceFloorModelGroup modelGroup = getModelGroup(floorsData);
+        final PriceFloorEnforcement enforcement = floorRules.getEnforcement();
+
+        return PriceFloorsData.builder()
+                .location(floorRules.getLocation())
+                .fetchStatus(floorRules.getFetchStatus())
+                .skipped(floorRules.getSkipped())
+                .modelName(ObjectUtil.getIfNotNull(modelGroup, PriceFloorModelGroup::getModelVersion))
+                .enforcement(ObjectUtil.getIfNotNull(enforcement, PriceFloorEnforcement::getEnforcePbs))
+                .dealsEnforced(ObjectUtil.getIfNotNull(enforcement, PriceFloorEnforcement::getFloorDeals))
+                .skipRate(floorRules.getSkipRate())
+                .provider(floorRules.getFloorProvider())
+                .floorMin(floorRules.getFloorMin())
+                .modelTimestamp(ObjectUtil.getIfNotNull(floorsData, PriceFloorData::getModelTimestamp))
+                .modelWeight(ObjectUtil.getIfNotNull(modelGroup, PriceFloorModelGroup::getModelWeight))
+                .build();
+    }
+
+    private static PriceFloorModelGroup getModelGroup(PriceFloorData floorsData) {
+        final List<PriceFloorModelGroup> modelGroups =
+                ObjectUtil.getIfNotNull(floorsData, PriceFloorData::getModelGroups);
+
+        return CollectionUtils.isNotEmpty(modelGroups)
+                ? modelGroups.get(0)
+                : null;
+    }
+
     // AMP
     private List<AdUnit> toAdUnits(BidRequest bidRequest,
                                    UidsCookie uidsCookie,
@@ -601,8 +652,18 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                 final Imp imp = findImpById(bidRequest.getImp(), impId);
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
-                        .add(toTwinBids(bidder, imp, bid, SUCCESS_STATUS, null, responseTime, serverHasUserId,
-                                currency, requestCurrencyRates, usepbsrates, accountId));
+                        .add(toTwinBids(bidder,
+                                imp,
+                                bidRequest,
+                                bid,
+                                SUCCESS_STATUS,
+                                null,
+                                responseTime,
+                                serverHasUserId,
+                                currency,
+                                requestCurrencyRates,
+                                usepbsrates,
+                                accountId));
             }
         }
     }
@@ -631,14 +692,28 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                 }
 
                 final BidError bidError = bidErrorFrom(extBidResponse, bidder, impId);
-                final String status = bidError != null ? ERROR_STATUS : NO_BID_STATUS;
+                final String status = isRejectedIpfBid(extBidResponse, bidder, impId)
+                        ? REJECTED_IPF_STATUS
+                        : bidError != null
+                        ? ERROR_STATUS
+                        : NO_BID_STATUS;
 
                 final Integer responseTime = serverLatencyMillisFrom(extBidResponse, bidder);
                 final Boolean serverHasUserId = serverHasUserIdFrom(uidsCookie, bidder);
 
                 impIdToBids.computeIfAbsent(impId, key -> new ArrayList<>())
-                        .add(toTwinBids(bidder, imp, null, status, bidError, responseTime, serverHasUserId, null,
-                                null, null, accountId));
+                        .add(toTwinBids(bidder,
+                                imp,
+                                bidRequest,
+                                null,
+                                status,
+                                bidError,
+                                responseTime,
+                                serverHasUserId,
+                                null,
+                                null,
+                                null,
+                                accountId));
             }
         }
     }
@@ -666,6 +741,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                 }
             }
         }
+
         return null;
     }
 
@@ -684,6 +760,21 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
         }
 
         return result;
+    }
+
+    private static boolean isRejectedIpfBid(ExtBidResponse extBidResponse, String bidder, String impId) {
+        return Optional.ofNullable(extBidResponse.getWarnings())
+                .map(bidderToWarnings -> bidderToWarnings.get(bidder))
+                .map(bidderWarnings -> bidderWarnings.stream()
+                        .anyMatch(warning -> isRejectedIpf(warning, impId)))
+                .orElse(false);
+    }
+
+    private static boolean isRejectedIpf(ExtBidderError extBidderError, String impId) {
+        final Set<String> impIds = extBidderError.getImpIds();
+        return BidderError.Type.rejected_ipf.getCode() == extBidderError.getCode()
+                && CollectionUtils.isNotEmpty(impIds)
+                && impIds.contains(impId);
     }
 
     private static boolean analyticsBidExists(Map<String, List<TwinBids>> impIdToBids, String impId, String bidder) {
@@ -725,6 +816,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private TwinBids toTwinBids(String bidder,
                                 Imp imp,
+                                BidRequest bidRequest,
                                 Bid bid,
                                 String status,
                                 BidError bidError,
@@ -748,8 +840,15 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                         .serverLatencyMillis(serverLatencyMillis)
                         .serverHasUserId(serverHasUserId)
                         .params(paramsFrom(imp, bidder))
-                        .bidResponse(analyticsBidResponse(bid, mediaTypeString(mediaTypeFromBid(extPrebid)), currency,
-                                requestCurrencyRates, usepbsrates, bidder, accountId))
+                        .bidResponse(analyticsBidResponse(bid,
+                                imp,
+                                bidRequest,
+                                mediaTypeString(mediaTypeFromBid(extPrebid)),
+                                currency,
+                                requestCurrencyRates,
+                                usepbsrates,
+                                bidder,
+                                accountId))
                         .build();
 
         return new TwinBids(bid, analyticsBid);
@@ -820,6 +919,8 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
 
     private org.prebid.server.rubicon.analytics.proto.BidResponse analyticsBidResponse(
             Bid bid,
+            Imp imp,
+            BidRequest bidRequest,
             String mediaType,
             String currency,
             Map<String, Map<String, BigDecimal>> requestCurrencyRates,
@@ -827,13 +928,73 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
             String bidder,
             String accountId) {
 
-        return bid != null
-                ? org.prebid.server.rubicon.analytics.proto.BidResponse.of(
-                bid.getDealid(),
-                convertToUSD(bid.getPrice(), currency, requestCurrencyRates, usepbsrates),
-                mediaType,
-                validDimensions("bid", bid.getW(), bid.getH(), bidder, accountId))
+        final ObjectNode impExt = ObjectUtil.getIfNotNull(imp, Imp::getExt);
+        final JsonNode impExtPrebidFloors = impExt != null
+                ? impExt.path(PREBID_EXT).path(EXT_PREBID_FLOORS)
                 : null;
+        final ExtImpPrebidFloors extImpPrebidFloors = impExtPrebidFloors != null && !impExtPrebidFloors.isMissingNode()
+                ? readExt((ObjectNode) impExtPrebidFloors, ExtImpPrebidFloors.class)
+                : null;
+        if (bid == null && extImpPrebidFloors == null) {
+            return null;
+        }
+
+        final BigDecimal bidPriceUSD = bid != null
+                ? convertToUSD(bid.getPrice(), currency, requestCurrencyRates, usepbsrates)
+                : null;
+        final Dimensions dimensions = bid != null
+                ? validDimensions("bid", bid.getW(), bid.getH(), bidder, accountId)
+                : null;
+
+        final PriceFloorResult priceFloorResult = resolvePriceFloors(bidRequest, imp,
+                isVideo(imp) ? ImpMediaType.video : ImpMediaType.banner);
+        final String floorCurrency = ObjectUtil.getIfNotNull(priceFloorResult, PriceFloorResult::getCurrency);
+        final BigDecimal floorValue = Optional.ofNullable(priceFloorResult)
+                .map(PriceFloorResult::getFloorValue)
+                .map(floor -> convertToUSD(floor, floorCurrency, requestCurrencyRates, usepbsrates))
+                .orElse(null);
+        final BigDecimal floorRuleValue = Optional.ofNullable(priceFloorResult)
+                .map(PriceFloorResult::getFloorRuleValue)
+                .map(rule -> convertToUSD(rule, floorCurrency, requestCurrencyRates, usepbsrates))
+                .orElse(null);
+
+        return org.prebid.server.rubicon.analytics.proto.BidResponse.builder()
+                .dealId(ObjectUtil.getIfNotNull(bid, Bid::getDealid))
+                .bidPriceUsd(bidPriceUSD)
+                .mediaType(mediaType)
+                .dimensions(dimensions)
+                .floorValue(floorValue)
+                .floorRule(ObjectUtil.getIfNotNull(priceFloorResult, PriceFloorResult::getFloorRule))
+                .floorRuleValue(floorRuleValue)
+                .build();
+    }
+
+    private static boolean isVideo(Imp imp) {
+        final Video video = imp.getVideo();
+        return video != null && (imp.getBanner() == null || isFullyPopulatedVideo(video));
+    }
+
+    private static boolean isFullyPopulatedVideo(Video video) {
+        return ObjectUtils.allNotNull(
+                video.getMimes(), video.getProtocols(), video.getMaxduration(), video.getLinearity(), video.getApi());
+    }
+
+    private PriceFloorResult resolvePriceFloors(BidRequest bidRequest,
+                                                Imp imp,
+                                                ImpMediaType mediaType) {
+
+        return floorResolver.resolve(
+                bidRequest,
+                extractFloorRules(bidRequest),
+                imp,
+                mediaType,
+                null,
+                null);
+    }
+
+    private static PriceFloorRules extractFloorRules(BidRequest bidRequest) {
+        final ExtRequestPrebid prebid = ObjectUtil.getIfNotNull(bidRequest.getExt(), ExtRequest::getPrebid);
+        return ObjectUtil.getIfNotNull(prebid, ExtRequestPrebid::getFloors);
     }
 
     private BigDecimal convertToUSD(
@@ -1115,6 +1276,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
     private Event toAuctionEvent(HttpRequestContext httpContext,
                                  AuctionContext auctionContext,
                                  List<AdUnit> adUnits,
+                                 PriceFloorsData floorsData,
                                  Integer accountId,
                                  Integer accountSamplingFactor,
                                  BiFunction<HttpRequestContext, AuctionContext, Event.EventBuilder> eventBuilderBase) {
@@ -1126,6 +1288,7 @@ public class RubiconAnalyticsReporter implements AnalyticsReporter {
                         bidRequest.getId(),
                         samplingFactor(accountSamplingFactor),
                         adUnits,
+                        floorsData,
                         accountId,
                         bidRequest.getTmax(),
                         hasRubiconId(httpContext),

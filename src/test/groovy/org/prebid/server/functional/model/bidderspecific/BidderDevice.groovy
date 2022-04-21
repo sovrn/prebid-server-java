@@ -1,11 +1,10 @@
 package org.prebid.server.functional.model.bidderspecific
 
 import groovy.transform.ToString
-import org.prebid.server.functional.model.request.auction.Imp
+import org.prebid.server.functional.model.request.auction.Device
 
 @ToString(includeNames = true, ignoreNulls = true)
-class BidderImp extends Imp {
+class BidderDevice extends Device {
 
-    BidderBanner banner
-    BidderImpExt ext
+    DeviceExt ext
 }

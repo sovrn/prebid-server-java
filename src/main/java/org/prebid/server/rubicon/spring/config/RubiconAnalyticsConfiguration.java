@@ -7,6 +7,7 @@ import org.prebid.server.auction.IpAddressHelper;
 import org.prebid.server.bidder.BidderCatalog;
 import org.prebid.server.cookie.UidsCookieService;
 import org.prebid.server.currency.CurrencyConversionService;
+import org.prebid.server.floors.PriceFloorResolver;
 import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.rubicon.analytics.RubiconAnalyticsReporter;
@@ -42,6 +43,7 @@ public class RubiconAnalyticsConfiguration {
                                                       CountryCodeMapper countryCodeMapper,
                                                       IpAddressHelper ipAddressHelper,
                                                       HttpClient httpClient,
+                                                      PriceFloorResolver floorResolver,
                                                       JacksonMapper mapper) {
 
         final AnalyticsLogs analyticsLogs = properties.getLog();
@@ -61,6 +63,7 @@ public class RubiconAnalyticsConfiguration {
                 countryCodeMapper,
                 ipAddressHelper,
                 httpClient,
+                floorResolver,
                 logEmptyDimensions,
                 mapper);
     }

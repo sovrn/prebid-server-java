@@ -1,5 +1,6 @@
 package org.prebid.server.functional.testcontainers.scaffolding
 
+import org.mockserver.matchers.Times
 import org.mockserver.model.HttpRequest
 import org.prebid.server.functional.model.mock.services.currencyconversion.CurrencyConversionRatesResponse
 import org.prebid.server.functional.util.ObjectMapperWrapper
@@ -18,7 +19,7 @@ class CurrencyConversion extends NetworkScaffolding {
     }
 
     void setCurrencyConversionRatesResponse(CurrencyConversionRatesResponse conversionRatesResponse) {
-        setResponse(request, conversionRatesResponse)
+        setResponse(request, conversionRatesResponse, OK_200, Times.unlimited())
     }
 
     @Override

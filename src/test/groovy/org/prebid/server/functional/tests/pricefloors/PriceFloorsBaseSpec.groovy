@@ -1,6 +1,5 @@
 package org.prebid.server.functional.tests.pricefloors
 
-import org.prebid.server.functional.model.Currency
 import org.prebid.server.functional.model.config.AccountAuctionConfig
 import org.prebid.server.functional.model.config.AccountConfig
 import org.prebid.server.functional.model.config.AccountPriceFloorsConfig
@@ -19,6 +18,7 @@ import org.prebid.server.functional.model.request.auction.Video
 import org.prebid.server.functional.service.PrebidServerService
 import org.prebid.server.functional.testcontainers.Dependencies
 import org.prebid.server.functional.testcontainers.PBSTest
+import org.prebid.server.functional.testcontainers.PbsConfig
 import org.prebid.server.functional.testcontainers.scaffolding.FloorsProvider
 import org.prebid.server.functional.tests.BaseSpec
 import org.prebid.server.functional.util.PBSUtils
@@ -26,6 +26,7 @@ import org.prebid.server.functional.util.PBSUtils
 import java.math.RoundingMode
 
 import static org.prebid.server.functional.model.request.auction.DistributionChannel.SITE
+import static org.prebid.server.functional.model.request.auction.FetchStatus.INPROGRESS
 
 @PBSTest
 abstract class PriceFloorsBaseSpec extends BaseSpec {
@@ -33,7 +34,8 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
     public static final float FLOOR_MIN = 0.5
     public static final Map<String, String> floorsConfig = ["price-floors.enabled"           : "true",
                                                             "settings.default-account-config": mapper.encode(defaultAccountConfigSettings)]
-    protected final PrebidServerService floorsPbsService = pbsServiceFactory.getService(floorsConfig)
+    protected final PrebidServerService floorsPbsService = pbsServiceFactory.getService(floorsConfig +
+            PbsConfig.externalCurrencyConverterConfig)
 
     protected static final String basicFetchUrl = Dependencies.networkServiceContainer.rootUri +
             FloorsProvider.FLOORS_ENDPOINT
@@ -46,6 +48,13 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
 
     def setupSpec() {
         floorsProvider.setResponse()
+    }
+
+    static Account getAccountWithEnabledFetch(String accountId) {
+        def priceFloors = new AccountPriceFloorsConfig(enabled: true,
+                fetch: new PriceFloorsFetch(url: basicFetchUrl + accountId, enabled: true))
+        def accountConfig = new AccountConfig(auction: new AccountAuctionConfig(priceFloors: priceFloors))
+        new Account(uuid: accountId, config: accountConfig)
     }
 
     protected static AccountConfig getDefaultAccountConfigSettings() {
@@ -64,13 +73,6 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
         new AccountConfig(auction: new AccountAuctionConfig(priceFloors: floors))
     }
 
-    protected static Account getAccountWithEnabledFetch(String accountId) {
-        def priceFloors = new AccountPriceFloorsConfig(enabled: true,
-                fetch: new PriceFloorsFetch(url: basicFetchUrl + accountId, enabled: true))
-        def accountConfig = new AccountConfig(auction: new AccountAuctionConfig(priceFloors: priceFloors))
-        new Account(uuid: accountId, config: accountConfig)
-    }
-
     protected static BidRequest getBidRequestWithFloors(DistributionChannel channel = SITE) {
         def floors = ExtPrebidFloors.extPrebidFloors
         BidRequest.getDefaultBidRequest(channel).tap {
@@ -84,7 +86,6 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
         channel == SITE
                 ? BidRequest.defaultStoredRequest.tap { ext.prebid.floors = ExtPrebidFloors.extPrebidFloors }
                 : new BidRequest(ext: new BidRequestExt(prebid: new Prebid(debug: 1, floors: ExtPrebidFloors.extPrebidFloors)))
-
     }
 
     static String getRule() {
@@ -95,9 +96,9 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
         PBSUtils.getRandomNumber(DEFAULT_MODEL_WEIGHT, MAX_MODEL_WEIGHT)
     }
 
-    static BigDecimal getAdjustedValue(BigDecimal floorValue, Float bidAdjustment) {
+    static BigDecimal getAdjustedFloorValue(BigDecimal floorValue, Float bidAdjustment) {
         def adjustedValue = floorValue / bidAdjustment
-        PBSUtils.getRoundedFractionalNumber(adjustedValue as BigDecimal, FLOOR_VALUE_PRECISION)
+        getRoundedFloorValue(adjustedValue as BigDecimal)
     }
 
     static BidRequest getBidRequestWithMultipleMediaTypes() {
@@ -113,8 +114,9 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
     }
 
     protected void cacheFloorsProviderRules(PrebidServerService pbsService = floorsPbsService, BidRequest bidRequest) {
-        pbsService.sendAuctionRequest(bidRequest)
-        Thread.sleep(1000)
+        PBSUtils.waitUntil({ pbsService.sendAuctionRequest(bidRequest).ext?.debug?.resolvedRequest?.ext?.prebid?.floors?.fetchStatus != INPROGRESS },
+                5000,
+                1000)
     }
 
     protected void cacheFloorsProviderRules(PrebidServerService pbsService = floorsPbsService,
@@ -125,18 +127,7 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
                 1000)
     }
 
-    protected BigDecimal getRoundedFloorValue(BigDecimal floorValue) {
-        floorValue.setScale(FLOOR_VALUE_PRECISION, RoundingMode.HALF_EVEN)
-    }
-
-    protected BigDecimal getPriceAfterCurrencyConversion(BigDecimal value, Currency currencyFrom, Currency currencyTo) {
-        def currencyRate = getCurrencyRate(currencyFrom, currencyTo)
-        def convertedValue = value * currencyRate
-        convertedValue.setScale(CURRENCY_CONVERSION_PRECISION, RoundingMode.HALF_EVEN)
-    }
-
-    private BigDecimal getCurrencyRate(Currency currencyFrom, Currency currencyTo) {
-        def response = defaultPbsService.sendCurrencyRatesRequest()
-        response.rates[currencyFrom.value][currencyTo.value]
-    }
+   static protected BigDecimal getRoundedFloorValue(BigDecimal floorValue) {
+       floorValue.setScale(FLOOR_VALUE_PRECISION, RoundingMode.HALF_EVEN)
+   }
 }

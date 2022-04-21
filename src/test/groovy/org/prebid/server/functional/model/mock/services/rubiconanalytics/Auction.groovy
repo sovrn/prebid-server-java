@@ -12,4 +12,5 @@ class Auction {
     Integer serverTimeoutMillis
     Boolean hasRubiconId
     Gdpr gdpr
+    Floors floors
 }

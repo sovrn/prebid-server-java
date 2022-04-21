@@ -10,7 +10,7 @@ import org.prebid.server.functional.util.PBSUtils
 
 import static org.prebid.server.functional.model.Currency.BOGUS
 import static org.prebid.server.functional.model.Currency.EUR
-import static org.prebid.server.functional.model.Currency.GBP
+import static org.prebid.server.functional.model.Currency.JPY
 import static org.prebid.server.functional.model.Currency.USD
 import static org.prebid.server.functional.model.request.auction.FetchStatus.NONE
 import static org.prebid.server.functional.model.request.auction.FetchStatus.SUCCESS
@@ -77,7 +77,7 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
         cacheFloorsProviderRules(bidRequest)
 
         and: "Bid response with 2 bids: price < floorMin, price = floorMin"
-        def convertedMinFloorValue = getPriceAfterCurrencyConversion(floorValue,
+        def convertedMinFloorValue = convertCurrency(floorValue,
                 floorsResponse.data.modelGroups[0].currency, bidRequest.cur[0])
         def bidResponse = BidResponse.getDefaultBidResponse(bidRequest).tap {
             cur = EUR
@@ -113,7 +113,7 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
 
         and: "Set Floors Provider response with a currency different from the floorMinCur, floorValur lower then floorMin"
         def floorProviderCur = EUR
-        def convertedMinFloorValue = getPriceAfterCurrencyConversion(floorMin,
+        def convertedMinFloorValue = convertCurrency(floorMin,
                 bidRequest.ext.prebid.floors.floorMinCur, floorProviderCur)
 
         def floorsResponse = PriceFloorRules.priceFloorRules.tap {
@@ -169,6 +169,9 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
         and: "PBS fetch rules from floors provider"
         cacheFloorsProviderRules(pbsService, bidRequest)
 
+        and: "Flush metrics"
+        flushMetrics(pbsService)
+
         when: "PBS processes auction request"
         def response = pbsService.sendAuctionRequest(bidRequest)
 
@@ -185,8 +188,7 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
                 "to convert from currency $requestFloorCur to desired ad server currency $floorsProviderCur" as String]
 
         and: "Metric #GENERAL_ERROR_METRIC should be update"
-        def metrics = pbsService.sendCollectedMetricsRequest()
-        assert metrics[GENERAL_ERROR_METRIC] == 1
+        assert getCurrentMetricValue(pbsService, GENERAL_ERROR_METRIC) == 1
 
         and: "Bidder request should contain bidFloor, bidFloorCur from request"
         def bidderRequest = bidder.getBidderRequests(bidRequest.id).last()
@@ -265,14 +267,15 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
         cacheFloorsProviderRules(bidRequest)
 
         and: "Bid response with 2 bids: price < floorMin, price = floorMin"
-        def bidResponseCur = GBP
-        def convertedMinFloorValueGbp = getPriceAfterCurrencyConversion(floorValue, floorCur, bidResponseCur)
-        def winBidPrice = convertedMinFloorValueGbp + 0.1
+        def floorValueInRequestCur = convertCurrency(floorValue, floorCur, bidRequest.cur.last())
+        def bidResponseCur = JPY
+        def floorValueInBidderCur = convertCurrency(floorValueInRequestCur, bidRequest.cur.last(), bidResponseCur)
+        def winBidPrice = floorValueInBidderCur + 0.1
         def bidResponse = BidResponse.getDefaultBidResponse(bidRequest).tap {
             cur = bidResponseCur
             seatbid.first().bid << Bid.getDefaultBid(bidRequest.imp.first())
             seatbid.first().bid.first().price = winBidPrice
-            seatbid.first().bid.last().price = convertedMinFloorValueGbp - 0.1
+            seatbid.first().bid.last().price = floorValueInBidderCur - 0.1
         }
         bidder.setResponse(bidRequest.id, bidResponse)
 
@@ -287,8 +290,8 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
         }
 
         and: "PBS should suppress bids lower than floorRuleValue"
-        def convertedFloorValueEur = getPriceAfterCurrencyConversion(winBidPrice, bidResponseCur, requestCur)
-        assert response.seatbid?.first()?.bid?.collect { it.price } == [convertedFloorValueEur]
+        def bidPriceInRequestCur = convertCurrency(winBidPrice, bidResponseCur, requestCur)
+        assert response.seatbid?.first()?.bid?.collect { it.price } == [bidPriceInRequestCur]
         assert response.cur == bidRequest.cur[0]
     }
 
@@ -319,6 +322,9 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
         and: "PBS fetch rules from floors provider"
         cacheFloorsProviderRules(bidRequest)
 
+        and: "Flush metrics"
+        flushMetrics(floorsPbsService)
+
         when: "PBS processes auction request"
         def response = floorsPbsService.sendAuctionRequest(bidRequest)
 
@@ -329,8 +335,7 @@ class PriceFloorsCurrencySpec extends PriceFloorsBaseSpec {
                 "to convert from currency $requestFloorCur to desired ad server currency $floorsProviderCur" as String]
 
         and: "Metric #GENERAL_ERROR_METRIC should be update"
-        def metrics = floorsPbsService.sendCollectedMetricsRequest()
-        assert metrics[GENERAL_ERROR_METRIC] == 1
+        assert getCurrentMetricValue(floorsPbsService, GENERAL_ERROR_METRIC) == 1
 
         and: "Bidder request should contain bidFloor, bidFloorCur from request"
         def bidderRequest = bidder.getBidderRequests(bidRequest.id).last()

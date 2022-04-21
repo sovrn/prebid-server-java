@@ -33,7 +33,7 @@ class RubiconAnalytics extends NetworkScaffolding {
     }
 
     RubiconAnalyticsResponse getAnalyticsRequest(String bidRequestId) {
-        def analyticsRequests = getBidderRequests(bidRequestId)
+        def analyticsRequests = getAnalyticsRequests(bidRequestId)
         def analyticsCallCount = analyticsRequests.size()
 
         if (analyticsCallCount != 1) {
@@ -43,7 +43,7 @@ class RubiconAnalytics extends NetworkScaffolding {
         analyticsRequests.first()
     }
 
-    List<RubiconAnalyticsResponse> getBidderRequests(String bidRequestId) {
+    List<RubiconAnalyticsResponse> getAnalyticsRequests(String bidRequestId) {
         getRecordedRequestsBody(bidRequestId).collect { mapper.decode(it, RubiconAnalyticsResponse) }
     }
 }

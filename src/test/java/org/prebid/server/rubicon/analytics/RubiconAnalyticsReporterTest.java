@@ -42,6 +42,13 @@ import org.prebid.server.cookie.proto.Uids;
 import org.prebid.server.currency.CurrencyConversionService;
 import org.prebid.server.exception.InvalidRequestException;
 import org.prebid.server.exception.PreBidException;
+import org.prebid.server.floors.PriceFloorResolver;
+import org.prebid.server.floors.model.PriceFloorData;
+import org.prebid.server.floors.model.PriceFloorEnforcement;
+import org.prebid.server.floors.model.PriceFloorLocation;
+import org.prebid.server.floors.model.PriceFloorModelGroup;
+import org.prebid.server.floors.model.PriceFloorRules;
+import org.prebid.server.floors.proto.FetchStatus;
 import org.prebid.server.geolocation.CountryCodeMapper;
 import org.prebid.server.geolocation.model.GeoInfo;
 import org.prebid.server.model.CaseInsensitiveMultiMap;
@@ -75,6 +82,7 @@ import org.prebid.server.rubicon.analytics.proto.Gam;
 import org.prebid.server.rubicon.analytics.proto.Gdpr;
 import org.prebid.server.rubicon.analytics.proto.Impression;
 import org.prebid.server.rubicon.analytics.proto.Params;
+import org.prebid.server.rubicon.analytics.proto.PriceFloorsData;
 import org.prebid.server.rubicon.analytics.proto.User;
 import org.prebid.server.rubicon.audit.UidsAuditCookieService;
 import org.prebid.server.rubicon.audit.proto.UidAudit;
@@ -140,6 +148,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
     private UidsCookie uidsCookie;
     @Mock
     private HttpClient httpClient;
+    @Mock
+    private PriceFloorResolver floorResolver;
 
     private RubiconAnalyticsReporter reporter;
     @Mock
@@ -182,7 +192,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         reporter = new RubiconAnalyticsReporter(HOST_URL, 1, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
+                countryCodeMapper, ipAddressHelper, httpClient, floorResolver, false, jacksonMapper);
     }
 
     @Test
@@ -190,7 +200,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         assertThatIllegalArgumentException()
                 .isThrownBy(
                         () -> new RubiconAnalyticsReporter("invalid_url", null, null, null, PBS_HOST_VENDOR_ID, null,
-                                null, null, null, null, null, null, null, false, null))
+                                null, null, null, null, null, null, null, floorResolver, false, null))
                 .withMessage("URL supplied is not valid: invalid_url/event");
     }
 
@@ -758,7 +768,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         reporter = new RubiconAnalyticsReporter(HOST_URL, 10, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
-                currencyService, countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
+                currencyService, countryCodeMapper, ipAddressHelper, httpClient, floorResolver, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -794,7 +804,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         // given
         reporter = new RubiconAnalyticsReporter(HOST_URL, 100, "pbs-version-1", "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService,
-                currencyService, countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
+                currencyService, countryCodeMapper, ipAddressHelper, httpClient, floorResolver, false, jacksonMapper);
 
         givenHttpClientReturnsResponse(200, null);
 
@@ -913,10 +923,12 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverHasUserId(true)
                                                         .params(Params.of(123, 456, 789))
                                                         .bidResponse(org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of("some-deal-id",
-                                                                        BigDecimal.valueOf(4.56),
-                                                                        "video",
-                                                                        Dimensions.of(500, 600)))
+                                                                .BidResponse.builder()
+                                                                .dealId("some-deal-id")
+                                                                .bidPriceUsd(BigDecimal.valueOf(4.56))
+                                                                .mediaType("video")
+                                                                .dimensions(Dimensions.of(500, 600))
+                                                                .build())
                                                         .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -935,8 +947,12 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .bidResponse(org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of("456", BigDecimal.valueOf(5.67),
-                                                                        "video", Dimensions.of(600, 700)))
+                                                                .BidResponse.builder()
+                                                                .dealId("456")
+                                                                .bidPriceUsd(BigDecimal.valueOf(5.67))
+                                                                .mediaType("video")
+                                                                .dimensions(Dimensions.of(600, 700))
+                                                                .build())
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
@@ -945,12 +961,16 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverLatencyMillis(202)
                                                         .serverHasUserId(false)
                                                         .bidResponse(org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of("567", BigDecimal.valueOf(6.78),
-                                                                        "video", Dimensions.of(600, 700)))
+                                                                .BidResponse.builder()
+                                                                .dealId("567")
+                                                                .bidPriceUsd(BigDecimal.valueOf(6.78))
+                                                                .mediaType("video")
+                                                                .dimensions(Dimensions.of(600, 700))
+                                                                .build())
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
-                                                        .status("no-bid")
+                                                        .status("rejected-ipf")
                                                         .source("server")
                                                         .serverLatencyMillis(101)
                                                         .serverHasUserId(true)
@@ -1025,6 +1045,19 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .build()))
                                         .error(Error.of("timeout-error", "Timeout error"))
                                         .build()),
+                        PriceFloorsData.builder()
+                                .location(PriceFloorLocation.fetch)
+                                .fetchStatus(FetchStatus.success)
+                                .skipped(false)
+                                .modelName("someVersion")
+                                .enforcement(true)
+                                .dealsEnforced(false)
+                                .skipRate(77)
+                                .provider("someProvider")
+                                .floorMin(BigDecimal.ZERO)
+                                .modelTimestamp(123456L)
+                                .modelWeight(10)
+                                .build(),
                         123,
                         1000L,
                         true,
@@ -1273,7 +1306,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
 
         reporter = new RubiconAnalyticsReporter(HOST_URL, null, null, "pbsHostname", PBS_HOST_VENDOR_ID,
                 "dataCenterRegion", bidderCatalog, uidsCookieService, uidsAuditCookieService, currencyService,
-                countryCodeMapper, ipAddressHelper, httpClient, false, jacksonMapper);
+                countryCodeMapper, ipAddressHelper, httpClient, floorResolver, false, jacksonMapper);
 
         // when
         reporter.processEvent(event);
@@ -1433,10 +1466,12 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                 .params(Params.of(123, 456, 789))
                                                 .bidResponse(
                                                         org.prebid.server.rubicon.analytics.proto
-                                                                .BidResponse.of("some-deal-id",
-                                                                        BigDecimal.valueOf(0.46),
-                                                                        "video",
-                                                                        Dimensions.of(500, 600)))
+                                                                .BidResponse.builder()
+                                                                .dealId("some-deal-id")
+                                                                .bidPriceUsd(BigDecimal.valueOf(0.46))
+                                                                .mediaType("video")
+                                                                .dimensions(Dimensions.of(500, 600))
+                                                                .build())
                                                 .build()))
                                         .build(),
                                 AdUnit.builder()
@@ -1458,8 +1493,12 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of("456", BigDecimal.valueOf(0.57),
-                                                                                "video", Dimensions.of(600, 700)))
+                                                                        .BidResponse.builder()
+                                                                        .dealId("456")
+                                                                        .bidPriceUsd(BigDecimal.valueOf(0.57))
+                                                                        .mediaType("video")
+                                                                        .dimensions(Dimensions.of(600, 700))
+                                                                        .build())
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("appnexus")
@@ -1469,12 +1508,16 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .serverHasUserId(false)
                                                         .bidResponse(
                                                                 org.prebid.server.rubicon.analytics.proto
-                                                                        .BidResponse.of("567", BigDecimal.valueOf(0.68),
-                                                                                "video", Dimensions.of(600, 700)))
+                                                                        .BidResponse.builder()
+                                                                        .dealId("567")
+                                                                        .bidPriceUsd(BigDecimal.valueOf(0.68))
+                                                                        .mediaType("video")
+                                                                        .dimensions(Dimensions.of(600, 700))
+                                                                        .build())
                                                         .build(),
                                                 org.prebid.server.rubicon.analytics.proto.Bid.builder()
                                                         .bidder("rubicon")
-                                                        .status("no-bid")
+                                                        .status("rejected-ipf")
                                                         .source("server")
                                                         .serverLatencyMillis(101)
                                                         .serverHasUserId(true)
@@ -1543,6 +1586,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                         .build()))
                                         .error(Error.of("timeout-error", "Timeout error"))
                                         .build()),
+                        null,
                         123,
                         1000L,
                         true,
@@ -1605,7 +1649,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                 .video(Video.builder().build())
                                 .ext(mapper.createObjectNode()
                                         .set("prebid", mapper.createObjectNode()
-                                                .set("bidder", mapper.createObjectNode()
+                                                .setAll(Map.of("bidder", mapper.createObjectNode()
                                                         .set("rubicon", mapper.valueToTree(
                                                                 ExtImpRubicon.builder()
                                                                         .video(RubiconVideoParams.builder()
@@ -1614,7 +1658,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                                                         .accountId(123)
                                                                         .siteId(456)
                                                                         .zoneId(789)
-                                                                        .build())))))
+                                                                        .build()))))))
                                 .build(),
                         Imp.builder().id("impId2")
                                 .video(Video.builder().startdelay(-1).w(100).h(200).build())
@@ -1656,6 +1700,25 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                 .cur(singletonList("USD"))
                 .ext(ExtRequest.of(ExtRequestPrebid.builder()
                         .integration(integration)
+                        .floors(PriceFloorRules.builder()
+                                .location(PriceFloorLocation.fetch)
+                                .fetchStatus(FetchStatus.success)
+                                .skipped(false)
+                                .skipRate(77)
+                                .floorProvider("someProvider")
+                                .floorMin(BigDecimal.ZERO)
+                                .data(PriceFloorData.builder()
+                                        .modelTimestamp(123456L)
+                                        .modelGroups(singletonList(PriceFloorModelGroup.builder()
+                                                .modelVersion("someVersion")
+                                                .modelWeight(10)
+                                                .build()))
+                                        .build())
+                                .enforcement(PriceFloorEnforcement.builder()
+                                        .enforcePbs(true)
+                                        .floorDeals(false)
+                                        .build())
+                                .build())
                         .bidders(mapper.valueToTree(ExtRequestPrebidBidders.of(
                                 ExtRequestPrebidBiddersRubicon.of(null, wrappername))))
                         .channel(ExtRequestPrebidChannel.of("app"))
@@ -1768,6 +1831,8 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
         final Map<String, List<ExtBidderError>> errors = doubleMap(
                 "appnexus", singletonList(ExtBidderError.of(1, "Timeout error", singleton("impId6"))),
                 "pubmatic", singletonList(ExtBidderError.of(1, "Timeout error", singleton("impId2"))));
+        final Map<String, List<ExtBidderError>> warnings = Map.of("rubicon",
+                singletonList(ExtBidderError.of(6, "Ipf error message", singleton("impId2"))));
 
         return BidResponse.builder()
                 .seatbid(asList(
@@ -1821,6 +1886,7 @@ public class RubiconAnalyticsReporterTest extends VertxTest {
                                 .build()))
                 .ext(ExtBidResponse.builder()
                         .errors(errors)
+                        .warnings(warnings)
                         .responsetimemillis(doubleMap("rubicon", 101, "appnexus", 202))
                         .build())
                 .build();

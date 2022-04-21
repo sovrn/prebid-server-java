@@ -441,7 +441,7 @@ class PriceFloorsSignalingSpec extends PriceFloorsBaseSpec {
 
         then: "Bidder request bidFloor should be update according to bidAdjustment"
         def bidderRequest = bidder.getBidderRequests(bidRequest.id).last()
-        assert bidderRequest.imp[0].bidFloor == getAdjustedValue(floorValue, bidAdjustment)
+        assert bidderRequest.imp[0].bidFloor == getAdjustedFloorValue(floorValue, bidAdjustment)
         assert bidderRequest.imp[0].ext.prebid.floors.floorRuleValue == floorValue
         assert bidderRequest.imp[0].ext.prebid.floors.floorValue == bidderRequest.imp[0].bidFloor
     }
@@ -468,7 +468,7 @@ class PriceFloorsSignalingSpec extends PriceFloorsBaseSpec {
         floorsProvider.setResponse(bidRequest.site.publisher.id, floorsResponse)
 
         when: "PBS cache rules and processes auction request"
-        cacheFloorsProviderRules(bidRequest, floorValue)
+        cacheFloorsProviderRules(bidRequest)
 
         then: "Bidder request should contain 1 modelGroup"
         def bidderRequest = bidder.getBidderRequests(bidRequest.id).last()

@@ -22,30 +22,31 @@ class Rule {
     private Country country
     private DeviceType deviceType
 
-    // TODO add factory for delimiter
     @JsonValue
     String getRule() {
-        delimiter = delimiter ?: DEFAULT_DELIMITER
+        defineDelimiter()
         def stringBuilder = new StringBuilder()
         this.class.declaredFields.findAll { !it.synthetic && !Modifier.isStatic(it.modifiers) && this[it.name] != null && it.name != "delimiter" }.each {
-            stringBuilder.append(this[it.name])
-                         .append(delimiter)
+            stringBuilder << this[it.name] << delimiter
         }
         StringUtils.removeEnd(stringBuilder.toString(), delimiter).toLowerCase()
     }
 
     @JsonValue
     String getRule(List<PriceFloorField> fields) {
-        delimiter = delimiter ?: DEFAULT_DELIMITER
-        def result = ""
+        defineDelimiter()
+        def stringBuilder = new StringBuilder()
         def classFields = this.class.declaredFields.findAll { !it.synthetic }
-        fields.each {
-            def fieldName = it.value
-            def classField = classFields.findAll { it.name == fieldName }
-                                        .collect { this[it.name] }
-            result += classField[0]
-            result += delimiter
+        fields.each { field ->
+            def classField = classFields.find { it.name == field.value }?.name
+            stringBuilder << this[classField] << delimiter
         }
-        StringUtils.removeEnd(result, delimiter).toLowerCase()
+        StringUtils.removeEnd(stringBuilder.toString(), delimiter).toLowerCase()
+    }
+
+    private void defineDelimiter() {
+        if (!delimiter) {
+            delimiter = DEFAULT_DELIMITER
+        }
     }
 }

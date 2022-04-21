@@ -6,6 +6,10 @@ import groovy.transform.ToString
 import org.prebid.server.functional.model.Currency
 import org.prebid.server.functional.util.PBSUtils
 
+import static org.prebid.server.functional.model.Currency.USD
+import static org.prebid.server.functional.model.pricefloors.PriceFloorField.COUNTRY
+import static org.prebid.server.functional.model.pricefloors.PriceFloorField.MEDIA_TYPE
+
 @EqualsAndHashCode
 @ToString(includeNames = true, ignoreNulls = true)
 class ModelGroup {
@@ -20,11 +24,10 @@ class ModelGroup {
     BigDecimal defaultFloor
 
     static ModelGroup getModelGroup() {
-        new ModelGroup(
-                currency: Currency.USD,
+        new ModelGroup(currency: USD,
                 schema: PriceFloorSchema.priceFloorSchema,
                 values: [(new Rule(mediaType: MediaType.MULTIPLE, country: Country.MULTIPLE)
-                        .getRule([PriceFloorField.MEDIA_TYPE, PriceFloorField.COUNTRY])): PBSUtils.randomFloorValue]
+                        .getRule([MEDIA_TYPE, COUNTRY])): PBSUtils.randomFloorValue]
         )
     }
 }

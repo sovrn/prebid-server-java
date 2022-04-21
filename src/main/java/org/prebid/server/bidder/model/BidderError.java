@@ -3,6 +3,7 @@ package org.prebid.server.bidder.model;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
+import java.util.Collections;
 import java.util.Set;
 
 /**
@@ -42,8 +43,8 @@ public class BidderError {
         return BidderError.of(message, Type.bad_server_response);
     }
 
-    public static BidderError rejectedIpf(String message) {
-        return BidderError.of(message, Type.rejected_ipf);
+    public static BidderError rejectedIpf(String message, String impId) {
+        return BidderError.of(message, Type.rejected_ipf, Collections.singleton(impId));
     }
 
     public static BidderError failedToRequestBids(String message) {
