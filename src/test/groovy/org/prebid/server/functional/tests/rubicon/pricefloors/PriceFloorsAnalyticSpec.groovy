@@ -2,10 +2,9 @@ package org.prebid.server.functional.tests.rubicon.pricefloors
 
 import org.prebid.server.functional.model.bidder.Rubicon
 import org.prebid.server.functional.model.db.StoredRequest
-import org.prebid.server.functional.model.mock.services.floorsprovider.PriceFloorRules
 import org.prebid.server.functional.model.mock.services.rubiconanalytics.Status
 import org.prebid.server.functional.model.pricefloors.MediaType
-import org.prebid.server.functional.model.pricefloors.PriceFloorEnforcement
+import org.prebid.server.functional.model.pricefloors.PriceFloorData
 import org.prebid.server.functional.model.pricefloors.PriceFloorSchema
 import org.prebid.server.functional.model.pricefloors.Rule
 import org.prebid.server.functional.model.request.amp.AmpRequest
@@ -99,9 +98,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            floorMin = floorValue
-            data.modelGroups[0].values = [(rule): floorValue]
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorValue]
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -147,8 +145,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
             !auctions?.first()?.floors?.enforcement
             !auctions?.first()?.floors?.dealsEnforced
             auctions?.first()?.floors?.skipRate == floorsResponse.skipRate
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
-            auctions?.first()?.floors?.floorMin == floorValue
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
+            !auctions?.first()?.floors?.floorMin
             !auctions?.first()?.floors?.modelTimestamp
             !auctions?.first()?.floors?.modelWeight
         }
@@ -177,10 +175,9 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            floorMin = PBSUtils.randomNumber
-            data.modelGroups[0].values = [(rule): floorValue]
-            data.modelGroups[0].currency = USD
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorValue]
+            modelGroups[0].currency = USD
         }
         floorsProvider.setResponse(ampRequest.account as String, floorsResponse)
 
@@ -226,7 +223,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
             !auctions?.first()?.floors?.enforcement
             !auctions?.first()?.floors?.dealsEnforced
             auctions?.first()?.floors?.skipRate == floorsResponse.skipRate
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
             auctions?.first()?.floors?.floorMin == ampStoredRequest.ext.prebid.floors.floorMin
             !auctions?.first()?.floors?.modelTimestamp
             !auctions?.first()?.floors?.modelWeight
@@ -252,9 +249,9 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         def floorProviderCur = EUR
         def floorMinFloorProviderCur = convertCurrency(floorMin, bidRequest.ext.prebid.floors.floorMinCur, floorProviderCur)
         def floorRuleValueEur = floorMinFloorProviderCur - 0.1
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorRuleValueEur]
-            data.modelGroups[0].currency = floorProviderCur
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorRuleValueEur]
+            modelGroups[0].currency = floorProviderCur
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -284,7 +281,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorValue == signallingFloorValue
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRule ==
-                    floorsResponse.data.modelGroups[0].values.keySet()[0]
+                    floorsResponse.modelGroups[0].values.keySet()[0]
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRuleValue == floorRuleValueUsd
 
             auctions?.first()?.floors?.location == FETCH
@@ -294,7 +291,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
             !auctions?.first()?.floors?.enforcement
             !auctions?.first()?.floors?.dealsEnforced
             auctions?.first()?.floors?.skipRate == floorsResponse.skipRate
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
             auctions?.first()?.floors?.floorMin == floorMin
             !auctions?.first()?.floors?.modelTimestamp
             !auctions?.first()?.floors?.modelWeight
@@ -325,9 +322,9 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         def floorProviderCur = EUR
         def floorMinFloorProviderCur = convertCurrency(floorMin, ampStoredRequest.ext.prebid.floors.floorMinCur, floorProviderCur)
         def floorRuleValueEur = floorMinFloorProviderCur - 0.1
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorRuleValueEur]
-            data.modelGroups[0].currency = floorProviderCur
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorRuleValueEur]
+            modelGroups[0].currency = floorProviderCur
         }
         floorsProvider.setResponse(ampRequest.account as String, floorsResponse)
 
@@ -356,7 +353,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorValue == signallingFloorValue
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRule ==
-                    floorsResponse.data.modelGroups[0].values.keySet()[0]
+                    floorsResponse.modelGroups[0].values.keySet()[0]
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRuleValue == floorRuleValueUsd
 
             auctions?.first()?.floors?.location == FETCH
@@ -366,7 +363,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
             !auctions?.first()?.floors?.enforcement
             !auctions?.first()?.floors?.dealsEnforced
             auctions?.first()?.floors?.skipRate == floorsResponse.skipRate
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
             auctions?.first()?.floors?.floorMin == floorMin
             !auctions?.first()?.floors?.modelTimestamp
             !auctions?.first()?.floors?.modelWeight
@@ -387,8 +384,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         accountDao.save(account)
 
         and: "Set Floors Provider response"
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorsProviderFloorValue]
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorsProviderFloorValue]
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -413,7 +410,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorValue == floorsProviderFloorValue
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRule ==
-                    floorsResponse.data.modelGroups[0].values.keySet()[0]
+                    floorsResponse.modelGroups[0].values.keySet()[0]
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRuleValue == floorsProviderFloorValue
         }
     }
@@ -437,8 +434,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         accountDao.save(account)
 
         and: "Set Floors Provider response"
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorsProviderFloorValue]
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorsProviderFloorValue]
         }
         floorsProvider.setResponse(ampRequest.account as String, floorsResponse)
 
@@ -463,7 +460,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorValue == floorsProviderFloorValue
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRule ==
-                    floorsResponse.data.modelGroups[0].values.keySet()[0]
+                    floorsResponse.modelGroups[0].values.keySet()[0]
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRuleValue == floorsProviderFloorValue
         }
     }
@@ -578,6 +575,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         given: "Rubicon BidRequest with floors, preferdeals = true"
         def bidRequest = bidRequestWithFloors.tap {
             ext.prebid.targeting = new Targeting(preferdeals: true)
+            ext.prebid.floors.enforcement = new ExtPrebidPriceFloorEnforcement(floorDeals: true)
         }
 
         and: "Account with enabled fetch, fetch.url in the DB"
@@ -586,9 +584,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorValue]
-            enforcement = new PriceFloorEnforcement(floorDeals: true)
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorValue]
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -623,6 +620,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         given: "Rubicon BidRequest with floors"
         def bidRequest = bidRequestWithFloors.tap {
             ext.prebid.targeting = new Targeting(preferdeals: true)
+            ext.prebid.floors.enforcement = new ExtPrebidPriceFloorEnforcement(floorDeals: false)
         }
 
         and: "Account with enabled fetch, fetch.url in the DB"
@@ -631,9 +629,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorValue]
-            enforcement = new PriceFloorEnforcement(floorDeals: false)
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorValue]
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -676,10 +673,10 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response with skipRate"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorValue]
-            data.modelGroups[0].currency = USD
-            data.modelGroups[0].skipRate = 100
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorValue]
+            modelGroups[0].currency = USD
+            modelGroups[0].skipRate = 100
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -696,13 +693,13 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorValue == floorValue
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRule ==
-                    floorsResponse.data.modelGroups[0].values.keySet()[0]
+                    floorsResponse.modelGroups[0].values.keySet()[0]
             auctions?.first()?.adUnits?.first()?.bids?.first()?.bidResponse?.floorRuleValue == floorValue
 
             auctions?.first()?.floors?.location == FETCH
             auctions?.first()?.floors?.fetchStatus == SUCCESS
             auctions?.first()?.floors?.skipped
-            auctions?.first()?.floors?.skipRate == floorsResponse.data.modelGroups[0].skipRate
+            auctions?.first()?.floors?.skipRate == floorsResponse.modelGroups[0].skipRate
         }
     }
 
@@ -716,12 +713,12 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].values = [(rule): floorValue]
-            data.modelGroups[0].modelVersion = PBSUtils.randomString
-            data.modelGroups[0].modelWeight = PriceFloorsBaseSpec.modelWeight
-            data.floorProvider = PBSUtils.randomString
-            data.modelTimestamp = PBSUtils.randomNumber
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].values = [(rule): floorValue]
+            modelGroups[0].modelVersion = PBSUtils.randomString
+            modelGroups[0].modelWeight = PriceFloorsBaseSpec.modelWeight
+            floorProvider = PBSUtils.randomString
+            modelTimestamp = PBSUtils.randomNumber
         }
         floorsProvider.setResponse(bidRequest.app.publisher.id, floorsResponse)
 
@@ -740,10 +737,10 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         then: "Analytics request should contain modelName, provider, modelTimestamp, modelWeight from floors provider"
         def analyticsRequest = rubiconAnalytics.getAnalyticsRequests(bidRequest.id).last()
         verifyAll(analyticsRequest) {
-            auctions?.first()?.floors?.modelName == floorsResponse.data.modelGroups[0].modelVersion
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
-            auctions?.first()?.floors?.modelTimestamp == floorsResponse.data.modelTimestamp
-            auctions?.first()?.floors?.modelWeight == floorsResponse.data.modelGroups[0].modelWeight
+            auctions?.first()?.floors?.modelName == floorsResponse.modelGroups[0].modelVersion
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
+            auctions?.first()?.floors?.modelTimestamp == floorsResponse.modelTimestamp
+            auctions?.first()?.floors?.modelWeight == floorsResponse.modelGroups[0].modelWeight
         }
     }
 
@@ -766,10 +763,9 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
         def videoMediaTypeRule = new Rule(mediaType: VIDEO).rule
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            floorMin = floorValue
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values =
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
+            modelGroups[0].values =
                     [(new Rule(mediaType: MediaType.MULTIPLE).rule): floorValue + 0.2,
                      (new Rule(mediaType: BANNER).rule)            : floorValue + 0.1,
                      (videoMediaTypeRule)                          : floorValue]
@@ -818,8 +814,8 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
             !auctions?.first()?.floors?.enforcement
             !auctions?.first()?.floors?.dealsEnforced
             auctions?.first()?.floors?.skipRate == floorsResponse.skipRate
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
-            auctions?.first()?.floors?.floorMin == floorValue
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
+            !auctions?.first()?.floors?.floorMin
             !auctions?.first()?.floors?.modelTimestamp
             !auctions?.first()?.floors?.modelWeight
         }
@@ -850,10 +846,9 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
         def videoMediaTypeRule = new Rule(mediaType: VIDEO).rule
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            floorMin = floorValue
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values =
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
+            modelGroups[0].values =
                     [(new Rule(mediaType: MediaType.MULTIPLE).rule): floorValue + 0.2,
                      (new Rule(mediaType: BANNER).rule)            : floorValue + 0.1,
                      (videoMediaTypeRule)                          : floorValue]
@@ -902,7 +897,7 @@ class PriceFloorsAnalyticSpec extends RubiconBaseSpec {
             !auctions?.first()?.floors?.enforcement
             !auctions?.first()?.floors?.dealsEnforced
             auctions?.first()?.floors?.skipRate == floorsResponse.skipRate
-            auctions?.first()?.floors?.provider == floorsResponse.data.floorProvider
+            auctions?.first()?.floors?.provider == floorsResponse.floorProvider
             auctions?.first()?.floors?.floorMin == ampStoredRequest.ext.prebid.floors.floorMin
             !auctions?.first()?.floors?.modelTimestamp
             !auctions?.first()?.floors?.modelWeight

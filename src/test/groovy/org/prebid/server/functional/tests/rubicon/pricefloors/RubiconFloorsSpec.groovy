@@ -1,8 +1,8 @@
 package org.prebid.server.functional.tests.rubicon.pricefloors
 
 import org.prebid.server.functional.model.db.StoredRequest
-import org.prebid.server.functional.model.mock.services.floorsprovider.PriceFloorRules
 import org.prebid.server.functional.model.pricefloors.MediaType
+import org.prebid.server.functional.model.pricefloors.PriceFloorData
 import org.prebid.server.functional.model.pricefloors.PriceFloorSchema
 import org.prebid.server.functional.model.pricefloors.Rule
 import org.prebid.server.functional.model.request.amp.AmpRequest
@@ -44,9 +44,9 @@ class RubiconFloorsSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values =
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
+            modelGroups[0].values =
                     [(new Rule(mediaType: MediaType.MULTIPLE).rule): floorValue + 0.2,
                      (new Rule(mediaType: BANNER).rule)            : floorValue + 0.1,
                      (new Rule(mediaType: VIDEO).rule)             : floorValue]
@@ -92,9 +92,9 @@ class RubiconFloorsSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values =
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
+            modelGroups[0].values =
                     [(new Rule(mediaType: MediaType.MULTIPLE).rule): floorValue + 0.2,
                      (new Rule(mediaType: BANNER).rule)            : floorValue + 0.1,
                      (new Rule(mediaType: VIDEO).rule)             : floorValue]
@@ -129,9 +129,9 @@ class RubiconFloorsSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values =
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
+            modelGroups[0].values =
                     [(new Rule(mediaType: MediaType.MULTIPLE).rule): floorValue + 0.2,
                      (new Rule(mediaType: BANNER).rule)            : floorValue + 0.1,
                      (new Rule(mediaType: VIDEO).rule)             : floorValue]
@@ -187,9 +187,9 @@ class RubiconFloorsSpec extends RubiconBaseSpec {
 
         and: "Set Floors Provider response"
         def floorValue = PBSUtils.randomFloorValue
-        def floorsResponse = PriceFloorRules.priceFloorRules.tap {
-            data.modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
-            data.modelGroups[0].values =
+        def floorsResponse = PriceFloorData.priceFloorData.tap {
+            modelGroups[0].schema = new PriceFloorSchema(fields: [MEDIA_TYPE])
+            modelGroups[0].values =
                     [(new Rule(mediaType: MediaType.MULTIPLE).rule): floorValue + 0.2,
                      (new Rule(mediaType: BANNER).rule)            : floorValue + 0.1,
                      (new Rule(mediaType: VIDEO).rule)             : floorValue]
