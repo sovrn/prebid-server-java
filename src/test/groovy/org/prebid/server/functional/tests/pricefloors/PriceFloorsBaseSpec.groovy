@@ -31,7 +31,7 @@ import static org.prebid.server.functional.model.request.auction.FetchStatus.INP
 @PBSTest
 abstract class PriceFloorsBaseSpec extends BaseSpec {
 
-    public static final float FLOOR_MIN = 0.5
+    public static final BigDecimal FLOOR_MIN = 0.5
     public static final Map<String, String> floorsConfig = ["price-floors.enabled"           : "true",
                                                             "settings.default-account-config": mapper.encode(defaultAccountConfigSettings)]
     protected final PrebidServerService floorsPbsService = pbsServiceFactory.getService(floorsConfig)
@@ -96,9 +96,9 @@ abstract class PriceFloorsBaseSpec extends BaseSpec {
         PBSUtils.getRandomNumber(DEFAULT_MODEL_WEIGHT, MAX_MODEL_WEIGHT)
     }
 
-    static BigDecimal getAdjustedValue(BigDecimal floorValue, Float bidAdjustment) {
+    static BigDecimal getAdjustedValue(BigDecimal floorValue, BigDecimal bidAdjustment) {
         def adjustedValue = floorValue / bidAdjustment
-        PBSUtils.getRoundedFractionalNumber(adjustedValue as BigDecimal, FLOOR_VALUE_PRECISION)
+        PBSUtils.roundDecimal(adjustedValue, FLOOR_VALUE_PRECISION)
     }
 
     static BidRequest getBidRequestWithMultipleMediaTypes() {
