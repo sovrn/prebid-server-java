@@ -4,11 +4,14 @@
     {
       "id": "imp_id",
       "banner": {
-        "w": 300,
+        "w": 320,
         "h": 250
       },
+      "tagid": "pkey",
       "ext": {
-        "placementId": "testPlacementId"
+        "bidder": {
+          "pkey": "pkey"
+        }
       }
     }
   ],
@@ -31,6 +34,12 @@
   "cur": [
     "USD"
   ],
+  "source": {
+    "ext": {
+      "str": "10.0",
+      "version": "{{ pbs.java.version }}"
+    }
+  },
   "regs": {
     "ext": {
       "gdpr": 0
