@@ -23,6 +23,7 @@ import spock.lang.Specification
 import java.math.RoundingMode
 
 import static java.math.RoundingMode.DOWN
+import static org.prebid.server.functional.util.SystemProperties.DEFAULT_TIMEOUT
 import static org.prebid.server.functional.model.Currency.EUR
 import static org.prebid.server.functional.model.Currency.JPY
 import static org.prebid.server.functional.model.Currency.USD
@@ -53,10 +54,8 @@ abstract class BaseSpec extends Specification {
     protected static final StoredRequestDao storedRequestDao = repository.storedRequestDao
     protected static final StoredResponseDao storedResponseDao = repository.storedResponseDao
 
-    protected static final String fetchUrl = Dependencies.networkServiceContainer.rootUri +
-            FloorsProvider.FLOORS_ENDPOINT
-    protected static final int MAX_TIMEOUT = 6000
-    private static final int MIN_TIMEOUT = 5000
+    protected static final int MAX_TIMEOUT = MIN_TIMEOUT + 1000
+    private static final int MIN_TIMEOUT = DEFAULT_TIMEOUT
     private static final int DEFAULT_TARGETING_PRECISION = 1
     public static final Currency DEFAULT_CURRENCY = USD
     protected static final int PRICE_PRECISION = 3
@@ -70,7 +69,6 @@ abstract class BaseSpec extends Specification {
         bidder.reset()
         prebidCache.reset()
         repository.removeAllDatabaseData()
-        pbsServiceFactory.stopContainers()
     }
 
     protected static int getRandomTimeout() {
