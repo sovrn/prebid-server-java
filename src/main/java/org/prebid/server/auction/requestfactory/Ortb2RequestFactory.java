@@ -44,6 +44,7 @@ import org.prebid.server.hooks.v1.entrypoint.EntrypointPayload;
 import org.prebid.server.json.JacksonMapper;
 import org.prebid.server.log.ConditionalLogger;
 import org.prebid.server.metric.MetricName;
+import org.prebid.server.metric.Metrics;
 import org.prebid.server.model.CaseInsensitiveMultiMap;
 import org.prebid.server.model.Endpoint;
 import org.prebid.server.model.HttpRequestContext;
@@ -103,6 +104,7 @@ public class Ortb2RequestFactory {
     private final HookStageExecutor hookStageExecutor;
     private final PriceFloorProcessor priceFloorProcessor;
     private final CountryCodeMapper countryCodeMapper;
+    private final Metrics metrics;
     private final Clock clock;
     private final JacksonMapper mapper;
 
@@ -119,6 +121,7 @@ public class Ortb2RequestFactory {
                                DealsPopulator dealsPopulator,
                                PriceFloorProcessor priceFloorProcessor,
                                CountryCodeMapper countryCodeMapper,
+                               Metrics metrics,
                                Clock clock,
                                JacksonMapper mapper) {
 
@@ -135,6 +138,7 @@ public class Ortb2RequestFactory {
         this.dealsPopulator = dealsPopulator;
         this.priceFloorProcessor = Objects.requireNonNull(priceFloorProcessor);
         this.countryCodeMapper = Objects.requireNonNull(countryCodeMapper);
+        this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
         this.mapper = Objects.requireNonNull(mapper);
     }
@@ -309,7 +313,7 @@ public class Ortb2RequestFactory {
         final String accountId = accountIdFrom(bidRequest);
         return StringUtils.isNotBlank(accountId) || !isLookupStoredRequest
                 ? Future.succeededFuture(accountId)
-                : storedRequestProcessor.processStoredRequests(accountId, bidRequest)
+                : storedRequestProcessor.processAuctionRequest(accountId, bidRequest)
                 .map(this::accountIdFrom);
     }
 
@@ -328,11 +332,15 @@ public class Ortb2RequestFactory {
     private Future<Account> loadAccount(Timeout timeout,
                                         HttpRequestContext httpRequest,
                                         String accountId) {
-        return StringUtils.isBlank(accountId)
+
+        final Future<Account> accountFuture = StringUtils.isBlank(accountId)
                 ? responseForEmptyAccount(httpRequest)
                 : applicationSettings.getAccountById(accountId, timeout)
                 .compose(this::ensureAccountActive,
                         exception -> accountFallback(exception, accountId, httpRequest));
+
+        return accountFuture
+                .onFailure(ignored -> metrics.updateAccountRequestRejectedByInvalidAccountMetrics(accountId));
     }
 
     /**

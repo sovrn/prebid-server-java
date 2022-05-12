@@ -48,6 +48,7 @@ import org.prebid.server.hooks.execution.model.HookStageExecutionResult;
 import org.prebid.server.hooks.execution.v1.auction.AuctionRequestPayloadImpl;
 import org.prebid.server.hooks.execution.v1.entrypoint.EntrypointPayloadImpl;
 import org.prebid.server.metric.MetricName;
+import org.prebid.server.metric.Metrics;
 import org.prebid.server.model.CaseInsensitiveMultiMap;
 import org.prebid.server.model.Endpoint;
 import org.prebid.server.model.HttpRequestContext;
@@ -125,6 +126,8 @@ public class Ortb2RequestFactoryTest extends VertxTest {
     private PriceFloorProcessor priceFloorProcessor;
     @Mock
     private CountryCodeMapper countryCodeMapper;
+    @Mock
+    private Metrics metrics;
 
     private final Clock clock = Clock.systemDefaultZone();
 
@@ -184,8 +187,52 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 dealsPopulator,
                 priceFloorProcessor,
                 countryCodeMapper,
+                metrics,
                 clock,
                 jacksonMapper);
+    }
+
+    @Test
+    public void shouldIncrementRejectedByInvalidAccountMetricsIfUnknownUser() {
+        // given
+        target = new Ortb2RequestFactory(
+                true,
+                BLACKLISTED_ACCOUNTS,
+                uidsCookieService,
+                requestValidator,
+                timeoutResolver,
+                timeoutFactory,
+                storedRequestProcessor,
+                applicationSettings,
+                ipAddressHelper,
+                hookStageExecutor,
+                dealsPopulator,
+                priceFloorProcessor,
+                countryCodeMapper,
+                metrics,
+                clock,
+                jacksonMapper);
+
+        final String accountId = "1234";
+        final BidRequest bidRequest = givenBidRequest(builder -> builder
+                .app(App.builder()
+                        .publisher(Publisher.builder().id(accountId).build())
+                        .build()));
+
+        given(applicationSettings.getAccountById(any(), any()))
+                .willReturn(Future.failedFuture(new PreBidException("Not found")));
+        given(storedRequestProcessor.processAuctionRequest(anyString(), any()))
+                .willReturn(Future.succeededFuture(bidRequest));
+
+        // when
+        target.fetchAccount(
+                AuctionContext.builder()
+                        .httpRequest(httpRequest)
+                        .bidRequest(bidRequest)
+                        .build());
+
+        // then
+        verify(metrics).updateAccountRequestRejectedByInvalidAccountMetrics(eq("1234"));
     }
 
     @Test
@@ -205,10 +252,11 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 dealsPopulator,
                 priceFloorProcessor,
                 countryCodeMapper,
+                metrics,
                 clock,
                 jacksonMapper);
 
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.succeededFuture(givenBidRequest(identity())));
 
         // when
@@ -244,6 +292,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 dealsPopulator,
                 priceFloorProcessor,
                 countryCodeMapper,
+                metrics,
                 clock,
                 jacksonMapper);
 
@@ -441,7 +490,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .build()))
                 .build();
 
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.succeededFuture(givenBidRequest(identity())));
 
         // when
@@ -671,7 +720,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(identity());
 
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.succeededFuture(bidRequest));
 
         given(applicationSettings.getAccountById(any(), any()))
@@ -701,7 +750,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .publisher(Publisher.builder().id(accountId).build())
                         .build()));
 
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.succeededFuture(mergedBidRequest));
 
         final Account fetchedAccount = Account.builder().id(accountId).status(AccountStatus.active).build();
@@ -716,7 +765,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .build());
 
         // then
-        verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
+        verify(storedRequestProcessor).processAuctionRequest("", receivedBidRequest);
         verify(applicationSettings).getAccountById(eq(accountId), any());
 
         assertThat(result.result()).isEqualTo(fetchedAccount);
@@ -731,7 +780,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 .site(Site.builder()
                         .publisher(Publisher.builder().id("321").build()).build()));
 
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.succeededFuture(mergedBidRequest));
 
         // when
@@ -742,7 +791,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .build());
 
         // then
-        verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
+        verify(storedRequestProcessor).processAuctionRequest("", receivedBidRequest);
         verifyNoInteractions(applicationSettings);
 
         assertThat(result.failed()).isTrue();
@@ -769,11 +818,12 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                 dealsPopulator,
                 priceFloorProcessor,
                 countryCodeMapper,
+                metrics,
                 clock,
                 jacksonMapper);
 
         final BidRequest receivedBidRequest = givenBidRequest(identity());
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.failedFuture(new RuntimeException("error")));
 
         // when
@@ -784,7 +834,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .build());
 
         // then
-        verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
+        verify(storedRequestProcessor).processAuctionRequest("", receivedBidRequest);
         verifyNoInteractions(applicationSettings);
 
         assertThat(result.failed()).isTrue();
@@ -795,7 +845,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
     public void shouldFetchAccountFromStoredAndReturnEmptyAccountIfStoredLookupIsFailed() {
         // given
         final BidRequest receivedBidRequest = givenBidRequest(identity());
-        given(storedRequestProcessor.processStoredRequests(any(), any()))
+        given(storedRequestProcessor.processAuctionRequest(any(), any()))
                 .willReturn(Future.failedFuture(new RuntimeException("error")));
 
         // when
@@ -806,7 +856,7 @@ public class Ortb2RequestFactoryTest extends VertxTest {
                         .build());
 
         // then
-        verify(storedRequestProcessor).processStoredRequests("", receivedBidRequest);
+        verify(storedRequestProcessor).processAuctionRequest("", receivedBidRequest);
         verifyNoInteractions(applicationSettings);
 
         assertThat(result.failed()).isTrue();
