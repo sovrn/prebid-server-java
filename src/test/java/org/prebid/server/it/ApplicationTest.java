@@ -655,7 +655,7 @@ public class ApplicationTest extends IntegrationTest {
                 final JsonNode aliasesNode = bidderEntry.getValue().get("aliases");
 
                 if (aliasesNode != null && aliasesNode.isObject()) {
-                    final Iterator<String> iterator = aliasesNode.fieldNames();
+                    Iterator<String> iterator = aliasesNode.fieldNames();
                     while (iterator.hasNext()) {
                         aliases.put(iterator.next().trim(), bidderName);
                     }

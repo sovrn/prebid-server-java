@@ -1197,9 +1197,9 @@ public class RubiconBidderTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldNotReturnErrorIfRequestContextIsMissed() {
+    public void makeHttpRequestsShouldReturnErrorIfNativeObjectVersionIsOneDotTwoAndRequestContextIsMissed() {
         // given
-        final String nativeRequest = "{\"eventtrackers\":[],\"plcmttype\":2}";
+        final String nativeRequest = "{\"eventtrackers\":[],\"placement\":2}";
         final Imp nativeImp = givenImp(builder -> builder
                 .id("1")
                 .xNative(Native.builder()
@@ -1212,8 +1212,11 @@ public class RubiconBidderTest extends VertxTest {
         final Result<List<HttpRequest<BidRequest>>> result = rubiconBidder.makeHttpRequests(bidRequest);
 
         // then
-        assertThat(result.getErrors()).isEmpty();
-        assertThat(result.getValue()).hasSize(1);
+        assertThat(result.getErrors())
+                .containsExactly(
+                        BidderError.of("Error in native object for imp with id 1: "
+                                + "Context is not present or not of int type", BidderError.Type.bad_input));
+        assertThat(result.getValue()).isEmpty();
     }
 
     @Test
@@ -1235,7 +1238,7 @@ public class RubiconBidderTest extends VertxTest {
         assertThat(result.getErrors())
                 .containsExactly(
                         BidderError.of("Error in native object for imp with id 1: "
-                                + "Context is not of int type", BidderError.Type.bad_input));
+                                + "Context is not present or not of int type", BidderError.Type.bad_input));
         assertThat(result.getValue()).isEmpty();
     }
 

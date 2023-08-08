@@ -391,7 +391,7 @@ public class CookieSyncService {
     }
 
     private static <T> Predicate<T> distinctBy(Function<? super T, ?> keyExtractor) {
-        final Set<Object> seen = new HashSet<>();
+        Set<Object> seen = new HashSet<>();
         return value -> seen.add(keyExtractor.apply(value));
     }
 

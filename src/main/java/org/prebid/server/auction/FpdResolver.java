@@ -83,7 +83,7 @@ public class FpdResolver {
     }
 
     private ExtUser updateUserExtDataWithFpdAttr(ObjectNode fpdUser, ExtUser originExtUser, ObjectNode extData) {
-        final ObjectNode resultData = extData != null ? extData : jacksonMapper.mapper().createObjectNode();
+        ObjectNode resultData = extData != null ? extData : jacksonMapper.mapper().createObjectNode();
         USER_DATA_ATTR.forEach(attribute -> setAttr(fpdUser, resultData, attribute));
         return originExtUser != null
                 ? originExtUser.toBuilder().data(resultData.isEmpty() ? null : resultData).build()

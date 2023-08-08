@@ -103,10 +103,9 @@ public class YeahmobiBidderTest extends VertxTest {
     @Test
     public void makeHttpRequestsShouldAddNativeRequestIfEmpty() {
         // given
-        final String nativeRequest = "{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,\"plcmtcnt\":1,"
-                + "\"assets\":[{\"id\":2,\"required\":1,\"title\":{\"len\":90}},{\"id\":6,\"required\":1,"
-                + "\"img\":{\"type\":3,\"wmin\":128,\"hmin\":128,"
-                + "\"mimes\":[\"image/jpg\",\"image/jpeg\",\"image/png\"]}},{\"id\":7,"
+        String nativeRequest = "{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,\"plcmtcnt\":1,\"assets\":[{\"id\":2,"
+                + "\"required\":1,\"title\":{\"len\":90}},{\"id\":6,\"required\":1,\"img\":{\"type\":3,\"wmin\""
+                + ":128,\"hmin\":128,\"mimes\":[\"image/jpg\",\"image/jpeg\",\"image/png\"]}},{\"id\":7,"
                 + "\"required\":1,\"data\":{\"type\":2,\"len\":120}}]}";
 
         final BidRequest bidRequest = givenBidRequest(
@@ -118,10 +117,9 @@ public class YeahmobiBidderTest extends VertxTest {
         final Result<List<HttpRequest<BidRequest>>> result = yeahmobiBidder.makeHttpRequests(bidRequest);
 
         // then
-        final String expectedNativeRequest = "{\"native\":{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,"
-                + "\"plcmtcnt\":1,\"assets\":[{\"id\":2,\"required\":1,\"title\":{\"len\":90}},{\"id\":6,"
-                + "\"required\":1,\"img\":{\"type\":3,\"wmin\":128,\"hmin\":128,"
-                + "\"mimes\":[\"image/jpg\",\"image/jpeg\",\"image/png\"]}},"
+        String expectedNativeRequest = "{\"native\":{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,\"plcmtcnt\":1,"
+                + "\"assets\":[{\"id\":2,\"required\":1,\"title\":{\"len\":90}},{\"id\":6,\"required\":1,\"img\":"
+                + "{\"type\":3,\"wmin\":128,\"hmin\":128,\"mimes\":[\"image/jpg\",\"image/jpeg\",\"image/png\"]}},"
                 + "{\"id\":7,\"required\":1,\"data\":{\"type\":2,\"len\":120}}]}}";
 
         assertThat(result.getErrors()).isEmpty();
@@ -157,7 +155,7 @@ public class YeahmobiBidderTest extends VertxTest {
     @Test
     public void makeHttpRequestsShouldNotNativeRequestIfAlreadyExists() {
         // given
-        final String nativeRequest = "{\"native\":{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,\"plcmtcnt\":1,"
+        String nativeRequest = "{\"native\":{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,\"plcmtcnt\":1,"
                 + "\"assets\":[{\"id\":2,\"required\":1,\"title\":{\"len\":90}},{\"id\":6,\"required\":1,"
                 + "\"img\":{\"type\":3,\"wmin\":128,\"hmin\":128,\"mimes\":[\"image/jpg\",\"image/jpeg\","
                 + "\"image/png\"]}},{\"id\":7,\"required\":1,\"data\":{\"type\":2,\"len\":120}}]}}";
@@ -171,10 +169,9 @@ public class YeahmobiBidderTest extends VertxTest {
         final Result<List<HttpRequest<BidRequest>>> result = yeahmobiBidder.makeHttpRequests(bidRequest);
 
         // then
-        final String expectedNativeRequest = "{\"native\":{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,"
-                + "\"plcmtcnt\":1,\"assets\":[{\"id\":2,\"required\":1,\"title\":{\"len\":90}},{\"id\":6,"
-                + "\"required\":1,\"img\":{\"type\":3,\"wmin\":128,\"hmin\":128,"
-                + "\"mimes\":[\"image/jpg\",\"image/jpeg\",\"image/png\"]}},"
+        String expectedNativeRequest = "{\"native\":{\"ver\":\"1.2\",\"context\":1,\"plcmttype\":4,\"plcmtcnt\":1,"
+                + "\"assets\":[{\"id\":2,\"required\":1,\"title\":{\"len\":90}},{\"id\":6,\"required\":1,\"img\":"
+                + "{\"type\":3,\"wmin\":128,\"hmin\":128,\"mimes\":[\"image/jpg\",\"image/jpeg\",\"image/png\"]}},"
                 + "{\"id\":7,\"required\":1,\"data\":{\"type\":2,\"len\":120}}]}}";
 
         assertThat(result.getErrors()).isEmpty();

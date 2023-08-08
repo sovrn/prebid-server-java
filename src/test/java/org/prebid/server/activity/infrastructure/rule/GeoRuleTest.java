@@ -21,7 +21,7 @@ public class GeoRuleTest {
     @Test
     public void allowedShouldReturnExpectedResult() {
         // given
-        final GeoRule rule = new GeoRule(null, null, true, null, null, true);
+        final Rule rule = new GeoRule(null, null, true, null, null, true);
 
         // when
         final boolean allowed = rule.allowed();
@@ -33,7 +33,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnTrueIfComponentTypesIsNull() {
         // given
-        final GeoRule rule = new GeoRule(null, null, true, null, null, true);
+        final Rule rule = new GeoRule(null, null, true, null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.BIDDER, null));
@@ -45,7 +45,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnFalseIfComponentTypesDoesNotContainsArgument() {
         // given
-        final GeoRule rule = new GeoRule(singleton(ComponentType.ANALYTICS), null, true, null, null, true);
+        final Rule rule = new GeoRule(singleton(ComponentType.ANALYTICS), null, true, null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.BIDDER, null));
@@ -57,7 +57,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnTrueIfComponentNamesIsNull() {
         // given
-        final GeoRule rule = new GeoRule(null, null, true, null, null, true);
+        final Rule rule = new GeoRule(null, null, true, null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.ANALYTICS, "componentName"));
@@ -69,7 +69,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnFalseIfComponentNamesDoesNotContainsArgument() {
         // given
-        final GeoRule rule = new GeoRule(null, singleton("other"), true, null, null, true);
+        final Rule rule = new GeoRule(null, singleton("other"), true, null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.ANALYTICS, "componentName"));
@@ -81,7 +81,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnFalseIfSidsDoesNotMatched() {
         // given
-        final GeoRule rule = new GeoRule(null, null, false, null, null, true);
+        final Rule rule = new GeoRule(null, null, false, null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.ANALYTICS, "componentName"));
@@ -93,13 +93,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnTrueIfGeoCodeWithoutRegionMatched() {
         // given
-        final GeoRule rule = new GeoRule(
-                null,
-                null,
-                true,
-                singletonList(GeoRule.GeoCode.of("Country", null)),
-                null,
-                true);
+        final Rule rule = new GeoRule(null, null, true, singletonList(GeoRule.GeoCode.of("Country", null)), null, true);
         final ActivityCallPayload payload = PrivacyEnforcementServiceActivityCallPayload.of(
                 ActivityCallPayloadImpl.of(ComponentType.BIDDER, "bidder"),
                 "country",
@@ -116,13 +110,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnFalseIfCountryDoesNotMatched() {
         // given
-        final GeoRule rule = new GeoRule(
-                null,
-                null,
-                true,
-                singletonList(GeoRule.GeoCode.of("Country", null)),
-                null,
-                true);
+        final Rule rule = new GeoRule(null, null, true, singletonList(GeoRule.GeoCode.of("Country", null)), null, true);
         final ActivityCallPayload payload = PrivacyEnforcementServiceActivityCallPayload.of(
                 ActivityCallPayloadImpl.of(ComponentType.BIDDER, "bidder"),
                 "otherCountry",
@@ -139,7 +127,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnTrueIfGeoCodeMatched() {
         // given
-        final GeoRule rule = new GeoRule(
+        final Rule rule = new GeoRule(
                 null,
                 null,
                 true,
@@ -162,7 +150,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnFalseIfRegionDoesNotMatched() {
         // given
-        final GeoRule rule = new GeoRule(
+        final Rule rule = new GeoRule(
                 null,
                 null,
                 true,
@@ -185,7 +173,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnTrueIfGpcMatched() {
         // given
-        final GeoRule rule = new GeoRule(null, null, true, null, "2", true);
+        final Rule rule = new GeoRule(null, null, true, null, "2", true);
         final ActivityCallPayload payload = BidRequestActivityCallPayload.of(
                 null,
                 BidRequest.builder()
@@ -202,7 +190,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnFalseIfGpcNotMatched() {
         // given
-        final GeoRule rule = new GeoRule(null, null, true, null, "2", true);
+        final Rule rule = new GeoRule(null, null, true, null, "2", true);
         final ActivityCallPayload payload = BidRequestActivityCallPayload.of(
                 null,
                 BidRequest.builder()
@@ -219,7 +207,7 @@ public class GeoRuleTest {
     @Test
     public void matchesShouldReturnExpectedResult() {
         // given
-        final GeoRule rule = new GeoRule(
+        final Rule rule = new GeoRule(
                 singleton(ComponentType.BIDDER),
                 singleton("bidder"),
                 true,

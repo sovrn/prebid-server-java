@@ -130,8 +130,7 @@ public class EnrichingApplicationSettings implements ApplicationSettings {
                             accountPrivacyConfig.getGdpr(),
                             accountPrivacyConfig.getCcpa(),
                             AccountActivitiesConfigurationUtils
-                                    .removeInvalidRules(accountPrivacyConfig.getActivities()),
-                            accountPrivacyConfig.getModules()))
+                                    .removeInvalidRules(accountPrivacyConfig.getActivities())))
                     .build();
         }
 

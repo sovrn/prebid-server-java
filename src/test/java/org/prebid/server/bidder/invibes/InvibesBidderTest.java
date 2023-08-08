@@ -241,7 +241,7 @@ public class InvibesBidderTest extends VertxTest {
                 .formats(Collections.singletonList(secondExpectedFormat))
                 .build());
 
-        final InvibesBidParams expectedBidParams = InvibesBidParams.builder()
+        InvibesBidParams expectedBidParams = InvibesBidParams.builder()
                 .placementIds(Arrays.asList(FIRST_PLACEMENT_ID, SECOND_PLACEMENT_ID))
                 .bidVersion(BID_VERSION)
                 .properties(bidProperties)

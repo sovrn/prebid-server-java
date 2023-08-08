@@ -14,5 +14,4 @@ class AccountPrivacyConfig {
     AccountCcpaConfig ccpa
     @JsonProperty("allowactivities")
     AllowActivities allowActivities
-    List<AccountGppConfig> modules
 }

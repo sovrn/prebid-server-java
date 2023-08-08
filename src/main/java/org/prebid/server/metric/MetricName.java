@@ -2,8 +2,6 @@ package org.prebid.server.metric;
 
 public enum MetricName {
 
-    general,
-
     // connection
     connection_accept_errors,
 

@@ -87,13 +87,14 @@ public class ApplogyBidderTest extends VertxTest {
     @Test
     public void makeHttpRequestsShouldSkipInvalidImpressionAndAddError() {
         // given
-        final ExtPrebid<?, ExtImpApplogy> ext = ExtPrebid.of(null, ExtImpApplogy.of("token1"));
-        final Imp imp = givenImp(
+        ExtPrebid<?, ExtImpApplogy> ext = ExtPrebid.of(null, ExtImpApplogy.of("token1"));
+        Imp imp = givenImp(
                 impBuilder -> impBuilder
                         .banner(null)
                         .id("2")
                         .ext(mapper.valueToTree(ext))
-                        .banner(Banner.builder().w(300).h(400).build()));
+                        .banner(Banner.builder().w(300).h(400).build())
+        );
         final BidRequest bidRequest = BidRequest.builder()
                 .imp(asList(
                         imp,

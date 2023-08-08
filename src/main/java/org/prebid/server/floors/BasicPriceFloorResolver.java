@@ -669,7 +669,7 @@ public class BasicPriceFloorResolver implements PriceFloorResolver {
                                                           List<List<String>> desiredRuleKey,
                                                           String delimiter) {
 
-            final int biggestRuleKeySize = desiredRuleKey.stream().mapToInt(List::size)
+            int biggestRuleKeySize = desiredRuleKey.stream().mapToInt(List::size)
                     .boxed()
                     .max(Integer::compare)
                     .orElse(0);

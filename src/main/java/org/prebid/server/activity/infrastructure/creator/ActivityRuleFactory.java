@@ -3,6 +3,7 @@ package org.prebid.server.activity.infrastructure.creator;
 import org.apache.commons.collections4.CollectionUtils;
 import org.prebid.server.activity.infrastructure.creator.rule.RuleCreator;
 import org.prebid.server.activity.infrastructure.rule.Rule;
+import org.prebid.server.auction.gpp.model.GppContext;
 
 import java.util.List;
 import java.util.Map;
@@ -20,13 +21,13 @@ public class ActivityRuleFactory {
                         Function.identity()));
     }
 
-    public Rule from(Object ruleConfiguration, ActivityControllerCreationContext activityControllerCreationContext) {
+    public Rule from(Object ruleConfiguration, GppContext gppContext) {
         final Class<?> ruleConfigurationClass = ruleConfiguration.getClass();
         final RuleCreator<?> ruleCreator = ruleCreators.get(ruleConfigurationClass);
         if (ruleCreator == null) {
             throw new IllegalStateException("Rule creator for %s not found.".formatted(ruleConfigurationClass));
         }
 
-        return ruleCreator.from(ruleConfiguration, activityControllerCreationContext);
+        return ruleCreator.from(ruleConfiguration, gppContext);
     }
 }

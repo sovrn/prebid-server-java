@@ -81,7 +81,7 @@ public class TappxBidder implements Bidder<BidRequest> {
     }
 
     private static List<Imp> modifyImps(List<Imp> imps, ExtImpTappx extImpTappx) {
-        final List<Imp> modifiedImps = new ArrayList<>(imps);
+        List<Imp> modifiedImps = new ArrayList<>(imps);
         modifiedImps.set(0, modifyImp(imps.get(0), extImpTappx));
 
         return modifiedImps;

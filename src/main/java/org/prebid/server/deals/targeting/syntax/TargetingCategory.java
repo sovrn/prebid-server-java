@@ -80,7 +80,7 @@ public class TargetingCategory {
     }
 
     private static String dropBidderName(String path) {
-        final int index = path.indexOf('.');
+        int index = path.indexOf('.');
         return path.substring(index + 1);
     }
 

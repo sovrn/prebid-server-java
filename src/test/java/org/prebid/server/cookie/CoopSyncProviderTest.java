@@ -48,7 +48,7 @@ public class CoopSyncProviderTest {
         givenCoopSyncProviderWithCoopSyncBidders("valid");
 
         // when
-        final Set<String> result = target.coopSyncBidders(
+        Set<String> result = target.coopSyncBidders(
                 CookieSyncContext.builder().cookieSyncRequest(CookieSyncRequest.builder().coopSync(false).build())
                         .build());
 

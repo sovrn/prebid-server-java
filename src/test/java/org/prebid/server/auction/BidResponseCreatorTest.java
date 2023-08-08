@@ -2916,12 +2916,7 @@ public class BidResponseCreatorTest extends VertxTest {
         final String invalidBidderName = "invalid";
 
         final BidRequest bidRequest = givenBidRequest(Imp.builder()
-                .ext(mapper.valueToTree(
-                        ExtImp.of(ExtImpPrebid.builder()
-                                .bidder(mapper.valueToTree(singletonMap(invalidBidderName, 0)))
-                                .build(),
-                        null)
-                ))
+                .ext(mapper.valueToTree(singletonMap(invalidBidderName, 0)))
                 .build());
 
         final List<BidderResponse> bidderResponses = singletonList(BidderResponse.of("bidder1", givenSeatBid(), 100));

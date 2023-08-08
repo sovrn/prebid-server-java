@@ -2,6 +2,7 @@ package org.prebid.server.activity.infrastructure.creator.rule;
 
 import org.junit.Test;
 import org.prebid.server.activity.ComponentType;
+import org.prebid.server.activity.infrastructure.ActivityInfrastructure;
 import org.prebid.server.activity.infrastructure.payload.impl.ActivityCallPayloadImpl;
 import org.prebid.server.activity.infrastructure.rule.Rule;
 import org.prebid.server.settings.model.activity.rule.AccountActivityComponentRuleConfig;
@@ -22,7 +23,8 @@ public class ComponentRuleCreatorTest {
         final Rule rule = target.from(config, null);
 
         // then
-        assertThat(rule.proceed(null)).isEqualTo(Rule.Result.ALLOW);
+        assertThat(rule.matches(null)).isTrue();
+        assertThat(rule.allowed()).isEqualTo(ActivityInfrastructure.ALLOW_ACTIVITY_BY_DEFAULT);
     }
 
     @Test
@@ -38,7 +40,7 @@ public class ComponentRuleCreatorTest {
         final Rule rule = target.from(config, null);
 
         // then
-        assertThat(rule.proceed(ActivityCallPayloadImpl.of(ComponentType.BIDDER, "name")))
-                .isEqualTo(Rule.Result.DISALLOW);
+        assertThat(rule.matches(ActivityCallPayloadImpl.of(ComponentType.BIDDER, "name"))).isTrue();
+        assertThat(rule.allowed()).isFalse();
     }
 }

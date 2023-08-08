@@ -10,7 +10,7 @@ import org.prebid.server.activity.infrastructure.payload.GpcActivityCallPayload;
 import java.util.List;
 import java.util.Set;
 
-public final class GeoRule extends AbstractMatchRule {
+public final class GeoRule implements Rule {
 
     private final ComponentRule componentRule;
     private final boolean sidsMatched;

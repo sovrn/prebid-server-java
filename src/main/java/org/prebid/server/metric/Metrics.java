@@ -35,6 +35,7 @@ public class Metrics extends UpdatableMetrics {
     private final Function<String, AdapterTypeMetrics> adapterMetricsCreator;
     private final Function<String, AnalyticsReporterMetrics> analyticMetricsCreator;
     private final Function<String, PriceFloorMetrics> priceFloorsMetricsCreator;
+    private final Function<String, AlertsConfigMetrics> alertsMetricsCreator;
     private final Function<Integer, BidderCardinalityMetrics> bidderCardinalityMetricsCreator;
     private final Function<MetricName, CircuitBreakerMetrics> circuitBreakerMetricsCreator;
     private final Function<MetricName, SettingsCacheMetrics> settingsCacheMetricsCreator;
@@ -47,7 +48,7 @@ public class Metrics extends UpdatableMetrics {
     private final Map<String, AdapterTypeMetrics> adapterMetrics;
     private final Map<String, AnalyticsReporterMetrics> analyticMetrics;
     private final Map<String, PriceFloorMetrics> priceFloorsMetrics;
-    private final AlertsConfigMetrics alertsMetrics;
+    private final Map<String, AlertsConfigMetrics> alertsMetrics;
     private final Map<Integer, BidderCardinalityMetrics> bidderCardinailtyMetrics;
     private final UserSyncMetrics userSyncMetrics;
     private final CookieSyncMetrics cookieSyncMetrics;
@@ -77,6 +78,8 @@ public class Metrics extends UpdatableMetrics {
                 metricRegistry, counterType, analyticCode);
         priceFloorsMetricsCreator = moduleType -> new PriceFloorMetrics(
                 metricRegistry, counterType, moduleType);
+        alertsMetricsCreator = account -> new AlertsConfigMetrics(
+                metricRegistry, counterType, account);
         circuitBreakerMetricsCreator = type -> new CircuitBreakerMetrics(metricRegistry, counterType, type);
         settingsCacheMetricsCreator = type -> new SettingsCacheMetrics(metricRegistry, counterType, type);
 
@@ -86,7 +89,7 @@ public class Metrics extends UpdatableMetrics {
         adapterMetrics = new HashMap<>();
         analyticMetrics = new HashMap<>();
         priceFloorsMetrics = new HashMap<>();
-        alertsMetrics = new AlertsConfigMetrics(metricRegistry, counterType);
+        alertsMetrics = new HashMap<>();
         bidderCardinailtyMetrics = new HashMap<>();
         userSyncMetrics = new UserSyncMetrics(metricRegistry, counterType);
         cookieSyncMetrics = new CookieSyncMetrics(metricRegistry, counterType);
@@ -132,8 +135,8 @@ public class Metrics extends UpdatableMetrics {
         return priceFloorsMetrics.computeIfAbsent("general", priceFloorsMetricsCreator);
     }
 
-    AlertsAccountConfigMetric configFailedForAccount(String accountId) {
-        return alertsMetrics.accountConfig(accountId);
+    AlertsConfigMetrics configFailedForAccount(String accountId) {
+        return alertsMetrics.computeIfAbsent(accountId, alertsMetricsCreator);
     }
 
     UserSyncMetrics userSync() {
@@ -326,10 +329,6 @@ public class Metrics extends UpdatableMetrics {
 
     public void updatePriceFloorGeneralAlertsMetric(MetricName result) {
         forPriceFloorGeneralErrors().incCounter(result);
-    }
-
-    public void updateAlertsMetrics(MetricName metricName) {
-        alertsMetrics.incCounter(metricName);
     }
 
     public void updateAlertsConfigFailed(String accountId, MetricName metricName) {

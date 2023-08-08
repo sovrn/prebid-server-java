@@ -474,18 +474,6 @@ public class MetricsTest {
     }
 
     @Test
-    public void updateAlertsMetricsShouldCreateMetricsAsExpected() {
-        // when
-        metrics.updateAlertsMetrics(MetricName.general);
-        metrics.updateAlertsMetrics(MetricName.failed);
-        metrics.updateAlertsMetrics(MetricName.general);
-
-        // then
-        assertThat(metricRegistry.counter("alerts.general").getCount()).isEqualTo(2);
-        assertThat(metricRegistry.counter("alerts.failed").getCount()).isOne();
-    }
-
-    @Test
     public void updateAlertsConfigMetricsShouldCreateMetricsAsExpected() {
         // when
         metrics.updateAlertsConfigFailed("accountId", MetricName.price_floors);

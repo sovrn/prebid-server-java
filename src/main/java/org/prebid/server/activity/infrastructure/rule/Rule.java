@@ -4,14 +4,7 @@ import org.prebid.server.activity.infrastructure.payload.ActivityCallPayload;
 
 public interface Rule {
 
-    Result proceed(ActivityCallPayload activityCallPayload);
+    boolean matches(ActivityCallPayload activityCallPayload);
 
-    enum Result {
-
-        ALLOW,
-
-        DISALLOW,
-
-        ABSTAIN
-    }
+    boolean allowed();
 }

@@ -95,7 +95,7 @@ public class AdtrgtmeBidder implements Bidder<BidRequest> {
     }
 
     private MultiMap makeRequestHeaders(Device device) {
-        final MultiMap headers = HttpUtil.headers();
+        MultiMap headers = HttpUtil.headers();
 
         headers.set(HttpUtil.X_OPENRTB_VERSION_HEADER, X_OPENRTB_VERSION);
         HttpUtil.addHeaderIfValueIsNotEmpty(headers, HttpUtil.USER_AGENT_HEADER,

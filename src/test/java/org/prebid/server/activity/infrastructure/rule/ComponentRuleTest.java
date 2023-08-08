@@ -12,7 +12,7 @@ public class ComponentRuleTest {
     @Test
     public void allowedShouldReturnExpectedResult() {
         // given
-        final ComponentRule rule = new ComponentRule(null, null, true);
+        final Rule rule = new ComponentRule(null, null, true);
 
         // when
         final boolean allowed = rule.allowed();
@@ -24,7 +24,7 @@ public class ComponentRuleTest {
     @Test
     public void matchesShouldReturnTrueIfComponentTypesIsNull() {
         // given
-        final ComponentRule rule = new ComponentRule(null, null, true);
+        final Rule rule = new ComponentRule(null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.BIDDER, null));
@@ -36,7 +36,7 @@ public class ComponentRuleTest {
     @Test
     public void matchesShouldReturnFalseIfComponentTypesDoesNotContainsArgument() {
         // given
-        final ComponentRule rule = new ComponentRule(singleton(ComponentType.ANALYTICS), null, true);
+        final Rule rule = new ComponentRule(singleton(ComponentType.ANALYTICS), null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.BIDDER, null));
@@ -48,7 +48,7 @@ public class ComponentRuleTest {
     @Test
     public void matchesShouldReturnTrueIfComponentNamesIsNull() {
         // given
-        final ComponentRule rule = new ComponentRule(null, null, true);
+        final Rule rule = new ComponentRule(null, null, true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.ANALYTICS, "componentName"));
@@ -60,7 +60,7 @@ public class ComponentRuleTest {
     @Test
     public void matchesShouldReturnFalseIfComponentNamesDoesNotContainsArgument() {
         // given
-        final ComponentRule rule = new ComponentRule(null, singleton("other"), true);
+        final Rule rule = new ComponentRule(null, singleton("other"), true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.ANALYTICS, "componentName"));
@@ -72,7 +72,7 @@ public class ComponentRuleTest {
     @Test
     public void matchesShouldReturnExpectedResult() {
         // given
-        final ComponentRule rule = new ComponentRule(singleton(ComponentType.BIDDER), singleton("bidder"), true);
+        final Rule rule = new ComponentRule(singleton(ComponentType.BIDDER), singleton("bidder"), true);
 
         // when
         final boolean matches = rule.matches(ActivityCallPayloadImpl.of(ComponentType.BIDDER, "bidder"));

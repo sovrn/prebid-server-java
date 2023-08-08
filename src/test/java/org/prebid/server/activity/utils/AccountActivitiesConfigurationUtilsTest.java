@@ -42,7 +42,7 @@ public class AccountActivitiesConfigurationUtilsTest {
     @Test
     public void isInvalidActivitiesConfigurationShouldReturnFalseIfAccountPrivacyActivitiesNull() {
         // given
-        final Account account = Account.builder().privacy(AccountPrivacyConfig.of(null, null, null, null)).build();
+        final Account account = Account.builder().privacy(AccountPrivacyConfig.of(null, null, null)).build();
 
         // when
         final boolean result = AccountActivitiesConfigurationUtils.isInvalidActivitiesConfiguration(account);
@@ -55,35 +55,31 @@ public class AccountActivitiesConfigurationUtilsTest {
     public void isInvalidActivitiesConfigurationShouldReturnFalseIfConfigurationValid() {
         // given
         final Account account = Account.builder()
-                .privacy(AccountPrivacyConfig.of(
-                        null,
-                        null,
-                        Map.of(
-                                Activity.SYNC_USER, AccountActivityConfiguration.of(null, null),
-                                Activity.CALL_BIDDER, AccountActivityConfiguration.of(null, asList(
-                                        null,
-                                        AccountActivityComponentRuleConfig.of(null, null),
-                                        AccountActivityComponentRuleConfig.of(
-                                                AccountActivityComponentRuleConfig.Condition.of(null, null),
+                .privacy(AccountPrivacyConfig.of(null, null, Map.of(
+                        Activity.SYNC_USER, AccountActivityConfiguration.of(null, null),
+                        Activity.CALL_BIDDER, AccountActivityConfiguration.of(null, asList(
+                                null,
+                                AccountActivityComponentRuleConfig.of(null, null),
+                                AccountActivityComponentRuleConfig.of(
+                                        AccountActivityComponentRuleConfig.Condition.of(null, null),
+                                        null),
+                                AccountActivityComponentRuleConfig.of(
+                                        AccountActivityComponentRuleConfig.Condition.of(
+                                                singletonList(ComponentType.BIDDER), singletonList("bidder")),
+                                        null))),
+                        Activity.MODIFY_UFDP, AccountActivityConfiguration.of(null, asList(
+                                AccountActivityGeoRuleConfig.of(null, null),
+                                AccountActivityGeoRuleConfig.of(
+                                        AccountActivityGeoRuleConfig.Condition.of(null, null, null, null, null),
+                                        null),
+                                AccountActivityGeoRuleConfig.of(
+                                        AccountActivityGeoRuleConfig.Condition.of(
+                                                singletonList(ComponentType.BIDDER),
+                                                singletonList("bidder"),
+                                                null,
+                                                null,
                                                 null),
-                                        AccountActivityComponentRuleConfig.of(
-                                                AccountActivityComponentRuleConfig.Condition.of(
-                                                        singletonList(ComponentType.BIDDER), singletonList("bidder")),
-                                                null))),
-                                Activity.MODIFY_UFDP, AccountActivityConfiguration.of(null, asList(
-                                        AccountActivityGeoRuleConfig.of(null, null),
-                                        AccountActivityGeoRuleConfig.of(
-                                                AccountActivityGeoRuleConfig.Condition.of(null, null, null, null, null),
-                                                null),
-                                        AccountActivityGeoRuleConfig.of(
-                                                AccountActivityGeoRuleConfig.Condition.of(
-                                                        singletonList(ComponentType.BIDDER),
-                                                        singletonList("bidder"),
-                                                        null,
-                                                        null,
-                                                        null),
-                                                null)))),
-                        null))
+                                        null))))))
                 .build();
 
         // when
@@ -97,14 +93,11 @@ public class AccountActivitiesConfigurationUtilsTest {
     public void isInvalidActivitiesConfigurationShouldReturnTrueOnInvalidComponentRule() {
         // given
         final Account account = Account.builder()
-                .privacy(AccountPrivacyConfig.of(
-                        null,
-                        null,
-                        Map.of(Activity.CALL_BIDDER, AccountActivityConfiguration.of(null, singletonList(
+                .privacy(AccountPrivacyConfig.of(null, null, Map.of(
+                        Activity.CALL_BIDDER, AccountActivityConfiguration.of(null, singletonList(
                                 AccountActivityComponentRuleConfig.of(
                                         AccountActivityComponentRuleConfig.Condition.of(emptyList(), emptyList()),
-                                        null)))),
-                        null))
+                                        null))))))
                 .build();
 
         // when
@@ -118,15 +111,12 @@ public class AccountActivitiesConfigurationUtilsTest {
     public void isInvalidActivitiesConfigurationShouldReturnTrueOnInvalidGeoRule() {
         // given
         final Account account = Account.builder()
-                .privacy(AccountPrivacyConfig.of(
-                        null,
-                        null,
-                        Map.of(Activity.CALL_BIDDER, AccountActivityConfiguration.of(null, singletonList(
+                .privacy(AccountPrivacyConfig.of(null, null, Map.of(
+                        Activity.CALL_BIDDER, AccountActivityConfiguration.of(null, singletonList(
                                 AccountActivityGeoRuleConfig.of(
                                         AccountActivityGeoRuleConfig.Condition.of(
                                                 emptyList(), emptyList(), null, null, null),
-                                        null)))),
-                        null))
+                                        null))))))
                 .build();
 
         // when

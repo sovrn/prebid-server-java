@@ -33,7 +33,7 @@ public class ActivityInfrastructureTest {
     public final MockitoRule mockitoRule = MockitoJUnit.rule();
 
     @Mock
-    private ActivityController activityController;
+    private ActivityConfiguration activityConfiguration;
 
     @Mock
     private Metrics metrics;
@@ -44,7 +44,7 @@ public class ActivityInfrastructureTest {
         assertThatExceptionOfType(AssertionError.class)
                 .isThrownBy(() -> new ActivityInfrastructure(
                         "accountId",
-                        Map.of(Activity.CALL_BIDDER, activityController),
+                        Map.of(Activity.CALL_BIDDER, activityConfiguration),
                         TraceLevel.basic,
                         metrics));
     }
@@ -52,7 +52,7 @@ public class ActivityInfrastructureTest {
     @Test
     public void isAllowedShouldReturnTrueAndUpdateMetrics() {
         // given
-        given(activityController.isAllowed(argThat(arg -> arg.componentType().equals(ComponentType.BIDDER))))
+        given(activityConfiguration.isAllowed(argThat(arg -> arg.componentType().equals(ComponentType.BIDDER))))
                 .willReturn(ActivityCallResult.of(true, 3));
 
         final ActivityInfrastructure infrastructure = activityInfrastructure(TraceLevel.verbose);
@@ -74,7 +74,7 @@ public class ActivityInfrastructureTest {
     @Test
     public void isAllowedShouldNotUpdateMetricsIfAllowedAndZeroProcessedRules() {
         // given
-        given(activityController.isAllowed(any()))
+        given(activityConfiguration.isAllowed(any()))
                 .willReturn(ActivityCallResult.of(true, 0));
 
         final ActivityInfrastructure infrastructure = activityInfrastructure(TraceLevel.basic);
@@ -94,7 +94,7 @@ public class ActivityInfrastructureTest {
     @Test
     public void isAllowedShouldUpdateExpectedMetricsIfDisallowedAndTraceLevelIsBasic() {
         // given
-        given(activityController.isAllowed(any()))
+        given(activityConfiguration.isAllowed(any()))
                 .willReturn(ActivityCallResult.of(false, 1));
 
         final ActivityInfrastructure infrastructure = activityInfrastructure(TraceLevel.basic);
@@ -114,7 +114,7 @@ public class ActivityInfrastructureTest {
     @Test
     public void isAllowedShouldUpdateExpectedMetricsIfDisallowedAndTraceLevelIsVerbose() {
         // given
-        given(activityController.isAllowed(any()))
+        given(activityConfiguration.isAllowed(any()))
                 .willReturn(ActivityCallResult.of(false, 1));
 
         final ActivityInfrastructure infrastructure = activityInfrastructure(TraceLevel.verbose);
@@ -137,7 +137,7 @@ public class ActivityInfrastructureTest {
                 Arrays.stream(Activity.values())
                         .collect(Collectors.toMap(
                                 UnaryOperator.identity(),
-                                key -> activityController)),
+                                key -> activityConfiguration)),
                 traceLevel,
                 metrics);
     }
