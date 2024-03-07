@@ -159,7 +159,7 @@ public class SovrnBidderTest extends VertxTest {
                 .extracting(SovrnBidderTest::mappedToBidRequest)
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBidfloor, Imp::getTagid, e -> e.getExt().get("adunitcode"))
-                .containsExactly(tuple(BigDecimal.TEN, "tagid", mapper.valueToTree("sovrn_auc")));
+                .containsExactly(tuple(null, "tagid", mapper.valueToTree("sovrn_auc")));
     }
 
     @Test
@@ -185,7 +185,7 @@ public class SovrnBidderTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
                 .id("impId")
-                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "legacyTagId", null, null)))));
+                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "legacyTagId", null)))));
 
         // when
         final Result<List<HttpRequest<BidRequest>>> result = target.makeHttpRequests(bidRequest);
@@ -205,7 +205,7 @@ public class SovrnBidderTest extends VertxTest {
         // given
         final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
                 .id("impId")
-                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "legacyTagId", null, " ")))));
+                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "legacyTagId", " ")))));
 
         // when
         final Result<List<HttpRequest<BidRequest>>> result = target.makeHttpRequests(bidRequest);
@@ -221,7 +221,7 @@ public class SovrnBidderTest extends VertxTest {
     }
 
     @Test
-    public void makeHttpRequestsShouldSetBidFloorFromExtIfImpBidFloorIsZero() {
+    public void makeHttpRequestsShouldNotSetBidFloorIfImpBidFloorIsZero() {
         // given
         final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
                 .banner(Banner.builder().format(singletonList(Format.builder().w(200).h(300).build()))
@@ -239,28 +239,54 @@ public class SovrnBidderTest extends VertxTest {
                 .extracting(SovrnBidderTest::mappedToBidRequest)
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBidfloor)
-                .containsExactly(BigDecimal.TEN);
+                .containsOnlyNulls();
     }
 
     @Test
-    public void makeHttpRequestsShouldSetBidFloorFromExtIfImpBidFloorIsMissed() {
+    public void makeHttpRequestsShouldNotSetBidFloorIfImpBidFloorIsNegative() {
         // given
-        final BidRequest bidRequest = givenBidRequest(identity());
+        final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
+                .banner(Banner.builder().format(singletonList(Format.builder().w(200).h(300).build()))
+                        .w(200)
+                        .h(300)
+                        .build())
+                .bidfloor(BigDecimal.valueOf(-1d)));
 
         // when
         final Result<List<HttpRequest<BidRequest>>> result = target.makeHttpRequests(bidRequest);
 
         // then
-        assertThat(result.getValue()).hasSize(1)
+        assertThat(result.getValue())
                 .extracting(HttpRequest::getBody)
                 .extracting(SovrnBidderTest::mappedToBidRequest)
                 .flatExtracting(BidRequest::getImp)
                 .extracting(Imp::getBidfloor)
-                .containsExactly(BigDecimal.TEN);
+                .containsOnlyNulls();
     }
 
     @Test
-    public void makeHttpRequestsShouldNotSetBidFloorFromExtIfImpBidFloorIsValid() {
+    public void makeHttpRequestsShouldNotSetBidFloorIfImpBidFloorIsNotSet() {
+        // given
+        final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
+                .banner(Banner.builder().format(singletonList(Format.builder().w(200).h(300).build()))
+                        .w(200)
+                        .h(300)
+                        .build()));
+
+        // when
+        final Result<List<HttpRequest<BidRequest>>> result = target.makeHttpRequests(bidRequest);
+
+        // then
+        assertThat(result.getValue())
+                .extracting(HttpRequest::getBody)
+                .extracting(SovrnBidderTest::mappedToBidRequest)
+                .flatExtracting(BidRequest::getImp)
+                .extracting(Imp::getBidfloor)
+                .containsOnlyNulls();
+    }
+
+    @Test
+    public void makeHttpRequestsShouldSetBidFloorIfImpBidFloorIsValid() {
         // given
         final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
                 .banner(Banner.builder().format(singletonList(Format.builder().w(200).h(300).build()))
@@ -340,7 +366,7 @@ public class SovrnBidderTest extends VertxTest {
                         .w(200)
                         .h(300)
                         .build())
-                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "legacyTagId", null, null)))));
+                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "legacyTagId", null)))));
 
         // when
         final Result<List<HttpRequest<BidRequest>>> result = target.makeHttpRequests(bidRequest);
@@ -395,7 +421,7 @@ public class SovrnBidderTest extends VertxTest {
     public void makeHttpRequestsShouldSkipImpAndAddErrorIfRequestNotContainsBothTagidAndLegacyTagid() {
         // given
         final BidRequest bidRequest = givenBidRequest(impBuilder -> impBuilder
-                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "", null, null)))));
+                .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of(null, "", null)))));
 
         // when
         final Result<List<HttpRequest<BidRequest>>> result = target.makeHttpRequests(bidRequest);
@@ -545,7 +571,7 @@ public class SovrnBidderTest extends VertxTest {
                                 .protocols(singletonList(1))
                                 .build())
                         .ext(mapper.valueToTree(ExtPrebid.of(null, ExtImpSovrn.of("tagid",
-                                "legacyTagId", BigDecimal.TEN, "sovrn_auc")))))
+                                "legacyTagId", "sovrn_auc")))))
                 .build();
     }
 

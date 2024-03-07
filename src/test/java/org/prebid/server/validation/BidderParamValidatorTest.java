@@ -180,7 +180,7 @@ public class BidderParamValidatorTest extends VertxTest {
     @Test
     public void validateShouldNotReturnValidationMessagesWhenSovrnImpExtIsOk() {
         // given
-        final ExtImpSovrn ext = ExtImpSovrn.of("tag", null, null, null);
+        final ExtImpSovrn ext = ExtImpSovrn.of("tag", null, null);
 
         final JsonNode node = mapper.convertValue(ext, JsonNode.class);
 

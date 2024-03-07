@@ -89,7 +89,7 @@ public class SovrnBidder implements Bidder<BidRequest> {
         final ExtImpSovrn sovrnExt = parseExtImpSovrn(impExt);
 
         return imp.toBuilder()
-                .bidfloor(resolveBidFloor(imp.getBidfloor(), sovrnExt.getBidfloor()))
+                .bidfloor(resolveBidFloor(imp.getBidfloor()))
                 .tagid(resolveTagId(sovrnExt))
                 .ext(resolveImpExt(sovrnExt, impExt))
                 .build();
@@ -103,10 +103,10 @@ public class SovrnBidder implements Bidder<BidRequest> {
         }
     }
 
-    private static BigDecimal resolveBidFloor(BigDecimal impBidFloor, BigDecimal extBidFloor) {
-        return !BidderUtil.isValidPrice(impBidFloor) && BidderUtil.isValidPrice(extBidFloor)
-                ? extBidFloor
-                : impBidFloor;
+    private static BigDecimal resolveBidFloor(BigDecimal impBidFloor) {
+        return BidderUtil.isValidPrice(impBidFloor)
+                ? impBidFloor
+                : null;
     }
 
     private String resolveTagId(ExtImpSovrn sovrnExt) {
